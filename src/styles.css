@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full bg-black text-white font-mono text-sm;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  input::placeholder {
+    color: #666666;
+  }
+}
+
+@layer components {
+  /* Native dual-range slider thumb styling (can't be expressed purely with utilities) */
+  .dual-input {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    pointer-events: none;
+  }
+  .dual-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    background: #ffffff;
+    border: 1px solid #000000;
+    border-radius: 50%;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .dual-input::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    background: #ffffff;
+    border: 1px solid #000000;
+    border-radius: 50%;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .dual-input:disabled::-webkit-slider-thumb,
+  .dual-input:disabled::-moz-range-thumb {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
