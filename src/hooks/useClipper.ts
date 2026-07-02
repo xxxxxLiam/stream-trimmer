@@ -166,6 +166,14 @@ export function useClipper() {
     return rangeTranscript.filter((l) => l.text.toLowerCase().includes(q));
   }, [rangeTranscript, transcriptQuery]);
 
+  // Full transcript view (search narrows; range only highlights).
+  const displayTranscript = useMemo(() => {
+    if (!transcript) return [];
+    const q = transcriptQuery.trim().toLowerCase();
+    if (!q) return transcript;
+    return transcript.filter((l) => l.text.toLowerCase().includes(q));
+  }, [transcript, transcriptQuery]);
+
   const rangeTranscriptText = useMemo(
     () => rangeTranscript.map((l) => l.text).join(" "),
     [rangeTranscript],
@@ -269,6 +277,7 @@ export function useClipper() {
     transcript,
     rangeTranscript,
     filteredTranscript,
+    displayTranscript,
     transcriptQuery,
     setTranscriptQuery,
     setStartFromLine,
