@@ -1,34 +1,45 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+/**
+ * File: useClipper.ts
+ * Path: src/hooks/useClipper.ts
+ * Description: Central clipper state — URL, info, range, format/quality, transcript, download.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   MAX_CLIP_SECONDS,
   formatTimestamp,
   parseTimestamp,
   extractVideoId,
   parseJson,
-} from "../lib/clip.js";
+  type ClipFormat,
+  type TranscriptLine,
+  type TranscriptResponse,
+  type VideoInfo,
+} from "../lib/clip";
 
-// Quality options swap based on the chosen output format.
-export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"];
-export const AUDIO_QUALITIES = ["320", "192", "128"];
+export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
+export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
+
+export type Quality =
+  | (typeof VIDEO_QUALITIES)[number]
+  | (typeof AUDIO_QUALITIES)[number];
 
 export function useClipper() {
   const [url, setUrl] = useState("");
-  const [info, setInfo] = useState(null);
+  const [info, setInfo] = useState<VideoInfo | null>(null);
   const [startText, setStartText] = useState("");
   const [endText, setEndText] = useState("");
-  const [format, setFormat] = useState("mp4"); // "mp4" | "mp3"
-  const [quality, setQuality] = useState("best");
+  const [format, setFormat] = useState<ClipFormat>("mp4");
+  const [quality, setQuality] = useState<string>("best");
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
 
-  // Transcript state
   const [showTranscript, setShowTranscript] = useState(false);
-  const [transcript, setTranscript] = useState(null); // null = not loaded, [] = none
+  const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
 
   const videoId = useMemo(() => extractVideoId(url), [url]);
-  const duration = info?.duration || 0;
+  const duration = info?.duration ?? 0;
 
   const start = useMemo(() => {
     const parsed = parseTimestamp(startText);
@@ -60,33 +71,18 @@ export function useClipper() {
 
   // Keep quality valid when switching format (resolutions vs bitrates).
   useEffect(() => {
-    const allowed = format === "mp3" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
+    const allowed: readonly string[] =
+      format === "mp3" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
     if (!allowed.includes(quality)) setQuality(allowed[0]);
   }, [format, quality]);
-
-  // Seamless load: auto-fetch info as soon as a valid YouTube URL is present, debounced.
-  const debounceRef = useRef(null);
-  useEffect(() => {
-    if (!videoId) {
-      setInfo(null);
-      return;
-    }
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      loadInfo();
-    }, 400);
-    return () => clearTimeout(debounceRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId]);
 
   // Reset transcript whenever the video changes.
   useEffect(() => {
     setTranscript(null);
     setShowTranscript(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId]);
 
-  async function pasteInto(setter) {
+  const pasteInto = useCallback(async (setter: (v: string) => void) => {
     try {
       const text = await navigator.clipboard.readText();
       setter(text.trim());
@@ -95,16 +91,18 @@ export function useClipper() {
         "Couldn't read clipboard. Paste manually or allow clipboard access.",
       );
     }
-  }
+  }, []);
 
-  function setStartFromSeconds(value) {
-    setStartText(formatTimestamp(Math.min(value, end - 1)));
-  }
-  function setEndFromSeconds(value) {
-    setEndText(formatTimestamp(Math.max(value, start + 1)));
-  }
+  const setStartFromSeconds = useCallback(
+    (value: number) => setStartText(formatTimestamp(Math.min(value, end - 1))),
+    [end],
+  );
+  const setEndFromSeconds = useCallback(
+    (value: number) => setEndText(formatTimestamp(Math.max(value, start + 1))),
+    [start],
+  );
 
-  async function loadInfo() {
+  const loadInfo = useCallback(async () => {
     if (!url) return;
     setError("");
     setLoadingInfo(true);
@@ -114,20 +112,20 @@ export function useClipper() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data = await parseJson(res);
+      const data = await parseJson<VideoInfo & { error?: string }>(res);
       if (!res.ok) throw new Error(data.error || "Failed to load video info");
       setInfo(data);
       setStartText("");
       setEndText(formatTimestamp(Math.min(data.duration, MAX_CLIP_SECONDS)));
     } catch (e) {
-      setError(e.message || "Failed to load video info");
+      setError(e instanceof Error ? e.message : "Failed to load video info");
       setInfo(null);
     } finally {
       setLoadingInfo(false);
     }
-  }
+  }, [url]);
 
-  async function loadTranscript() {
+  const loadTranscript = useCallback(async () => {
     if (!url) return;
     setLoadingTranscript(true);
     try {
@@ -136,22 +134,23 @@ export function useClipper() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data = await parseJson(res);
+      const data = await parseJson<TranscriptResponse>(res);
       setTranscript(data.available ? data.lines : []);
     } catch {
       setTranscript([]);
     } finally {
       setLoadingTranscript(false);
     }
-  }
+  }, [url]);
 
-  function toggleTranscript() {
-    const next = !showTranscript;
-    setShowTranscript(next);
-    if (next && transcript === null) loadTranscript(); // fetch on first open
-  }
+  const toggleTranscript = useCallback(() => {
+    setShowTranscript((prev) => {
+      const next = !prev;
+      if (next && transcript === null) void loadTranscript();
+      return next;
+    });
+  }, [transcript, loadTranscript]);
 
-  // Lines overlapping the selected range (re-filters live as start/end change).
   const rangeTranscript = useMemo(() => {
     if (!transcript) return [];
     return transcript.filter((l) => l.end > start && l.start < end);
@@ -162,15 +161,15 @@ export function useClipper() {
     [rangeTranscript],
   );
 
-  async function copyTranscript() {
+  const copyTranscript = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(rangeTranscriptText);
     } catch {
       setError("Couldn't copy. Select the text and copy manually.");
     }
-  }
+  }, [rangeTranscriptText]);
 
-  async function download() {
+  const download = useCallback(async () => {
     if (!info) {
       setError("Load a video first");
       return;
@@ -188,7 +187,9 @@ export function useClipper() {
         body: JSON.stringify({ url, start, end, format, quality }),
       });
       if (!res.ok) {
-        const data = await parseJson(res).catch(() => ({}));
+        const data = await parseJson<{ error?: string }>(res).catch(
+          () => ({}) as { error?: string },
+        );
         throw new Error(data.error || "Download failed");
       }
       const blob = await res.blob();
@@ -202,11 +203,11 @@ export function useClipper() {
       a.remove();
       URL.revokeObjectURL(objectUrl);
     } catch (e) {
-      setError(e.message || "Download failed");
+      setError(e instanceof Error ? e.message : "Download failed");
     } finally {
       setDownloading(false);
     }
-  }
+  }, [info, validationError, url, start, end, format, quality]);
 
   return {
     url,
@@ -233,7 +234,6 @@ export function useClipper() {
     pasteInto,
     setStartFromSeconds,
     setEndFromSeconds,
-    // transcript
     showTranscript,
     toggleTranscript,
     loadingTranscript,
@@ -243,3 +243,5 @@ export function useClipper() {
     copyTranscript,
   };
 }
+
+export type ClipperState = ReturnType<typeof useClipper>;

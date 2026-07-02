@@ -1,6 +1,40 @@
+/**
+ * File: clip.ts
+ * Path: src/lib/clip.ts
+ * Description: Shared client-side helpers and API types for the clipper.
+ */
 export const MAX_CLIP_SECONDS = 600;
 
-export function formatTimestamp(seconds) {
+export type ClipFormat = "mp4" | "mp3";
+
+export interface VideoInfo {
+  id: string;
+  title: string;
+  duration: number;
+  thumbnail?: string;
+}
+
+export interface TranscriptLine {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface TranscriptResponse {
+  lines: TranscriptLine[];
+  available: boolean;
+  note?: string;
+}
+
+export interface DownloadRequest {
+  url: string;
+  start: number;
+  end: number;
+  format: ClipFormat;
+  quality: string;
+}
+
+export function formatTimestamp(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds || 0));
   const hh = String(Math.floor(s / 3600)).padStart(2, "0");
   const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
@@ -9,7 +43,7 @@ export function formatTimestamp(seconds) {
 }
 
 // Parse "HH:MM:SS", "MM:SS", or bare "SS" into seconds. Returns null if invalid.
-export function parseTimestamp(text) {
+export function parseTimestamp(text: string | null | undefined): number | null {
   if (text == null) return null;
   const t = String(text).trim();
   if (t === "") return null;
@@ -22,7 +56,7 @@ export function parseTimestamp(text) {
   return null;
 }
 
-export function extractVideoId(url) {
+export function extractVideoId(url: string): string | null {
   try {
     const u = new URL(url);
     if (u.hostname.includes("youtu.be")) return u.pathname.slice(1) || null;
@@ -36,10 +70,10 @@ export function extractVideoId(url) {
   }
 }
 
-export async function parseJson(response) {
+export async function parseJson<T = unknown>(response: Response): Promise<T> {
   const ct = response.headers.get("content-type") || "";
   if (!ct.includes("application/json")) {
     throw new Error("Backend not reachable. Run `npm run dev` locally.");
   }
-  return response.json();
+  return response.json() as Promise<T>;
 }
