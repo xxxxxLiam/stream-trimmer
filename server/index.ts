@@ -185,6 +185,7 @@ app.post("/api/info", async (req: Request, res: Response) => {
       title: info.title,
       duration: info.duration,
       thumbnail: info.thumbnail,
+      bitrates: computeBitrates(info),
     });
   } catch (e) {
     res.status(400).json({ error: errMessage(e) || "yt-dlp failed" });
