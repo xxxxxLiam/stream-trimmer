@@ -1,42 +1,55 @@
-# Plan — 4 improvements
 
 ## Analysis
 
-**Jump bug**: `handleRowJump` in `PreviewPanel.tsx` calls `setTranscriptQuery("")` then a `requestAnimationFrame` scroll. When search is active, `displayTranscript` was filtered, so `rowRefs.current[index]` points to the wrong element (or is remounted after query clear). Result: it scrolls to top.
-
-**Download flow**: `useClipper.download()` does one `fetch('/api/download')`, awaits the blob, then triggers an `<a download>`. Backend `/api/download` awaits `yt.run(...)` then streams the file. No progress signal exists — overlay is a spinner.
-
-**Filename**: server sets `clip-<hex>.<ext>`; client's `<a download>` overrides with `clip-HHMMSS-HHMMSS.<ext>`. Title unused.
-
-**Save destination**: browser uses anchor download (Downloads folder). Electron: no IPC for dialogs yet; preload only exposes `__API_BASE__`.
+- **Packaged app fails, terminal works** → environment gap. Terminal has `deno` on PATH; packaged Electron spawns yt-dlp with a stripped PATH, so yt-dlp's `[jsc:deno]` step can't solve YouTube's JS challenge and exits with a non-zero code. The generic "yt-dlp failed" message hides the real stderr.
+- **Real errors hidden** → `errMessage()` exists but the `exec` path in `/api/download` only rejects with `"yt-dlp exited with code N"`; stderr is consumed by the progress parser and never captured for the error path.
+- **MP4 that's actually WebM** → format string `bv*+ba/b` lets yt-dlp pick AV1 (`.webm`) + Opus; muxing into `.mp4` yields a mislabeled/broken file on some players. Need MP4-first codec preference (H.264/AVC + AAC) with graceful fallback and matching container.
+- **Shorts** → `extractVideoId` already recognizes `shorts`, but yt-dlp URL and the preview iframe use the raw URL; normalizing to `watch?v=ID` avoids edge cases in both places.
+- **Preview iframe "Error 150"** → embedding disabled by owner. It's a preview-only signal and must not look like a download error.
 
 ## Action plan
 
-1. **Jump fix** (`PreviewPanel.tsx`): introduce `pendingScrollId` state; on row click set it and clear search; a `useEffect` watching `pendingScrollId` + `transcriptQuery === ""` runs after re-render, resolves the row via a stable id→ref map, `scrollIntoView({block:"center"})`, triggers the flash, clears `pendingScrollId`.
+1. **Bundle deno with the app** so yt-dlp can solve JS challenges offline.
+   - `scripts/bundle-binaries.cjs`: download the correct deno release for the target platform (darwin-x64/arm64, win32-x64, linux-x64) into `resources/bin/deno[.exe]`. Cache in `resources/bin/.cache/` to avoid re-downloading. chmod +x on unix.
+   - `electron/main.cjs`: before starting the backend, prepend `<resources>/bin` to `process.env.PATH` so any child process (yt-dlp) inherits it and finds `deno`.
+   - `server/index.ts`: also prepend `resources/bin` to PATH when running under Electron (defense in depth), and pass it explicitly to yt-dlp child env.
+   - Bump `yt-dlp` bundling to always fetch the latest release binary in `bundle-binaries.cjs` (replace `youtube-dl-exec`'s stale bundled binary with a fresh download from the yt-dlp GitHub releases). Cache by version tag.
 
-2. **Download progress**:
-   - Backend: assign `jobId`, register in-memory `Map<jobId, {clients:Response[], percent, phase}>`. Add `GET /api/download/progress?jobId=…` (SSE). In `/api/download`, spawn yt-dlp via `create(...).exec(url, opts)` returning a `ChildProcess`; parse stderr/stdout `[download]\s+(\d+\.\d+)%`. Emit progress. When yt-dlp exits, set `phase:"processing"`, then stream file and emit `phase:"done"` on stream close. Normalize multi-pass: track max percent, reset detection via "Destination:" line resets not needed — clamp monotonic-per-pass then compute `overall = 0.5*firstPass + 0.5*secondPass` or simpler: run count passes and map. Simpler: just show latest percent and let it "reset"; use monotonic max across the whole job for the bar.
-   - Client: `useClipper.download()` generates a `jobId` (crypto.randomUUID), opens `EventSource` before POSTing, updates `downloadProgress`+`downloadPhase`, closes ES when done or on error.
-   - UI: `OverlayLoader` gains optional `progress` (0-100) + `phase` ("downloading"|"processing"|"done"); renders determinate bar or shimmer for processing.
+2. **Surface real yt-dlp errors** in `server/index.ts`:
+   - In `/api/download`, capture the tail of stderr while parsing progress; on non-zero exit reject with the trimmed stderr (last ~40 lines).
+   - `/api/info` and `/api/transcript` already use `errMessage`; ensure the message includes stderr from `youtube-dl-exec` errors (it does — verify).
+   - Log the actual command failure to the Electron main-process console so packaged-app diagnostics are visible in the OS log.
 
-3. **Filename**:
-   - Add `sanitizeFilename(title)` in `src/lib/clip.ts`: strip `/\\:*?"<>|`, collapse whitespace, trim to 120 chars, fallback `clip`.
-   - Build `${safe} [${hhmmss(start)}-${hhmmss(end)}].${ext}` with `:`→`-`.
-   - Use for browser anchor and Electron save default.
+3. **Real MP4 selection** in `/api/download`:
+   - For `mp4`, use: `bestvideo[ext=mp4][vcodec^=avc1][height<=CAP]+bestaudio[ext=m4a]/best[ext=mp4][height<=CAP]/best[height<=CAP]` (drop the height clause when quality is `best`).
+   - Keep `mergeOutputFormat: "mp4"`.
+   - MP3 path unchanged.
 
-4. **Destination selector**:
-   - `electron/preload.cjs`: `contextBridge.exposeInMainWorld('electronAPI', { pickDirectory, saveFile, isElectron:true })`.
-   - `electron/main.cjs`: `ipcMain.handle('dialog:pickDirectory', ...)` → `dialog.showOpenDialog({properties:['openDirectory']})`. `ipcMain.handle('file:save', async (_e, {dirPath, filename, arrayBuffer}) => fs.writeFile(...))`.
-   - New component `DestinationSelector.tsx` in the form column: shows chosen folder (persisted in `localStorage` key `clipper.saveDir`), "Change…" button. Hidden in browser (no `window.electronAPI`).
-   - `useClipper.download()`: if `window.electronAPI?.isElectron` → fetch blob → `arrayBuffer()` → `electronAPI.saveFile({dirPath, filename, arrayBuffer})`. Else → anchor download with sanitized filename.
+4. **Shorts + URL normalization** in `src/lib/clip.ts`:
+   - Add `normalizeYouTubeUrl(url)` → converts `youtube.com/shorts/ID`, `m.youtube.com/shorts/ID`, `youtu.be/ID` to canonical `https://www.youtube.com/watch?v=ID` (preserves `t=` if present).
+   - `useClipper`: normalize before calling `/api/info` and `/api/download`.
+   - `PreviewPanel`: iframe already uses `videoId`, no change needed, but confirm `extractVideoId` handles `shorts`.
+   - Server `urlSchema`: keep permissive YouTube host check; normalization happens client-side.
 
-## Technical details
+5. **Graceful preview when embed is blocked** in `PreviewPanel.tsx`:
+   - Attach `onError` and a `postMessage` listener for YouTube iframe API error 150/101; on error, replace iframe with a small "Preview unavailable — video owner disabled embedding. Download still works." card. Text is clearly separate from download state.
 
-- Backend progress state cleaned up on job completion (setTimeout 30s).
-- SSE headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`; flush after each write.
-- yt-dlp progress via `youtube-dl-exec` `exec()` (non-promise) — subscribe to `child.stderr.on('data')` and `child.stdout.on('data')`. Match `/(\d+(?:\.\d+)?)%/`.
-- Multi-pass normalization: track `passCount` incremented on each "Destination:" line; `overall = ((passCount-1) + latestPercent/100) / expectedPasses` where `expectedPasses = isAudio || quality==='best' ? 2 : 2` (video+audio). Fall back to raw latest if unsure. Clamp `0..99` until done event.
-- Preload uses `ipcRenderer.invoke` via contextBridge — no nodeIntegration, sandbox remains true. Note: sandbox:true still allows `contextBridge` and `ipcRenderer.invoke` in preload.
-- Verify: click transcript row while searching → search clears, that exact line centers with flash; download shows moving bar → "Finishing up…" → file saves as `Video Title [00:00:10-00:00:30].mp4`; Electron picker opens & persists; browser hides selector.
+6. **Verify** in the packaged app: normal video downloads; MP4 opens in QuickTime/VLC as H.264/AAC; MP3 plays; a Shorts URL fetches info, previews, and clips end-to-end; a forced failure (bad URL) surfaces yt-dlp's real stderr; embed-disabled video shows the preview fallback but downloads succeed.
 
-Proceeding to implementation.
+## Files touched
+
+- `scripts/bundle-binaries.cjs` — add deno download + fresh yt-dlp download.
+- `electron/main.cjs` — prepend `<resources>/bin` to `PATH` before backend start.
+- `server/index.ts` — PATH injection, real stderr on `/api/download`, MP4 format string.
+- `src/lib/clip.ts` — `normalizeYouTubeUrl`, Shorts handling.
+- `src/hooks/useClipper.ts` — call `normalizeYouTubeUrl` before requests.
+- `src/components/PreviewPanel.tsx` — embed-error fallback UI.
+
+## Verification checklist
+
+- Packaged `.dmg`/`.exe` downloads a standard video without needing user-installed deno/yt-dlp/ffmpeg.
+- `ffprobe` on the MP4 output reports `h264` + `aac` in an `mp4` container.
+- MP3 output is valid MPEG audio.
+- `https://youtube.com/shorts/<id>` normalized → info+preview+download all work.
+- Bad URL returns yt-dlp's actual error string in the toast/error panel.
+- Embed-blocked video: preview shows fallback text; download still succeeds.

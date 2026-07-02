@@ -9,6 +9,7 @@ import {
   formatTimestamp,
   parseTimestamp,
   extractVideoId,
+  normalizeYouTubeUrl,
   parseJson,
   estimateBytes,
   apiUrl,
@@ -137,7 +138,7 @@ export function useClipper() {
       const res = await fetch(apiUrl("/api/info"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: normalizeYouTubeUrl(url) }),
       });
       const data = await parseJson<VideoInfo & { error?: string }>(res);
       if (!res.ok) throw new Error(data.error || "Failed to load video info");
@@ -159,7 +160,7 @@ export function useClipper() {
       const res = await fetch(apiUrl("/api/transcript"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: normalizeYouTubeUrl(url) }),
       });
       const data = await parseJson<TranscriptResponse>(res);
       setTranscript(data.available ? data.lines : []);
@@ -275,7 +276,13 @@ export function useClipper() {
         {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, start, end, format, quality }),
+        body: JSON.stringify({
+          url: normalizeYouTubeUrl(url),
+          start,
+          end,
+          format,
+          quality,
+        }),
         },
       );
       if (!res.ok) {

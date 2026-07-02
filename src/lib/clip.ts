@@ -121,6 +121,24 @@ export function extractVideoId(url: string): string | null {
   }
 }
 
+// Normalize any YouTube URL variant (shorts, youtu.be, embed, m.youtube.com)
+// to the canonical https://www.youtube.com/watch?v=ID form. Preserves the
+// `t` (start-time) param when present. Returns the original string if it
+// isn't recognizable so validation still surfaces a clear error.
+export function normalizeYouTubeUrl(url: string): string {
+  const id = extractVideoId(url);
+  if (!id) return url;
+  try {
+    const u = new URL(url);
+    const t = u.searchParams.get("t") || u.searchParams.get("start");
+    const q = new URLSearchParams({ v: id });
+    if (t) q.set("t", t);
+    return `https://www.youtube.com/watch?${q.toString()}`;
+  } catch {
+    return `https://www.youtube.com/watch?v=${id}`;
+  }
+}
+
 export async function parseJson<T = unknown>(response: Response): Promise<T> {
   const ct = response.headers.get("content-type") || "";
   if (!ct.includes("application/json")) {

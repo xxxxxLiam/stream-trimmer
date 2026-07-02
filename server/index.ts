@@ -30,6 +30,17 @@ function packagedBinary(name: string): string | null {
   return fs.existsSync(candidate) ? candidate : null;
 }
 
+// Defense in depth: also prepend resources/bin to PATH here so yt-dlp's
+// [jsc:deno] step can locate the bundled `deno` runtime.
+if (process.env.ELECTRON_RESOURCES) {
+  const binDir = path.join(process.env.ELECTRON_RESOURCES, "bin");
+  const sep = process.platform === "win32" ? ";" : ":";
+  const cur = process.env.PATH || "";
+  if (!cur.split(sep).includes(binDir)) {
+    process.env.PATH = `${binDir}${sep}${cur}`;
+  }
+}
+
 type YtRunner = (url: string, opts: Record<string, unknown>) => Promise<any>;
 type YtExec = (url: string, opts: Record<string, unknown>) => ChildProcess;
 
@@ -386,8 +397,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   const videoFormat =
     quality === "best"
-      ? "bv*+ba/b"
-      : `bv*[height<=${quality}]+ba/b[height<=${quality}]`;
+      ? "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+      : `bestvideo[ext=mp4][vcodec^=avc1][height<=${quality}]+bestaudio[ext=m4a]/best[ext=mp4][height<=${quality}]/best[height<=${quality}]`;
 
   const options: Record<string, unknown> = isAudio
     ? {
@@ -436,11 +447,14 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   try {
     publishProgress(jobId, { phase: "downloading", percent: 0 });
+    let stderrTail = "";
     await new Promise<void>((resolve, reject) => {
       const child = yt!.exec(url, options);
       let buf = "";
       const onChunk = (chunk: Buffer | string) => {
-        buf += chunk.toString();
+        const s = chunk.toString();
+        buf += s;
+        stderrTail = (stderrTail + s).slice(-4000);
         const parts = buf.split(/\r|\n/);
         buf = parts.pop() || "";
         for (const line of parts) updateFromLine(line);
@@ -451,7 +465,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
       child.on("close", (code) => {
         if (buf) updateFromLine(buf);
         if (code === 0) resolve();
-        else reject(new Error(`yt-dlp exited with code ${code}`));
+        else {
+          const tail = stderrTail
+            .split(/\r?\n/)
+            .filter((l) => l.trim() && !/^\[download\]\s+\d/.test(l))
+            .slice(-8)
+            .join("\n")
+            .trim();
+          console.error(`[server] yt-dlp exit ${code}:\n${tail}`);
+          reject(new Error(tail || `yt-dlp exited with code ${code}`));
+        }
       });
     });
 
