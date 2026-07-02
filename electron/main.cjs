@@ -2,10 +2,11 @@
 // backend on a free port, loads the built front-end, and shuts everything
 // down cleanly on quit. No dev server ships; this file is CommonJS because
 // the project's package.json sets "type": "module".
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("node:path");
 const net = require("node:net");
 const fs = require("node:fs");
+const fsp = require("node:fs/promises");
 
 const isDev = process.env.ELECTRON_DEV === "1";
 
@@ -93,6 +94,7 @@ app.whenReady().then(async () => {
   try {
     const port = await startBackend();
     await createWindow(port);
+    registerIpc();
   } catch (err) {
     console.error("[electron] failed to start:", err);
     app.quit();
@@ -112,3 +114,29 @@ app.on("before-quit", () => {
     }
   }
 });
+
+function registerIpc() {
+  ipcMain.handle("dialog:pickDirectory", async () => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: "Choose download folder",
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (res.canceled || res.filePaths.length === 0) return null;
+    return res.filePaths[0];
+  });
+
+  ipcMain.handle("file:save", async (_e, payload) => {
+    try {
+      if (!payload || typeof payload.dirPath !== "string" || typeof payload.filename !== "string") {
+        return { ok: false, error: "Invalid save payload" };
+      }
+      const safeName = payload.filename.replace(/[\\/]/g, "_");
+      const target = path.join(payload.dirPath, safeName);
+      const buf = Buffer.from(payload.data);
+      await fsp.writeFile(target, buf);
+      return { ok: true, path: target };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : "Save failed" };
+    }
+  });
+}
