@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "postinstall": "node scripts/setup.js",
     "setup": "node scripts/setup.js",
@@ -12,7 +13,12 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\""
+    "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\"",
+    "dev:electron": "cross-env ELECTRON_DEV=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"wait-on http://localhost:8080 && electron electron/main.cjs\"",
+    "build:electron": "vite build && node scripts/bundle-binaries.cjs && node scripts/build-server.cjs",
+    "dist:mac": "npm run build:electron && electron-builder --mac dmg",
+    "dist:win": "npm run build:electron && electron-builder --win nsis",
+    "dist:linux": "npm run build:electron && electron-builder --linux AppImage"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",
@@ -38,6 +44,49 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.0"
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "vite": "^5.4.0",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "app.youtubeclipper.local",
+    "productName": "YouTube Clipper",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/*.ts"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": ["**/*"]
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.utilities",
+      "identity": null,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": "nsis",
+      "sign": null
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo"
+    }
   }
 }
