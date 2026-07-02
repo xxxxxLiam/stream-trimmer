@@ -85,7 +85,7 @@ function preflight(): boolean {
 
   if (problems.length === 0) {
     console.log(`[server] yt-dlp ready: ${yt!.source}`);
-    console.log(`[server] ffmpeg ready: ${ffmpegPath}`);
+    console.log(`[server] ffmpeg ready: ${resolvedFfmpeg}`);
     return true;
   }
 
@@ -308,7 +308,7 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
       noPlaylist: true,
       noWarnings: true,
       output: path.join(tempDir, "sub"),
-      ffmpegLocation: ffmpegPath,
+      ffmpegLocation: resolvedFfmpeg,
     });
 
     const files = fs.readdirSync(tempDir);
@@ -386,7 +386,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
         audioFormat: "mp3",
         audioQuality: quality,
         output: outputPath,
-        ffmpegLocation: ffmpegPath,
+        ffmpegLocation: resolvedFfmpeg,
       }
     : {
         downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
@@ -396,7 +396,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
         format: videoFormat,
         mergeOutputFormat: "mp4",
         output: outputPath,
-        ffmpegLocation: ffmpegPath,
+        ffmpegLocation: resolvedFfmpeg,
       };
 
   try {
