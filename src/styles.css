@@ -25,9 +25,41 @@ body,
 .panel {
   width: 100%;
   max-width: 640px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.title {
+  grid-column: 1 / -1;
+}
+
+.url-row,
+.preview-col,
+.controls {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .panel {
+    max-width: 1080px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .url-row {
+    grid-column: 1 / -1;
+  }
+  .controls {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .preview-col {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+  }
 }
 
 h1 {
