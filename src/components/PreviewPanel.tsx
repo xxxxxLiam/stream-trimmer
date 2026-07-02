@@ -12,6 +12,7 @@ import {
   Search,
   ChevronBarLeft,
   ChevronBarRight,
+  ExclamationTriangle,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
 import { formatTimestamp } from "../lib/clip";
@@ -75,6 +76,27 @@ export default function PreviewPanel() {
     setPendingScrollId(lineStart);
     setTranscriptQuery("");
   };
+
+  // Detect embed-blocked videos (Error 150/101) via YT IFrame API postMessage.
+  const [embedBlocked, setEmbedBlocked] = useState(false);
+  useEffect(() => {
+    setEmbedBlocked(false);
+  }, [videoId]);
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      if (typeof e.data !== "string") return;
+      try {
+        const data = JSON.parse(e.data);
+        if (data?.event === "onError" && (data.info === 150 || data.info === 101)) {
+          setEmbedBlocked(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -248,13 +270,25 @@ export default function PreviewPanel() {
               className="absolute inset-0 flex items-center justify-center"
             >
               {videoId ? (
-                <iframe
-                  src={`https://www.youtube.com/embed/${videoId}`}
-                  title="YouTube preview"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="h-full w-full border-0"
-                />
+                embedBlocked ? (
+                  <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center text-fg-muted">
+                    <ExclamationTriangle size={22} className="text-accent" />
+                    <span className="text-[13px] text-fg">Preview unavailable</span>
+                    <span className="text-[12px] text-fg-faint">
+                      The video owner disabled embedded playback. This has no
+                      effect on downloading — clip and download still work.
+                    </span>
+                  </div>
+                ) : (
+                  <iframe
+                    key={videoId}
+                    src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1`}
+                    title="YouTube preview"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="h-full w-full border-0"
+                  />
+                )
               ) : (
                 <div className="flex flex-col items-center gap-2 text-fg-faint">
                   <CameraVideo size={22} />
