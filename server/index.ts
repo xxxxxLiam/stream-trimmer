@@ -6,11 +6,11 @@
  */
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { z } from "zod";
 // youtube-dl-exec ships its own types but they're partial — treat as any for the
 // options object shape while keeping our request/response types precise.
@@ -31,9 +31,11 @@ function packagedBinary(name: string): string | null {
 }
 
 type YtRunner = (url: string, opts: Record<string, unknown>) => Promise<any>;
+type YtExec = (url: string, opts: Record<string, unknown>) => ChildProcess;
 
 interface YtResolved {
   run: YtRunner;
+  exec: YtExec;
   source: string;
 }
 
@@ -41,19 +43,24 @@ interface YtResolved {
 function resolveYtDlp(): YtResolved | null {
   const packaged = packagedBinary("yt-dlp");
   if (packaged) {
+    const inst = create(packaged) as unknown as YtRunner & { exec: YtExec };
     return {
-      run: create(packaged) as unknown as YtRunner,
+      run: inst,
+      exec: inst.exec.bind(inst),
       source: `packaged (${packaged})`,
     };
   }
   const anyMod = ytdlpModule as unknown as {
     binaryPath?: string;
     ytdlp?: { binaryPath?: string };
+    exec?: YtExec;
   };
   const bundled = anyMod.binaryPath || anyMod.ytdlp?.binaryPath;
   if (bundled && fs.existsSync(bundled)) {
+    const inst = ytdlpModule as unknown as YtRunner & { exec: YtExec };
     return {
-      run: ytdlpModule as unknown as YtRunner,
+      run: inst,
+      exec: inst.exec.bind(inst),
       source: `bundled (${bundled})`,
     };
   }
@@ -62,8 +69,10 @@ function resolveYtDlp(): YtResolved | null {
       process.platform === "win32" ? "where yt-dlp" : "command -v yt-dlp";
     const sysPath = execSync(lookup).toString().trim().split("\n")[0];
     if (sysPath && fs.existsSync(sysPath)) {
+      const inst = create(sysPath) as unknown as YtRunner & { exec: YtExec };
       return {
-        run: create(sysPath) as unknown as YtRunner,
+        run: inst,
+        exec: inst.exec.bind(inst),
         source: `system (${sysPath})`,
       };
     }
@@ -342,6 +351,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
   if (!binariesOk) return binaryError(res);
 
   const { url, start, end, format, quality }: DownloadInput = parsed.data;
+  const jobId =
+    typeof req.query.jobId === "string" && req.query.jobId
+      ? req.query.jobId
+      : `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   // Re-probe duration so the cap can't be bypassed by a crafted request.
   try {
@@ -399,27 +412,154 @@ app.post("/api/download", async (req: Request, res: Response) => {
         ffmpegLocation: resolvedFfmpeg,
       };
 
+  const expectedPasses = isAudio ? 1 : 2;
+  let passIdx = 0;
+  let lastPct = 0;
+  const updateFromLine = (line: string) => {
+    if (/^\[download\] Destination:/.test(line) || /Downloading \d+ format/.test(line)) {
+      if (passIdx < expectedPasses) passIdx = Math.min(passIdx + 1, expectedPasses);
+      lastPct = 0;
+    }
+    const m = line.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
+    if (m) {
+      const pct = Math.min(100, Math.max(0, parseFloat(m[1])));
+      if (pct + 5 < lastPct && passIdx < expectedPasses) passIdx = Math.min(passIdx + 1, expectedPasses);
+      lastPct = pct;
+      const base = Math.max(0, passIdx - 1);
+      const overall = Math.min(
+        99,
+        Math.round(((base + pct / 100) / expectedPasses) * 100),
+      );
+      publishProgress(jobId, { phase: "downloading", percent: overall });
+    }
+  };
+
   try {
-    await yt!.run(url, options);
+    publishProgress(jobId, { phase: "downloading", percent: 0 });
+    await new Promise<void>((resolve, reject) => {
+      const child = yt!.exec(url, options);
+      let buf = "";
+      const onChunk = (chunk: Buffer | string) => {
+        buf += chunk.toString();
+        const parts = buf.split(/\r|\n/);
+        buf = parts.pop() || "";
+        for (const line of parts) updateFromLine(line);
+      };
+      child.stdout?.on("data", onChunk);
+      child.stderr?.on("data", onChunk);
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (buf) updateFromLine(buf);
+        if (code === 0) resolve();
+        else reject(new Error(`yt-dlp exited with code ${code}`));
+      });
+    });
 
     if (!fs.existsSync(outputPath)) {
       cleanup();
+      publishProgress(jobId, { phase: "error", percent: 0, message: "no output" });
       return res.status(500).json({ error: "yt-dlp produced no output" });
     }
 
+    publishProgress(jobId, { phase: "processing", percent: 99 });
+
     const stat = fs.statSync(outputPath);
-    const name = `clip-${crypto.randomBytes(4).toString("hex")}.${ext}`;
+    const name = `clip.${ext}`;
     res.setHeader("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
     res.setHeader("Content-Length", stat.size);
     res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
     const stream = fs.createReadStream(outputPath);
     stream.pipe(res);
-    stream.on("close", cleanup);
-    stream.on("error", cleanup);
+    stream.on("close", () => {
+      publishProgress(jobId, { phase: "done", percent: 100 });
+      cleanup();
+    });
+    stream.on("error", () => {
+      publishProgress(jobId, { phase: "error", percent: 0, message: "stream error" });
+      cleanup();
+    });
   } catch (e) {
     cleanup();
+    publishProgress(jobId, { phase: "error", percent: 0, message: errMessage(e) });
     res.status(500).json({ error: errMessage(e) || "Download failed" });
   }
+});
+
+// Progress channel — Server-Sent Events keyed by jobId.
+interface ProgressEvent {
+  phase: "downloading" | "processing" | "done" | "error";
+  percent: number;
+  message?: string;
+}
+
+interface JobChannel {
+  clients: Set<Response>;
+  last: ProgressEvent;
+  cleanupTimer?: NodeJS.Timeout;
+}
+
+const jobs = new Map<string, JobChannel>();
+
+function getOrCreateJob(id: string): JobChannel {
+  let job = jobs.get(id);
+  if (!job) {
+    job = { clients: new Set(), last: { phase: "downloading", percent: 0 } };
+    jobs.set(id, job);
+  }
+  return job;
+}
+
+function publishProgress(id: string, evt: ProgressEvent) {
+  const job = getOrCreateJob(id);
+  job.last = evt;
+  const payload = `data: ${JSON.stringify(evt)}\n\n`;
+  for (const client of job.clients) {
+    try {
+      client.write(payload);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (evt.phase === "done" || evt.phase === "error") {
+    if (job.cleanupTimer) clearTimeout(job.cleanupTimer);
+    job.cleanupTimer = setTimeout(() => {
+      for (const c of job.clients) {
+        try {
+          c.end();
+        } catch {
+          /* ignore */
+        }
+      }
+      jobs.delete(id);
+    }, 5000);
+  }
+}
+
+app.get("/api/download/progress", (req: Request, res: Response) => {
+  const jobId = String(req.query.jobId || "");
+  if (!jobId) return res.status(400).end();
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const job = getOrCreateJob(jobId);
+  job.clients.add(res);
+  res.write(`data: ${JSON.stringify(job.last)}\n\n`);
+
+  const ping = setInterval(() => {
+    try {
+      res.write(": ping\n\n");
+    } catch {
+      /* ignore */
+    }
+  }, 15000);
+
+  req.on("close", () => {
+    clearInterval(ping);
+    job.clients.delete(res);
+  });
 });
 
 app.listen(PORT, () => {
