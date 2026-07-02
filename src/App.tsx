@@ -12,6 +12,7 @@ import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import { formatTimestamp } from "./lib/clip";
+import { formatBytes } from "./lib/clip";
 
 function Meta() {
   const { info, duration, loadingInfo } = useClipperContext();
@@ -70,6 +71,7 @@ function FooterBar() {
     download,
     start,
     end,
+    estimatedBytes,
   } = useClipperContext();
   const disabled = !info || downloading || Boolean(validationError);
   const status = !info
@@ -77,12 +79,24 @@ function FooterBar() {
     : validationError
       ? "Invalid selection"
       : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
+  const sizeLabel =
+    info && !validationError && estimatedBytes > 0
+      ? `~${formatBytes(estimatedBytes)} estimated`
+      : "";
 
   return (
     <div className="flex items-center justify-between border-t border-hairline bg-bg-deep/60 px-4 py-2.5">
       <div className="flex items-center gap-2 text-[12px] text-fg-muted">
         <Scissors size={12} />
         <span>{status}</span>
+        {sizeLabel && (
+          <>
+            <span className="text-fg-faint">·</span>
+            <span className="text-fg-faint" title="Approximate — actual size varies with scene bitrate">
+              {sizeLabel}
+            </span>
+          </>
+        )}
       </div>
       <button
         type="button"
