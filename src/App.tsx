@@ -11,6 +11,7 @@ import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
 import OverlayLoader from "./components/OverlayLoader";
+import DestinationSelector from "./components/DestinationSelector";
 import { formatTimestamp } from "./lib/clip";
 import { formatBytes } from "./lib/clip";
 
@@ -72,13 +73,19 @@ function FooterBar() {
     start,
     end,
     estimatedBytes,
+    isElectron,
+    saveDir,
   } = useClipperContext();
-  const disabled = !info || downloading || Boolean(validationError);
+  const needsSaveDir = isElectron && !saveDir;
+  const disabled =
+    !info || downloading || Boolean(validationError) || needsSaveDir;
   const status = !info
     ? "Ready"
     : validationError
       ? "Invalid selection"
-      : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
+      : needsSaveDir
+        ? "Choose a save folder"
+        : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
   const sizeLabel =
     info && !validationError && estimatedBytes > 0
       ? `~${formatBytes(estimatedBytes)} estimated`
@@ -113,7 +120,13 @@ function FooterBar() {
 }
 
 function Layout() {
-  const { loadingInfo, downloading, loadingTranscript } = useClipperContext();
+  const {
+    loadingInfo,
+    downloading,
+    loadingTranscript,
+    downloadProgress,
+    downloadPhase,
+  } = useClipperContext();
   const overlayVisible = loadingInfo || downloading || loadingTranscript;
   const overlayLabel = downloading
     ? "Downloading clip"
@@ -123,7 +136,12 @@ function Layout() {
 
   return (
     <>
-      <OverlayLoader visible={overlayVisible} label={overlayLabel} />
+      <OverlayLoader
+        visible={overlayVisible}
+        label={overlayLabel}
+        progress={downloading ? downloadProgress : undefined}
+        phase={downloading ? downloadPhase : undefined}
+      />
 
       <main className="flex min-h-screen w-full flex-col bg-panel">
         {/* Title bar */}
@@ -145,6 +163,7 @@ function Layout() {
             <Meta />
             <TimeRangeControls />
             <FormatQualityFields />
+            <DestinationSelector />
             <ErrorBanner />
           </section>
 
