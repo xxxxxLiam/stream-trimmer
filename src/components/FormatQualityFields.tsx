@@ -25,13 +25,12 @@ export default function FormatQualityFields() {
   const qualityOptions =
     format === "mp3" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
 
-  const selectClass =
-    "w-full border border-white bg-black px-3 py-2.5 text-white outline-none disabled:opacity-50";
+  const selectClass = "field appearance-none pr-8 cursor-pointer";
 
   return (
     <div className="flex gap-4">
       <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className="text-xs uppercase tracking-wider opacity-80">
+        <span className="text-[11px] uppercase tracking-wider text-fg-faint">
           Format
         </span>
         <select
@@ -46,7 +45,7 @@ export default function FormatQualityFields() {
       </label>
 
       <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className="text-xs uppercase tracking-wider opacity-80">
+        <span className="text-[11px] uppercase tracking-wider text-fg-faint">
           Quality
         </span>
         <select
