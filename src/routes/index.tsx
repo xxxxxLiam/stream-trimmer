@@ -4,7 +4,7 @@
  * Description: Provides the local YouTube clipper UI and download workflow.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const MAX_CLIP_SECONDS = 600;
 const ONE_SECOND = 1;
@@ -74,7 +74,24 @@ function isVideoInfo(data: unknown): data is VideoInfo {
   );
 }
 
+async function parseJsonOrThrow(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      "Backend not reachable. Run `npm run dev` on your own machine and open http://localhost:5173 — the Lovable preview cannot run yt-dlp or ffmpeg.",
+    );
+  }
+  return response.json();
+}
+
 function YouTubeClipperPage() {
+  const [isLocal, setIsLocal] = useState(true);
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    setIsLocal(host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0");
+  }, []);
+
   const [url, setUrl] = useState("");
   const [info, setInfo] = useState<VideoInfo | null>(null);
   const [start, setStart] = useState(0);
@@ -126,7 +143,7 @@ function YouTubeClipperPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data: unknown = await response.json();
+      const data: unknown = await parseJsonOrThrow(response);
 
       if (!response.ok || hasErrorMessage(data)) {
         throw new Error(hasErrorMessage(data) ? data.error : "Failed to load video info");
@@ -163,8 +180,10 @@ function YouTubeClipperPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || "Download failed");
+        const data = (await parseJsonOrThrow(response).catch((caught) => {
+          throw caught instanceof Error ? caught : new Error("Download failed");
+        })) as { error?: string };
+        throw new Error(data?.error || "Download failed");
       }
 
       const blob = await response.blob();
@@ -188,6 +207,14 @@ function YouTubeClipperPage() {
       <section className="clipper-panel" aria-labelledby="clipper-title">
         <h1 id="clipper-title">YouTube Clipper</h1>
 
+        {!isLocal ? (
+          <div className="clipper-error" role="status">
+            This app requires the local backend (yt-dlp + ffmpeg). Clone the repo, run
+            {" "}<code>npm run dev</code>{" "}on your own machine, and open{" "}
+            <code>http://localhost:5173</code>. The Lovable preview only serves the UI.
+          </div>
+        ) : null}
+
         <input
           type="url"
           placeholder="Paste a YouTube URL"
@@ -199,6 +226,7 @@ function YouTubeClipperPage() {
               fetchInfo();
             }
           }}
+          disabled={!isLocal}
         />
 
         {videoId ? (
@@ -257,7 +285,11 @@ function YouTubeClipperPage() {
         {isLoadingInfo ? <div className="clipper-meta">Loading video info…</div> : null}
         {error ? <div className="clipper-error">{error}</div> : null}
 
-        <button type="button" onClick={downloadClip} disabled={!info || isDownloading || Boolean(validationMessage)}>
+        <button
+          type="button"
+          onClick={downloadClip}
+          disabled={!isLocal || !info || isDownloading || Boolean(validationMessage)}
+        >
           {isDownloading ? "Downloading…" : "Download clip"}
         </button>
       </section>
