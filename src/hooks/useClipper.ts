@@ -12,6 +12,7 @@ import {
   parseJson,
   estimateBytes,
   apiUrl,
+  buildClipFilename,
   type ClipFormat,
   type TranscriptLine,
   type TranscriptResponse,
@@ -34,12 +35,34 @@ export function useClipper() {
   const [quality, setQuality] = useState<string>("best");
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadPhase, setDownloadPhase] = useState<
+    "idle" | "downloading" | "processing" | "done" | "error"
+  >("idle");
   const [error, setError] = useState("");
 
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [transcriptQuery, setTranscriptQuery] = useState("");
+
+  const isElectron =
+    typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
+  const [saveDir, setSaveDirState] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("clipper.saveDir");
+  });
+  const setSaveDir = useCallback((dir: string | null) => {
+    setSaveDirState(dir);
+    if (typeof window === "undefined") return;
+    if (dir) window.localStorage.setItem("clipper.saveDir", dir);
+    else window.localStorage.removeItem("clipper.saveDir");
+  }, []);
+  const pickSaveDir = useCallback(async () => {
+    if (!window.electronAPI) return;
+    const chosen = await window.electronAPI.pickDirectory();
+    if (chosen) setSaveDir(chosen);
+  }, [setSaveDir]);
 
   const videoId = useMemo(() => extractVideoId(url), [url]);
   const duration = info?.duration ?? 0;
@@ -217,12 +240,44 @@ export function useClipper() {
     }
     setError("");
     setDownloading(true);
+    setDownloadProgress(0);
+    setDownloadPhase("downloading");
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    let es: EventSource | null = null;
     try {
-      const res = await fetch(apiUrl("/api/download"), {
+      es = new EventSource(
+        apiUrl(`/api/download/progress?jobId=${encodeURIComponent(jobId)}`),
+      );
+      es.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data) as {
+            phase: "downloading" | "processing" | "done" | "error";
+            percent: number;
+          };
+          setDownloadPhase(data.phase);
+          if (typeof data.percent === "number") {
+            setDownloadProgress((prev) =>
+              data.phase === "downloading"
+                ? Math.max(prev, data.percent)
+                : data.percent,
+            );
+          }
+        } catch {
+          /* ignore */
+        }
+      };
+    } catch {
+      /* EventSource unavailable — proceed without progress */
+    }
+    try {
+      const res = await fetch(
+        apiUrl(`/api/download?jobId=${encodeURIComponent(jobId)}`),
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, start, end, format, quality }),
-      });
+        },
+      );
       if (!res.ok) {
         const data = await parseJson<{ error?: string }>(res).catch(
           () => ({}) as { error?: string },
@@ -231,20 +286,39 @@ export function useClipper() {
       }
       const blob = await res.blob();
       const ext = format === "mp3" ? "mp3" : "mp4";
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = `clip-${formatTimestamp(start).replaceAll(":", "")}-${formatTimestamp(end).replaceAll(":", "")}.${ext}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objectUrl);
+      const filename = buildClipFilename(info.title, start, end, ext);
+      if (isElectron && window.electronAPI && saveDir) {
+        const arr = await blob.arrayBuffer();
+        const result = await window.electronAPI.saveFile({
+          dirPath: saveDir,
+          filename,
+          data: arr,
+        });
+        if (!result.ok) throw new Error(result.error);
+      } else {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      }
+      setDownloadProgress(100);
+      setDownloadPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed");
+      setDownloadPhase("error");
     } finally {
+      es?.close();
       setDownloading(false);
+      window.setTimeout(() => {
+        setDownloadPhase("idle");
+        setDownloadProgress(0);
+      }, 1200);
     }
-  }, [info, validationError, url, start, end, format, quality]);
+  }, [info, validationError, url, start, end, format, quality, isElectron, saveDir]);
 
   return {
     url,
@@ -260,6 +334,8 @@ export function useClipper() {
     setQuality,
     loadingInfo,
     downloading,
+    downloadProgress,
+    downloadPhase,
     error,
     videoId,
     duration,
@@ -285,6 +361,10 @@ export function useClipper() {
     rangeTranscriptText,
     copyTranscript,
     estimatedBytes,
+    isElectron,
+    saveDir,
+    setSaveDir,
+    pickSaveDir,
   };
 }
 
