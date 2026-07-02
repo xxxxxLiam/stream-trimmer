@@ -4,12 +4,15 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/setup.js",
+    "setup": "node scripts/setup.js",
     "dev": "concurrently -k -n client,server -c cyan,magenta \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "vite",
     "dev:server": "node server/index.js",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\""
   },
   "dependencies": {
     "concurrently": "^9.0.0",
