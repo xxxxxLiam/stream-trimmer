@@ -10,6 +10,7 @@ import {
   parseTimestamp,
   extractVideoId,
   parseJson,
+  estimateBytes,
   type ClipFormat,
   type TranscriptLine,
   type TranscriptResponse,
@@ -37,6 +38,7 @@ export function useClipper() {
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
+  const [transcriptQuery, setTranscriptQuery] = useState("");
 
   const videoId = useMemo(() => extractVideoId(url), [url]);
   const duration = info?.duration ?? 0;
@@ -80,6 +82,7 @@ export function useClipper() {
   useEffect(() => {
     setTranscript(null);
     setShowTranscript(false);
+    setTranscriptQuery("");
   }, [videoId]);
 
   const pasteInto = useCallback(async (setter: (v: string) => void) => {
@@ -156,6 +159,12 @@ export function useClipper() {
     return transcript.filter((l) => l.end > start && l.start < end);
   }, [transcript, start, end]);
 
+  const filteredTranscript = useMemo(() => {
+    const q = transcriptQuery.trim().toLowerCase();
+    if (!q) return rangeTranscript;
+    return rangeTranscript.filter((l) => l.text.toLowerCase().includes(q));
+  }, [rangeTranscript, transcriptQuery]);
+
   const rangeTranscriptText = useMemo(
     () => rangeTranscript.map((l) => l.text).join(" "),
     [rangeTranscript],
@@ -168,6 +177,25 @@ export function useClipper() {
       setError("Couldn't copy. Select the text and copy manually.");
     }
   }, [rangeTranscriptText]);
+
+  // Click a transcript line → set its start as clip start, or its end as clip end.
+  // Choice: end button uses line.end so "set as end" includes the whole spoken line.
+  const setStartFromLine = useCallback(
+    (line: TranscriptLine) => setStartText(formatTimestamp(line.start)),
+    [],
+  );
+  const setEndFromLine = useCallback(
+    (line: TranscriptLine) => setEndText(formatTimestamp(line.end)),
+    [],
+  );
+
+  // Live size estimate (bytes) for the selected range/format/quality.
+  const estimatedBytes = useMemo(() => {
+    if (!info?.bitrates) return 0;
+    const table = format === "mp3" ? info.bitrates.mp3 : info.bitrates.mp4;
+    const kbps = table?.[quality] ?? 0;
+    return estimateBytes(kbps, Math.max(0, end - start));
+  }, [info, format, quality, start, end]);
 
   const download = useCallback(async () => {
     if (!info) {
@@ -239,8 +267,14 @@ export function useClipper() {
     loadingTranscript,
     transcript,
     rangeTranscript,
+    filteredTranscript,
+    transcriptQuery,
+    setTranscriptQuery,
+    setStartFromLine,
+    setEndFromLine,
     rangeTranscriptText,
     copyTranscript,
+    estimatedBytes,
   };
 }
 
