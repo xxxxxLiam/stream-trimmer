@@ -4,7 +4,7 @@
  * Description: Right-column panel: video iframe and transcript view, swapped with animation.
  */
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CameraVideo,
   FileText,
@@ -45,6 +45,22 @@ export default function PreviewPanel() {
       behavior: "smooth",
     });
   }, [firstInRangeKey?.start]);
+
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [flashKey, setFlashKey] = useState<number | null>(null);
+
+  const handleRowJump = (index: number) => {
+    setTranscriptQuery("");
+    // Defer scroll so the (possibly re-rendered) full transcript is mounted.
+    requestAnimationFrame(() => {
+      rowRefs.current[index]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    setFlashKey(index);
+    window.setTimeout(() => setFlashKey(null), 600);
+  };
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -112,17 +128,37 @@ export default function PreviewPanel() {
                       {displayTranscript.map((l, i) => {
                         const inRange = l.end > start && l.start < end;
                         const isFirstInRange = inRange && l === firstInRangeKey;
+                        const isFlashing = flashKey === i;
                         return (
                         <div
                           key={`${l.start}-${i}`}
-                          ref={isFirstInRange ? firstInRangeRef : undefined}
+                          ref={(el) => {
+                            rowRefs.current[i] = el;
+                            if (isFirstInRange) firstInRangeRef.current = el;
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleRowJump(i)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleRowJump(i);
+                            }
+                          }}
                           className={
-                            "group flex items-start gap-3 rounded-row px-2 py-1.5 transition-colors " +
+                            "group relative flex cursor-pointer items-start gap-3 pl-3 pr-2 py-1.5 transition-colors " +
                             (inRange
-                              ? "bg-accent/10 border-l-2 border-accent hover:bg-accent/15"
-                              : "border-l-2 border-transparent opacity-50 hover:bg-panel-hover hover:opacity-100")
+                              ? "bg-accent/10 hover:bg-accent/15"
+                              : "opacity-50 hover:bg-panel-hover hover:opacity-100") +
+                            (isFlashing ? " ring-1 ring-accent/60" : "")
                           }
                         >
+                          {inRange && (
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute left-0 top-0 bottom-0 w-[2px] bg-accent"
+                            />
+                          )}
                           <span
                             className={
                               "w-14 shrink-0 pt-[1px] text-[11px] tabular-nums " +
@@ -142,7 +178,10 @@ export default function PreviewPanel() {
                           <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                             <button
                               type="button"
-                              onClick={() => setStartFromLine(l)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStartFromLine(l);
+                              }}
                               className="rounded-chip p-1 text-fg-faint hover:bg-accent/15 hover:text-accent"
                               title="Set as clip start"
                               aria-label="Set as clip start"
@@ -151,7 +190,10 @@ export default function PreviewPanel() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setEndFromLine(l)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEndFromLine(l);
+                              }}
                               className="rounded-chip p-1 text-fg-faint hover:bg-accent/15 hover:text-accent"
                               title="Set as clip end"
                               aria-label="Set as clip end"
