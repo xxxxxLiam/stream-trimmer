@@ -20,6 +20,16 @@ import ffmpegPath from "ffmpeg-static";
 const PORT = Number(process.env.PORT || 5174);
 const MAX_CLIP_SECONDS = 600;
 
+// When running inside a packaged Electron app, binaries live under
+// `<resources>/bin/`. Prefer those over the dev-time bundled/PATH locations.
+function packagedBinary(name: string): string | null {
+  const base = process.env.ELECTRON_RESOURCES;
+  if (!base) return null;
+  const exe = process.platform === "win32" ? `${name}.exe` : name;
+  const candidate = path.join(base, "bin", exe);
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
 type YtRunner = (url: string, opts: Record<string, unknown>) => Promise<any>;
 
 interface YtResolved {
@@ -29,6 +39,13 @@ interface YtResolved {
 
 // Resolve yt-dlp: prefer the bundled binary, fall back to one on the system PATH.
 function resolveYtDlp(): YtResolved | null {
+  const packaged = packagedBinary("yt-dlp");
+  if (packaged) {
+    return {
+      run: create(packaged) as unknown as YtRunner,
+      source: `packaged (${packaged})`,
+    };
+  }
   const anyMod = ytdlpModule as unknown as {
     binaryPath?: string;
     ytdlp?: { binaryPath?: string };
@@ -57,7 +74,9 @@ function resolveYtDlp(): YtResolved | null {
 }
 
 const yt = resolveYtDlp();
-const ffmpegOk = Boolean(ffmpegPath && fs.existsSync(ffmpegPath));
+const packagedFfmpeg = packagedBinary("ffmpeg");
+const resolvedFfmpeg = packagedFfmpeg || ffmpegPath;
+const ffmpegOk = Boolean(resolvedFfmpeg && fs.existsSync(resolvedFfmpeg));
 
 function preflight(): boolean {
   const problems: string[] = [];
@@ -66,7 +85,7 @@ function preflight(): boolean {
 
   if (problems.length === 0) {
     console.log(`[server] yt-dlp ready: ${yt!.source}`);
-    console.log(`[server] ffmpeg ready: ${ffmpegPath}`);
+    console.log(`[server] ffmpeg ready: ${resolvedFfmpeg}`);
     return true;
   }
 
@@ -289,7 +308,7 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
       noPlaylist: true,
       noWarnings: true,
       output: path.join(tempDir, "sub"),
-      ffmpegLocation: ffmpegPath,
+      ffmpegLocation: resolvedFfmpeg,
     });
 
     const files = fs.readdirSync(tempDir);
@@ -367,7 +386,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
         audioFormat: "mp3",
         audioQuality: quality,
         output: outputPath,
-        ffmpegLocation: ffmpegPath,
+        ffmpegLocation: resolvedFfmpeg,
       }
     : {
         downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
@@ -377,7 +396,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
         format: videoFormat,
         mergeOutputFormat: "mp4",
         output: outputPath,
-        ffmpegLocation: ffmpegPath,
+        ffmpegLocation: resolvedFfmpeg,
       };
 
   try {
