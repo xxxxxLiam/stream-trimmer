@@ -1,192 +1,154 @@
-/**
- * File: index.js
- * Path: server/index.js
- * Description: Runs the local yt-dlp and ffmpeg clip-download backend.
- */
+import express from "express";
 import cors from "cors";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
-import express from "express";
 import { z } from "zod";
+import ytdlp from "youtube-dl-exec";
+import ffmpegPath from "ffmpeg-static";
 
 const PORT = Number(process.env.PORT || 5174);
 const MAX_CLIP_SECONDS = 600;
-const BINARY_CHECK_ARGS = ["--version"];
-const RANDOM_FILENAME_BYTES = 4;
 
-const youtubeUrlSchema = z.object({
-  url: z
-    .string()
-    .url()
-    .refine((value) => /youtube\.com|youtu\.be/.test(value), "URL must be a YouTube link"),
-});
+const urlSchema = z
+  .string()
+  .url()
+  .refine((v) => /youtube\.com|youtu\.be/.test(v), "URL must be a YouTube link");
+
+const infoSchema = z.object({ url: urlSchema });
 
 const downloadSchema = z
   .object({
-    url: z.string().url(),
+    url: urlSchema,
     start: z.number().nonnegative(),
     end: z.number().positive(),
   })
-  .refine((value) => value.end > value.start, { message: "End must be greater than start" })
-  .refine((value) => value.end - value.start <= MAX_CLIP_SECONDS, {
+  .refine((v) => v.end > v.start, { message: "End must be greater than start" })
+  .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
     message: `Clip length capped at ${MAX_CLIP_SECONDS} seconds (10 minutes)`,
   });
 
-function writeLine(message) {
-  process.stdout.write(`${message}\n`);
-}
-
-function writeError(message) {
-  process.stderr.write(`${message}\n`);
-}
-
-function hasBinary(name) {
-  const probe = spawnSync(name, BINARY_CHECK_ARGS, { stdio: "ignore" });
-  return probe.status === 0;
-}
-
-function cleanup(dir) {
+// Preflight: ensure bundled binaries resolved.
+function preflight() {
+  const problems = [];
   try {
-    fs.rmSync(dir, { recursive: true, force: true });
+    const ytBin = ytdlp.binaryPath || ytdlp.ytdlp?.binaryPath;
+    if (!ytBin || !fs.existsSync(ytBin)) problems.push("yt-dlp");
   } catch {
-    // Cleanup is best-effort for temporary files.
+    problems.push("yt-dlp");
   }
+  if (!ffmpegPath || !fs.existsSync(ffmpegPath)) problems.push("ffmpeg");
+
+  if (problems.length === 0) {
+    console.log(`[server] bundled binaries ready (ffmpeg: ${ffmpegPath})`);
+    return true;
+  }
+
+  console.error(`[server] Missing bundled binaries: ${problems.join(", ")}`);
+  const platform = process.platform;
+  const hint =
+    platform === "darwin"
+      ? "Run `npm install` again. On Apple Silicon you may need Rosetta: `softwareupdate --install-rosetta`."
+      : platform === "win32"
+        ? "Run `npm install` again in an elevated shell. Ensure your antivirus is not quarantining yt-dlp.exe."
+        : "Run `npm install` again. Ensure your Node version is 18+ and that /tmp is executable.";
+  console.error(`[server] ${hint}`);
+  return false;
 }
 
-const hasYtDlp = hasBinary("yt-dlp");
-const hasFfmpeg = hasBinary("ffmpeg");
-
-if (!hasYtDlp) {
-  writeError("[startup] MISSING: yt-dlp is not on PATH. Install it from https://github.com/yt-dlp/yt-dlp#installation");
-}
-
-if (!hasFfmpeg) {
-  writeError("[startup] MISSING: ffmpeg is not on PATH. Install it from https://ffmpeg.org/download.html");
-}
-
-if (hasYtDlp && hasFfmpeg) {
-  writeLine("[startup] yt-dlp and ffmpeg detected on PATH");
-}
+const binariesOk = preflight();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post("/api/info", (request, response) => {
-  const parsed = youtubeUrlSchema.safeParse(request.body);
+function binaryError(res) {
+  return res.status(500).json({
+    error:
+      "Bundled yt-dlp or ffmpeg not available. Re-run `npm install`, then restart `npm run dev`.",
+  });
+}
 
-  if (!parsed.success) {
-    return response.status(400).json({ error: parsed.error.issues[0].message });
-  }
+app.post("/api/info", async (req, res) => {
+  const parsed = infoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  if (!binariesOk) return binaryError(res);
 
-  if (!hasYtDlp) {
-    return response.status(500).json({
-      error: "yt-dlp is not installed or is not available on PATH. Install yt-dlp locally, then restart npm run dev.",
+  try {
+    const info = await ytdlp(parsed.data.url, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      noPlaylist: true,
     });
+    res.json({
+      id: info.id,
+      title: info.title,
+      duration: info.duration,
+      thumbnail: info.thumbnail,
+    });
+  } catch (e) {
+    res.status(400).json({ error: (e?.stderr || e?.message || "yt-dlp failed").toString().trim() });
   }
-
-  const child = spawn("yt-dlp", ["--dump-json", "--no-warnings", parsed.data.url]);
-  let output = "";
-  let errorOutput = "";
-
-  child.stdout.on("data", (chunk) => {
-    output += chunk.toString();
-  });
-
-  child.stderr.on("data", (chunk) => {
-    errorOutput += chunk.toString();
-  });
-
-  child.on("close", (code) => {
-    if (code !== 0) {
-      return response.status(400).json({ error: errorOutput.trim() || "yt-dlp failed to read video info" });
-    }
-
-    try {
-      const info = JSON.parse(output);
-      return response.json({
-        title: info.title,
-        duration: info.duration,
-        id: info.id,
-        thumbnail: info.thumbnail,
-      });
-    } catch {
-      return response.status(500).json({ error: "Failed to parse yt-dlp output" });
-    }
-  });
 });
 
-app.post("/api/download", (request, response) => {
-  const parsed = downloadSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    return response.status(400).json({ error: parsed.error.issues[0].message });
-  }
-
-  if (!hasYtDlp || !hasFfmpeg) {
-    return response.status(500).json({
-      error: "yt-dlp and ffmpeg must both be installed and available on PATH. Install them locally, then restart npm run dev.",
-    });
-  }
+app.post("/api/download", async (req, res) => {
+  const parsed = downloadSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  if (!binariesOk) return binaryError(res);
 
   const { url, start, end } = parsed.data;
-  const durationProbe = spawnSync("yt-dlp", ["--print", "%(duration)s", "--no-warnings", url], { encoding: "utf8" });
-  const duration = Number.parseFloat((durationProbe.stdout || "").trim());
 
-  if (Number.isFinite(duration) && end > duration + 1) {
-    return response.status(400).json({ error: "End exceeds video duration" });
+  // Re-probe duration server-side.
+  try {
+    const info = await ytdlp(url, { dumpSingleJson: true, noWarnings: true, noPlaylist: true });
+    if (typeof info.duration === "number" && end > info.duration + 1) {
+      return res.status(400).json({ error: "End exceeds video duration" });
+    }
+  } catch (e) {
+    return res.status(400).json({ error: (e?.stderr || e?.message || "yt-dlp probe failed").toString().trim() });
   }
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ytclip-"));
   const outputPath = path.join(tempDir, "clip.mp4");
-  const section = `*${start.toFixed(2)}-${end.toFixed(2)}`;
-  const args = [
-    "--no-warnings",
-    "--no-playlist",
-    "--download-sections",
-    section,
-    "--force-keyframes-at-cuts",
-    "-f",
-    "bv*+ba/b",
-    "--merge-output-format",
-    "mp4",
-    "-o",
-    outputPath,
-    url,
-  ];
-  const child = spawn("yt-dlp", args);
-  let errorOutput = "";
+  const cleanup = () => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+  };
 
-  child.stderr.on("data", (chunk) => {
-    errorOutput += chunk.toString();
-  });
+  try {
+    await ytdlp(url, {
+      downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
+      forceKeyframesAtCuts: true,
+      noPlaylist: true,
+      noWarnings: true,
+      format: "bv*+ba/b",
+      mergeOutputFormat: "mp4",
+      output: outputPath,
+      ffmpegLocation: ffmpegPath,
+    });
 
-  child.stdout.on("data", (chunk) => {
-    process.stdout.write(chunk);
-  });
-
-  child.on("close", (code) => {
-    if (code !== 0 || !fs.existsSync(outputPath)) {
-      cleanup(tempDir);
-      return response.status(500).json({ error: errorOutput.trim() || "yt-dlp failed" });
+    if (!fs.existsSync(outputPath)) {
+      cleanup();
+      return res.status(500).json({ error: "yt-dlp produced no output" });
     }
 
     const stat = fs.statSync(outputPath);
-    response.setHeader("Content-Type", "video/mp4");
-    response.setHeader("Content-Length", stat.size);
-    response.setHeader(
-      "Content-Disposition",
-      `attachment; filename="clip-${crypto.randomBytes(RANDOM_FILENAME_BYTES).toString("hex")}.mp4"`,
-    );
+    const name = `clip-${crypto.randomBytes(4).toString("hex")}.mp4`;
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
     const stream = fs.createReadStream(outputPath);
-    stream.pipe(response);
-    stream.on("close", () => cleanup(tempDir));
-  });
+    stream.pipe(res);
+    stream.on("close", cleanup);
+    stream.on("error", cleanup);
+  } catch (e) {
+    cleanup();
+    res.status(500).json({ error: (e?.stderr || e?.message || "Download failed").toString().trim() });
+  }
 });
 
 app.listen(PORT, () => {
-  writeLine(`[server] listening on http://localhost:${PORT}`);
+  console.log(`[server] listening on http://localhost:${PORT}`);
 });

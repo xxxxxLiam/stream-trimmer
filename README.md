@@ -1,61 +1,50 @@
 # YouTube Clipper
 
-A fully local web app for downloading a trimmed section of a YouTube video.
-The UI lives in `src/`, and the local Node backend lives in `server/`.
+Download a trimmed section (up to 10 minutes) of a YouTube video, fully on your own machine.
 
-## Why doesn't the Lovable preview work?
+![screenshot](docs/screenshot.png)
 
-The Lovable preview only serves the front-end. It cannot run `yt-dlp` or
-`ffmpeg`, and it cannot host a long-running Node backend. This app is
-designed to run **entirely on your own machine**. Clone the repo, install
-the prerequisites below, and run `npm run dev` locally — the clipping UI
-then works at `http://localhost:5173`.
+## What it does
 
-## Prerequisites
+- Runs entirely locally — no accounts, no ads, no telemetry.
+- Downloads **only** the time range you select, not the full video, via yt-dlp's `--download-sections`.
+- Uses stream-copy in ffmpeg so trimming is near-instant and lossless.
 
-Both binaries must be installed and available on your `PATH`:
-
-### yt-dlp
-
-- macOS: `brew install yt-dlp`
-- Windows: `winget install yt-dlp`
-- Linux: `pipx install yt-dlp` or your distro's package manager
-
-### ffmpeg
-
-- macOS: `brew install ffmpeg`
-- Windows: `winget install Gyan.FFmpeg`
-- Linux: `sudo apt install ffmpeg`
-
-Verify both are available:
+## Quick start
 
 ```sh
-yt-dlp --version
-ffmpeg -version
-```
-
-## Install and run
-
-```sh
-npm install
+git clone <your-fork-or-this-repo> youtube-clipper
+cd youtube-clipper && npm install
 npm run dev
 ```
 
-This starts:
+Then open http://localhost:5173.
 
-- The web app on the Vite dev server
-- The local Express backend on `http://localhost:5174`
-- A Vite proxy from `/api` to the backend
+## Prerequisites
+
+- **Node.js 18+** (see `.nvmrc`).
+
+That's it. The `yt-dlp` and `ffmpeg` binaries are auto-installed as npm dependencies (`youtube-dl-exec`, `ffmpeg-static`) — no system-wide installs, no `brew`/`apt`/`winget` step.
 
 ## Usage
 
-1. Paste a YouTube URL and press Enter, or click out of the field.
-2. Preview the video and load its duration.
-3. Select a start and end time with the range controls.
-4. Click **Download clip** to download an `.mp4` clip.
+1. Paste a YouTube URL and press Enter (or blur the field).
+2. Preview loads and the range slider unlocks with the video's real duration.
+3. Drag the two handles to pick a start/end (max 10 minutes).
+4. Click **Download clip** to save an `.mp4`.
 
-## Notes
+## How it works
 
-- Clips are capped at 10 minutes on both the client and backend.
-- The backend uses `yt-dlp --download-sections` and `ffmpeg` locally.
-- This backend is intended for local development because it shells out to native binaries.
+A minimal React SPA (Vite) talks to a local Express worker over `/api`. The worker shells out to the bundled `yt-dlp` binary with `--download-sections "*START-END"` and `--force-keyframes-at-cuts`, points `--ffmpeg-location` at the bundled `ffmpeg-static` binary, and streams the trimmed `.mp4` back to the browser. A single `npm run dev` starts both processes via `concurrently`.
+
+## Legal & responsible use
+
+This is a neutral, general-purpose tool. Use it only for content you own or have the rights to download — your own uploads, public-domain material, Creative Commons works, or clips you have permission to save. Respect [YouTube's Terms of Service](https://www.youtube.com/t/terms) and applicable copyright law. This project is built on the excellent [yt-dlp](https://github.com/yt-dlp/yt-dlp) — please read their notes on responsible use.
+
+## Maintenance
+
+Provided as-is and **unmaintained**. If yt-dlp/ffmpeg change behaviour or YouTube breaks things, fork the repo and update at your own discretion. Issues and PRs may not receive a response.
+
+## License
+
+[MIT](./LICENSE).
