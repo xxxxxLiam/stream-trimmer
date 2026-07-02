@@ -119,76 +119,82 @@ export default function App() {
   return (
     <main className="app">
       <section className="panel">
-        <h1>YouTube Clipper</h1>
+        <h1 className="title">YouTube Clipper</h1>
 
-        <input
-          type="url"
-          placeholder="Paste a YouTube URL"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onBlur={loadInfo}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") loadInfo();
-          }}
-        />
-
-        <div className="preview">
-          {videoId ? (
-            <iframe
-              src={`https://www.youtube.com/embed/${videoId}`}
-              title="YouTube preview"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <span>preview</span>
-          )}
+        <div className="url-row">
+          <input
+            type="url"
+            placeholder="Paste a YouTube URL"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onBlur={loadInfo}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") loadInfo();
+            }}
+          />
         </div>
 
-        {info && (
-          <>
-            <div className="meta">
-              {info.title} · {formatTimestamp(duration)}
-            </div>
-            <div className="range">
-              <input
-                type="range"
-                aria-label="Start time"
-                min={0}
-                max={duration}
-                step={1}
-                value={start}
-                onChange={(e) => setStart(Math.min(Number(e.target.value), end - 1))}
+        <div className="preview-col">
+          <div className="preview">
+            {videoId ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${videoId}`}
+                title="YouTube preview"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
               />
-              <input
-                type="range"
-                aria-label="End time"
-                min={0}
-                max={duration}
-                step={1}
-                value={end}
-                onChange={(e) => setEnd(Math.max(Number(e.target.value), start + 1))}
-              />
-              <div className="timestamps">
-                <span>{formatTimestamp(start)}</span>
-                <span>{formatTimestamp(end - start)} selected</span>
-                <span>{formatTimestamp(end)}</span>
+            ) : (
+              <span>preview</span>
+            )}
+          </div>
+        </div>
+
+        <div className="controls">
+          {info && (
+            <>
+              <div className="meta">
+                {info.title} · {formatTimestamp(duration)}
               </div>
-            </div>
-          </>
-        )}
+              <div className="range">
+                <input
+                  type="range"
+                  aria-label="Start time"
+                  min={0}
+                  max={duration}
+                  step={1}
+                  value={start}
+                  onChange={(e) => setStart(Math.min(Number(e.target.value), end - 1))}
+                />
+                <input
+                  type="range"
+                  aria-label="End time"
+                  min={0}
+                  max={duration}
+                  step={1}
+                  value={end}
+                  onChange={(e) => setEnd(Math.max(Number(e.target.value), start + 1))}
+                />
+                <div className="timestamps">
+                  <span>{formatTimestamp(start)}</span>
+                  <span>{formatTimestamp(end - start)} selected</span>
+                  <span>{formatTimestamp(end)}</span>
+                </div>
+              </div>
+            </>
+          )}
 
-        {loadingInfo && <div className="status">Loading video info…</div>}
-        {downloading && <div className="status">Downloading clip…</div>}
-        {error && <div className="error">{error}</div>}
+          <button
+            type="button"
+            onClick={download}
+            disabled={!info || downloading || Boolean(validationError)}
+          >
+            {downloading ? "Downloading…" : "Download clip"}
+          </button>
 
-        <button
-          type="button"
-          onClick={download}
-          disabled={!info || downloading || Boolean(validationError)}
-        >
-          {downloading ? "Downloading…" : "Download clip"}
-        </button>
+          {loadingInfo && <div className="status">Loading video info…</div>}
+          {downloading && <div className="status">Downloading clip…</div>}
+          {error && <div className="error">{error}</div>}
+        </div>
       </section>
     </main>
   );
