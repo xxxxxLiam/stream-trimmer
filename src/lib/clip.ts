@@ -7,11 +7,19 @@ export const MAX_CLIP_SECONDS = 600;
 
 export type ClipFormat = "mp4" | "mp3";
 
+export type BitrateMap = Partial<Record<string, number>>; // kbps
+
+export interface Bitrates {
+  mp4?: BitrateMap;
+  mp3?: BitrateMap;
+}
+
 export interface VideoInfo {
   id: string;
   title: string;
   duration: number;
   thumbnail?: string;
+  bitrates?: Bitrates;
 }
 
 export interface TranscriptLine {
@@ -32,6 +40,22 @@ export interface DownloadRequest {
   end: number;
   format: ClipFormat;
   quality: string;
+}
+
+export function formatBytes(bytes: number): string {
+  if (!isFinite(bytes) || bytes <= 0) return "—";
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(mb < 10 ? 2 : mb < 100 ? 1 : 0)} MB`;
+  return `${(mb / 1024).toFixed(2)} GB`;
+}
+
+// bytes = kbps * 1000 / 8 * seconds
+export function estimateBytes(kbps: number, seconds: number): number {
+  if (kbps <= 0 || seconds <= 0) return 0;
+  return (kbps * 1000 * seconds) / 8;
 }
 
 export function formatTimestamp(seconds: number): string {
