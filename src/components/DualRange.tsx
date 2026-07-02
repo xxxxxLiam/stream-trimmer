@@ -30,9 +30,9 @@ export default function DualRange({
     <div
       className={`relative flex h-7 items-center ${disabled ? "opacity-60" : ""}`}
     >
-      <div className="absolute inset-x-0 h-0.5 bg-neutral-700" />
+      <div className="absolute inset-x-0 h-[3px] rounded-full bg-white/10" />
       <div
-        className="absolute h-0.5 bg-white"
+        className="absolute h-[3px] rounded-full bg-accent"
         style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
       />
       <input
