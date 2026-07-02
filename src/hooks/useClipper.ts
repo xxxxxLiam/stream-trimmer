@@ -11,6 +11,7 @@ import {
   extractVideoId,
   parseJson,
   estimateBytes,
+  apiUrl,
   type ClipFormat,
   type TranscriptLine,
   type TranscriptResponse,
@@ -110,7 +111,7 @@ export function useClipper() {
     setError("");
     setLoadingInfo(true);
     try {
-      const res = await fetch("/api/info", {
+      const res = await fetch(apiUrl("/api/info"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
@@ -132,7 +133,7 @@ export function useClipper() {
     if (!url) return;
     setLoadingTranscript(true);
     try {
-      const res = await fetch("/api/transcript", {
+      const res = await fetch(apiUrl("/api/transcript"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
@@ -209,7 +210,7 @@ export function useClipper() {
     setError("");
     setDownloading(true);
     try {
-      const res = await fetch("/api/download", {
+      const res = await fetch(apiUrl("/api/download"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, start, end, format, quality }),

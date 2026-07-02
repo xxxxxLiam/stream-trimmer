@@ -101,3 +101,19 @@ export async function parseJson<T = unknown>(response: Response): Promise<T> {
   }
   return response.json() as Promise<T>;
 }
+
+// Resolves an API path. In Electron the preload sets `window.__API_BASE__`
+// to the loopback URL of the in-process Express backend. In the browser dev
+// workflow it's undefined and Vite's `/api` proxy handles routing.
+declare global {
+  interface Window {
+    __API_BASE__?: string;
+  }
+}
+export function apiUrl(path: string): string {
+  const base =
+    typeof window !== "undefined" && window.__API_BASE__
+      ? window.__API_BASE__.replace(/\/$/, "")
+      : "";
+  return `${base}${path}`;
+}
