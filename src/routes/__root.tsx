@@ -1,3 +1,8 @@
+/**
+ * File: __root.tsx
+ * Path: src/routes/__root.tsx
+ * Description: Defines the root application shell and document metadata.
+ */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -77,11 +82,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "YouTube Clipper" },
+      {
+        name: "description",
+        content: "Local YouTube clip downloader with preview and a 10-minute range cap.",
+      },
+      { name: "author", content: "YouTube Clipper" },
+      { property: "og:title", content: "YouTube Clipper" },
+      {
+        property: "og:description",
+        content: "Local YouTube clip downloader with preview and a 10-minute range cap.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
