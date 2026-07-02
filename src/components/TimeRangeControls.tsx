@@ -3,7 +3,7 @@
  * Path: src/components/TimeRangeControls.tsx
  * Description: HH:MM:SS start/end fields with Paste buttons plus the dual-range slider.
  */
-import { BsClipboard } from "react-bootstrap-icons";
+import { Clipboard } from "react-bootstrap-icons";
 import DualRange from "./DualRange";
 import { useClipperContext } from "../context/ClipperContext";
 import { formatTimestamp } from "../lib/clip";
@@ -45,7 +45,7 @@ function TimestampField({
           className="flex items-center border-l border-white px-3 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-black disabled:hover:text-white"
           aria-label={`Paste ${label.toLowerCase()}`}
         >
-          <BsClipboard />
+          <Clipboard />
         </button>
       </div>
     </label>

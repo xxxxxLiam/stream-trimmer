@@ -3,7 +3,7 @@
  * Path: src/components/UrlBar.tsx
  * Description: YouTube URL input with an explicit Search button.
  */
-import { BsSearch } from "react-bootstrap-icons";
+import { Search } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
 
 export default function UrlBar() {
@@ -28,7 +28,7 @@ export default function UrlBar() {
         className="flex items-center gap-2 border-l border-white px-4 py-2.5 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-black disabled:hover:text-white"
         aria-label="Search"
       >
-        <BsSearch />
+        <Search />
         <span className="hidden sm:inline">Search</span>
       </button>
     </div>

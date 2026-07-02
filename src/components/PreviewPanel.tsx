@@ -5,9 +5,9 @@
  */
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BsCameraVideo,
-  BsFileText,
-  BsClipboardCheck,
+  CameraVideo,
+  FileText,
+  ClipboardCheck,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
 import { formatTimestamp } from "../lib/clip";
@@ -36,7 +36,7 @@ export default function PreviewPanel() {
           disabled={!info}
           className={toggleClass}
         >
-          {showTranscript ? <BsCameraVideo /> : <BsFileText />}
+          {showTranscript ? <CameraVideo /> : <FileText />}
           <span>{showTranscript ? "View video" : "View transcript"}</span>
         </button>
         {showTranscript && (
@@ -46,7 +46,7 @@ export default function PreviewPanel() {
             disabled={rangeTranscript.length === 0}
             className={toggleClass}
           >
-            <BsClipboardCheck />
+            <ClipboardCheck />
             <span>Copy</span>
           </button>
         )}

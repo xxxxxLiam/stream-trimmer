@@ -4,7 +4,7 @@
  * Description: Full-viewport dim overlay with a spinner shown during fetches.
  */
 import { AnimatePresence, motion } from "framer-motion";
-import { BsArrowRepeat } from "react-bootstrap-icons";
+import { ArrowRepeat } from "react-bootstrap-icons";
 
 interface OverlayLoaderProps {
   visible: boolean;
@@ -26,7 +26,7 @@ export default function OverlayLoader({ visible, label }: OverlayLoaderProps) {
           aria-live="polite"
         >
           <div className="flex flex-col items-center gap-4 border border-white px-8 py-6">
-            <BsArrowRepeat className="h-8 w-8 animate-spin" />
+            <ArrowRepeat className="h-8 w-8 animate-spin" />
             <span className="text-xs uppercase tracking-widest">{label}</span>
           </div>
         </motion.div>

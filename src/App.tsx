@@ -4,7 +4,7 @@
  * Description: Root layout — responsive two-column grid, overlay loader, form + preview.
  */
 import { AnimatePresence, motion } from "framer-motion";
-import { BsDownload } from "react-bootstrap-icons";
+import { Download } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
 import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
@@ -45,7 +45,7 @@ function DownloadButton() {
       disabled={!info || downloading || Boolean(validationError)}
       className="flex w-full items-center justify-center gap-2 border border-white px-3 py-2.5 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-black disabled:hover:text-white"
     >
-      <BsDownload />
+      <Download />
       <span>
         {downloading ? "Downloading…" : `Download ${format.toUpperCase()}`}
       </span>
