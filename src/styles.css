@@ -17,21 +17,57 @@ body,
 .app {
   min-height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
 }
 
-.panel {
+/* Two-column grid on desktop, single stacked column on mobile */
+.grid {
   width: 100%;
-  max-width: 640px;
+  max-width: 1080px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 24px;
+  margin: 0 auto;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  /* Title spans the full top row */
+  .form-col {
+    display: contents;
+  } /* let its children place onto .grid directly */
+  .title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .url-desktop {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .controls {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  /* Preview starts on row 2 (level with the URL), right column, spanning down */
+  .preview-col {
+    grid-column: 2;
+    grid-row: 2 / 4;
+  }
+}
+
+.panel {
+  width: 100%;
+  min-width: 0;
 }
 
 .title {
-  grid-column: 1 / -1;
+  margin-bottom: 16px;
 }
 
 .url-row,
@@ -43,22 +79,24 @@ body,
   min-width: 0;
 }
 
+/* URL field lives above the preview on mobile, inside the form on desktop */
+.url-desktop {
+  display: none;
+}
+.url-mobile {
+  display: block;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto 24px;
+}
+
 @media (min-width: 900px) {
-  .panel {
-    max-width: 1080px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
+  .url-desktop {
+    display: block;
+    margin-bottom: 16px;
   }
-  .url-row {
-    grid-column: 1 / -1;
-  }
-  .controls {
-    grid-column: 1;
-    grid-row: 3;
-  }
-  .preview-col {
-    grid-column: 2;
-    grid-row: 3;
+  .url-mobile {
+    display: none;
   }
 }
 
@@ -71,6 +109,7 @@ h1 {
 
 input[type="url"],
 input[type="text"],
+select,
 button {
   width: 100%;
   background: #000000;
@@ -95,6 +134,13 @@ button:hover:not(:disabled) {
   color: #000000;
 }
 
+/* Disabled inputs (until a URL is loaded) */
+input:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .preview {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -113,16 +159,133 @@ button:hover:not(:disabled) {
   border: 0;
 }
 
+/* Manual timestamp fields with inline paste button */
+.ts-fields {
+  display: flex;
+  gap: 16px;
+}
+
+.ts-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ts-label {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.ts-input {
+  display: flex;
+  border: 1px solid #ffffff;
+}
+
+.ts-input input[type="text"] {
+  flex: 1;
+  border: none; /* border lives on the wrapper */
+  min-width: 0;
+}
+
+.ts-input input::placeholder {
+  color: #666666; /* greyed placeholder: empty start = from beginning */
+}
+
+.paste-btn {
+  width: auto;
+  flex: 0 0 auto;
+  border: none;
+  border-left: 1px solid #ffffff;
+  padding: 0 14px;
+}
+
+/* Format + quality selectors */
+.options {
+  display: flex;
+  gap: 16px;
+}
+
+.option-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
 .range {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.range input[type="range"] {
+/* Dual-handle range: two overlaid native inputs sharing one track */
+.dual-range {
+  position: relative;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.dual-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #444444;
+}
+
+.dual-selected {
+  position: absolute;
+  height: 100%;
+  background: #ffffff;
+}
+
+.dual-input {
+  position: absolute;
+  left: 0;
   width: 100%;
-  accent-color: #ffffff;
+  margin: 0;
   background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: none; /* track ignores clicks; thumbs re-enable below */
+}
+
+.dual-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.dual-input::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.dual-range.is-disabled .dual-input::-webkit-slider-thumb,
+.dual-range.is-disabled .dual-input::-moz-range-thumb {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dual-range.is-disabled .dual-selected {
+  opacity: 0.5;
 }
 
 .timestamps {
@@ -134,6 +297,82 @@ button:hover:not(:disabled) {
 .meta,
 .status {
   opacity: 0.8;
+}
+
+/* Option A: indeterminate download progress bar */
+.progress {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border: 1px solid #ffffff;
+  overflow: hidden;
+}
+
+.progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 30%;
+  background: #ffffff;
+  animation: indeterminate 1.2s infinite ease-in-out;
+}
+
+@keyframes indeterminate {
+  0% {
+    left: -30%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.progress-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+/* Transcript view (swaps with the video preview) */
+.preview-header {
+  display: flex;
+  gap: 12px;
+}
+
+.toggle-btn {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.transcript {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid #ffffff;
+  padding: 12px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.transcript-line {
+  margin-bottom: 8px;
+}
+
+.transcript-ts {
+  opacity: 0.5;
+  margin-right: 8px;
+}
+
+.transcript-status {
+  opacity: 0.6;
+}
+
+.transcript-note {
+  opacity: 0.4;
+  margin-top: 12px;
+  font-size: 12px;
 }
 
 .error {

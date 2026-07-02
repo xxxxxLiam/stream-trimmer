@@ -1,201 +1,268 @@
-import { useEffect, useMemo, useState } from "react";
+import DualRange from "./components/DualRange.jsx";
+import {
+  useClipper,
+  VIDEO_QUALITIES,
+  AUDIO_QUALITIES,
+} from "./hooks/useClipper.js";
+import { formatTimestamp } from "./lib/clip.js";
 
-const MAX_CLIP_SECONDS = 600;
-
-function formatTimestamp(seconds) {
-  const s = Math.max(0, Math.floor(seconds || 0));
-  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
-
-function extractVideoId(url) {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1) || null;
-    const v = u.searchParams.get("v");
-    if (v) return v;
-    const parts = u.pathname.split("/");
-    const i = parts.findIndex((p) => ["embed", "shorts", "v"].includes(p));
-    return i >= 0 ? parts[i + 1] || null : null;
-  } catch {
-    return null;
-  }
-}
-
-async function parseJson(response) {
-  const ct = response.headers.get("content-type") || "";
-  if (!ct.includes("application/json")) {
-    throw new Error("Backend not reachable. Run `npm run dev` locally.");
-  }
-  return response.json();
-}
+const QUALITY_LABELS = {
+  best: "Best",
+  1080: "1080p",
+  720: "720p",
+  480: "480p",
+  360: "360p",
+  320: "320 kbps",
+  192: "192 kbps",
+  128: "128 kbps",
+};
 
 export default function App() {
-  const [url, setUrl] = useState("");
-  const [info, setInfo] = useState(null);
-  const [start, setStart] = useState(0);
-  const [end, setEnd] = useState(0);
-  const [loadingInfo, setLoadingInfo] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState("");
+  const {
+    url,
+    setUrl,
+    info,
+    startText,
+    setStartText,
+    endText,
+    setEndText,
+    format,
+    setFormat,
+    quality,
+    setQuality,
+    loadingInfo,
+    downloading,
+    error,
+    videoId,
+    duration,
+    start,
+    end,
+    validationError,
+    loadInfo,
+    download,
+    pasteInto,
+    setStartFromSeconds,
+    setEndFromSeconds,
+    showTranscript,
+    toggleTranscript,
+    loadingTranscript,
+    transcript,
+    rangeTranscript,
+    copyTranscript,
+  } = useClipper();
 
-  const videoId = useMemo(() => extractVideoId(url), [url]);
-  const duration = info?.duration || 0;
+  const qualityOptions = format === "mp3" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
 
-  const validationError = useMemo(() => {
-    if (!url || !info) return "";
-    if (start >= end) return "Start must be before end";
-    if (end > info.duration) return "End exceeds video duration";
-    if (end - start > MAX_CLIP_SECONDS) return "Clip length capped at 10 minutes";
-    return "";
-  }, [url, info, start, end]);
+  const urlField = (
+    <div className="url-row">
+      <input
+        type="url"
+        placeholder="Paste a YouTube URL"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onBlur={loadInfo}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") loadInfo();
+        }}
+      />
+    </div>
+  );
 
-  useEffect(() => {
-    if (validationError) setError(validationError);
-  }, [validationError]);
-
-  async function loadInfo() {
-    if (!url) return;
-    setError("");
-    setInfo(null);
-    setLoadingInfo(true);
-    try {
-      const res = await fetch("/api/info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const data = await parseJson(res);
-      if (!res.ok) throw new Error(data.error || "Failed to load video info");
-      setInfo(data);
-      setStart(0);
-      setEnd(Math.min(data.duration, MAX_CLIP_SECONDS));
-    } catch (e) {
-      setError(e.message || "Failed to load video info");
-    } finally {
-      setLoadingInfo(false);
-    }
-  }
-
-  async function download() {
-    if (!info) {
-      setError("Load a video first");
-      return;
-    }
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    setError("");
-    setDownloading(true);
-    try {
-      const res = await fetch("/api/download", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, start, end }),
-      });
-      if (!res.ok) {
-        const data = await parseJson(res).catch(() => ({}));
-        throw new Error(data.error || "Download failed");
-      }
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = `clip-${formatTimestamp(start).replaceAll(":", "")}-${formatTimestamp(end).replaceAll(":", "")}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objectUrl);
-    } catch (e) {
-      setError(e.message || "Download failed");
-    } finally {
-      setDownloading(false);
-    }
-  }
+  const timestampField = (label, value, setter, placeholder, disabled) => (
+    <label className="ts-field">
+      <span className="ts-label">{label}</span>
+      <div className="ts-input">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => setter(e.target.value)}
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          className="paste-btn"
+          onClick={() => pasteInto(setter)}
+          disabled={disabled}
+        >
+          Paste
+        </button>
+      </div>
+    </label>
+  );
 
   return (
     <main className="app">
-      <section className="panel">
+      <div className="url-mobile">{urlField}</div>
+
+      <div className="grid">
         <h1 className="title">YouTube Clipper</h1>
+        <section className="panel form-col">
+          <div className="url-desktop">{urlField}</div>
 
-        <div className="url-row">
-          <input
-            type="url"
-            placeholder="Paste a YouTube URL"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onBlur={loadInfo}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") loadInfo();
-            }}
-          />
-        </div>
+          <div className="controls">
+            <div className="meta">
+              {loadingInfo
+                ? "Loading video info…"
+                : info
+                  ? `${info.title} · ${formatTimestamp(duration)}`
+                  : "Paste a URL to begin"}
+            </div>
 
-        <div className="preview-col">
-          <div className="preview">
-            {videoId ? (
-              <iframe
-                src={`https://www.youtube.com/embed/${videoId}`}
-                title="YouTube preview"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+            <div className="ts-fields">
+              {timestampField(
+                "Start",
+                startText,
+                setStartText,
+                "00:00:00",
+                !info,
+              )}
+              {timestampField(
+                "End",
+                endText,
+                setEndText,
+                info ? formatTimestamp(duration) : "00:00:00",
+                !info,
+              )}
+            </div>
+
+            <div className="range">
+              <DualRange
+                min={0}
+                max={duration || 1}
+                start={start}
+                end={end}
+                onStart={setStartFromSeconds}
+                onEnd={setEndFromSeconds}
+                disabled={!info}
               />
-            ) : (
-              <span>preview</span>
+              <div className="timestamps">
+                <span>{formatTimestamp(start)}</span>
+                <span>{formatTimestamp(end - start)} selected</span>
+                <span>{formatTimestamp(end)}</span>
+              </div>
+            </div>
+
+            <div className="options">
+              <label className="option-field">
+                <span className="ts-label">Format</span>
+                <select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value)}
+                  disabled={!info}
+                >
+                  <option value="mp4">MP4 (video)</option>
+                  <option value="mp3">MP3 (audio)</option>
+                </select>
+              </label>
+
+              <label className="option-field">
+                <span className="ts-label">Quality</span>
+                <select
+                  value={quality}
+                  onChange={(e) => setQuality(e.target.value)}
+                  disabled={!info}
+                >
+                  {qualityOptions.map((q) => (
+                    <option key={q} value={q}>
+                      {QUALITY_LABELS[q] || q}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={download}
+              disabled={!info || downloading || Boolean(validationError)}
+            >
+              {downloading
+                ? "Downloading…"
+                : `Download ${format.toUpperCase()}`}
+            </button>
+
+            {downloading && (
+              <div
+                className="progress"
+                role="progressbar"
+                aria-label="Downloading clip"
+              >
+                <div className="progress-bar" />
+                <span className="progress-label">Downloading clip…</span>
+              </div>
+            )}
+            {error && <div className="error">{error}</div>}
+          </div>
+        </section>
+
+        <section className="panel preview-col">
+          <div className="preview-header">
+            <button
+              type="button"
+              className="toggle-btn"
+              onClick={toggleTranscript}
+              disabled={!info}
+            >
+              {showTranscript ? "View video" : "View transcript"}
+            </button>
+            {showTranscript && (
+              <button
+                type="button"
+                className="toggle-btn"
+                onClick={copyTranscript}
+                disabled={rangeTranscript.length === 0}
+              >
+                Copy
+              </button>
             )}
           </div>
-        </div>
 
-        <div className="controls">
-          {info && (
-            <>
-              <div className="meta">
-                {info.title} · {formatTimestamp(duration)}
-              </div>
-              <div className="range">
-                <input
-                  type="range"
-                  aria-label="Start time"
-                  min={0}
-                  max={duration}
-                  step={1}
-                  value={start}
-                  onChange={(e) => setStart(Math.min(Number(e.target.value), end - 1))}
+          {showTranscript ? (
+            <div className="transcript">
+              {loadingTranscript ? (
+                <span className="transcript-status">Loading transcript…</span>
+              ) : rangeTranscript.length > 0 ? (
+                <>
+                  {rangeTranscript.map((l, i) => (
+                    <p key={i} className="transcript-line">
+                      <span className="transcript-ts">
+                        {formatTimestamp(l.start)}
+                      </span>{" "}
+                      {l.text}
+                    </p>
+                  ))}
+                  <p className="transcript-note">
+                    Auto-generated by YouTube — may contain errors.
+                  </p>
+                </>
+              ) : transcript && transcript.length === 0 ? (
+                <span className="transcript-status">
+                  No transcript available for this video.
+                </span>
+              ) : (
+                <span className="transcript-status">
+                  No lines in the selected range.
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="preview">
+              {videoId ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${videoId}`}
+                  title="YouTube preview"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
                 />
-                <input
-                  type="range"
-                  aria-label="End time"
-                  min={0}
-                  max={duration}
-                  step={1}
-                  value={end}
-                  onChange={(e) => setEnd(Math.max(Number(e.target.value), start + 1))}
-                />
-                <div className="timestamps">
-                  <span>{formatTimestamp(start)}</span>
-                  <span>{formatTimestamp(end - start)} selected</span>
-                  <span>{formatTimestamp(end)}</span>
-                </div>
-              </div>
-            </>
+              ) : (
+                <span>preview</span>
+              )}
+            </div>
           )}
-
-          <button
-            type="button"
-            onClick={download}
-            disabled={!info || downloading || Boolean(validationError)}
-          >
-            {downloading ? "Downloading…" : "Download clip"}
-          </button>
-
-          {loadingInfo && <div className="status">Loading video info…</div>}
-          {downloading && <div className="status">Downloading clip…</div>}
-          {error && <div className="error">{error}</div>}
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }

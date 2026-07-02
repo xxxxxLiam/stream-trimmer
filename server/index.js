@@ -15,12 +15,10 @@ const MAX_CLIP_SECONDS = 600;
 
 // Resolve yt-dlp: prefer the bundled binary, fall back to one on the system PATH.
 function resolveYtDlp() {
-  // 1. Bundled binary from youtube-dl-exec, if it actually downloaded.
   const bundled = ytdlpDefault.binaryPath || ytdlpDefault.ytdlp?.binaryPath;
   if (bundled && fs.existsSync(bundled)) {
     return { run: ytdlpDefault, source: `bundled (${bundled})` };
   }
-  // 2. System yt-dlp on PATH.
   try {
     const lookup =
       process.platform === "win32" ? "where yt-dlp" : "command -v yt-dlp";
@@ -90,6 +88,8 @@ const downloadSchema = z
     url: urlSchema,
     start: z.number().nonnegative(),
     end: z.number().positive(),
+    format: z.enum(["mp4", "mp3"]).default("mp4"),
+    quality: z.string().default("best"),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -105,6 +105,33 @@ function binaryError(res) {
     error:
       "yt-dlp or ffmpeg not available. Check the server console for the install command, then run `npm run setup`.",
   });
+}
+
+// Minimal WebVTT parser -> [{ start: seconds, end: seconds, text }]
+function parseVtt(raw) {
+  const lines = [];
+  const blocks = raw.replace(/\r/g, "").split("\n\n");
+  const tc =
+    /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+  const toSec = (h, m, s) => h * 3600 + m * 60 + s;
+  for (const block of blocks) {
+    const rows = block.split("\n");
+    const timing = rows.find((r) => tc.test(r));
+    if (!timing) continue;
+    const m = timing.match(tc);
+    const start = toSec(+m[1], +m[2], +m[3]);
+    const end = toSec(+m[5], +m[6], +m[7]);
+    const text = rows
+      .filter(
+        (r) => !tc.test(r) && r.trim() && !/^\d+$/.test(r) && r !== "WEBVTT",
+      )
+      .join(" ")
+      .replace(/<[^>]+>/g, "")
+      .trim();
+    if (text) lines.push({ start, end, text });
+  }
+  // De-dupe consecutive identical lines (auto-captions repeat rolling text).
+  return lines.filter((l, i) => i === 0 || l.text !== lines[i - 1].text);
 }
 
 app.post("/api/info", async (req, res) => {
@@ -126,11 +153,70 @@ app.post("/api/info", async (req, res) => {
       thumbnail: info.thumbnail,
     });
   } catch (e) {
-    res
-      .status(400)
-      .json({
-        error: (e?.stderr || e?.message || "yt-dlp failed").toString().trim(),
-      });
+    res.status(400).json({
+      error: (e?.stderr || e?.message || "yt-dlp failed").toString().trim(),
+    });
+  }
+});
+
+app.post("/api/transcript", async (req, res) => {
+  const parsed = infoSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  if (!binariesOk) return binaryError(res);
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "yttxt-"));
+  const cleanup = () => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+  };
+
+  try {
+    // English is usually an AUTO caption on YouTube (see `yt-dlp --list-subs`),
+    // so writeAutoSubs matters. writeSubs also covers videos with real subs.
+    await yt.run(parsed.data.url, {
+      skipDownload: true,
+      writeAutoSubs: true,
+      writeSubs: true,
+      subLangs: "en", // exact match; "en.*" can miss depending on version
+      subFormat: "vtt",
+      noPlaylist: true,
+      noWarnings: true,
+      output: path.join(tempDir, "sub"),
+      ffmpegLocation: ffmpegPath,
+    });
+
+    const files = fs.readdirSync(tempDir);
+    console.log("[server] transcript files:", files); // diagnostic while stabilising
+
+    // Prefer a real "en" track, else any .vtt that landed.
+    const vtt =
+      files.find((f) => /\.en\.vtt$/.test(f)) ||
+      files.find((f) => f.endsWith(".vtt"));
+
+    if (!vtt) {
+      cleanup();
+      return res.json({ lines: [], available: false });
+    }
+
+    const raw = fs.readFileSync(path.join(tempDir, vtt), "utf8");
+    cleanup();
+
+    const lines = parseVtt(raw);
+    res.json({ lines, available: lines.length > 0 });
+  } catch (e) {
+    console.error(
+      "[server] transcript error:",
+      (e?.stderr || e?.message || "").toString().trim(),
+    ); // diagnostic
+    cleanup();
+    // No captions is a normal outcome, not a hard error.
+    res.json({
+      lines: [],
+      available: false,
+      note: (e?.stderr || e?.message || "").toString().trim(),
+    });
   }
 });
 
@@ -140,7 +226,7 @@ app.post("/api/download", async (req, res) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const { url, start, end } = parsed.data;
+  const { url, start, end, format, quality } = parsed.data;
 
   // Re-probe duration server-side so the cap can't be bypassed by a crafted request.
   try {
@@ -153,34 +239,54 @@ app.post("/api/download", async (req, res) => {
       return res.status(400).json({ error: "End exceeds video duration" });
     }
   } catch (e) {
-    return res
-      .status(400)
-      .json({
-        error: (e?.stderr || e?.message || "yt-dlp probe failed")
-          .toString()
-          .trim(),
-      });
+    return res.status(400).json({
+      error: (e?.stderr || e?.message || "yt-dlp probe failed")
+        .toString()
+        .trim(),
+    });
   }
 
+  const isAudio = format === "mp3";
+  const ext = isAudio ? "mp3" : "mp4";
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ytclip-"));
-  const outputPath = path.join(tempDir, "clip.mp4");
+  const outputPath = path.join(tempDir, `clip.${ext}`);
   const cleanup = () => {
     try {
       fs.rmSync(tempDir, { recursive: true, force: true });
     } catch {}
   };
 
+  // Map the UI quality to a yt-dlp video format string.
+  const videoFormat =
+    quality === "best"
+      ? "bv*+ba/b"
+      : `bv*[height<=${quality}]+ba/b[height<=${quality}]`;
+
+  const options = isAudio
+    ? {
+        downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
+        forceKeyframesAtCuts: true,
+        noPlaylist: true,
+        noWarnings: true,
+        extractAudio: true,
+        audioFormat: "mp3",
+        audioQuality: quality, // kbps, e.g. "192"
+        output: outputPath,
+        ffmpegLocation: ffmpegPath,
+      }
+    : {
+        downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
+        forceKeyframesAtCuts: true,
+        noPlaylist: true,
+        noWarnings: true,
+        format: videoFormat,
+        mergeOutputFormat: "mp4",
+        output: outputPath,
+        ffmpegLocation: ffmpegPath,
+      };
+
   try {
-    await yt.run(url, {
-      downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
-      forceKeyframesAtCuts: true,
-      noPlaylist: true,
-      noWarnings: true,
-      format: "bv*+ba/b",
-      mergeOutputFormat: "mp4",
-      output: outputPath,
-      ffmpegLocation: ffmpegPath,
-    });
+    await yt.run(url, options);
 
     if (!fs.existsSync(outputPath)) {
       cleanup();
@@ -188,8 +294,8 @@ app.post("/api/download", async (req, res) => {
     }
 
     const stat = fs.statSync(outputPath);
-    const name = `clip-${crypto.randomBytes(4).toString("hex")}.mp4`;
-    res.setHeader("Content-Type", "video/mp4");
+    const name = `clip-${crypto.randomBytes(4).toString("hex")}.${ext}`;
+    res.setHeader("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
     res.setHeader("Content-Length", stat.size);
     res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
     const stream = fs.createReadStream(outputPath);
@@ -198,11 +304,9 @@ app.post("/api/download", async (req, res) => {
     stream.on("error", cleanup);
   } catch (e) {
     cleanup();
-    res
-      .status(500)
-      .json({
-        error: (e?.stderr || e?.message || "Download failed").toString().trim(),
-      });
+    res.status(500).json({
+      error: (e?.stderr || e?.message || "Download failed").toString().trim(),
+    });
   }
 });
 
