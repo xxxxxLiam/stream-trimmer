@@ -57,6 +57,23 @@ function getErrorMessage(caught: unknown, fallback: string) {
   return caught instanceof Error ? caught.message : fallback;
 }
 
+function hasErrorMessage(data: unknown): data is { error: string } {
+  return typeof data === "object" && data !== null && "error" in data && typeof data.error === "string";
+}
+
+function isVideoInfo(data: unknown): data is VideoInfo {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "id" in data &&
+    "title" in data &&
+    "duration" in data &&
+    typeof data.id === "string" &&
+    typeof data.title === "string" &&
+    typeof data.duration === "number"
+  );
+}
+
 function YouTubeClipperPage() {
   const [url, setUrl] = useState("");
   const [info, setInfo] = useState<VideoInfo | null>(null);
@@ -109,10 +126,14 @@ function YouTubeClipperPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data = (await response.json()) as VideoInfo | { error?: string };
+      const data: unknown = await response.json();
 
-      if (!response.ok || "error" in data) {
-        throw new Error("error" in data ? data.error || "Failed to load video info" : "Failed to load video info");
+      if (!response.ok || hasErrorMessage(data)) {
+        throw new Error(hasErrorMessage(data) ? data.error : "Failed to load video info");
+      }
+
+      if (!isVideoInfo(data)) {
+        throw new Error("Video info response was invalid");
       }
 
       setInfo(data);
