@@ -1,3 +1,8 @@
+/**
+ * File: styles.css
+ * Path: src/styles.css
+ * Description: Defines global design tokens and YouTube Clipper styles.
+ */
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
