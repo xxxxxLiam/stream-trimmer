@@ -66,6 +66,33 @@ export function formatTimestamp(seconds: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
+// Filesystem-safe filename from a raw video title. Strips illegal chars,
+// collapses whitespace, trims to 120 chars, and falls back to "clip".
+export function sanitizeFilename(title: string | null | undefined): string {
+  const raw = (title ?? "").normalize("NFKC");
+  const cleaned = raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[.\s]+|[.\s]+$/g, "")
+    .slice(0, 120)
+    .trim();
+  return cleaned || "clip";
+}
+
+// Build a title-based clip filename: `${safeTitle} [HH-MM-SS-HH-MM-SS].ext`.
+export function buildClipFilename(
+  title: string | null | undefined,
+  start: number,
+  end: number,
+  ext: string,
+): string {
+  const safe = sanitizeFilename(title);
+  const s = formatTimestamp(start).replaceAll(":", "-");
+  const e = formatTimestamp(end).replaceAll(":", "-");
+  return `${safe} [${s}-${e}].${ext}`;
+}
+
 // Parse "HH:MM:SS", "MM:SS", or bare "SS" into seconds. Returns null if invalid.
 export function parseTimestamp(text: string | null | undefined): number | null {
   if (text == null) return null;
@@ -108,6 +135,15 @@ export async function parseJson<T = unknown>(response: Response): Promise<T> {
 declare global {
   interface Window {
     __API_BASE__?: string;
+    electronAPI?: {
+      isElectron: true;
+      pickDirectory: () => Promise<string | null>;
+      saveFile: (payload: {
+        dirPath: string;
+        filename: string;
+        data: ArrayBuffer;
+      }) => Promise<{ ok: true; path: string } | { ok: false; error: string }>;
+    };
   }
 }
 export function apiUrl(path: string): string {

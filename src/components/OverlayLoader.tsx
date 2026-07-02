@@ -9,9 +9,25 @@ import { ArrowRepeat } from "react-bootstrap-icons";
 interface OverlayLoaderProps {
   visible: boolean;
   label: string;
+  progress?: number;
+  phase?: "idle" | "downloading" | "processing" | "done" | "error";
 }
 
-export default function OverlayLoader({ visible, label }: OverlayLoaderProps) {
+export default function OverlayLoader({
+  visible,
+  label,
+  progress,
+  phase,
+}: OverlayLoaderProps) {
+  const showBar = typeof progress === "number" && phase && phase !== "idle";
+  const indeterminate = phase === "processing";
+  const pct = Math.max(0, Math.min(100, progress ?? 0));
+  const finishing = phase === "processing";
+  const displayLabel = finishing
+    ? "Finishing up"
+    : phase === "downloading"
+      ? `Downloading ${Math.floor(pct)}%`
+      : label;
   return (
     <AnimatePresence>
       {visible && (
@@ -30,10 +46,29 @@ export default function OverlayLoader({ visible, label }: OverlayLoaderProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="flex items-center gap-3 rounded-panel border border-hairline bg-panel px-5 py-3 shadow-panel"
+            className="flex min-w-[260px] flex-col gap-2 rounded-panel border border-hairline bg-panel px-5 py-3 shadow-panel"
           >
-            <ArrowRepeat className="h-4 w-4 animate-spin text-accent" />
-            <span className="text-[12px] text-fg-muted">{label}…</span>
+            <div className="flex items-center gap-3">
+              <ArrowRepeat className="h-4 w-4 animate-spin text-accent" />
+              <span className="text-[12px] text-fg-muted">{displayLabel}…</span>
+            </div>
+            {showBar && (
+              <div className="relative h-1 w-full overflow-hidden rounded-full bg-panel-raised">
+                {indeterminate ? (
+                  <motion.div
+                    className="absolute inset-y-0 w-1/3 rounded-full bg-accent/70"
+                    animate={{ x: ["-100%", "300%"] }}
+                    transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                ) : (
+                  <motion.div
+                    className="absolute inset-y-0 left-0 rounded-full bg-accent"
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                  />
+                )}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

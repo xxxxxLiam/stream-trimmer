@@ -46,20 +46,34 @@ export default function PreviewPanel() {
     });
   }, [firstInRangeKey?.start]);
 
-  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
+  // Stable per-line refs keyed by line.start so filtering / clearing search
+  // doesn't invalidate the target.
+  const rowRefs = useRef(new Map<number, HTMLDivElement | null>());
   const [flashKey, setFlashKey] = useState<number | null>(null);
+  const [pendingScrollId, setPendingScrollId] = useState<number | null>(null);
 
-  const handleRowJump = (index: number) => {
+  // Clear search first (state update), then scroll after the unfiltered
+  // transcript re-renders. Effect runs on every render but only acts when
+  // there's a pending target AND the search is empty.
+  useEffect(() => {
+    if (pendingScrollId == null) return;
+    if (transcriptQuery.trim() !== "") return;
+    const el = rowRefs.current.get(pendingScrollId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashKey(pendingScrollId);
+    const target = pendingScrollId;
+    setPendingScrollId(null);
+    const t = window.setTimeout(
+      () => setFlashKey((k) => (k === target ? null : k)),
+      600,
+    );
+    return () => window.clearTimeout(t);
+  }, [pendingScrollId, transcriptQuery, displayTranscript]);
+
+  const handleRowJump = (lineStart: number) => {
+    setPendingScrollId(lineStart);
     setTranscriptQuery("");
-    // Defer scroll so the (possibly re-rendered) full transcript is mounted.
-    requestAnimationFrame(() => {
-      rowRefs.current[index]?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    });
-    setFlashKey(index);
-    window.setTimeout(() => setFlashKey(null), 600);
   };
 
   return (
@@ -128,21 +142,21 @@ export default function PreviewPanel() {
                       {displayTranscript.map((l, i) => {
                         const inRange = l.end > start && l.start < end;
                         const isFirstInRange = inRange && l === firstInRangeKey;
-                        const isFlashing = flashKey === i;
+                        const isFlashing = flashKey === l.start;
                         return (
                         <div
                           key={`${l.start}-${i}`}
                           ref={(el) => {
-                            rowRefs.current[i] = el;
+                            rowRefs.current.set(l.start, el);
                             if (isFirstInRange) firstInRangeRef.current = el;
                           }}
                           role="button"
                           tabIndex={0}
-                          onClick={() => handleRowJump(i)}
+                          onClick={() => handleRowJump(l.start)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              handleRowJump(i);
+                              handleRowJump(l.start);
                             }
                           }}
                           className={
