@@ -3,6 +3,14 @@
 A fully local web app for downloading a trimmed section of a YouTube video.
 The UI lives in `src/`, and the local Node backend lives in `server/`.
 
+## Why doesn't the Lovable preview work?
+
+The Lovable preview only serves the front-end. It cannot run `yt-dlp` or
+`ffmpeg`, and it cannot host a long-running Node backend. This app is
+designed to run **entirely on your own machine**. Clone the repo, install
+the prerequisites below, and run `npm run dev` locally — the clipping UI
+then works at `http://localhost:5173`.
+
 ## Prerequisites
 
 Both binaries must be installed and available on your `PATH`:
