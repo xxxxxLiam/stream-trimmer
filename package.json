@@ -70,7 +70,9 @@
       {
         "from": "resources/bin",
         "to": "bin",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "asar": true,
@@ -78,15 +80,18 @@
       "target": "dmg",
       "category": "public.app-category.utilities",
       "identity": null,
+      "icon": "build/icon.icns",
       "gatekeeperAssess": false
     },
     "win": {
       "target": "nsis",
+      "icon": "build/icon.ico",
       "sign": null
     },
     "linux": {
       "target": "AppImage",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "icon": "build/icon.png"
     }
   }
 }

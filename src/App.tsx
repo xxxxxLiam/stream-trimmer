@@ -1,7 +1,7 @@
 /**
  * File: App.tsx
  * Path: src/App.tsx
- * Description: Root layout — responsive two-column grid, overlay loader, form + preview.
+ * Description: Root layout — full-viewport two-column grid, overlay loader, form + preview.
  */
 import { AnimatePresence, motion } from "framer-motion";
 import { Download, Scissors } from "react-bootstrap-icons";
@@ -125,47 +125,35 @@ function Layout() {
     <>
       <OverlayLoader visible={overlayVisible} label={overlayLabel} />
 
-      <main className="flex min-h-full items-start justify-center px-4 py-8 sm:py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 8, scale: 0.99 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 300, damping: 28 }}
-          className="w-full max-w-[1120px] overflow-hidden rounded-panel border border-hairline bg-panel shadow-panel backdrop-blur"
-        >
-          {/* Title bar */}
-          <div className="flex items-center gap-2 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
-            <div className="flex gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-              <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-              <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-            </div>
-            <span className="ml-2 text-[12px] font-medium tracking-tight text-fg-muted">
-              YouTube Clipper
-            </span>
-            <span className="ml-auto text-[11px] text-fg-faint">Local · Private</span>
-          </div>
+      <main className="flex min-h-screen w-full flex-col bg-panel">
+        {/* Title bar */}
+        <div className="flex items-center gap-2 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
+          <span className="text-[12px] font-medium tracking-tight text-fg-muted">
+            YouTube Clipper
+          </span>
+          <span className="ml-auto text-[11px] text-fg-faint">Local · Private</span>
+        </div>
 
-          {/* Command bar */}
-          <div className="border-b border-hairline px-4 py-3">
-            <UrlBar />
-          </div>
+        {/* Command bar */}
+        <div className="border-b border-hairline px-4 py-3">
+          <UrlBar />
+        </div>
 
-          {/* Body */}
-          <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-2 lg:items-start lg:p-5">
-            <section className="flex min-w-0 flex-col gap-3">
-              <Meta />
-              <TimeRangeControls />
-              <FormatQualityFields />
-              <ErrorBanner />
-            </section>
+        {/* Body */}
+        <div className="grid flex-1 grid-cols-1 gap-6 p-4 lg:grid-cols-2 lg:items-start lg:p-5">
+          <section className="flex min-w-0 flex-col gap-3">
+            <Meta />
+            <TimeRangeControls />
+            <FormatQualityFields />
+            <ErrorBanner />
+          </section>
 
-            <section className="min-w-0">
-              <PreviewPanel />
-            </section>
-          </div>
+          <section className="min-w-0">
+            <PreviewPanel />
+          </section>
+        </div>
 
-          <FooterBar />
-        </motion.div>
+        <FooterBar />
       </main>
     </>
   );
