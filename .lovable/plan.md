@@ -1,30 +1,43 @@
+## Why you're seeing this error
+
+The Lovable preview only runs the Vite/React front-end. It does **not** run the local Express backend (`server/index.js`) — and it can't, because Lovable's hosted preview has no `yt-dlp` or `ffmpeg` binaries and no long-running Node process.
+
+So when the UI calls `POST /api/info`, there is no `/api/info` route in the preview. The preview server returns its SPA 404 HTML page, the browser tries to `JSON.parse("<!DOCTYPE ...")`, and you get:
+
+> Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+This is expected. **This app is designed to run on your own machine only** — that was the original brief ("100% locally, MUST NOT introduce serverless/hosted backend").
+
 ## Plan
 
-1. **Replace the placeholder home route**
-   - Move the YouTube Clipper UI into the existing main app at `src/routes/index.tsx`.
-   - Keep all UI code under `src/` as requested, instead of inside the separate `youtube-clipper/` folder.
-   - Add a file header to match your workspace standard.
+I'll make two small changes so the app behaves correctly, then hand it off for local use.
 
-2. **Move the minimalist styling into the main app**
-   - Merge the black/white clipper styles into `src/styles.css`.
-   - Preserve the minimal UI shown in your screenshot: black background, white text/borders, no gradients/shadows.
+### 1. Detect the Lovable preview and show a clear message
+In `src/routes/index.tsx`:
+- On mount, detect if the host is not `localhost` / `127.0.0.1`.
+- If so, render a minimalist banner above the UI:
+  > "This app requires the local backend (yt-dlp + ffmpeg). Run `npm run dev` on your machine and open http://localhost:5173."
+- Disable the URL input + Download button in that case, so no one can trigger the broken fetch.
 
-3. **Add a local Node backend at the project root**
-   - Move the Express/yt-dlp/ffmpeg backend from `youtube-clipper/server/index.js` to `server/index.js`.
-   - Keep it as local-only tooling because it uses `child_process`, `yt-dlp`, and `ffmpeg`, which cannot run inside the hosted preview/serverless runtime.
-   - Improve the startup/runtime error message so missing `yt-dlp`/`ffmpeg` is explicit and actionable.
+### 2. Make the fetch error human-readable when it does fire
+Wrap the `/api/info` and `/api/download` fetches so that:
+- If the response `content-type` is not JSON, we throw a friendly error ("Backend not reachable — is `npm run dev` running?") instead of the raw `JSON.parse` crash.
 
-4. **Wire the root package and Vite config**
-   - Update the root `package.json` scripts so `npm run dev` starts both the Lovable/Vite client and the local Express backend.
-   - Add any missing local-backend dependencies to the root package.
-   - Add a dev proxy in the root `vite.config.ts` so `/api/info` and `/api/download` route to the local backend.
+### 3. README clarification
+Add a short "Why doesn't the Lovable preview work?" note at the top of `README.md` explaining that the preview is front-end only and the app must be cloned/run locally.
 
-5. **Remove the accidental nested project**
-   - Delete the separate `youtube-clipper/` directory after its useful code has been moved into the root project.
+### Files touched
+- `src/routes/index.tsx` — env detection banner + safer fetch wrappers
+- `README.md` — preview-vs-local clarification
 
-6. **Update app metadata**
-   - Replace the default `Lovable App` title/description in `src/routes/__root.tsx` with YouTube Clipper-specific metadata.
+No backend, styling, or feature changes. The 10-minute cap, black/white theme, single `npm run dev`, and local yt-dlp/ffmpeg pipeline all stay exactly as-is.
 
-7. **Verify**
-   - Run a safe validation/build check after changes.
-   - The hosted Lovable preview may still show a missing `yt-dlp` message because native binaries are not installed there, but the app will be structured correctly for local use with `yt-dlp` and `ffmpeg` installed.
+### To actually use the app
+On your own machine:
+```
+git clone <this repo>
+cd <repo>
+npm install
+npm run dev
+```
+Then open http://localhost:5173 — that's where clipping works.
