@@ -25,10 +25,10 @@ function TimestampField({
 }) {
   return (
     <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-      <span className="text-xs uppercase tracking-wider opacity-80">
+      <span className="text-[11px] uppercase tracking-wider text-fg-faint">
         {label}
       </span>
-      <div className="flex items-stretch border border-white">
+      <div className="group flex items-center rounded-row border border-hairline bg-panel-raised transition-colors focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgba(255,99,99,0.18)]">
         <input
           type="text"
           inputMode="numeric"
@@ -36,16 +36,16 @@ function TimestampField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          className="min-w-0 flex-1 bg-black px-3 py-2.5 outline-none disabled:opacity-50"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-fg outline-none disabled:opacity-50"
         />
         <button
           type="button"
           onClick={onPaste}
           disabled={disabled}
-          className="flex items-center border-l border-white px-3 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-black disabled:hover:text-white"
+          className="mr-1 flex items-center rounded-chip px-2 py-1 text-fg-muted transition-colors hover:bg-panel-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           aria-label={`Paste ${label.toLowerCase()}`}
         >
-          <Clipboard />
+          <Clipboard size={12} />
         </button>
       </div>
     </label>
@@ -98,9 +98,11 @@ export default function TimeRangeControls() {
           onEnd={setEndFromSeconds}
           disabled={!info}
         />
-        <div className="flex justify-between opacity-80">
+        <div className="flex justify-between text-[12px] text-fg-muted tabular-nums">
           <span>{formatTimestamp(start)}</span>
-          <span>{formatTimestamp(end - start)} selected</span>
+          <span className="text-accent">
+            {formatTimestamp(end - start)} selected
+          </span>
           <span>{formatTimestamp(end)}</span>
         </div>
       </div>

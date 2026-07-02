@@ -4,7 +4,7 @@
  * Description: Root layout — responsive two-column grid, overlay loader, form + preview.
  */
 import { AnimatePresence, motion } from "framer-motion";
-import { Download } from "react-bootstrap-icons";
+import { Download, Scissors } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
 import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
@@ -20,36 +20,23 @@ function Meta() {
       {info && !loadingInfo ? (
         <motion.div
           key={info.id}
-          initial={{ opacity: 0, y: 4 }}
+          initial={{ opacity: 0, y: 3 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="opacity-80"
+          transition={{ duration: 0.16 }}
+          className="flex items-center gap-2 rounded-row bg-panel-hover px-3 py-2 text-[12px] text-fg-muted"
         >
-          {info.title} · {formatTimestamp(duration)}
+          <span className="truncate text-fg">{info.title}</span>
+          <span className="ml-auto shrink-0 tabular-nums text-fg-faint">
+            {formatTimestamp(duration)}
+          </span>
         </motion.div>
       ) : (
-        <div className="opacity-60">Paste a URL and press Search to begin</div>
+        <div className="rounded-row border border-dashed border-hairline px-3 py-2 text-[12px] text-fg-faint">
+          Paste a YouTube URL and press Search to begin
+        </div>
       )}
     </AnimatePresence>
-  );
-}
-
-function DownloadButton() {
-  const { info, downloading, validationError, format, download } =
-    useClipperContext();
-  return (
-    <button
-      type="button"
-      onClick={download}
-      disabled={!info || downloading || Boolean(validationError)}
-      className="flex w-full items-center justify-center gap-2 border border-white px-3 py-2.5 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-black disabled:hover:text-white"
-    >
-      <Download />
-      <span>
-        {downloading ? "Downloading…" : `Download ${format.toUpperCase()}`}
-      </span>
-    </button>
   );
 }
 
@@ -60,17 +47,54 @@ function ErrorBanner() {
       {error && (
         <motion.div
           key="err"
-          initial={{ opacity: 0, y: -4 }}
+          initial={{ opacity: 0, y: -3 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          className="border border-white px-3 py-2.5"
+          transition={{ duration: 0.14 }}
+          className="rounded-row border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-accent"
           role="alert"
         >
           {error}
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function FooterBar() {
+  const {
+    info,
+    downloading,
+    validationError,
+    format,
+    download,
+    start,
+    end,
+  } = useClipperContext();
+  const disabled = !info || downloading || Boolean(validationError);
+  const status = !info
+    ? "Ready"
+    : validationError
+      ? "Invalid selection"
+      : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
+
+  return (
+    <div className="flex items-center justify-between border-t border-hairline bg-bg-deep/60 px-4 py-2.5">
+      <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+        <Scissors size={12} />
+        <span>{status}</span>
+      </div>
+      <button
+        type="button"
+        onClick={download}
+        disabled={disabled}
+        className="btn-primary text-[12px]"
+      >
+        <Download size={12} />
+        <span>{downloading ? "Downloading" : `Download ${format.toUpperCase()}`}</span>
+        <span className="kbd border-white/30 bg-white/10 text-white/90">⌘↵</span>
+      </button>
+    </div>
   );
 }
 
@@ -87,25 +111,47 @@ function Layout() {
     <>
       <OverlayLoader visible={overlayVisible} label={overlayLabel} />
 
-      <main className="flex min-h-full flex-col items-center px-4 py-8">
-        <div className="mx-auto grid w-full max-w-[1080px] grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
-          <h1 className="text-base font-normal uppercase tracking-widest lg:col-span-2">
-            YouTube Clipper
-          </h1>
+      <main className="flex min-h-full items-start justify-center px-4 py-8 sm:py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 8, scale: 0.99 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          className="w-full max-w-[1120px] overflow-hidden rounded-panel border border-hairline bg-panel shadow-panel backdrop-blur"
+        >
+          {/* Title bar */}
+          <div className="flex items-center gap-2 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
+            <div className="flex gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
+              <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
+              <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
+            </div>
+            <span className="ml-2 text-[12px] font-medium tracking-tight text-fg-muted">
+              YouTube Clipper
+            </span>
+            <span className="ml-auto text-[11px] text-fg-faint">Local · Private</span>
+          </div>
 
-          <section className="flex min-w-0 flex-col gap-4">
+          {/* Command bar */}
+          <div className="border-b border-hairline px-4 py-3">
             <UrlBar />
-            <Meta />
-            <TimeRangeControls />
-            <FormatQualityFields />
-            <DownloadButton />
-            <ErrorBanner />
-          </section>
+          </div>
 
-          <section className="min-w-0">
-            <PreviewPanel />
-          </section>
-        </div>
+          {/* Body */}
+          <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-2 lg:items-start lg:p-5">
+            <section className="flex min-w-0 flex-col gap-3">
+              <Meta />
+              <TimeRangeControls />
+              <FormatQualityFields />
+              <ErrorBanner />
+            </section>
+
+            <section className="min-w-0">
+              <PreviewPanel />
+            </section>
+          </div>
+
+          <FooterBar />
+        </motion.div>
       </main>
     </>
   );
