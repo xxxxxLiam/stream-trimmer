@@ -10,26 +10,27 @@ export default function UrlBar() {
   const { url, setUrl, loadInfo, loadingInfo } = useClipperContext();
 
   return (
-    <div className="flex items-stretch border border-white">
+    <div className="group flex items-center gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-1.5 transition-colors focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgba(255,99,99,0.18)]">
+      <Search className="shrink-0 text-fg-muted" size={14} />
       <input
         type="url"
-        placeholder="Paste a YouTube URL"
+        placeholder="Paste a YouTube URL…"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") loadInfo();
         }}
-        className="min-w-0 flex-1 bg-black px-3 py-2.5 text-white outline-none"
+        className="min-w-0 flex-1 bg-transparent py-1.5 text-[14px] text-fg outline-none"
       />
       <button
         type="button"
         onClick={loadInfo}
         disabled={!url || loadingInfo}
-        className="flex items-center gap-2 border-l border-white px-4 py-2.5 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-black disabled:hover:text-white"
+        className="flex items-center gap-1.5 rounded-chip px-2 py-1 text-fg-muted transition-colors hover:bg-panel-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-fg-muted"
         aria-label="Search"
       >
-        <Search />
-        <span className="hidden sm:inline">Search</span>
+        <span className="text-[12px]">Search</span>
+        <span className="kbd">↵</span>
       </button>
     </div>
   );
