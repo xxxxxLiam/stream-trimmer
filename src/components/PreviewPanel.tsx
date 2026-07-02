@@ -287,6 +287,18 @@ export default function PreviewPanel() {
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                     className="h-full w-full border-0"
+                    onLoad={(e) => {
+                      // Handshake so the embed emits onError events for 150/101.
+                      const win = (e.currentTarget as HTMLIFrameElement).contentWindow;
+                      try {
+                        win?.postMessage(
+                          JSON.stringify({ event: "listening", id: videoId }),
+                          "*",
+                        );
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
                   />
                 )
               ) : (
