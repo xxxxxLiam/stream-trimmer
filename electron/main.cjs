@@ -41,6 +41,15 @@ async function startBackend() {
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
 
+  // Ensure bundled binaries (yt-dlp, ffmpeg, deno for JS-challenge solving)
+  // are visible to any spawned child by prepending resources/bin to PATH.
+  const binDir = path.join(resolveResourcesDir(), "bin");
+  const sep = process.platform === "win32" ? ";" : ":";
+  const currentPath = process.env.PATH || "";
+  if (!currentPath.split(sep).includes(binDir)) {
+    process.env.PATH = `${binDir}${sep}${currentPath}`;
+  }
+
   const bundledServer = path.join(__dirname, "dist", "server.cjs");
   if (!fs.existsSync(bundledServer)) {
     throw new Error(
