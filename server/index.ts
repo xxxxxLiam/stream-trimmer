@@ -256,6 +256,74 @@ function errMessage(e: unknown): string {
   return (anyE?.stderr || anyE?.message || "").toString().trim();
 }
 
+// Log every field execa/youtube-dl-exec typically attaches, plus context
+// about what we invoked, so the real failure is visible in the server log.
+function logYtError(
+  where: string,
+  url: string,
+  options: Record<string, unknown>,
+  e: unknown,
+): void {
+  const anyE = (e ?? {}) as {
+    stderr?: string;
+    stdout?: string;
+    message?: string;
+    shortMessage?: string;
+    exitCode?: number;
+    signal?: string;
+    command?: string;
+    escapedCommand?: string;
+    failed?: boolean;
+    timedOut?: boolean;
+    killed?: boolean;
+  };
+  console.error(`[server] ${where} FAILED`);
+  console.error(`[server]   url=${url}`);
+  console.error(`[server]   binary=${yt?.source ?? "(unresolved)"}`);
+  console.error(`[server]   binDir=${BIN_DIR ?? "(none)"}`);
+  try {
+    console.error(`[server]   options=${JSON.stringify(options)}`);
+  } catch {
+    console.error(`[server]   options=(unserializable)`);
+  }
+  if (anyE.command) console.error(`[server]   command=${anyE.command}`);
+  if (anyE.escapedCommand)
+    console.error(`[server]   escapedCommand=${anyE.escapedCommand}`);
+  if (typeof anyE.exitCode === "number")
+    console.error(`[server]   exitCode=${anyE.exitCode}`);
+  if (anyE.signal) console.error(`[server]   signal=${anyE.signal}`);
+  if (anyE.shortMessage)
+    console.error(`[server]   shortMessage=${anyE.shortMessage}`);
+  if (anyE.message) console.error(`[server]   message=${anyE.message}`);
+  if (anyE.stdout) console.error(`[server]   stdout:\n${anyE.stdout}`);
+  if (anyE.stderr) console.error(`[server]   stderr:\n${anyE.stderr}`);
+  console.error(`[server]   raw:`, e);
+}
+
+function fullErrMessage(e: unknown): string {
+  const anyE = (e ?? {}) as {
+    stderr?: string;
+    stdout?: string;
+    shortMessage?: string;
+    message?: string;
+    exitCode?: number;
+  };
+  const parts: string[] = [];
+  if (anyE.stderr?.trim()) parts.push(anyE.stderr.trim());
+  if (anyE.shortMessage?.trim() && !parts.join("\n").includes(anyE.shortMessage.trim()))
+    parts.push(anyE.shortMessage.trim());
+  if (
+    anyE.message?.trim() &&
+    !parts.join("\n").includes(anyE.message.trim())
+  )
+    parts.push(anyE.message.trim());
+  if (anyE.stdout?.trim()) parts.push(`stdout: ${anyE.stdout.trim()}`);
+  if (typeof anyE.exitCode === "number")
+    parts.push(`exitCode=${anyE.exitCode}`);
+  const combined = parts.join("\n").trim();
+  return combined || "yt-dlp failed (no error output captured)";
+}
+
 // Per-quality bitrate (kbps) estimates used by the client for size estimation.
 // For MP4: pick best video format ≤ height cap, add best audio tbr.
 // For MP3: fixed by target bitrate (yt-dlp -x transcodes to this).
@@ -334,12 +402,18 @@ app.post("/api/info", async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
+  const options: Record<string, unknown> = {
+    dumpSingleJson: true,
+    noWarnings: true,
+    noPlaylist: true,
+  };
   try {
-    const info = await yt!.run(parsed.data.url, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noPlaylist: true,
-    }, { env: childEnv() } as any);
+    console.log(
+      `[server] /api/info url=${parsed.data.url} options=${JSON.stringify(options)}`,
+    );
+    const info = await yt!.run(parsed.data.url, options, {
+      env: childEnv(),
+    } as any);
     res.json({
       id: info.id,
       title: info.title,
@@ -348,7 +422,8 @@ app.post("/api/info", async (req: Request, res: Response) => {
       bitrates: computeBitrates(info),
     });
   } catch (e) {
-    res.status(400).json({ error: errMessage(e) || "yt-dlp failed" });
+    logYtError("/api/info", parsed.data.url, options, e);
+    res.status(400).json({ error: fullErrMessage(e) });
   }
 });
 
@@ -367,18 +442,22 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
     }
   };
 
+  const options: Record<string, unknown> = {
+    skipDownload: true,
+    writeAutoSubs: true,
+    writeSubs: true,
+    subLangs: "en",
+    subFormat: "vtt",
+    noPlaylist: true,
+    noWarnings: true,
+    output: path.join(tempDir, "sub"),
+    ffmpegLocation: resolvedFfmpeg,
+  };
   try {
-    await yt!.run(parsed.data.url, {
-      skipDownload: true,
-      writeAutoSubs: true,
-      writeSubs: true,
-      subLangs: "en",
-      subFormat: "vtt",
-      noPlaylist: true,
-      noWarnings: true,
-      output: path.join(tempDir, "sub"),
-      ffmpegLocation: resolvedFfmpeg,
-    }, { env: childEnv() } as any);
+    console.log(
+      `[server] /api/transcript url=${parsed.data.url} options=${JSON.stringify(options)}`,
+    );
+    await yt!.run(parsed.data.url, options, { env: childEnv() } as any);
 
     const files = fs.readdirSync(tempDir);
     console.log("[server] transcript files:", files);
@@ -398,9 +477,9 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
     const lines = parseVtt(raw);
     res.json({ lines, available: lines.length > 0 });
   } catch (e) {
-    console.error("[server] transcript error:", errMessage(e));
+    logYtError("/api/transcript", parsed.data.url, options, e);
     cleanup();
-    res.json({ lines: [], available: false, note: errMessage(e) });
+    res.json({ lines: [], available: false, note: fullErrMessage(e) });
   }
 });
 
@@ -417,19 +496,22 @@ app.post("/api/download", async (req: Request, res: Response) => {
       : `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   // Re-probe duration so the cap can't be bypassed by a crafted request.
+  const probeOptions: Record<string, unknown> = {
+    dumpSingleJson: true,
+    noWarnings: true,
+    noPlaylist: true,
+  };
   try {
-    const info = await yt!.run(url, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noPlaylist: true,
-    }, { env: childEnv() } as any);
+    console.log(
+      `[server] /api/download probe url=${url} options=${JSON.stringify(probeOptions)}`,
+    );
+    const info = await yt!.run(url, probeOptions, { env: childEnv() } as any);
     if (typeof info.duration === "number" && end > info.duration + 1) {
       return res.status(400).json({ error: "End exceeds video duration" });
     }
   } catch (e) {
-    return res
-      .status(400)
-      .json({ error: errMessage(e) || "yt-dlp probe failed" });
+    logYtError("/api/download probe", url, probeOptions, e);
+    return res.status(400).json({ error: fullErrMessage(e) });
   }
 
   const isAudio = format === "mp3";
@@ -498,6 +580,9 @@ app.post("/api/download", async (req: Request, res: Response) => {
   try {
     publishProgress(jobId, { phase: "downloading", percent: 0 });
     console.log(`[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`);
+    console.log(
+      `[server] /api/download exec url=${url} options=${JSON.stringify(options)}`,
+    );
     let stderrTail = "";
     await new Promise<void>((resolve, reject) => {
       const child = yt!.exec(url, options, { env: childEnv() } as any);
@@ -553,9 +638,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
       cleanup();
     });
   } catch (e) {
+    logYtError("/api/download", url, options, e);
     cleanup();
-    publishProgress(jobId, { phase: "error", percent: 0, message: errMessage(e) });
-    res.status(500).json({ error: errMessage(e) || "Download failed" });
+    const msg = fullErrMessage(e);
+    publishProgress(jobId, { phase: "error", percent: 0, message: msg });
+    res.status(500).json({ error: msg });
   }
 });
 
