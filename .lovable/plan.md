@@ -1,55 +1,34 @@
-
 ## Analysis
 
-- **Packaged app fails, terminal works** → environment gap. Terminal has `deno` on PATH; packaged Electron spawns yt-dlp with a stripped PATH, so yt-dlp's `[jsc:deno]` step can't solve YouTube's JS challenge and exits with a non-zero code. The generic "yt-dlp failed" message hides the real stderr.
-- **Real errors hidden** → `errMessage()` exists but the `exec` path in `/api/download` only rejects with `"yt-dlp exited with code N"`; stderr is consumed by the progress parser and never captured for the error path.
-- **MP4 that's actually WebM** → format string `bv*+ba/b` lets yt-dlp pick AV1 (`.webm`) + Opus; muxing into `.mp4` yields a mislabeled/broken file on some players. Need MP4-first codec preference (H.264/AVC + AAC) with graceful fallback and matching container.
-- **Shorts** → `extractVideoId` already recognizes `shorts`, but yt-dlp URL and the preview iframe use the raw URL; normalizing to `watch?v=ID` avoids edge cases in both places.
-- **Preview iframe "Error 150"** → embedding disabled by owner. It's a preview-only signal and must not look like a download error.
+Confirmed: running the bundled `yt-dlp` with `PATH=<Resources>/bin` succeeds, so binaries are fine. The failure is that the packaged Electron app spawns `yt-dlp` without the bundled `bin/` on the child's PATH, so yt-dlp's `[jsc:deno]` step can't locate `deno`.
 
-## Action plan
+Root cause is scope: `electron/main.cjs` mutates `process.env.PATH` in the main process, but the bundled Express server (`electron/dist/server.cjs`) is loaded via `require()` — it inherits main's env at require time, but `youtube-dl-exec` spawns children with its own env plumbing that has historically not always propagated a later-mutated `process.env`. Fix must set `env` explicitly on the exec call itself, not rely on ambient PATH.
 
-1. **Bundle deno with the app** so yt-dlp can solve JS challenges offline.
-   - `scripts/bundle-binaries.cjs`: download the correct deno release for the target platform (darwin-x64/arm64, win32-x64, linux-x64) into `resources/bin/deno[.exe]`. Cache in `resources/bin/.cache/` to avoid re-downloading. chmod +x on unix.
-   - `electron/main.cjs`: before starting the backend, prepend `<resources>/bin` to `process.env.PATH` so any child process (yt-dlp) inherits it and finds `deno`.
-   - `server/index.ts`: also prepend `resources/bin` to PATH when running under Electron (defense in depth), and pass it explicitly to yt-dlp child env.
-   - Bump `yt-dlp` bundling to always fetch the latest release binary in `bundle-binaries.cjs` (replace `youtube-dl-exec`'s stale bundled binary with a fresh download from the yt-dlp GitHub releases). Cache by version tag.
+Separately, current MP4 selection still resolves to AV1+Opus in `.webm` — need to strictly force `avc1`/`m4a` and merge to mp4.
 
-2. **Surface real yt-dlp errors** in `server/index.ts`:
-   - In `/api/download`, capture the tail of stderr while parsing progress; on non-zero exit reject with the trimmed stderr (last ~40 lines).
-   - `/api/info` and `/api/transcript` already use `errMessage`; ensure the message includes stderr from `youtube-dl-exec` errors (it does — verify).
-   - Log the actual command failure to the Electron main-process console so packaged-app diagnostics are visible in the OS log.
+## Fix
 
-3. **Real MP4 selection** in `/api/download`:
-   - For `mp4`, use: `bestvideo[ext=mp4][vcodec^=avc1][height<=CAP]+bestaudio[ext=m4a]/best[ext=mp4][height<=CAP]/best[height<=CAP]` (drop the height clause when quality is `best`).
-   - Keep `mergeOutputFormat: "mp4"`.
-   - MP3 path unchanged.
+### `server/index.ts`
+- Compute `binDir` once from `process.env.ELECTRON_RESOURCES` (fallback `path.join(process.resourcesPath, 'bin')` when running under Electron; dev = `resources/bin` relative to cwd).
+- Build a shared `childEnv = { ...process.env, PATH: <binDir><delim><existing PATH> }`.
+- Pass `env: childEnv` in every `yt!.run(...)` and `yt!.exec(...)` options object (info probe, transcript, download probe, download exec). This is the authoritative fix — `youtube-dl-exec` forwards the `env` option to `execa`/`spawn`.
+- On startup, log: resolved `binDir`, whether `deno`/`yt-dlp`/`ffmpeg` exist there, and the effective `PATH` prefix the child will see. Also log once per `/api/download` request: "child PATH[0]=<binDir>".
+- Tighten MP4 format string: `bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[ext=mp4]/best`, keep `mergeOutputFormat: "mp4"`, and force `remuxVideo: "mp4"` as a safety net so the final container is truly `.mp4`. Output path stays `clip.mp4`.
+- If youtube-dl-exec supports it, also pass `--extractor-args "youtube:player_client=web_safari,web"` only if needed — otherwise rely on PATH+deno.
 
-4. **Shorts + URL normalization** in `src/lib/clip.ts`:
-   - Add `normalizeYouTubeUrl(url)` → converts `youtube.com/shorts/ID`, `m.youtube.com/shorts/ID`, `youtu.be/ID` to canonical `https://www.youtube.com/watch?v=ID` (preserves `t=` if present).
-   - `useClipper`: normalize before calling `/api/info` and `/api/download`.
-   - `PreviewPanel`: iframe already uses `videoId`, no change needed, but confirm `extractVideoId` handles `shorts`.
-   - Server `urlSchema`: keep permissive YouTube host check; normalization happens client-side.
+### `electron/main.cjs`
+- Keep the existing defensive PATH prepend (belt & suspenders), but additionally set `process.env.ELECTRON_RESOURCES_BIN` explicitly so the server has a single source of truth without recomputing.
+- Log resolved resources dir + bin dir + existence of `deno`/`yt-dlp`/`ffmpeg` at startup.
 
-5. **Graceful preview when embed is blocked** in `PreviewPanel.tsx`:
-   - Attach `onError` and a `postMessage` listener for YouTube iframe API error 150/101; on error, replace iframe with a small "Preview unavailable — video owner disabled embedding. Download still works." card. Text is clearly separate from download state.
+### `scripts/build-server.cjs`
+- No behavioral change required; verify the bundle doesn't tree-shake `execa`'s env handling. (Read-only check — likely no edit.)
 
-6. **Verify** in the packaged app: normal video downloads; MP4 opens in QuickTime/VLC as H.264/AAC; MP3 plays; a Shorts URL fetches info, previews, and clips end-to-end; a forced failure (bad URL) surfaces yt-dlp's real stderr; embed-disabled video shows the preview fallback but downloads succeed.
+## Verification
 
-## Files touched
-
-- `scripts/bundle-binaries.cjs` — add deno download + fresh yt-dlp download.
-- `electron/main.cjs` — prepend `<resources>/bin` to `PATH` before backend start.
-- `server/index.ts` — PATH injection, real stderr on `/api/download`, MP4 format string.
-- `src/lib/clip.ts` — `normalizeYouTubeUrl`, Shorts handling.
-- `src/hooks/useClipper.ts` — call `normalizeYouTubeUrl` before requests.
-- `src/components/PreviewPanel.tsx` — embed-error fallback UI.
-
-## Verification checklist
-
-- Packaged `.dmg`/`.exe` downloads a standard video without needing user-installed deno/yt-dlp/ffmpeg.
-- `ffprobe` on the MP4 output reports `h264` + `aac` in an `mp4` container.
-- MP3 output is valid MPEG audio.
-- `https://youtube.com/shorts/<id>` normalized → info+preview+download all work.
-- Bad URL returns yt-dlp's actual error string in the toast/error panel.
-- Embed-blocked video: preview shows fallback text; download still succeeds.
+1. `npm run dist:mac` → open packaged app.
+2. Open the log file (Console.app filter on app name, or `~/Library/Logs/<AppName>/`): confirm lines:
+   - `[server] binDir=/…/Resources/bin (deno=ok, yt-dlp=ok, ffmpeg=ok)`
+   - `[server] child PATH prefix=/…/Resources/bin`
+3. Paste a YouTube URL → Search returns metadata (proves info call uses correct PATH).
+4. Select MP4, download a 30 s clip → file plays in QuickTime; `ffprobe clip.mp4` shows `h264` video + `aac` audio in an `mp4` container.
+5. Trigger a deliberate failure (invalid URL) → real yt-dlp stderr tail surfaces in the UI, not a generic message.
