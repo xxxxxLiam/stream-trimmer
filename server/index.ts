@@ -110,9 +110,7 @@ function makeRunner(binary: string, source: string): YtResolved {
     // dargs turns { dumpSingleJson: true, subLangs: "en" } into
     // ["--dump-single-json", "--sub-langs", "en"]. useEquals:false matches
     // yt-dlp's expected flag style.
-    const flags = dargs(opts as Record<string, unknown>, {
-      useEquals: false,
-    }).filter(Boolean);
+    const flags = dargs(opts as any, { useEquals: false }).filter(Boolean);
     return [url, ...flags];
   };
   const exec: YtExec = (url, opts, execaOpts) => {
