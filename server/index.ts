@@ -9,12 +9,13 @@ import cors from "cors";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execSync } from "node:child_process";
-import type { ChildProcess } from "node:child_process";
+import { execSync, spawn, type ChildProcess } from "node:child_process";
 import { z } from "zod";
-// youtube-dl-exec ships its own types but they're partial — treat as any for the
-// options object shape while keeping our request/response types precise.
-import ytdlpModule, { create } from "youtube-dl-exec";
+// We don't use youtube-dl-exec's runner: its underlying `tinyspawn` splits the
+// binary path on spaces (breaks `/Applications/YouTube Clipper.app/...`). We
+// spawn yt-dlp directly with node's child_process, and use `dargs` (already a
+// transitive dep) to convert the same option-object shape into CLI flags.
+import dargs from "dargs";
 import ffmpegPath from "ffmpeg-static";
 
 const PORT = Number(process.env.PORT || 5174);
@@ -97,45 +98,86 @@ interface YtResolved {
   run: YtRunner;
   exec: YtExec;
   source: string;
+  binary: string;
 }
 
-// Resolve yt-dlp: prefer the bundled binary, fall back to one on the system PATH.
+// Build a runner around a resolved yt-dlp binary that spawns it directly.
+// This is the authoritative fix for the space-in-path spawn bug: node's
+// `spawn(executable, args)` treats `executable` as an atomic path — no shell
+// interpretation, no split-on-space.
+function makeRunner(binary: string, source: string): YtResolved {
+  const toArgs = (url: string, opts: Record<string, unknown>): string[] => {
+    // dargs turns { dumpSingleJson: true, subLangs: "en" } into
+    // ["--dump-single-json", "--sub-langs", "en"]. useEquals:false matches
+    // yt-dlp's expected flag style.
+    const flags = dargs(opts as Record<string, unknown>, {
+      useEquals: false,
+    }).filter(Boolean);
+    return [url, ...flags];
+  };
+  const exec: YtExec = (url, opts, execaOpts) => {
+    const args = toArgs(url, opts);
+    const env = (execaOpts?.env as NodeJS.ProcessEnv | undefined) ?? childEnv();
+    return spawn(binary, args, {
+      env,
+      windowsHide: true,
+      // shell:false is the default — explicit for clarity.
+      shell: false,
+    });
+  };
+  const run: YtRunner = (url, opts, execaOpts) =>
+    new Promise((resolve, reject) => {
+      const child = exec(url, opts, execaOpts);
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      child.stdout?.on("data", (c: Buffer) => stdoutChunks.push(c));
+      child.stderr?.on("data", (c: Buffer) => stderrChunks.push(c));
+      child.on("error", (err) => {
+        // ENOENT / EACCES etc. from spawn itself.
+        (err as any).stderr = Buffer.concat(stderrChunks).toString();
+        (err as any).stdout = Buffer.concat(stdoutChunks).toString();
+        (err as any).command = `${binary} ${toArgs(url, opts).join(" ")}`;
+        reject(err);
+      });
+      child.on("close", (code, signal) => {
+        const stdout = Buffer.concat(stdoutChunks).toString();
+        const stderr = Buffer.concat(stderrChunks).toString();
+        if (code === 0) {
+          // yt-dlp with --dump-single-json prints JSON to stdout.
+          try {
+            resolve(stdout.trim().startsWith("{") ? JSON.parse(stdout) : stdout);
+          } catch {
+            resolve(stdout);
+          }
+        } else {
+          const err: any = new Error(stderr.trim() || `yt-dlp exited ${code}`);
+          err.exitCode = code;
+          err.signal = signal;
+          err.stdout = stdout;
+          err.stderr = stderr;
+          err.command = `${binary} ${toArgs(url, opts).join(" ")}`;
+          reject(err);
+        }
+      });
+    });
+  return { run, exec, source, binary };
+}
+
+// Resolve yt-dlp: prefer the bundled binary, fall back to one on system PATH.
 function resolveYtDlp(): YtResolved | null {
   const packaged = packagedBinary("yt-dlp");
-  if (packaged) {
-    const inst = create(packaged) as unknown as YtRunner & { exec: YtExec };
-    return {
-      run: inst,
-      exec: inst.exec.bind(inst),
-      source: `packaged (${packaged})`,
-    };
-  }
-  const anyMod = ytdlpModule as unknown as {
-    binaryPath?: string;
-    ytdlp?: { binaryPath?: string };
-    exec?: YtExec;
-  };
-  const bundled = anyMod.binaryPath || anyMod.ytdlp?.binaryPath;
-  if (bundled && fs.existsSync(bundled)) {
-    const inst = ytdlpModule as unknown as YtRunner & { exec: YtExec };
-    return {
-      run: inst,
-      exec: inst.exec.bind(inst),
-      source: `bundled (${bundled})`,
-    };
-  }
+  if (packaged) return makeRunner(packaged, `packaged (${packaged})`);
+  const devBundled = BIN_DIR
+    ? path.join(BIN_DIR, process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp")
+    : null;
+  if (devBundled && fs.existsSync(devBundled))
+    return makeRunner(devBundled, `bundled (${devBundled})`);
   try {
     const lookup =
       process.platform === "win32" ? "where yt-dlp" : "command -v yt-dlp";
     const sysPath = execSync(lookup).toString().trim().split("\n")[0];
-    if (sysPath && fs.existsSync(sysPath)) {
-      const inst = create(sysPath) as unknown as YtRunner & { exec: YtExec };
-      return {
-        run: inst,
-        exec: inst.exec.bind(inst),
-        source: `system (${sysPath})`,
-      };
-    }
+    if (sysPath && fs.existsSync(sysPath))
+      return makeRunner(sysPath, `system (${sysPath})`);
   } catch {
     // not on PATH
   }
