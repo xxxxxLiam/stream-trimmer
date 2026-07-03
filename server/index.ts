@@ -41,6 +41,47 @@ if (process.env.ELECTRON_RESOURCES) {
   }
 }
 
+// Resolve the bundled bin directory once. Packaged: <resources>/bin.
+// Dev: repo `resources/bin`. Used to build an authoritative child env so
+// spawned yt-dlp reliably sees `deno` for the [jsc:deno] step.
+function resolveBinDir(): string | null {
+  const fromMain = process.env.ELECTRON_RESOURCES_BIN;
+  if (fromMain && fs.existsSync(fromMain)) return fromMain;
+  if (process.env.ELECTRON_RESOURCES) {
+    const p = path.join(process.env.ELECTRON_RESOURCES, "bin");
+    if (fs.existsSync(p)) return p;
+  }
+  const devPath = path.resolve(process.cwd(), "resources", "bin");
+  if (fs.existsSync(devPath)) return devPath;
+  return null;
+}
+
+const BIN_DIR = resolveBinDir();
+
+function childEnv(): NodeJS.ProcessEnv {
+  const base = { ...process.env };
+  if (BIN_DIR) {
+    const sep = path.delimiter;
+    const cur = base.PATH || "";
+    const parts = cur.split(sep);
+    if (!parts.includes(BIN_DIR)) {
+      base.PATH = `${BIN_DIR}${sep}${cur}`;
+    }
+  }
+  return base;
+}
+
+// Log the effective PATH prefix once so packaged-app runs are verifiable.
+{
+  const exe = (n: string) => (process.platform === "win32" ? `${n}.exe` : n);
+  const check = (n: string) =>
+    BIN_DIR && fs.existsSync(path.join(BIN_DIR, exe(n))) ? "ok" : "MISSING";
+  console.log(
+    `[server] binDir=${BIN_DIR ?? "(none)"} (yt-dlp=${check("yt-dlp")}, ffmpeg=${check("ffmpeg")}, deno=${check("deno")})`,
+  );
+  console.log(`[server] child PATH prefix=${BIN_DIR ?? "(unchanged)"}`);
+}
+
 type YtRunner = (url: string, opts: Record<string, unknown>) => Promise<any>;
 type YtExec = (url: string, opts: Record<string, unknown>) => ChildProcess;
 
@@ -290,7 +331,7 @@ app.post("/api/info", async (req: Request, res: Response) => {
       dumpSingleJson: true,
       noWarnings: true,
       noPlaylist: true,
-    });
+    }, { env: childEnv() } as any);
     res.json({
       id: info.id,
       title: info.title,
@@ -329,7 +370,7 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
       noWarnings: true,
       output: path.join(tempDir, "sub"),
       ffmpegLocation: resolvedFfmpeg,
-    });
+    }, { env: childEnv() } as any);
 
     const files = fs.readdirSync(tempDir);
     console.log("[server] transcript files:", files);
@@ -373,7 +414,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       dumpSingleJson: true,
       noWarnings: true,
       noPlaylist: true,
-    });
+    }, { env: childEnv() } as any);
     if (typeof info.duration === "number" && end > info.duration + 1) {
       return res.status(400).json({ error: "End exceeds video duration" });
     }
@@ -397,8 +438,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   const videoFormat =
     quality === "best"
-      ? "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-      : `bestvideo[ext=mp4][vcodec^=avc1][height<=${quality}]+bestaudio[ext=m4a]/best[ext=mp4][height<=${quality}]/best[height<=${quality}]`;
+      ? "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[ext=mp4]/best"
+      : `bestvideo[ext=mp4][vcodec^=avc1][height<=${quality}]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[vcodec^=avc1][height<=${quality}]+bestaudio[acodec^=mp4a]/best[ext=mp4][height<=${quality}]/best[height<=${quality}]`;
 
   const options: Record<string, unknown> = isAudio
     ? {
@@ -419,6 +460,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
         noWarnings: true,
         format: videoFormat,
         mergeOutputFormat: "mp4",
+        remuxVideo: "mp4",
         output: outputPath,
         ffmpegLocation: resolvedFfmpeg,
       };
@@ -447,9 +489,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   try {
     publishProgress(jobId, { phase: "downloading", percent: 0 });
+    console.log(`[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`);
     let stderrTail = "";
     await new Promise<void>((resolve, reject) => {
-      const child = yt!.exec(url, options);
+      const child = yt!.exec(url, options, { env: childEnv() } as any);
       let buf = "";
       const onChunk = (chunk: Buffer | string) => {
         const s = chunk.toString();
