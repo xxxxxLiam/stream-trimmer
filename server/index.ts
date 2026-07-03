@@ -82,8 +82,16 @@ function childEnv(): NodeJS.ProcessEnv {
   console.log(`[server] child PATH prefix=${BIN_DIR ?? "(unchanged)"}`);
 }
 
-type YtRunner = (url: string, opts: Record<string, unknown>) => Promise<any>;
-type YtExec = (url: string, opts: Record<string, unknown>) => ChildProcess;
+type YtRunner = (
+  url: string,
+  opts: Record<string, unknown>,
+  execaOpts?: Record<string, unknown>,
+) => Promise<any>;
+type YtExec = (
+  url: string,
+  opts: Record<string, unknown>,
+  execaOpts?: Record<string, unknown>,
+) => ChildProcess;
 
 interface YtResolved {
   run: YtRunner;
