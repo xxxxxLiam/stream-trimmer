@@ -99,7 +99,10 @@ function FooterBar() {
         {sizeLabel && (
           <>
             <span className="text-fg-faint">·</span>
-            <span className="text-fg-faint" title="Approximate — actual size varies with scene bitrate">
+            <span
+              className="text-fg-faint"
+              title="Approximate — actual size varies with scene bitrate"
+            >
               {sizeLabel}
             </span>
           </>
@@ -112,8 +115,12 @@ function FooterBar() {
         className="btn-primary text-[12px]"
       >
         <Download size={12} />
-        <span>{downloading ? "Downloading" : `Download ${format.toUpperCase()}`}</span>
-        <span className="kbd border-white/30 bg-white/10 text-white/90">⌘↵</span>
+        <span>
+          {downloading ? "Downloading" : `Download ${format.toUpperCase()}`}
+        </span>
+        <span className="kbd border-white/30 bg-white/10 text-white/90">
+          ⌘↵
+        </span>
       </button>
     </div>
   );
@@ -149,7 +156,9 @@ function Layout() {
           <span className="text-[12px] font-medium tracking-tight text-fg-muted">
             YouTube Clipper
           </span>
-          <span className="ml-auto text-[11px] text-fg-faint">Local · Private</span>
+          <span className="ml-auto text-[11px] text-fg-faint">
+            Local · Private
+          </span>
         </div>
 
         {/* Command bar */}
@@ -167,7 +176,7 @@ function Layout() {
             <ErrorBanner />
           </section>
 
-          <section className="min-w-0">
+          <section className="flex min-h-0 min-w-0 flex-col">
             <PreviewPanel />
           </section>
         </div>

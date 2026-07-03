@@ -77,18 +77,40 @@ export default function PreviewPanel() {
     setTranscriptQuery("");
   };
 
-  // Detect embed-blocked videos (Error 150/101) via YT IFrame API postMessage.
+  // Detect embed-blocked videos. Primary: YT IFrame API postMessage onError
+  // (101/150/153). Fallback: if the embed hasn't confirmed playback within a
+  // few seconds, assume it's blocked (YouTube doesn't always post the error).
   const [embedBlocked, setEmbedBlocked] = useState(false);
+  const [embedConfirmed, setEmbedConfirmed] = useState(false);
+
   useEffect(() => {
     setEmbedBlocked(false);
-  }, [videoId]);
+    setEmbedConfirmed(false);
+    if (!videoId || showTranscript) return;
+    const t = window.setTimeout(() => {
+      setEmbedConfirmed((confirmed) => {
+        if (!confirmed) setEmbedBlocked(true);
+        return confirmed;
+      });
+    }, 3500);
+    return () => window.clearTimeout(t);
+  }, [videoId, showTranscript]);
+
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       if (typeof e.data !== "string") return;
       try {
         const data = JSON.parse(e.data);
-        if (data?.event === "onError" && (data.info === 150 || data.info === 101)) {
+        if (
+          data?.event === "onError" &&
+          [101, 150, 153].includes(Number(data.info))
+        ) {
           setEmbedBlocked(true);
+        }
+        // Any ready/state signal means the embed is actually playing.
+        if (data?.event === "onReady" || data?.event === "onStateChange") {
+          setEmbedConfirmed(true);
+          setEmbedBlocked(false);
         }
       } catch {
         /* ignore */
@@ -99,8 +121,8 @@ export default function PreviewPanel() {
   }, []);
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex gap-3">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 gap-3">
         <button
           type="button"
           onClick={toggleTranscript}
@@ -123,194 +145,193 @@ export default function PreviewPanel() {
         )}
       </div>
 
-      <div className="relative aspect-video w-full overflow-hidden rounded-panel border border-hairline bg-panel-raised">
-        <AnimatePresence mode="wait">
-          {showTranscript ? (
-            <motion.div
-              key="transcript"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14, ease: "easeOut" }}
-              className="absolute inset-0 flex flex-col"
-            >
-              {!loadingTranscript && transcript && transcript.length > 0 && (
-                <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-bg-deep/40 px-3 py-2">
-                  <Search size={12} className="text-fg-faint" />
-                  <input
-                    type="text"
-                    value={transcriptQuery}
-                    onChange={(e) => setTranscriptQuery(e.target.value)}
-                    placeholder="Search transcript…"
-                    className="min-w-0 flex-1 bg-transparent text-[12px] text-fg outline-none"
-                  />
-                  {transcriptQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setTranscriptQuery("")}
-                      className="rounded-chip px-1.5 py-0.5 text-[11px] text-fg-faint hover:bg-panel-hover hover:text-fg"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
+      {showTranscript ? (
+        <motion.div
+          key="transcript"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.14, ease: "easeOut" }}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-hairline bg-panel-raised"
+        >
+          {!loadingTranscript && transcript && transcript.length > 0 && (
+            <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-bg-deep/40 px-3 py-2">
+              <Search size={12} className="text-fg-faint" />
+              <input
+                type="text"
+                value={transcriptQuery}
+                onChange={(e) => setTranscriptQuery(e.target.value)}
+                placeholder="Search transcript…"
+                className="min-w-0 flex-1 bg-transparent text-[12px] text-fg outline-none"
+              />
+              {transcriptQuery && (
+                <button
+                  type="button"
+                  onClick={() => setTranscriptQuery("")}
+                  className="rounded-chip px-1.5 py-0.5 text-[11px] text-fg-faint hover:bg-panel-hover hover:text-fg"
+                >
+                  Clear
+                </button>
               )}
-              <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                {loadingTranscript ? (
-                  <span className="block px-2 py-2 text-fg-muted">Loading transcript…</span>
-                ) : transcript && transcript.length > 0 ? (
-                  displayTranscript.length > 0 ? (
-                    <>
-                      {displayTranscript.map((l, i) => {
-                        const inRange = l.end > start && l.start < end;
-                        const isFirstInRange = inRange && l === firstInRangeKey;
-                        const isFlashing = flashKey === l.start;
-                        return (
-                        <div
-                          key={`${l.start}-${i}`}
-                          ref={(el) => {
-                            rowRefs.current.set(l.start, el);
-                            if (isFirstInRange) firstInRangeRef.current = el;
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleRowJump(l.start)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleRowJump(l.start);
-                            }
-                          }}
+            </div>
+          )}
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {loadingTranscript ? (
+              <span className="block px-2 py-2 text-fg-muted">
+                Loading transcript…
+              </span>
+            ) : transcript && transcript.length > 0 ? (
+              displayTranscript.length > 0 ? (
+                <>
+                  {displayTranscript.map((l, i) => {
+                    const inRange = l.end > start && l.start < end;
+                    const isFirstInRange = inRange && l === firstInRangeKey;
+                    const isFlashing = flashKey === l.start;
+                    return (
+                      <div
+                        key={`${l.start}-${i}`}
+                        ref={(el) => {
+                          rowRefs.current.set(l.start, el);
+                          if (isFirstInRange) firstInRangeRef.current = el;
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleRowJump(l.start)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleRowJump(l.start);
+                          }
+                        }}
+                        className={
+                          "group relative flex cursor-pointer items-start gap-3 pl-3 pr-2 py-1.5 transition-colors " +
+                          (inRange
+                            ? "bg-accent/10 hover:bg-accent/15"
+                            : "opacity-50 hover:bg-panel-hover hover:opacity-100") +
+                          (isFlashing ? " ring-1 ring-accent/60" : "")
+                        }
+                      >
+                        {inRange && (
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-0 top-0 bottom-0 w-[2px] bg-accent"
+                          />
+                        )}
+                        <span
                           className={
-                            "group relative flex cursor-pointer items-start gap-3 pl-3 pr-2 py-1.5 transition-colors " +
-                            (inRange
-                              ? "bg-accent/10 hover:bg-accent/15"
-                              : "opacity-50 hover:bg-panel-hover hover:opacity-100") +
-                            (isFlashing ? " ring-1 ring-accent/60" : "")
+                            "w-14 shrink-0 pt-[1px] text-[11px] tabular-nums " +
+                            (inRange ? "text-accent" : "text-fg-faint")
                           }
                         >
-                          {inRange && (
-                            <span
-                              aria-hidden
-                              className="pointer-events-none absolute left-0 top-0 bottom-0 w-[2px] bg-accent"
-                            />
-                          )}
-                          <span
-                            className={
-                              "w-14 shrink-0 pt-[1px] text-[11px] tabular-nums " +
-                              (inRange ? "text-accent" : "text-fg-faint")
-                            }
+                          {formatTimestamp(l.start)}
+                        </span>
+                        <span
+                          className={
+                            "min-w-0 flex-1 text-[13px] leading-relaxed " +
+                            (inRange ? "text-fg" : "text-fg-muted")
+                          }
+                        >
+                          {l.text}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStartFromLine(l);
+                            }}
+                            className="rounded-chip p-1 text-fg-faint hover:bg-accent/15 hover:text-accent"
+                            title="Set as clip start"
+                            aria-label="Set as clip start"
                           >
-                            {formatTimestamp(l.start)}
-                          </span>
-                          <span
-                            className={
-                              "min-w-0 flex-1 text-[13px] leading-relaxed " +
-                              (inRange ? "text-fg" : "text-fg-muted")
-                            }
+                            <ChevronBarLeft size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEndFromLine(l);
+                            }}
+                            className="rounded-chip p-1 text-fg-faint hover:bg-accent/15 hover:text-accent"
+                            title="Set as clip end"
+                            aria-label="Set as clip end"
                           >
-                            {l.text}
-                          </span>
-                          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setStartFromLine(l);
-                              }}
-                              className="rounded-chip p-1 text-fg-faint hover:bg-accent/15 hover:text-accent"
-                              title="Set as clip start"
-                              aria-label="Set as clip start"
-                            >
-                              <ChevronBarLeft size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEndFromLine(l);
-                              }}
-                              className="rounded-chip p-1 text-fg-faint hover:bg-accent/15 hover:text-accent"
-                              title="Set as clip end"
-                              aria-label="Set as clip end"
-                            >
-                              <ChevronBarRight size={12} />
-                            </button>
-                          </div>
+                            <ChevronBarRight size={12} />
+                          </button>
                         </div>
-                        );
-                      })}
-                      <p className="mt-3 px-2 text-[11px] text-fg-faint">
-                        Auto-generated by YouTube — may contain errors.
-                      </p>
-                    </>
-                  ) : (
-                    <span className="block px-2 py-2 text-fg-muted">
-                      No lines match “{transcriptQuery}”.
-                    </span>
-                  )
-                ) : transcript && transcript.length === 0 ? (
-                  <span className="block px-2 py-2 text-fg-muted">
-                    No transcript available for this video.
-                  </span>
-                ) : (
-                  <span className="block px-2 py-2 text-fg-muted">
-                    No transcript loaded.
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="video"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.99 }}
-              transition={{ duration: 0.16, ease: "easeOut" }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              {videoId ? (
-                embedBlocked ? (
-                  <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center text-fg-muted">
-                    <ExclamationTriangle size={22} className="text-accent" />
-                    <span className="text-[13px] text-fg">Preview unavailable</span>
-                    <span className="text-[12px] text-fg-faint">
-                      The video owner disabled embedded playback. This has no
-                      effect on downloading — clip and download still work.
-                    </span>
-                  </div>
-                ) : (
-                  <iframe
-                    key={videoId}
-                    src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1`}
-                    title="YouTube preview"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="h-full w-full border-0"
-                    onLoad={(e) => {
-                      // Handshake so the embed emits onError events for 150/101.
-                      const win = (e.currentTarget as HTMLIFrameElement).contentWindow;
-                      try {
-                        win?.postMessage(
-                          JSON.stringify({ event: "listening", id: videoId }),
-                          "*",
-                        );
-                      } catch {
-                        /* ignore */
-                      }
-                    }}
-                  />
-                )
+                      </div>
+                    );
+                  })}
+                  <p className="mt-3 px-2 text-[11px] text-fg-faint">
+                    Auto-generated by YouTube — may contain errors.
+                  </p>
+                </>
               ) : (
-                <div className="flex flex-col items-center gap-2 text-fg-faint">
-                  <CameraVideo size={22} />
-                  <span className="text-[12px]">Preview will appear here</span>
+                <span className="block px-2 py-2 text-fg-muted">
+                  No lines match “{transcriptQuery}”.
+                </span>
+              )
+            ) : transcript && transcript.length === 0 ? (
+              <span className="block px-2 py-2 text-fg-muted">
+                No transcript available for this video.
+              </span>
+            ) : (
+              <span className="block px-2 py-2 text-fg-muted">
+                No transcript loaded.
+              </span>
+            )}
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="video"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+          className="relative aspect-video w-full shrink-0 overflow-hidden rounded-panel border border-hairline bg-panel-raised"
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            {videoId ? (
+              embedBlocked ? (
+                <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center text-fg-muted">
+                  <ExclamationTriangle size={22} className="text-accent" />
+                  <span className="text-[13px] text-fg">Preview unavailable</span>
+                  <span className="text-[12px] text-fg-faint">
+                    The video owner disabled embedded playback. This has no
+                    effect on downloading — clip and download still work.
+                  </span>
                 </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              ) : (
+                <iframe
+                  key={videoId}
+                  src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1`}
+                  title="YouTube preview"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="h-full w-full border-0"
+                  onLoad={(e) => {
+                    // Handshake so the embed emits onReady/onError events.
+                    const win = (e.currentTarget as HTMLIFrameElement)
+                      .contentWindow;
+                    try {
+                      win?.postMessage(
+                        JSON.stringify({ event: "listening", id: videoId }),
+                        "*",
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                />
+              )
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-fg-faint">
+                <CameraVideo size={22} />
+                <span className="text-[12px]">Preview will appear here</span>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
