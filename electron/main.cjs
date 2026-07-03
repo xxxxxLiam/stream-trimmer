@@ -49,6 +49,15 @@ async function startBackend() {
   if (!currentPath.split(sep).includes(binDir)) {
     process.env.PATH = `${binDir}${sep}${currentPath}`;
   }
+  process.env.ELECTRON_RESOURCES_BIN = binDir;
+
+  // Startup diagnostic — confirms binaries are in place before the server
+  // starts spawning yt-dlp.
+  const exe = (n) => (process.platform === "win32" ? `${n}.exe` : n);
+  const check = (n) => (fs.existsSync(path.join(binDir, exe(n))) ? "ok" : "MISSING");
+  console.log(
+    `[electron] binDir=${binDir} (yt-dlp=${check("yt-dlp")}, ffmpeg=${check("ffmpeg")}, deno=${check("deno")})`,
+  );
 
   const bundledServer = path.join(__dirname, "dist", "server.cjs");
   if (!fs.existsSync(bundledServer)) {
