@@ -150,20 +150,7 @@ export async function parseJson<T = unknown>(response: Response): Promise<T> {
 // Resolves an API path. In Electron the preload sets `window.__API_BASE__`
 // to the loopback URL of the in-process Express backend. In the browser dev
 // workflow it's undefined and Vite's `/api` proxy handles routing.
-declare global {
-  interface Window {
-    __API_BASE__?: string;
-    electronAPI?: {
-      isElectron: true;
-      pickDirectory: () => Promise<string | null>;
-      saveFile: (payload: {
-        dirPath: string;
-        filename: string;
-        data: ArrayBuffer;
-      }) => Promise<{ ok: true; path: string } | { ok: false; error: string }>;
-    };
-  }
-}
+// Window augmentations live in src/vite-env.d.ts.
 export function apiUrl(path: string): string {
   const base =
     typeof window !== "undefined" && window.__API_BASE__
