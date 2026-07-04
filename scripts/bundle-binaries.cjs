@@ -9,6 +9,7 @@ const zlib = require("node:zlib");
 const { spawnSync } = require("node:child_process");
 
 const platform = process.platform; // 'darwin' | 'win32' | 'linux'
+const arch = process.arch; // 'x64' | 'arm64'
 const outDir = path.join(__dirname, "..", "resources", "bin");
 const cacheDir = path.join(outDir, ".cache");
 fs.mkdirSync(outDir, { recursive: true });
@@ -25,13 +26,10 @@ function copy(src, dstName) {
   console.log(`[bundle-binaries] ${src} -> ${dst}`);
 }
 
-// ffmpeg via ffmpeg-static
-const ffmpegStatic = require("ffmpeg-static");
-if (!ffmpegStatic || !fs.existsSync(ffmpegStatic)) {
-  console.error("ffmpeg-static binary missing. Reinstall ffmpeg-static.");
-  process.exit(1);
-}
-copy(ffmpegStatic, platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
+// ffmpeg is downloaded explicitly per target platform below, mirroring the
+// yt-dlp / deno pattern. We do NOT rely on the ffmpeg-static npm package
+// resolving to the correct arch, because it caches whichever binary was
+// installed on the host and has silently shipped wrong-arch builds before.
 
 // -------- HTTP download helper (follows redirects) --------
 function download(url, destPath) {
@@ -59,6 +57,42 @@ function download(url, destPath) {
         .on("error", reject);
     req(url);
   });
+}
+
+// -------- Platform-arch guard --------
+// Assert the file at `p` is a native executable for the current platform.
+// Fails loudly (throws) so a wrong-arch binary can never ship silently.
+function assertPlatformExecutable(p, label) {
+  const fd = fs.openSync(p, "r");
+  const buf = Buffer.alloc(4);
+  fs.readSync(fd, buf, 0, 4, 0);
+  fs.closeSync(fd);
+
+  let ok = false;
+  let detected = buf.toString("hex");
+  if (platform === "linux") {
+    // ELF: 7f 45 4c 46
+    ok = buf[0] === 0x7f && buf[1] === 0x45 && buf[2] === 0x4c && buf[3] === 0x46;
+    detected = ok ? "ELF" : detected;
+  } else if (platform === "darwin") {
+    // Mach-O 64-bit LE (cf fa ed fe) or universal fat (ca fe ba be / be ba fe ca)
+    ok =
+      (buf[0] === 0xcf && buf[1] === 0xfa && buf[2] === 0xed && buf[3] === 0xfe) ||
+      (buf[0] === 0xca && buf[1] === 0xfe && buf[2] === 0xba && buf[3] === 0xbe) ||
+      (buf[0] === 0xbe && buf[1] === 0xba && buf[2] === 0xfe && buf[3] === 0xca);
+    detected = ok ? "Mach-O" : detected;
+  } else if (platform === "win32") {
+    // PE: 'MZ' (4d 5a)
+    ok = buf[0] === 0x4d && buf[1] === 0x5a;
+    detected = ok ? "PE" : detected;
+  }
+  if (!ok) {
+    throw new Error(
+      `[bundle-binaries] ${label} at ${p} is not a native ${platform}/${arch} executable ` +
+        `(magic=${detected}). Refusing to bundle a wrong-arch binary.`,
+    );
+  }
+  console.log(`[bundle-binaries] verified ${label} is ${detected} for ${platform}/${arch}`);
 }
 
 function cached(name, urlFactory, install) {
@@ -92,6 +126,40 @@ async function bundleYtDlp() {
     /* windows */
   }
   console.log(`[bundle-binaries] yt-dlp -> ${dst}`);
+}
+
+// -------- ffmpeg: fetch static build for the current platform+arch --------
+// Source: eugeneware/ffmpeg-static GitHub releases (same upstream the npm
+// package uses). Assets are gzip'd single binaries named
+// `ffmpeg-<platform>-<arch>[.exe].gz`.
+async function bundleFfmpeg() {
+  const tag = "b6.0"; // pinned static build
+  let assetPlatform;
+  if (platform === "darwin") assetPlatform = "darwin";
+  else if (platform === "win32") assetPlatform = "win32";
+  else assetPlatform = "linux";
+  const assetArch = arch === "arm64" ? "arm64" : "x64";
+  const exeSuffix = platform === "win32" ? ".exe" : "";
+  const assetName = `ffmpeg-${assetPlatform}-${assetArch}${exeSuffix}.gz`;
+  const url = `https://github.com/eugeneware/ffmpeg-static/releases/download/${tag}/${assetName}`;
+  const gzPath = path.join(cacheDir, assetName);
+  const outName = platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  const dst = path.join(outDir, outName);
+
+  console.log(`[bundle-binaries] downloading ffmpeg: ${url}`);
+  await download(url, gzPath);
+
+  // gunzip → dst
+  const gz = fs.readFileSync(gzPath);
+  const bin = zlib.gunzipSync(gz);
+  fs.writeFileSync(dst, bin);
+  try {
+    fs.chmodSync(dst, 0o755);
+  } catch {
+    /* windows */
+  }
+  assertPlatformExecutable(dst, "ffmpeg");
+  console.log(`[bundle-binaries] ffmpeg -> ${dst}`);
 }
 
 // -------- deno: fetch latest release for yt-dlp's JS challenge solver --------
@@ -143,6 +211,11 @@ async function bundleDeno() {
 (async () => {
   try {
     await cached(
+      platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
+      () => null,
+      bundleFfmpeg,
+    );
+    await cached(
       platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
       () => null,
       bundleYtDlp,
@@ -152,6 +225,14 @@ async function bundleDeno() {
       () => null,
       bundleDeno,
     );
+    // Final belt-and-braces verification of every bundled binary.
+    for (const name of [
+      platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
+      platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
+      platform === "win32" ? "deno.exe" : "deno",
+    ]) {
+      assertPlatformExecutable(path.join(outDir, name), name);
+    }
     console.log("[bundle-binaries] done");
   } catch (err) {
     console.error("[bundle-binaries] failed:", err.message || err);
