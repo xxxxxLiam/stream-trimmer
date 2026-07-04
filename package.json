@@ -29,6 +29,7 @@
     "autoprefixer": "^10.5.2",
     "concurrently": "^9.0.0",
     "cors": "^2.8.5",
+    "electron-updater": "^6.8.9",
     "express": "^4.21.0",
     "ffmpeg-static": "^5.2.0",
     "framer-motion": "^12.42.2",
