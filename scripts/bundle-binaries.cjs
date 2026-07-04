@@ -63,36 +63,74 @@ function download(url, destPath) {
 // Assert the file at `p` is a native executable for the current platform.
 // Fails loudly (throws) so a wrong-arch binary can never ship silently.
 function assertPlatformExecutable(p, label) {
+  // Read enough header for PE lookups (PE offset lives at 0x3C, then +24
+  // bytes to the machine field of the optional header — 512 is plenty).
   const fd = fs.openSync(p, "r");
-  const buf = Buffer.alloc(4);
-  fs.readSync(fd, buf, 0, 4, 0);
+  const head = Buffer.alloc(512);
+  const read = fs.readSync(fd, head, 0, 512, 0);
   fs.closeSync(fd);
 
-  let ok = false;
-  let detected = buf.toString("hex");
+  const wantArch = arch === "arm64" ? "arm64" : "x64";
+  let container = null;
+  let detectedArch = null;
+
   if (platform === "linux") {
-    // ELF: 7f 45 4c 46
-    ok = buf[0] === 0x7f && buf[1] === 0x45 && buf[2] === 0x4c && buf[3] === 0x46;
-    detected = ok ? "ELF" : detected;
+    // ELF: 7f 45 4c 46, then e_machine at offset 0x12 (2 bytes LE)
+    if (head[0] === 0x7f && head[1] === 0x45 && head[2] === 0x4c && head[3] === 0x46) {
+      container = "ELF";
+      const eMachine = head.readUInt16LE(0x12);
+      if (eMachine === 0x3e) detectedArch = "x64"; // EM_X86_64
+      else if (eMachine === 0xb7) detectedArch = "arm64"; // EM_AARCH64
+      else detectedArch = `elf-machine-0x${eMachine.toString(16)}`;
+    }
   } else if (platform === "darwin") {
-    // Mach-O 64-bit LE (cf fa ed fe) or universal fat (ca fe ba be / be ba fe ca)
-    ok =
-      (buf[0] === 0xcf && buf[1] === 0xfa && buf[2] === 0xed && buf[3] === 0xfe) ||
-      (buf[0] === 0xca && buf[1] === 0xfe && buf[2] === 0xba && buf[3] === 0xbe) ||
-      (buf[0] === 0xbe && buf[1] === 0xba && buf[2] === 0xfe && buf[3] === 0xca);
-    detected = ok ? "Mach-O" : detected;
+    // Universal / fat: accept as-is (contains all arches).
+    const isFat =
+      (head[0] === 0xca && head[1] === 0xfe && head[2] === 0xba && head[3] === 0xbe) ||
+      (head[0] === 0xbe && head[1] === 0xba && head[2] === 0xfe && head[3] === 0xca);
+    if (isFat) {
+      container = "Mach-O (universal)";
+      detectedArch = wantArch; // universal → treat as satisfying any arch
+    } else if (head[0] === 0xcf && head[1] === 0xfa && head[2] === 0xed && head[3] === 0xfe) {
+      // Thin 64-bit LE Mach-O; cputype is uint32 LE at offset 4.
+      container = "Mach-O";
+      const cputype = head.readUInt32LE(4);
+      if (cputype === 0x01000007) detectedArch = "x64"; // CPU_TYPE_X86_64
+      else if (cputype === 0x0100000c) detectedArch = "arm64"; // CPU_TYPE_ARM64
+      else detectedArch = `macho-cputype-0x${cputype.toString(16)}`;
+    }
   } else if (platform === "win32") {
-    // PE: 'MZ' (4d 5a)
-    ok = buf[0] === 0x4d && buf[1] === 0x5a;
-    detected = ok ? "PE" : detected;
+    // PE: 'MZ' at 0, e_lfanew (uint32 LE) at 0x3C points to 'PE\0\0' + COFF header.
+    // COFF Machine field is the 2 bytes immediately after 'PE\0\0'.
+    if (head[0] === 0x4d && head[1] === 0x5a) {
+      container = "PE";
+      const peOff = head.readUInt32LE(0x3c);
+      if (peOff + 6 <= read && head[peOff] === 0x50 && head[peOff + 1] === 0x45) {
+        const machine = head.readUInt16LE(peOff + 4);
+        if (machine === 0x8664) detectedArch = "x64"; // IMAGE_FILE_MACHINE_AMD64
+        else if (machine === 0xaa64) detectedArch = "arm64"; // IMAGE_FILE_MACHINE_ARM64
+        else detectedArch = `pe-machine-0x${machine.toString(16)}`;
+      } else {
+        detectedArch = "pe-header-missing";
+      }
+    }
   }
-  if (!ok) {
+
+  if (!container) {
     throw new Error(
-      `[bundle-binaries] ${label} at ${p} is not a native ${platform}/${arch} executable ` +
-        `(magic=${detected}). Refusing to bundle a wrong-arch binary.`,
+      `[bundle-binaries] ${label} at ${p} is not a native ${platform} executable ` +
+        `(magic=${head.slice(0, 4).toString("hex")}). Refusing to bundle.`,
     );
   }
-  console.log(`[bundle-binaries] verified ${label} is ${detected} for ${platform}/${arch}`);
+  if (detectedArch !== wantArch) {
+    throw new Error(
+      `[bundle-binaries] ${label} at ${p} is ${container} for arch=${detectedArch}, ` +
+        `but this runner is ${platform}/${wantArch}. Refusing to bundle a wrong-arch binary.`,
+    );
+  }
+  console.log(
+    `[bundle-binaries] verified ${label}: ${container} ${detectedArch} for ${platform}/${wantArch}`,
+  );
 }
 
 function cached(name, urlFactory, install) {
@@ -139,8 +177,10 @@ async function bundleFfmpeg() {
   else if (platform === "win32") assetPlatform = "win32";
   else assetPlatform = "linux";
   const assetArch = arch === "arm64" ? "arm64" : "x64";
-  const exeSuffix = platform === "win32" ? ".exe" : "";
-  const assetName = `ffmpeg-${assetPlatform}-${assetArch}${exeSuffix}.gz`;
+  // NOTE: eugeneware/ffmpeg-static assets have NO ".exe" in the remote name
+  // on any platform — the file is always `ffmpeg-<platform>-<arch>.gz`.
+  // The local output filename still gets `.exe` on win32 below.
+  const assetName = `ffmpeg-${assetPlatform}-${assetArch}.gz`;
   const url = `https://github.com/eugeneware/ffmpeg-static/releases/download/${tag}/${assetName}`;
   const gzPath = path.join(cacheDir, assetName);
   const outName = platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
