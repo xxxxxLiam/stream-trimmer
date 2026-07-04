@@ -12,6 +12,7 @@ import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
+import UpdateStatus from "./components/UpdateStatus";
 import { formatTimestamp } from "./lib/clip";
 import { formatBytes } from "./lib/clip";
 
@@ -156,9 +157,10 @@ function Layout() {
           <span className="text-[12px] font-medium tracking-tight text-fg-muted">
             YouTube Clipper
           </span>
-          <span className="ml-auto text-[11px] text-fg-faint">
-            Local · Private
-          </span>
+          <div className="ml-auto flex items-center gap-3">
+            <UpdateStatus />
+            <span className="text-[11px] text-fg-faint">Local · Private</span>
+          </div>
         </div>
 
         {/* Command bar */}
