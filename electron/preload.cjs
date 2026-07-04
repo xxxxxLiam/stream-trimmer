@@ -12,6 +12,13 @@ try {
     isElectron: true,
     pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"),
     saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
+    checkForUpdates: () => ipcRenderer.invoke("updater:check"),
+    quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
+    onUpdateStatus: (cb) => {
+      const listener = (_e, payload) => cb(payload);
+      ipcRenderer.on("updater:status", listener);
+      return () => ipcRenderer.removeListener("updater:status", listener);
+    },
   });
 } catch {
   // contextBridge unavailable in some contexts — fall back to a direct set.
