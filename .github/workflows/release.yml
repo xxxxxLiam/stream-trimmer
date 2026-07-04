@@ -34,8 +34,7 @@ jobs:
 
       - name: Install dependencies
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          YOUTUBE_DL_SKIP_DOWNLOAD: "true"
         run: npm ci
 
       - name: Build front-end + bundle binaries + server
