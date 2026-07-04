@@ -627,11 +627,24 @@
       </div>
 
       <div class="foot">
-        <strong>First launch:</strong> the app is unsigned (normal for free
-        open-source apps), so your OS shows a one-time prompt. On Mac,
-        right-click the app → <strong>Open</strong>. On Windows, click
-        <strong>More info</strong> → <strong>Run anyway</strong>. On Linux, make
-        it executable first with <code>chmod +x</code>.
+        <strong>First launch — the app is unsigned</strong> (normal for free
+        open-source apps), so your system shows a one-time prompt. <br /><br />
+        <strong>macOS:</strong> drag the app to Applications. If you see
+        <em>"YouTube Clipper is damaged and can't be opened,"</em> that's just
+        macOS blocking an unsigned download — the app is safe. Open
+        <strong>Terminal</strong> and run:
+        <br />
+        <code>xattr -cr "/Applications/YouTube Clipper.app"</code>
+        <br />
+        then open the app normally.
+        <br /><br />
+        <strong>Windows:</strong> run the installer. If SmartScreen appears,
+        click <strong>More info</strong> → <strong>Run anyway</strong>.
+        <br /><br />
+        <strong>Linux:</strong> make the AppImage executable (<code
+          >chmod +x</code
+        >
+        or right-click → Properties → allow executing), then run it.
       </div>
     </main>
   </body>
