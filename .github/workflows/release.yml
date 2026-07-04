@@ -1,0 +1,44 @@
+name: Release
+
+# Triggered by pushing a version tag like v1.0.1. Builds native installers
+# on each OS's own runner and publishes them to the matching GitHub Release
+# using the built-in GITHUB_TOKEN (no PAT required).
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build: npx electron-builder --mac dmg --publish always
+          - os: windows-latest
+            build: npx electron-builder --win nsis --publish always
+          - os: ubuntu-latest
+            build: npx electron-builder --linux AppImage --publish always
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build front-end + bundle binaries + server
+        run: npm run build:electron
+
+      - name: Build & publish installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ${{ matrix.build }}
