@@ -46,7 +46,7 @@ if (process.env.ELECTRON_RESOURCES) {
 // Dev: repo `resources/bin`. Used to build an authoritative child env so
 // spawned yt-dlp reliably sees `deno` for the [jsc:deno] step.
 function resolveBinDir(): string | null {
-  const fromMain = process.env.ELECTRON_RESOURCES_BIN;
+  const fromMain = process.env. ELECTRON_RESOURCES_BIN;
   if (fromMain && fs.existsSync(fromMain)) return fromMain;
   if (process.env.ELECTRON_RESOURCES) {
     const p = path.join(process.env.ELECTRON_RESOURCES, "bin");
@@ -143,7 +143,9 @@ function makeRunner(binary: string, source: string): YtResolved {
         if (code === 0) {
           // yt-dlp with --dump-single-json prints JSON to stdout.
           try {
-            resolve(stdout.trim().startsWith("{") ? JSON.parse(stdout) : stdout);
+            resolve(
+              stdout.trim().startsWith("{") ? JSON.parse(stdout) : stdout,
+            );
           } catch {
             resolve(stdout);
           }
@@ -227,10 +229,7 @@ const binariesOk = preflight();
 const urlSchema = z
   .string()
   .url()
-  .refine(
-    (v) => /youtube\.com|youtu\.be/.test(v),
-    "URL must be a YouTube link",
-  );
+  .refine((v) => /youtube\.com|youtu\.be/.test(v), "URL must be a YouTube link");
 
 const infoSchema = z.object({ url: urlSchema });
 
@@ -280,9 +279,7 @@ function parseVtt(raw: string): VttLine[] {
     const start = toSec(+m[1], +m[2], +m[3]);
     const end = toSec(+m[5], +m[6], +m[7]);
     const text = rows
-      .filter(
-        (r) => !tc.test(r) && r.trim() && !/^\d+$/.test(r) && r !== "WEBVTT",
-      )
+      .filter((r) => !tc.test(r) && r.trim() && !/^\d+$/.test(r) && r !== "WEBVTT")
       .join(" ")
       .replace(/<[^>]+>/g, "")
       .trim();
@@ -350,12 +347,12 @@ function fullErrMessage(e: unknown): string {
   };
   const parts: string[] = [];
   if (anyE.stderr?.trim()) parts.push(anyE.stderr.trim());
-  if (anyE.shortMessage?.trim() && !parts.join("\n").includes(anyE.shortMessage.trim()))
-    parts.push(anyE.shortMessage.trim());
   if (
-    anyE.message?.trim() &&
-    !parts.join("\n").includes(anyE.message.trim())
+    anyE.shortMessage?.trim() &&
+    !parts.join("\n").includes(anyE.shortMessage.trim())
   )
+    parts.push(anyE.shortMessage.trim());
+  if (anyE.message?.trim() && !parts.join("\n").includes(anyE.message.trim()))
     parts.push(anyE.message.trim());
   if (anyE.stdout?.trim()) parts.push(`stdout: ${anyE.stdout.trim()}`);
   if (typeof anyE.exitCode === "number")
@@ -577,6 +574,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
         forceKeyframesAtCuts: true,
         noPlaylist: true,
         noWarnings: true,
+        newline: true,
+        progress: true,
         extractAudio: true,
         audioFormat: "mp3",
         audioQuality: quality,
@@ -588,6 +587,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
         forceKeyframesAtCuts: true,
         noPlaylist: true,
         noWarnings: true,
+        newline: true,
+        progress: true,
         format: videoFormat,
         mergeOutputFormat: "mp4",
         remuxVideo: "mp4",
@@ -595,31 +596,45 @@ app.post("/api/download", async (req: Request, res: Response) => {
         ffmpegLocation: resolvedFfmpeg,
       };
 
-  const expectedPasses = isAudio ? 1 : 2;
-  let passIdx = 0;
-  let lastPct = 0;
+  // Progress is driven by ffmpeg's `... time=HH:MM:SS.ss ...` output, which
+  // streams continuously as the clip is processed (yt-dlp routes section
+  // downloads through ffmpeg with --download-sections). Progress =
+  // processed time / clip length. yt-dlp's own `[download] NN%` only appears
+  // once at the very end, so it's used only as a fallback.
+  const clipDuration = Math.max(0.1, end - start);
+  let lastReported = 0;
+  const hmsToSeconds = (h: string, m: string, s: string) =>
+    Number(h) * 3600 + Number(m) * 60 + parseFloat(s);
   const updateFromLine = (line: string) => {
-    if (/^\[download\] Destination:/.test(line) || /Downloading \d+ format/.test(line)) {
-      if (passIdx < expectedPasses) passIdx = Math.min(passIdx + 1, expectedPasses);
-      lastPct = 0;
+    const tm = line.match(/time=\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/);
+    if (tm) {
+      const secs = hmsToSeconds(tm[1], tm[2], tm[3]);
+      // Ignore ffmpeg's initial bogus negative timestamp.
+      if (secs >= 0) {
+        const pct = Math.min(99, Math.round((secs / clipDuration) * 100));
+        if (pct > lastReported) {
+          lastReported = pct;
+          publishProgress(jobId, { phase: "downloading", percent: pct });
+        }
+      }
+      return;
     }
-    const m = line.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
-    if (m) {
-      const pct = Math.min(100, Math.max(0, parseFloat(m[1])));
-      if (pct + 5 < lastPct && passIdx < expectedPasses) passIdx = Math.min(passIdx + 1, expectedPasses);
-      lastPct = pct;
-      const base = Math.max(0, passIdx - 1);
-      const overall = Math.min(
-        99,
-        Math.round(((base + pct / 100) / expectedPasses) * 100),
-      );
-      publishProgress(jobId, { phase: "downloading", percent: overall });
+    // Fallback: honor a real yt-dlp download percentage if one is emitted.
+    const dm = line.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
+    if (dm) {
+      const pct = Math.min(99, Math.round(parseFloat(dm[1])));
+      if (pct > lastReported) {
+        lastReported = pct;
+        publishProgress(jobId, { phase: "downloading", percent: pct });
+      }
     }
   };
 
   try {
     publishProgress(jobId, { phase: "downloading", percent: 0 });
-    console.log(`[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`);
+    console.log(
+      `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
+    );
     console.log(
       `[server] /api/download exec url=${url} options=${JSON.stringify(options)}`,
     );
@@ -656,7 +671,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
     if (!fs.existsSync(outputPath)) {
       cleanup();
-      publishProgress(jobId, { phase: "error", percent: 0, message: "no output" });
+      publishProgress(jobId, {
+        phase: "error",
+        percent: 0,
+        message: "no output",
+      });
       return res.status(500).json({ error: "yt-dlp produced no output" });
     }
 
@@ -674,7 +693,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
       cleanup();
     });
     stream.on("error", () => {
-      publishProgress(jobId, { phase: "error", percent: 0, message: "stream error" });
+      publishProgress(jobId, {
+        phase: "error",
+        percent: 0,
+        message: "stream error",
+      });
       cleanup();
     });
   } catch (e) {

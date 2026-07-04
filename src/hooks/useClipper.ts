@@ -40,6 +40,7 @@ export function useClipper() {
   const [downloadPhase, setDownloadPhase] = useState<
     "idle" | "downloading" | "processing" | "done" | "error"
   >("idle");
+  const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const [showTranscript, setShowTranscript] = useState(false);
@@ -64,6 +65,12 @@ export function useClipper() {
     const chosen = await window.electronAPI.pickDirectory();
     if (chosen) setSaveDir(chosen);
   }, [setSaveDir]);
+
+  const revealLastSaved = useCallback(() => {
+    if (isElectron && window.electronAPI?.showInFolder && lastSavedPath) {
+      void window.electronAPI.showInFolder(lastSavedPath);
+    }
+  }, [isElectron, lastSavedPath]);
 
   const videoId = useMemo(() => extractVideoId(url), [url]);
   const duration = info?.duration ?? 0;
@@ -274,15 +281,15 @@ export function useClipper() {
       const res = await fetch(
         apiUrl(`/api/download?jobId=${encodeURIComponent(jobId)}`),
         {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: normalizeYouTubeUrl(url),
-          start,
-          end,
-          format,
-          quality,
-        }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: normalizeYouTubeUrl(url),
+            start,
+            end,
+            format,
+            quality,
+          }),
         },
       );
       if (!res.ok) {
@@ -302,7 +309,9 @@ export function useClipper() {
           data: arr,
         });
         if (!result.ok) throw new Error(result.error);
+        setLastSavedPath(result.path ?? null);
       } else {
+        setLastSavedPath(null);
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = objectUrl;
@@ -325,7 +334,17 @@ export function useClipper() {
         setDownloadProgress(0);
       }, 1200);
     }
-  }, [info, validationError, url, start, end, format, quality, isElectron, saveDir]);
+  }, [
+    info,
+    validationError,
+    url,
+    start,
+    end,
+    format,
+    quality,
+    isElectron,
+    saveDir,
+  ]);
 
   return {
     url,
@@ -372,6 +391,8 @@ export function useClipper() {
     saveDir,
     setSaveDir,
     pickSaveDir,
+    lastSavedPath,
+    revealLastSaved,
   };
 }
 

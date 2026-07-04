@@ -1,7 +1,7 @@
 {
   "name": "youtube-clipper",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -89,9 +89,14 @@
     "asar": true,
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
-      "artifactName": "YouTube-Clipper-${version}-macOS-AppleSilicon.${ext}",
+      "artifactName": "YouTube-Clipper-macOS-AppleSilicon.${ext}",
       "category": "public.app-category.utilities",
       "identity": null,
       "icon": "build/icon.icns",
@@ -99,17 +104,27 @@
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "artifactName": "YouTube-Clipper-${version}-Windows-x64-Setup.${ext}",
+      "artifactName": "YouTube-Clipper-Windows-x64-Setup.${ext}",
       "icon": "build/icon.ico",
       "sign": null
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "artifactName": "YouTube-Clipper-${version}-Linux-x64.${ext}",
+      "artifactName": "YouTube-Clipper-Linux-x64.${ext}",
       "category": "AudioVideo",
       "icon": "build/icon.png"
     }

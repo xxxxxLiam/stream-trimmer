@@ -12,6 +12,8 @@ try {
     isElectron: true,
     pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"),
     saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
+    showInFolder: (targetPath) =>
+      ipcRenderer.invoke("file:showInFolder", targetPath),
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
     onUpdateStatus: (cb) => {

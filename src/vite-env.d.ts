@@ -16,7 +16,14 @@ interface ElectronAPI {
     filename: string;
     data: ArrayBuffer | Uint8Array;
   }) => Promise<{ ok: boolean; path?: string; error?: string }>;
-  checkForUpdates: () => Promise<{ ok: boolean; version?: string; error?: string }>;
+  showInFolder: (
+    targetPath: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
+  checkForUpdates: () => Promise<{
+    ok: boolean;
+    version?: string;
+    error?: string;
+  }>;
   quitAndInstall: () => Promise<{ ok: boolean; error?: string }>;
   onUpdateStatus: (cb: (payload: UpdateStatusPayload) => void) => () => void;
 }

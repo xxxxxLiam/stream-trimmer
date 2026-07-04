@@ -81,21 +81,16 @@ export default function PreviewPanel() {
   // (101/150/153). Fallback: if the embed hasn't confirmed playback within a
   // few seconds, assume it's blocked (YouTube doesn't always post the error).
   const [embedBlocked, setEmbedBlocked] = useState(false);
-  const [embedConfirmed, setEmbedConfirmed] = useState(false);
 
+  // Reset the blocked state whenever we load a new video or leave the video view.
   useEffect(() => {
     setEmbedBlocked(false);
-    setEmbedConfirmed(false);
-    if (!videoId || showTranscript) return;
-    const t = window.setTimeout(() => {
-      setEmbedConfirmed((confirmed) => {
-        if (!confirmed) setEmbedBlocked(true);
-        return confirmed;
-      });
-    }, 3500);
-    return () => window.clearTimeout(t);
   }, [videoId, showTranscript]);
 
+  // Only mark the embed as blocked when YouTube explicitly reports an
+  // embedding-disabled error (101/150/153). A silent embed (no onReady) is
+  // normal — especially in the packaged app — and must NOT be treated as
+  // blocked, or every video would falsely show "Preview unavailable".
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       if (typeof e.data !== "string") return;
@@ -106,11 +101,6 @@ export default function PreviewPanel() {
           [101, 150, 153].includes(Number(data.info))
         ) {
           setEmbedBlocked(true);
-        }
-        // Any ready/state signal means the embed is actually playing.
-        if (data?.event === "onReady" || data?.event === "onStateChange") {
-          setEmbedConfirmed(true);
-          setEmbedBlocked(false);
         }
       } catch {
         /* ignore */
@@ -294,7 +284,9 @@ export default function PreviewPanel() {
               embedBlocked ? (
                 <div className="flex max-w-sm flex-col items-center gap-2 px-6 text-center text-fg-muted">
                   <ExclamationTriangle size={22} className="text-accent" />
-                  <span className="text-[13px] text-fg">Preview unavailable</span>
+                  <span className="text-[13px] text-fg">
+                    Preview unavailable
+                  </span>
                   <span className="text-[12px] text-fg-faint">
                     The video owner disabled embedded playback. This has no
                     effect on downloading — clip and download still work.

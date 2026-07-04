@@ -3,8 +3,15 @@
  * Path: src/App.tsx
  * Description: Root layout — full-viewport two-column grid, overlay loader, form + preview.
  */
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Download, Scissors } from "react-bootstrap-icons";
+import {
+  Download,
+  Scissors,
+  CheckCircleFill,
+  FolderSymlink,
+  X,
+} from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
 import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
@@ -127,6 +134,62 @@ function FooterBar() {
   );
 }
 
+function DownloadToast() {
+  const { downloadPhase, isElectron, saveDir, lastSavedPath, revealLastSaved } =
+    useClipperContext();
+  const [show, setShow] = useState(false);
+
+  // Show a confirmation toast when a desktop download finishes to a chosen
+  // folder. Browser downloads have no known path, so they never trigger it.
+  useEffect(() => {
+    if (downloadPhase === "done" && isElectron && saveDir && lastSavedPath) {
+      setShow(true);
+      const t = window.setTimeout(() => setShow(false), 8000);
+      return () => window.clearTimeout(t);
+    }
+  }, [downloadPhase, isElectron, saveDir, lastSavedPath]);
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          key="dl-toast"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 12 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-panel border border-hairline bg-panel-raised px-4 py-3 shadow-panel"
+          role="status"
+        >
+          <CheckCircleFill size={16} className="shrink-0 text-accent" />
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[13px] font-medium text-fg">Clip saved</span>
+            <span className="max-w-[220px] truncate text-[11px] text-fg-faint">
+              {saveDir}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={revealLastSaved}
+            className="btn ml-1 shrink-0 text-[12px]"
+          >
+            <FolderSymlink size={12} />
+            <span>Open folder</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShow(false)}
+            className="shrink-0 rounded-chip p-1 text-fg-faint hover:bg-panel-hover hover:text-fg"
+            aria-label="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function Layout() {
   const {
     loadingInfo,
@@ -185,6 +248,7 @@ function Layout() {
 
         <FooterBar />
       </main>
+      <DownloadToast />
     </>
   );
 }

@@ -121,7 +121,8 @@ async function startBackend() {
   // Startup diagnostic — confirms binaries are in place before the server
   // starts spawning yt-dlp.
   const exe = (n) => (process.platform === "win32" ? `${n}.exe` : n);
-  const check = (n) => (fs.existsSync(path.join(binDir, exe(n))) ? "ok" : "MISSING");
+  const check = (n) =>
+    fs.existsSync(path.join(binDir, exe(n))) ? "ok" : "MISSING";
   console.log(
     `[electron] binDir=${binDir} (yt-dlp=${check("yt-dlp")}, ffmpeg=${check("ffmpeg")}, deno=${check("deno")})`,
   );
@@ -213,7 +214,11 @@ function registerIpc() {
 
   ipcMain.handle("file:save", async (_e, payload) => {
     try {
-      if (!payload || typeof payload.dirPath !== "string" || typeof payload.filename !== "string") {
+      if (
+        !payload ||
+        typeof payload.dirPath !== "string" ||
+        typeof payload.filename !== "string"
+      ) {
         return { ok: false, error: "Invalid save payload" };
       }
       const safeName = payload.filename.replace(/[\\/]/g, "_");
@@ -222,7 +227,27 @@ function registerIpc() {
       await fsp.writeFile(target, buf);
       return { ok: true, path: target };
     } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : "Save failed" };
+      return {
+        ok: false,
+        error: err && err.message ? err.message : "Save failed",
+      };
+    }
+  });
+
+  ipcMain.handle("file:showInFolder", (_e, targetPath) => {
+    try {
+      if (typeof targetPath !== "string" || !targetPath) {
+        return { ok: false, error: "No path" };
+      }
+      // Highlights the file in Finder/Explorer (opens the folder if the file
+      // is gone). Points right at the clip rather than just opening the dir.
+      shell.showItemInFolder(targetPath);
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err && err.message ? err.message : "Failed to reveal",
+      };
     }
   });
 
@@ -230,9 +255,15 @@ function registerIpc() {
     if (isDev) return { ok: false, error: "Updates disabled in dev" };
     try {
       const result = await autoUpdater.checkForUpdates();
-      return { ok: true, version: result && result.updateInfo && result.updateInfo.version };
+      return {
+        ok: true,
+        version: result && result.updateInfo && result.updateInfo.version,
+      };
     } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : "Check failed" };
+      return {
+        ok: false,
+        error: err && err.message ? err.message : "Check failed",
+      };
     }
   });
 
@@ -241,7 +272,10 @@ function registerIpc() {
       autoUpdater.quitAndInstall();
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : "Install failed" };
+      return {
+        ok: false,
+        error: err && err.message ? err.message : "Install failed",
+      };
     }
   });
 }
