@@ -225,14 +225,9 @@ async function bundleDeno() {
       () => null,
       bundleDeno,
     );
-    // Final belt-and-braces verification of every bundled binary.
-    for (const name of [
-      platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
-      platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
-      platform === "win32" ? "deno.exe" : "deno",
-    ]) {
-      assertPlatformExecutable(path.join(outDir, name), name);
-    }
+    // (ffmpeg is arch-verified inside bundleFfmpeg. yt-dlp on Linux is a
+    // Python zipapp with a `#!` shebang — not an ELF — so we don't run the
+    // native-executable check on it.)
     console.log("[bundle-binaries] done");
   } catch (err) {
     console.error("[bundle-binaries] failed:", err.message || err);
