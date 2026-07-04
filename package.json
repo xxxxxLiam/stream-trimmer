@@ -18,7 +18,11 @@
     "build:electron": "vite build && node scripts/bundle-binaries.cjs && node scripts/build-server.cjs",
     "dist:mac": "npm run build:electron && electron-builder --mac dmg",
     "dist:win": "npm run build:electron && electron-builder --win nsis",
-    "dist:linux": "npm run build:electron && electron-builder --linux AppImage"
+    "dist:linux": "npm run build:electron && electron-builder --linux AppImage",
+    "release:mac": "npm run build:electron && electron-builder --mac dmg --publish always",
+    "release:win": "npm run build:electron && electron-builder --win nsis --publish always",
+    "release:linux": "npm run build:electron && electron-builder --linux AppImage --publish always",
+    "release": "npm run build:electron && electron-builder -mwl --publish always"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",
@@ -29,6 +33,7 @@
     "autoprefixer": "^10.5.2",
     "concurrently": "^9.0.0",
     "cors": "^2.8.5",
+    "electron-updater": "^6.8.9",
     "express": "^4.21.0",
     "ffmpeg-static": "^5.2.0",
     "framer-motion": "^12.42.2",
@@ -40,6 +45,7 @@
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "youtube-dl-exec": "^3.0.10",
+    "electron-updater": "^6.3.9",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -55,6 +61,12 @@
     "appId": "app.youtubeclipper.local",
     "productName": "YouTube Clipper",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "xxxxxLiam",
+      "repo": "stream-trimmer",
+      "releaseType": "release"
+    },
     "directories": {
       "buildResources": "build",
       "output": "dist-electron"
