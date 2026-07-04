@@ -1,7 +1,7 @@
 {
   "name": "youtube-clipper",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -64,7 +64,7 @@
       "provider": "github",
       "owner": "xxxxxLiam",
       "repo": "stream-trimmer",
-      "releaseType": "release"
+      "releaseType": "draft"
     },
     "directories": {
       "buildResources": "build",
