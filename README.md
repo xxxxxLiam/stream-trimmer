@@ -137,29 +137,49 @@ matching metadata file that `electron-builder` uploads:
 
 Without those `.yml` files the app cannot detect a new version.
 
-### Steps
+### Recommended: cut a release via GitHub Actions (free, native builds)
 
-1. Bump `version` in `package.json` (e.g. `1.0.0` → `1.0.1`).
-2. Create a GitHub personal access token with `repo` scope at
-   <https://github.com/settings/tokens> and export it in your shell:
+The workflow at `.github/workflows/release.yml` runs on tag push and builds
+native installers on their own OS runners in parallel:
+
+- `macos-latest` → `YouTube-Clipper-<version>-macOS-AppleSilicon.dmg` (arm64)
+- `windows-latest` → `YouTube-Clipper-<version>-Windows-x64-Setup.exe`
+- `ubuntu-latest` → `YouTube-Clipper-<version>-Linux-x64.AppImage`
+
+It publishes to the matching GitHub Release using the built-in
+`GITHUB_TOKEN` — no personal access token needed.
+
+Steps:
+
+1. Bump `version` in `package.json` (e.g. `1.0.0` → `1.0.1`) and commit.
+2. Tag and push:
 
    ```sh
-   export GH_TOKEN=ghp_your_token_here
+   git tag v1.0.1
+   git push origin main --tags
    ```
 
-3. Run the release script on the matching OS (installers cannot be
-   cross-built):
+3. Watch the **Actions** tab. When all three jobs finish, the release
+   appears on the **Releases** page with all three installers and the
+   matching `latest.yml` / `latest-mac.yml` / `latest-linux.yml` metadata
+   files that `electron-updater` reads.
 
-   ```sh
-   npm run release:mac     # on macOS
-   npm run release:win     # on Windows
-   npm run release:linux   # on Linux
-   ```
+The tag's `v` prefix (`v1.0.1`) must match the `version` in `package.json`
+(`1.0.1`) — `electron-builder` uses the `package.json` version for the
+release name.
 
-   Each command builds the installer and uploads it (with its `latest*.yml`)
-   to a GitHub Release named after the version.
-4. Verify on GitHub that the release is **published** (not draft) and lists
-   both the installer and the `latest*.yml` file.
+### Optional fallback: build locally
+
+Only needed if CI is unavailable. Build the installer for **the OS you're
+on** — you cannot cross-build (that's the bug this workflow exists to
+prevent). Requires a GitHub PAT with `repo` scope as `GH_TOKEN`:
+
+```sh
+export GH_TOKEN=ghp_your_token_here
+npm run release:mac     # on macOS (arm64 only)
+npm run release:win     # on Windows (x64)
+npm run release:linux   # on Linux (x64)
+```
 
 ### Platform notes
 
