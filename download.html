@@ -1,0 +1,642 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YouTube Clipper Download</title>
+    <style>
+      :root {
+        --bg: #0b0b0c;
+        --bg-deep: #08080a;
+        --panel: #161618;
+        --panel-raised: #1c1c1f;
+        --panel-hover: rgba(255, 255, 255, 0.06);
+        --hairline: rgba(255, 255, 255, 0.08);
+        --hairline-strong: rgba(255, 255, 255, 0.14);
+        --fg: #f5f5f7;
+        --fg-muted: rgba(255, 255, 255, 0.55);
+        --fg-faint: rgba(255, 255, 255, 0.35);
+        --accent: #ff6363;
+        --accent-soft: rgba(255, 99, 99, 0.15);
+        --r-panel: 14px;
+        --r-row: 8px;
+        --r-chip: 5px;
+        --shadow-panel:
+          0 40px 80px -20px rgba(0, 0, 0, 0.7),
+          0 8px 20px -8px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        --shadow-row: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+        --font-sans:
+          -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+          "Inter", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: var(--font-sans);
+        background: var(--bg);
+        background-image:
+          radial-gradient(
+            1200px 600px at 50% -10%,
+            rgba(255, 99, 99, 0.08),
+            transparent 60%
+          ),
+          radial-gradient(
+            800px 500px at 100% 100%,
+            rgba(255, 255, 255, 0.03),
+            transparent 55%
+          );
+        color: var(--fg);
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 20px 80px;
+        -webkit-font-smoothing: antialiased;
+      }
+      .panel {
+        width: 100%;
+        max-width: 540px;
+        background: linear-gradient(180deg, var(--panel-raised), var(--panel));
+        border: 1px solid var(--hairline);
+        border-radius: var(--r-panel);
+        box-shadow: var(--shadow-panel);
+        padding: 40px 36px 34px;
+        position: relative;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 26px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border: 1px solid rgba(255, 99, 99, 0.25);
+        padding: 5px 11px;
+        border-radius: var(--r-chip);
+      }
+      .chip::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+      }
+      .version {
+        font-size: 12px;
+        color: var(--fg-faint);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+      }
+      h1 {
+        font-size: clamp(28px, 6vw, 38px);
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      h1 span {
+        color: var(--accent);
+      }
+      .sub {
+        font-size: 14.5px;
+        color: var(--fg-muted);
+        max-width: 44ch;
+        line-height: 1.5;
+        margin-bottom: 30px;
+      }
+      .btns {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .btn {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        text-decoration: none;
+        color: var(--fg);
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--hairline);
+        border-radius: var(--r-row);
+        padding: 15px 18px;
+        box-shadow: var(--shadow-row);
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease,
+          transform 0.15s ease;
+      }
+      .btn:hover {
+        background: var(--panel-hover);
+        border-color: var(--hairline-strong);
+        transform: translateY(-1px);
+      }
+      .btn:active {
+        transform: translateY(0);
+      }
+      .glyph {
+        flex: 0 0 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--hairline);
+        border-radius: var(--r-chip);
+        color: var(--fg);
+      }
+      .glyph svg {
+        width: 22px;
+        height: 22px;
+      }
+      .btn-text {
+        flex: 1;
+        min-width: 0;
+      }
+      .btn-os {
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .btn-file {
+        font-size: 12px;
+        color: var(--fg-faint);
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .arrow {
+        flex: 0 0 auto;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 15px;
+        transition: background 0.15s ease;
+      }
+      .btn:hover .arrow {
+        background: var(--accent);
+        color: var(--bg);
+      }
+      .foot {
+        margin-top: 26px;
+        padding-top: 20px;
+        border-top: 1px solid var(--hairline);
+        font-size: 12.5px;
+        color: var(--fg-muted);
+        line-height: 1.6;
+      }
+      .foot strong {
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .foot code {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 11.5px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--hairline);
+        padding: 1px 6px;
+        border-radius: 4px;
+        color: var(--fg);
+      }
+    </style>
+    <style>
+      @media (prefers-color-scheme: dark) {
+        #dia-made-with-badge {
+          background: rgba(44, 44, 44, 0.93) !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+        }
+        #dia-made-with-badge img {
+          filter: invert(1) !important;
+        }
+      }
+      @media print {
+        @page {
+          margin: 0;
+          padding: 0.5in;
+        }
+        *,
+        *::before,
+        *::after {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+          break-after: avoid;
+          break-inside: avoid;
+        }
+        img,
+        svg,
+        canvas,
+        figure,
+        table,
+        pre,
+        blockquote,
+        iframe,
+        video,
+        li,
+        dt,
+        dd,
+        tr {
+          break-inside: avoid;
+        }
+        p {
+          orphans: 3;
+          widows: 3;
+        }
+        thead {
+          display: table-header-group;
+        }
+        nav,
+        .no-print,
+        button {
+          display: none !important;
+        }
+        #dia-made-with-badge-container {
+          display: none !important;
+        }
+      }
+    </style>
+    <style id="dia-annotation-style">
+      .dia-annotation-btn {
+        position: absolute;
+        z-index: 9999;
+        height: 30px;
+        padding: 0 12px 0 10px;
+        border: none;
+        border-radius: 8px;
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #fff !important;
+        background-image: none !important;
+        opacity: 1 !important;
+        mix-blend-mode: normal !important;
+        isolation: isolate;
+        color: #1d1d1f;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+        cursor: pointer;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        transition: background-color 0.15s ease;
+        pointer-events: auto;
+        white-space: nowrap;
+      }
+      .dia-annotation-btn:hover {
+        background-color: #f0f0f3 !important;
+      }
+      .dia-annotation-btn svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+      .dia-annotation-badge {
+        position: absolute;
+        z-index: 9998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #007aff;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        padding: 0 5px;
+        cursor: pointer;
+        user-select: none;
+        line-height: 1;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+      /* Delete-mode variant for direct-edit badges: shown while the stamped
+               block is focused so the user can one-click dismiss the pending edit. */
+      .dia-annotation-badge.dia-annotation-badge-delete {
+        background: #ff3b30;
+        padding: 0;
+        min-width: 20px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+      }
+      .dia-annotation-badge.dia-annotation-badge-delete svg {
+        width: 11px;
+        height: 11px;
+        fill: currentColor;
+      }
+      .dia-annotation-highlight {
+        background: rgba(255, 230, 0, 0.45);
+        border-radius: 2px;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+      /* Applied to a stamped contenteditable block while its text differs from
+               the original snapshot. Matches the annotation highlight so users get
+               consistent visual confirmation that their change is queued. */
+      [data-dia-edit-id].dia-direct-edit-active {
+        background: rgba(255, 230, 0, 0.45);
+        border-radius: 2px;
+      }
+      /* Used when the selection spans element boundaries and we can't cleanly
+               wrap it in a single inline span. One absolutely-positioned rect sized
+               to the range's bounding box, with a translucent fill + opaque stroke. */
+      .dia-annotation-highlight-overlay {
+        position: absolute;
+        background: rgba(255, 230, 0, 0.45);
+        border: 1px solid #e6be00;
+        border-radius: 3px;
+        pointer-events: none;
+        box-sizing: border-box;
+        z-index: 9997;
+      }
+      .dia-annotation-popover {
+        position: absolute;
+        z-index: 9999;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        padding: 6px;
+        min-width: 320px;
+        max-width: 420px;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 13px;
+        color: #1d1d1f;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-end;
+        gap: 4px;
+        transition: opacity 0.15s ease;
+      }
+      .dia-annotation-popover.single-line {
+        align-items: center;
+      }
+      .dia-annotation-popover textarea {
+        flex: 1;
+        min-width: 0;
+        min-height: 28px;
+        max-height: 120px;
+        border: none;
+        background: transparent;
+        padding: 6px 8px;
+        font-size: 13px;
+        font-family: inherit;
+        resize: none;
+        outline: none;
+        box-sizing: border-box;
+        color: inherit;
+        line-height: 1.4;
+      }
+      .dia-annotation-popover-actions {
+        display: flex;
+        gap: 4px;
+        padding-bottom: 4px;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .dia-annotation-popover.single-line .dia-annotation-popover-actions {
+        padding-bottom: 0;
+      }
+      .dia-annot-send,
+      .dia-annot-edit,
+      .dia-annot-trash {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        padding: 4px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        color: rgba(0, 0, 0, 0.55);
+      }
+      .dia-annot-send:hover,
+      .dia-annot-edit:hover {
+        background: rgba(0, 0, 0, 0.06);
+      }
+      .dia-annot-send svg,
+      .dia-annot-edit svg,
+      .dia-annot-trash svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+      .dia-annot-trash {
+        color: #ff3b30;
+      }
+      .dia-annot-trash:hover {
+        background: rgba(255, 59, 48, 0.1);
+      }
+      .dia-annot-done {
+        border: none;
+        cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        background: #000;
+        color: #fff;
+      }
+      .dia-annot-done:hover {
+        opacity: 0.85;
+      }
+      .dia-annot-done svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+      .dia-annot-send[disabled],
+      .dia-annot-done[disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .dia-annot-send[disabled]:hover,
+      .dia-annot-done[disabled]:hover {
+        background: transparent;
+        opacity: 0.35;
+      }
+      @media (prefers-color-scheme: dark) {
+        .dia-annotation-btn {
+          background-color: #2c2c2e !important;
+          color: #f5f5f7;
+        }
+        .dia-annotation-btn:hover {
+          background-color: #3a3a3c !important;
+        }
+        .dia-annotation-highlight {
+          background: rgba(255, 214, 0, 0.35);
+        }
+        [data-dia-edit-id].dia-direct-edit-active {
+          background: rgba(255, 214, 0, 0.35);
+        }
+        .dia-annotation-highlight-overlay {
+          background: rgba(255, 214, 0, 0.35);
+          border-color: #ffcc00;
+        }
+        .dia-annotation-popover {
+          background: #2c2c2e;
+          color: #f5f5f7;
+        }
+        .dia-annot-send,
+        .dia-annot-edit {
+          color: rgba(255, 255, 255, 0.6);
+        }
+        .dia-annot-send:hover,
+        .dia-annot-edit:hover {
+          background: rgba(255, 255, 255, 0.08);
+        }
+        .dia-annot-trash {
+          color: #ff453a;
+        }
+        .dia-annot-trash:hover {
+          background: rgba(255, 69, 58, 0.15);
+        }
+        .dia-annot-done {
+          background: #fff;
+          color: #000;
+        }
+      }
+      @media print {
+        .dia-annotation-btn,
+        .dia-annotation-popover,
+        .dia-annotation-badge,
+        .dia-annotation-highlight,
+        .dia-annotation-highlight-overlay,
+        [data-dia-edit-id].dia-direct-edit-active {
+          background: transparent !important;
+        }
+        .dia-annotation-btn,
+        .dia-annotation-popover,
+        .dia-annotation-badge,
+        .dia-annotation-highlight-overlay {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="panel">
+      <div class="top">
+        <span class="chip">Desktop App</span>
+        <span class="version">v1.0.0</span>
+      </div>
+      <h1 data-dia-edit-id="a463aba9-be15-4f54-86ab-1b3613296d89">
+        Download <span>YouTube Clipper</span>
+      </h1>
+      <p class="sub" data-dia-edit-id="63a03878-8a55-4d8e-a43a-f0e65d5e4303">
+        Trim any YouTube clip, fully on your machine. Grab the file for your OS
+        below — that's the only one you need.
+      </p>
+
+      <div class="btns">
+        <a
+          class="btn"
+          href="https://github.com/xxxxxLiam/stream-trimmer/releases/download/v1.0.0/YouTube.Clipper-1.0.0-mac-arm64.dmg"
+        >
+          <span class="glyph">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M16.365 1.43c0 1.14-.417 2.2-1.11 2.99-.744.85-1.96 1.51-3.08 1.42-.14-1.09.42-2.24 1.08-2.98.75-.83 2.04-1.44 3.11-1.43zM20.9 17.24c-.55 1.27-.81 1.84-1.52 2.96-.99 1.56-2.39 3.51-4.12 3.52-1.54.02-1.94-.99-4.03-.98-2.1.01-2.53.99-4.07.97-1.73-.02-3.06-1.77-4.05-3.33C.36 16.42-.03 11.6 1.87 9.03 3.2 7.2 5.29 6.13 7.26 6.13c2.01 0 3.27 1.1 4.93 1.1 1.61 0 2.59-1.1 4.92-1.1 1.74 0 3.58.95 4.9 2.58-4.3 2.35-3.6 8.5-1.11 8.53z"
+              ></path>
+            </svg>
+          </span>
+          <span class="btn-text">
+            <div class="btn-os">macOS</div>
+            <div class="btn-file">
+              YouTube.Clipper-1.0.0-mac-arm64.dmg · 261 MB
+            </div>
+          </span>
+          <span class="arrow">↓</span>
+        </a>
+
+        <a
+          class="btn"
+          href="https://github.com/xxxxxLiam/stream-trimmer/releases/download/v1.0.0/YouTube.Clipper.exe"
+        >
+          <span class="glyph">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M3 3.9l7.2-.98v6.94H3V3.9zM3 20.1l7.2.98v-6.86H3v5.88zM11.05 21.2L21 22.5v-8.36h-9.95v7.06zM11.05 2.8v7.06H21V1.5l-9.95 1.3z"
+              ></path>
+            </svg>
+          </span>
+          <span class="btn-text">
+            <div class="btn-os">Windows</div>
+            <div class="btn-file">YouTube.Clipper.exe · 169 MB</div>
+          </span>
+          <span class="arrow">↓</span>
+        </a>
+
+        <a
+          class="btn"
+          href="https://github.com/xxxxxLiam/stream-trimmer/releases/download/v1.0.0/YouTube.Clipper-1.0.0-linux-arm64.AppImage"
+        >
+          <span class="glyph">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 2c-1.2 0-2.1 1-2 2.3.05.7-.1 1.3-.4 1.9-.5 1-.7 2-.6 3.1.1 1.2-.3 2.2-1 3.1-.9 1.1-1.4 2.1-1 3.3.2.6-.1 1-.6 1.4-.6.5-.5 1.2.2 1.5.9.4 1.9.5 2.8.9.5.2 1 .1 1.3-.3.5-.6 1.3-.6 1.8 0 .3.4.8.5 1.3.3.9-.4 1.9-.5 2.8-.9.7-.3.8-1 .2-1.5-.5-.4-.8-.8-.6-1.4.4-1.2-.1-2.2-1-3.3-.7-.9-1.1-1.9-1-3.1.1-1.1-.1-2.1-.6-3.1-.3-.6-.45-1.2-.4-1.9C14.1 3 13.2 2 12 2zm-1 4.2c.3 0 .5.3.5.7s-.2.7-.5.7-.5-.3-.5-.7.2-.7.5-.7zm2 0c.3 0 .5.3.5.7s-.2.7-.5.7-.5-.3-.5-.7.2-.7.5-.7z"
+              ></path>
+            </svg>
+          </span>
+          <span class="btn-text">
+            <div class="btn-os">Linux</div>
+            <div class="btn-file">
+              YouTube.Clipper-1.0.0-linux-arm64.AppImage · 248 MB
+            </div>
+          </span>
+          <span class="arrow">↓</span>
+        </a>
+      </div>
+
+      <div class="foot">
+        <strong>First launch:</strong> the app is unsigned (normal for free
+        open-source apps), so your OS shows a one-time prompt. On Mac,
+        right-click the app → <strong>Open</strong>. On Windows, click
+        <strong>More info</strong> → <strong>Run anyway</strong>. On Linux, make
+        it executable first with <code>chmod +x</code>.
+      </div>
+    </main>
+  </body>
+</html>
