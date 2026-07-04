@@ -60,7 +60,7 @@
   "build": {
     "appId": "app.youtubeclipper.local",
     "productName": "YouTube Clipper",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "artifactName": "YouTube-Clipper-${version}-${os}-${arch}.${ext}",
     "publish": {
       "provider": "github",
       "owner": "xxxxxLiam",
@@ -89,19 +89,28 @@
     ],
     "asar": true,
     "mac": {
-      "target": "dmg",
+      "target": [
+        { "target": "dmg", "arch": ["arm64"] }
+      ],
+      "artifactName": "YouTube-Clipper-${version}-macOS-AppleSilicon.${ext}",
       "category": "public.app-category.utilities",
       "identity": null,
       "icon": "build/icon.icns",
       "gatekeeperAssess": false
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "artifactName": "YouTube-Clipper-${version}-Windows-x64-Setup.${ext}",
       "icon": "build/icon.ico",
       "sign": null
     },
     "linux": {
-      "target": "AppImage",
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "artifactName": "YouTube-Clipper-${version}-Linux-x64.${ext}",
       "category": "AudioVideo",
       "icon": "build/icon.png"
     }
