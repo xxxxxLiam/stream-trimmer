@@ -1,8 +1,10 @@
 name: Release
 
-# Triggered by pushing a version tag like v1.0.1. Builds native installers
-# on each OS's own runner and publishes them to the matching GitHub Release
-# using the built-in GITHUB_TOKEN (no PAT required).
+# Triggered by pushing a version tag like v1.0.7. One job creates a single
+# GitHub Release first (avoids the parallel-job duplicate-release race), then
+# three native jobs build + upload their installers to it. electron-builder
+# publishes to the existing release; it goes live automatically — no manual
+# "publish draft" step.
 on:
   push:
     tags:
@@ -12,7 +14,20 @@ permissions:
   contents: write
 
 jobs:
+  # Create ONE release up front so the three build jobs don't race to create
+  # duplicates. draft:false + prerelease:false means it's live immediately.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
   release:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
