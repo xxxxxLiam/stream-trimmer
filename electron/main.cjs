@@ -7,6 +7,13 @@ const path = require("node:path");
 const net = require("node:net");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
+// electron-updater — free auto-updates via GitHub Releases. Reads
+// latest.yml / latest-mac.yml / latest-linux.yml uploaded by
+// electron-builder alongside each release's installer.
+// NOTE: macOS auto-update requires a signed + notarized build. Until this
+// app is signed, mac users must download new versions manually; we handle
+// the resulting error gracefully instead of crashing.
+const { autoUpdater } = require("electron-updater");
 
 const isDev = process.env.ELECTRON_DEV === "1";
 
@@ -18,6 +25,66 @@ if (!app.requestSingleInstanceLock()) {
 
 let mainWindow = null;
 let serverHandle = null; // { close(cb) } returned by the bundled server
+
+function sendUpdateStatus(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("updater:status", payload);
+  }
+}
+
+function setupAutoUpdater() {
+  if (isDev) return; // never hit GitHub during dev
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.logger = console;
+
+  autoUpdater.on("checking-for-update", () => {
+    console.log("[updater] checking for update");
+    sendUpdateStatus({ state: "checking" });
+  });
+  autoUpdater.on("update-available", (info) => {
+    console.log("[updater] update available", info && info.version);
+    sendUpdateStatus({ state: "available", version: info && info.version });
+  });
+  autoUpdater.on("update-not-available", () => {
+    console.log("[updater] no update available");
+    sendUpdateStatus({ state: "none" });
+  });
+  autoUpdater.on("download-progress", (p) => {
+    const percent = Math.round(p && p.percent ? p.percent : 0);
+    sendUpdateStatus({ state: "downloading", percent });
+  });
+  autoUpdater.on("update-downloaded", async (info) => {
+    console.log("[updater] update downloaded", info && info.version);
+    sendUpdateStatus({ state: "ready", version: info && info.version });
+    try {
+      const res = await dialog.showMessageBox(mainWindow, {
+        type: "info",
+        buttons: ["Restart now", "Later"],
+        defaultId: 0,
+        cancelId: 1,
+        title: "Update ready",
+        message: `Version ${info && info.version} has been downloaded.`,
+        detail: "Restart the app to apply the update.",
+      });
+      if (res.response === 0) autoUpdater.quitAndInstall();
+    } catch (err) {
+      console.error("[updater] restart dialog failed:", err);
+    }
+  });
+  autoUpdater.on("error", (err) => {
+    const message = (err && err.message) || String(err);
+    console.error("[updater] error:", message);
+    // On unsigned macOS builds this fires with a code-signature error.
+    // Surface a "download manually" hint instead of crashing.
+    sendUpdateStatus({ state: "error", message });
+  });
+
+  // Fire the initial check shortly after window is ready.
+  autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+    console.error("[updater] initial check failed:", err);
+  });
+}
 
 function pickFreePort() {
   return new Promise((resolve, reject) => {
@@ -113,6 +180,7 @@ app.whenReady().then(async () => {
     const port = await startBackend();
     await createWindow(port);
     registerIpc();
+    setupAutoUpdater();
   } catch (err) {
     console.error("[electron] failed to start:", err);
     app.quit();
@@ -155,6 +223,25 @@ function registerIpc() {
       return { ok: true, path: target };
     } catch (err) {
       return { ok: false, error: err && err.message ? err.message : "Save failed" };
+    }
+  });
+
+  ipcMain.handle("updater:check", async () => {
+    if (isDev) return { ok: false, error: "Updates disabled in dev" };
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return { ok: true, version: result && result.updateInfo && result.updateInfo.version };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : "Check failed" };
+    }
+  });
+
+  ipcMain.handle("updater:quitAndInstall", () => {
+    try {
+      autoUpdater.quitAndInstall();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : "Install failed" };
     }
   });
 }
