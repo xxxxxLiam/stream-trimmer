@@ -125,6 +125,54 @@ This is a neutral, general-purpose tool. Use it only for content you own or have
 
 Provided as-is and **unmaintained**. If yt-dlp/ffmpeg change behaviour or YouTube breaks things, fork the repo and update at your own discretion. Issues and PRs may not receive a response.
 
+## Releasing new versions (auto-update)
+
+The desktop app auto-updates via `electron-updater`, reading from this repo's
+GitHub Releases. Each release must contain the platform installer **plus** the
+matching metadata file that `electron-builder` uploads:
+
+- Windows: `latest.yml`
+- macOS: `latest-mac.yml`
+- Linux: `latest-linux.yml`
+
+Without those `.yml` files the app cannot detect a new version.
+
+### Steps
+
+1. Bump `version` in `package.json` (e.g. `1.0.0` → `1.0.1`).
+2. Create a GitHub personal access token with `repo` scope at
+   <https://github.com/settings/tokens> and export it in your shell:
+
+   ```sh
+   export GH_TOKEN=ghp_your_token_here
+   ```
+
+3. Run the release script on the matching OS (installers cannot be
+   cross-built):
+
+   ```sh
+   npm run release:mac     # on macOS
+   npm run release:win     # on Windows
+   npm run release:linux   # on Linux
+   ```
+
+   Each command builds the installer and uploads it (with its `latest*.yml`)
+   to a GitHub Release named after the version.
+4. Verify on GitHub that the release is **published** (not draft) and lists
+   both the installer and the `latest*.yml` file.
+
+### Platform notes
+
+- **Windows (NSIS)** — auto-update works unsigned; users see a one-time
+  SmartScreen prompt on first install.
+- **Linux (AppImage)** — auto-update works unsigned. The app must have been
+  launched from an AppImage file.
+- **macOS (DMG)** — auto-update requires the app to be **signed AND
+  notarized**. Until an Apple Developer certificate is configured, mac users
+  will see an update notification but the install will fail; they need to
+  download the new DMG manually from the Releases page. The app handles this
+  gracefully — it does not crash.
+
 ## License
 
 [MIT](./LICENSE).
