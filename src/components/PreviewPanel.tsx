@@ -141,7 +141,7 @@ export default function PreviewPanel() {
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.14, ease: "easeOut" }}
-          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-hairline bg-panel-raised"
+          className="flex min-h-0 max-h-[70vh] flex-1 flex-col overflow-hidden rounded-panel border border-hairline bg-panel-raised"
         >
           {!loadingTranscript && transcript && transcript.length > 0 && (
             <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-bg-deep/40 px-3 py-2">
