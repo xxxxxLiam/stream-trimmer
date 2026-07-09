@@ -13,6 +13,7 @@ import {
   ChevronBarLeft,
   ChevronBarRight,
   ExclamationTriangle,
+  Download,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
 import { formatTimestamp } from "../lib/clip";
@@ -34,6 +35,9 @@ export default function PreviewPanel() {
     setStartFromLine,
     setEndFromLine,
     copyTranscript,
+    exportComments,
+    exportingComments,
+    commentsNote,
   } = useClipperContext();
 
   const firstInRangeRef = useRef<HTMLDivElement | null>(null);
@@ -132,6 +136,23 @@ export default function PreviewPanel() {
             <ClipboardCheck size={12} />
             <span>Copy</span>
           </button>
+        )}
+        <button
+          type="button"
+          onClick={exportComments}
+          disabled={!info || exportingComments}
+          className="btn text-[12px]"
+          title="Export all comments (top-level + replies) to CSV"
+        >
+          <Download size={12} />
+          <span>
+            {exportingComments ? "Fetching comments…" : "Export comments (CSV)"}
+          </span>
+        </button>
+        {commentsNote && (
+          <span className="ml-1 self-center text-[11px] text-fg-faint">
+            {commentsNote}
+          </span>
         )}
       </div>
 
