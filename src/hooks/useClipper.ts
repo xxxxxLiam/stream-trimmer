@@ -14,10 +14,13 @@ import {
   estimateBytes,
   apiUrl,
   buildClipFilename,
+  commentsToCsv,
+  sanitizeFilename,
   type ClipFormat,
   type TranscriptLine,
   type TranscriptResponse,
   type VideoInfo,
+  type CommentsResponse,
 } from "../lib/clip";
 
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
@@ -48,6 +51,10 @@ export function useClipper() {
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [transcriptQuery, setTranscriptQuery] = useState("");
 
+  // Comment export state.
+  const [exportingComments, setExportingComments] = useState(false);
+  const [commentsNote, setCommentsNote] = useState<string>("");
+
   const isElectron =
     typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
   const [saveDir, setSaveDirState] = useState<string | null>(() => {
@@ -71,6 +78,62 @@ export function useClipper() {
       void window.electronAPI.showInFolder(lastSavedPath);
     }
   }, [isElectron, lastSavedPath]);
+
+  const exportComments = useCallback(async () => {
+    if (!info) {
+      setError("Load a video first");
+      return;
+    }
+    setError("");
+    setCommentsNote("");
+    setExportingComments(true);
+    try {
+      const res = await fetch(apiUrl("/api/comments"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: normalizeYouTubeUrl(url) }),
+      });
+      const data = await parseJson<CommentsResponse & { error?: string }>(res);
+      if (!res.ok) throw new Error(data.error || "Failed to fetch comments");
+      if (data.commentsDisabled) {
+        setCommentsNote("Comments are disabled for this video");
+        return;
+      }
+      if (!data.comments || data.comments.length === 0) {
+        setCommentsNote("No comments found for this video");
+        return;
+      }
+      const csv = commentsToCsv(data.comments);
+      const filename = `${sanitizeFilename(info.title)}-comments.csv`;
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      if (isElectron && window.electronAPI && saveDir) {
+        const arr = await blob.arrayBuffer();
+        const result = await window.electronAPI.saveFile({
+          dirPath: saveDir,
+          filename,
+          data: arr,
+        });
+        if (!result.ok) throw new Error(result.error);
+        setLastSavedPath(result.path ?? null);
+      } else {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      }
+      setCommentsNote(
+        `Exported ${data.comments.length} comments (dislikes unavailable from YouTube)`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to export comments");
+    } finally {
+      setExportingComments(false);
+    }
+  }, [info, url, isElectron, saveDir]);
 
   const videoId = useMemo(() => extractVideoId(url), [url]);
   const duration = info?.duration ?? 0;
@@ -393,6 +456,9 @@ export function useClipper() {
     pickSaveDir,
     lastSavedPath,
     revealLastSaved,
+    exportComments,
+    exportingComments,
+    commentsNote,
   };
 }
 
