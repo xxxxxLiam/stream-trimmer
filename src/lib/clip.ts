@@ -42,6 +42,60 @@ export interface DownloadRequest {
   quality: string;
 }
 
+// Server → client shape from POST /api/comments.
+export interface CommentRow {
+  comment_id: string;
+  parent_id: string;
+  is_reply: boolean;
+  author: string;
+  author_channel_id: string;
+  text: string;
+  like_count: number | "";
+  dislike_count: number | "";
+  is_favorited: boolean;
+  is_pinned: boolean;
+  is_uploader: boolean;
+  published_time: string;
+  timestamp: number | "";
+  reply_count: number | "";
+}
+
+export interface CommentsResponse {
+  title: string;
+  commentsDisabled: boolean;
+  comments: CommentRow[];
+}
+
+// RFC 4180-ish CSV: wrap every field, double any embedded quotes. Prefixed
+// with a UTF-8 BOM so Excel opens emoji/non-Latin text cleanly.
+export function commentsToCsv(rows: CommentRow[]): string {
+  const columns: (keyof CommentRow)[] = [
+    "comment_id",
+    "parent_id",
+    "is_reply",
+    "author",
+    "author_channel_id",
+    "text",
+    "like_count",
+    "dislike_count",
+    "is_favorited",
+    "is_pinned",
+    "is_uploader",
+    "published_time",
+    "timestamp",
+    "reply_count",
+  ];
+  const escape = (v: unknown): string => {
+    const s = v == null ? "" : String(v);
+    return `"${s.replace(/"/g, '""')}"`;
+  };
+  const lines = [columns.join(",")];
+  for (const row of rows) {
+    lines.push(columns.map((c) => escape(row[c])).join(","));
+  }
+  return "\uFEFF" + lines.join("\r\n") + "\r\n";
+}
+
 export function formatBytes(bytes: number): string {
   if (!isFinite(bytes) || bytes <= 0) return "—";
   if (bytes < 1024) return `${Math.round(bytes)} B`;
