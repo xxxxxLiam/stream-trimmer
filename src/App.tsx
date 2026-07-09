@@ -214,7 +214,7 @@ function Layout() {
         phase={downloading ? downloadPhase : undefined}
       />
 
-      <main className="flex min-h-screen w-full flex-col bg-panel">
+      <main className="flex h-screen w-full flex-col overflow-hidden bg-panel">
         {/* Title bar */}
         <div className="flex items-center gap-2 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
           <span className="text-[12px] font-medium tracking-tight text-fg-muted">
@@ -232,8 +232,8 @@ function Layout() {
         </div>
 
         {/* Body */}
-        <div className="grid flex-1 grid-cols-1 gap-6 p-4 lg:grid-cols-2 lg:items-start lg:p-5">
-          <section className="flex min-w-0 flex-col gap-3">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-4 lg:grid-cols-2 lg:items-stretch lg:overflow-hidden lg:p-5">
+          <section className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
             <Meta />
             <TimeRangeControls />
             <FormatQualityFields />
@@ -241,12 +241,14 @@ function Layout() {
             <ErrorBanner />
           </section>
 
-          <section className="flex min-h-0 min-w-0 flex-col">
+          <section className="flex min-w-0 flex-col lg:min-h-0 lg:overflow-hidden">
             <PreviewPanel />
           </section>
         </div>
 
-        <FooterBar />
+        <div className="shrink-0">
+          <FooterBar />
+        </div>
       </main>
       <DownloadToast />
     </>
