@@ -891,5 +891,13 @@ app.get("/api/download/progress", (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
+// SPA fallback for the packaged UI — must be registered after all API routes.
+if (uiDir && fs.existsSync(uiDir)) {
+  app.get(/^\/(?!api\/).*/, (_req: Request, res: Response) => {
+    res.sendFile(path.join(uiDir, "index.html"));
+  });
+}
+
+app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
 });
