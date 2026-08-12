@@ -108,6 +108,14 @@ async function startBackend() {
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
 
+  // Serve the built UI from the same local server so the window loads over
+  // http://127.0.0.1 instead of file://. YouTube embeds refuse to render in a
+  // null-origin (file://) frame, which is why the preview used to stay blank.
+  const uiDir = path.join(__dirname, "..", "dist");
+  if (!isDev && fs.existsSync(path.join(uiDir, "index.html"))) {
+    process.env.ELECTRON_UI_DIR = uiDir;
+  }
+
   // Ensure bundled binaries (yt-dlp, ffmpeg, deno for JS-challenge solving)
   // are visible to any spawned child by prepending resources/bin to PATH.
   const binDir = path.join(resolveResourcesDir(), "bin");
@@ -165,7 +173,15 @@ async function createWindow(port) {
   if (isDev) {
     await mainWindow.loadURL("http://localhost:8080");
   } else {
-    await mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
+    try {
+      await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
+    } catch (err) {
+      // Emergency fallback — the app still works, minus the video preview.
+      console.error("[electron] http load failed, falling back to file://", err);
+      await mainWindow.loadFile(
+        path.join(__dirname, "..", "dist", "index.html"),
+      );
+    }
   }
 }
 
