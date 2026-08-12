@@ -47,6 +47,15 @@ export function useClipper() {
   const [error, setError] = useState("");
 
   const [showTranscript, setShowTranscript] = useState(false);
+  // Seek requests are a counter-stamped channel so repeated seeks to the same
+  // timestamp still reach the player.
+  const [seekRequest, setSeekRequest] = useState<{
+    time: number;
+    nonce: number;
+  } | null>(null);
+  const requestSeek = useCallback((time: number) => {
+    setSeekRequest((prev) => ({ time, nonce: (prev?.nonce ?? 0) + 1 }));
+  }, []);
   const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [transcriptQuery, setTranscriptQuery] = useState("");
@@ -447,6 +456,8 @@ export function useClipper() {
     setTranscriptQuery,
     setStartFromLine,
     setEndFromLine,
+    seekRequest,
+    requestSeek,
     rangeTranscriptText,
     copyTranscript,
     estimatedBytes,

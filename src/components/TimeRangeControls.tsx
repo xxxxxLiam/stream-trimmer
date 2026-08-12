@@ -65,6 +65,7 @@ export default function TimeRangeControls() {
     setStartFromSeconds,
     setEndFromSeconds,
     pasteInto,
+    requestSeek,
   } = useClipperContext();
 
   return (
@@ -94,8 +95,14 @@ export default function TimeRangeControls() {
           max={duration || 1}
           start={start}
           end={end}
-          onStart={setStartFromSeconds}
-          onEnd={setEndFromSeconds}
+          onStart={(v) => {
+            setStartFromSeconds(v);
+            requestSeek(v);
+          }}
+          onEnd={(v) => {
+            setEndFromSeconds(v);
+            requestSeek(v);
+          }}
           disabled={!info}
         />
         <div className="flex justify-between text-[12px] text-fg-muted tabular-nums">
