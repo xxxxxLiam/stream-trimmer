@@ -1,75 +1,39 @@
-# Auto-updates via electron-updater + GitHub Releases
+# Fix the preview + turn it into a scrubbing / in-out tool
 
-Wire up free auto-updates using `electron-updater` (from electron-builder) with GitHub Releases as the host for `xxxxxLiam/stream-trimmer`.
+## Why the preview is blank today
 
-## Files changed
+In development the UI is served from `http://localhost:8080`, so the YouTube embed gets a real origin and plays. In the installed desktop app the UI is loaded straight off disk (`file://`), so the iframe origin is `null`. YouTube's embed player rejects null-origin frames and the `enablejsapi` handshake never completes, so the frame stays empty even for videos that allow embedding. This is not a per-video setting — it affects every video in the packaged app.
 
-### 1. `package.json`
-- Add dependency: `electron-updater` (runtime dep, required by main process).
-- Add `build.publish`:
-  ```json
-  "publish": { "provider": "github", "owner": "xxxxxLiam", "repo": "stream-trimmer", "releaseType": "release" }
-  ```
-- Add scripts:
-  - `release`: `npm run build:electron && electron-builder -mwl --publish always` (or per-OS variants below)
-  - `release:mac`: `npm run build:electron && electron-builder --mac dmg --publish always`
-  - `release:win`: `npm run build:electron && electron-builder --win nsis --publish always`
-  - `release:linux`: `npm run build:electron && electron-builder --linux AppImage --publish always`
-- Keep existing `dist:*` scripts unchanged (local unpublished builds).
-- No changes to targets: mac dmg/arm64, win nsis/x64, linux AppImage — all support electron-updater.
+## What will change
 
-### 2. `electron/main.cjs`
-- Import `autoUpdater` from `electron-updater` and `dialog`, `ipcMain` (already imported).
-- Guard with `if (!isDev)` so dev runs don't hit GitHub.
-- Configure:
-  - `autoUpdater.autoDownload = true`
-  - `autoUpdater.autoInstallOnAppQuit = true`
-  - `autoUpdater.logger = console`
-- After `createWindow`, call `autoUpdater.checkForUpdatesAndNotify()`.
-- Wire events, each forwards a status payload to the renderer via `mainWindow.webContents.send('updater:status', {...})` and logs:
-  - `checking-for-update` → status "checking"
-  - `update-available` → status "available" + version
-  - `update-not-available` → status "none"
-  - `download-progress` → status "downloading" + percent
-  - `update-downloaded` → status "ready"; show `dialog.showMessageBox` with "Restart now" / "Later"; on Restart call `autoUpdater.quitAndInstall()`.
-  - `error` → status "error" + message; on macOS unsigned builds this will fire ("Could not get code signature"); swallow gracefully and forward a "manual download" hint instead of crashing.
-- Add IPC handlers:
-  - `ipcMain.handle('updater:check', () => autoUpdater.checkForUpdates())`
-  - `ipcMain.handle('updater:quitAndInstall', () => autoUpdater.quitAndInstall())`
+### 1. Serve the packaged UI over local HTTP
+The app already runs a local Express worker. The built UI will be served from that same server, and the desktop window will load `http://127.0.0.1:<port>` instead of the file path. The embed then behaves exactly as it does in dev. Nothing about privacy changes — the server is local-only.
 
-### 3. `electron/preload.cjs`
-- Extend `electronAPI` with:
-  - `checkForUpdates()` → invokes `updater:check`
-  - `quitAndInstall()` → invokes `updater:quitAndInstall`
-  - `onUpdateStatus(cb)` → subscribes to `updater:status` channel, returns unsubscribe fn.
+### 2. Thumbnail fallback
+When YouTube genuinely blocks embedding (error 101/150/153), show the video thumbnail with a play overlay that opens the video in the default browser, instead of the current plain "Preview unavailable" message. Same fallback covers the case where the player fails to initialise.
 
-### 4. `src/components/UpdateStatus.tsx` (new)
-- Small pill in the title bar area listening to `window.electronAPI.onUpdateStatus`.
-- States: hidden (idle/none), "Checking…", "Downloading update… 42%", "Update ready — Restart", "Update check failed — download manually" (with link to Releases).
-- "Check for updates" button and "Restart" button use existing dark theme tokens (`bg-panel`, `text-fg`, `accent`).
-- Only renders when `window.electronAPI?.isElectron` is true.
+### 3. Player becomes a real clip tool
+Load the YouTube IFrame API properly and drive the player from the app:
 
-### 5. `src/App.tsx`
-- Mount `<UpdateStatus />` inside the existing title bar row (right side, near "Local · Private").
+- Live playhead readout under the video.
+- "Set start" / "Set end" buttons that capture the current playhead into the range, with keyboard shortcuts (`I` / `O`).
+- Range slider, transcript highlight, and player stay in sync: dragging a handle or clicking a transcript line seeks the player.
+- "Play selection" button that plays only start to end and loops.
+- Scrub bar overlay showing the selected range on the video timeline.
 
-### 6. `src/vite-env.d.ts`
-- Extend the `electronAPI` type declaration with the new methods and status payload type.
-
-### 7. `README.md`
-- Add a "Releasing new versions" section covering: bump `version` in `package.json`, set `GH_TOKEN` env var (GitHub PAT with `repo` scope, from https://github.com/settings/tokens), run `npm run release:<os>` on the matching OS, verify the GitHub Release is published (not draft) and contains the installer plus `latest.yml` / `latest-mac.yml` / `latest-linux.yml`. Note macOS auto-update requires signing + notarization; until then, mac users update manually.
+All existing behaviour (transcript, download, comment export, 10-minute cap) stays as is.
 
 ## Technical notes
 
-- `electron-updater` reads `latest.yml` / `latest-mac.yml` / `latest-linux.yml` from the GitHub Release matching the current app version. electron-builder generates and uploads these when `--publish always` is used.
-- Windows NSIS: auto-update works unsigned (SmartScreen warning on first install only).
-- Linux AppImage: auto-update works unsigned; requires the app was launched from an AppImage file (electron-updater detects `APPIMAGE` env var).
-- macOS: `dialog` error path is handled so the app doesn't crash; without signing + notarization the update will fail to apply and the user is told to download manually.
-- Dev guard: `isDev` (already defined via `ELECTRON_DEV=1`) prevents update checks during `npm run dev:electron`.
-- No changes to server, yt-dlp, ffmpeg, transcript, or download flows.
+- `electron/main.cjs`: add a static handler for `dist/` on the existing Express server; `createWindow` loads `http://127.0.0.1:${port}` in production. Keep `loadFile` as an emergency fallback if the server is unreachable.
+- `vite.config.ts`: `base` stays relative-safe; served over HTTP so absolute paths work either way.
+- New `src/hooks/useYouTubePlayer.ts`: loads `https://www.youtube.com/iframe_api`, creates the player, exposes `seekTo`, `getCurrentTime`, `play/pause`, and an error callback for 101/150/153.
+- New `src/components/PlayerControls.tsx`: playhead, set-in/set-out, play-selection.
+- `src/components/PreviewPanel.tsx`: replace the raw iframe + postMessage handshake with the hook; add thumbnail fallback (`https://img.youtube.com/vi/<id>/hqdefault.jpg`).
+- `src/hooks/useClipper.ts`: expose `setStartFromSeconds` / `setEndFromSeconds` and a seek request channel so transcript clicks drive the player.
+- Bump `package.json` version.
 
-## What you'll do manually
+## Verification
 
-1. Bump `version` in `package.json` for each release (e.g. `1.0.1`).
-2. Create a GitHub PAT with `repo` scope → export `GH_TOKEN=ghp_...` in your shell before running `npm run release:*`.
-3. Run the release command on the matching OS (mac build on Mac, win on Windows, linux on Linux — or via CI).
-4. On GitHub, verify the release is published (electron-builder creates it as draft by default; either flip it to published, or set `releaseType: "release"` as above — plan uses the latter so it publishes immediately).
+- Dev preview: player loads, set-in/out updates the range, play-selection loops.
+- Packaged build: confirm the window loads over `127.0.0.1` and the embed renders.
