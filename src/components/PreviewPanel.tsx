@@ -21,6 +21,12 @@ import { formatTimestamp } from "../lib/clip";
 import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
 import PlayerControls from "./PlayerControls";
 
+// Electron's window-open handler routes this to the system browser; in a
+// normal browser it opens a new tab.
+function openExternal(id: string) {
+  window.open(`https://www.youtube.com/watch?v=${id}`, "_blank", "noopener");
+}
+
 export default function PreviewPanel() {
   const {
     info,
