@@ -17,6 +17,8 @@ import {
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
 import { formatTimestamp } from "../lib/clip";
+import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
+import PlayerControls from "./PlayerControls";
 
 export default function PreviewPanel() {
   const {
@@ -38,6 +40,8 @@ export default function PreviewPanel() {
     exportComments,
     exportingComments,
     commentsNote,
+    seekRequest,
+    requestSeek,
   } = useClipperContext();
 
   const firstInRangeRef = useRef<HTMLDivElement | null>(null);
@@ -79,40 +83,33 @@ export default function PreviewPanel() {
   const handleRowJump = (lineStart: number) => {
     setPendingScrollId(lineStart);
     setTranscriptQuery("");
+    requestSeek(lineStart);
   };
 
-  // Detect embed-blocked videos. Primary: YT IFrame API postMessage onError
-  // (101/150/153). Fallback: if the embed hasn't confirmed playback within a
-  // few seconds, assume it's blocked (YouTube doesn't always post the error).
-  const [embedBlocked, setEmbedBlocked] = useState(false);
+  // YouTube IFrame API player — drives scrubbing and in/out points.
+  const player = useYouTubePlayer(showTranscript ? null : videoId);
+  const embedBlocked = player.blocked;
+  const [loopSelection, setLoopSelection] = useState(false);
 
-  // Reset the blocked state whenever we load a new video or leave the video view.
+  // Apply seek requests coming from the transcript or the range slider.
   useEffect(() => {
-    setEmbedBlocked(false);
-  }, [videoId, showTranscript]);
+    if (!seekRequest) return;
+    player.seekTo(seekRequest.time);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekRequest?.nonce]);
 
-  // Only mark the embed as blocked when YouTube explicitly reports an
-  // embedding-disabled error (101/150/153). A silent embed (no onReady) is
-  // normal — especially in the packaged app — and must NOT be treated as
-  // blocked, or every video would falsely show "Preview unavailable".
+  // Loop playback inside the selected range.
   useEffect(() => {
-    function onMsg(e: MessageEvent) {
-      if (typeof e.data !== "string") return;
-      try {
-        const data = JSON.parse(e.data);
-        if (
-          data?.event === "onError" &&
-          [101, 150, 153].includes(Number(data.info))
-        ) {
-          setEmbedBlocked(true);
-        }
-      } catch {
-        /* ignore */
-      }
+    if (!loopSelection) return;
+    if (player.currentTime >= end || player.currentTime < start - 1) {
+      player.seekTo(start, true);
     }
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loopSelection, player.currentTime, start, end]);
+
+  useEffect(() => {
+    setLoopSelection(false);
+  }, [videoId]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
