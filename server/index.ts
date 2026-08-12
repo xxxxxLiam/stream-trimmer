@@ -252,6 +252,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// When packaged inside Electron, this same server also serves the built UI so
+// the window loads over http://127.0.0.1 instead of file://. A real origin is
+// required for the YouTube embed to render at all.
+const uiDir = process.env.ELECTRON_UI_DIR;
+if (uiDir && fs.existsSync(uiDir)) {
+  app.use(express.static(uiDir));
+  console.log(`[server] serving UI from ${uiDir}`);
+}
+
 function binaryError(res: Response) {
   return res.status(500).json({
     error:
