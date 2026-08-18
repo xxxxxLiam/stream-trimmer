@@ -577,33 +577,52 @@ app.post("/api/download", async (req: Request, res: Response) => {
       ? "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[ext=mp4]/best"
       : `bestvideo[ext=mp4][vcodec^=avc1][height<=${quality}]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[vcodec^=avc1][height<=${quality}]+bestaudio[acodec^=mp4a]/best[ext=mp4][height<=${quality}]/best[height<=${quality}]`;
 
-  const options: Record<string, unknown> = isAudio
-    ? {
-        downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
-        forceKeyframesAtCuts: true,
-        noPlaylist: true,
-        noWarnings: true,
-        newline: true,
-        progress: true,
-        extractAudio: true,
-        audioFormat: "mp3",
-        audioQuality: quality,
-        output: outputPath,
-        ffmpegLocation: resolvedFfmpeg,
-      }
-    : {
-        downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
-        forceKeyframesAtCuts: true,
-        noPlaylist: true,
-        noWarnings: true,
-        newline: true,
-        progress: true,
-        format: videoFormat,
-        mergeOutputFormat: "mp4",
-        remuxVideo: "mp4",
-        output: outputPath,
-        ffmpegLocation: resolvedFfmpeg,
-      };
+  // yt-dlp otherwise picks clients like ANDROID_VR whose media URLs are bound
+  // to that client's request context. With --download-sections the URL is
+  // handed to ffmpeg, whose plain HTTPS range request then gets 403'd. Pinning
+  // web-based clients (mobile last) yields URLs ffmpeg can actually fetch.
+  const PLAYER_CLIENTS =
+    "youtube:player_client=web_safari,web,mweb,tv,android_vr";
+
+  const commonOptions: Record<string, unknown> = {
+    noPlaylist: true,
+    noWarnings: true,
+    newline: true,
+    progress: true,
+    ffmpegLocation: resolvedFfmpeg,
+    extractorArgs: PLAYER_CLIENTS,
+  };
+
+  const formatOptions: Record<string, unknown> = isAudio
+    ? { extractAudio: true, audioFormat: "mp3", audioQuality: quality }
+    : { format: videoFormat, mergeOutputFormat: "mp4", remuxVideo: "mp4" };
+
+  // Attempt 1: let yt-dlp cut the section (fast, ffmpeg fetches the range).
+  const sectionOptions: Record<string, unknown> = {
+    ...commonOptions,
+    ...formatOptions,
+    downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
+    forceKeyframesAtCuts: true,
+    output: outputPath,
+    // Make ffmpeg's range request look like the one that minted the URL.
+    addHeader: [
+      "Referer:https://www.youtube.com/",
+      "Origin:https://www.youtube.com",
+    ],
+  };
+
+  // Attempt 2 (fallback): yt-dlp downloads the whole media itself (native
+  // downloader, no ffmpeg-fetched URLs), then we trim locally.
+  const fullPath = path.join(tempDir, `source.${isAudio ? "m4a" : "mp4"}`);
+  const fullOptions: Record<string, unknown> = {
+    ...commonOptions,
+    ...(isAudio
+      ? { format: "bestaudio[ext=m4a]/bestaudio/best" }
+      : { format: videoFormat, mergeOutputFormat: "mp4" }),
+    output: fullPath,
+  };
+
+  let options: Record<string, unknown> = sectionOptions;
 
   // Progress is driven by ffmpeg's `... time=HH:MM:SS.ss ...` output, which
   // streams continuously as the clip is processed (yt-dlp routes section
@@ -612,6 +631,19 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // once at the very end, so it's used only as a fallback.
   const clipDuration = Math.max(0.1, end - start);
   let lastReported = 0;
+  // Progress window the current phase maps onto (fallback splits the bar).
+  let scaleFrom = 0;
+  let scaleTo = 99;
+  const report = (fraction: number) => {
+    const pct = Math.min(
+      99,
+      Math.round(scaleFrom + (scaleTo - scaleFrom) * Math.min(1, fraction)),
+    );
+    if (pct > lastReported) {
+      lastReported = pct;
+      publishProgress(jobId, { phase: "downloading", percent: pct });
+    }
+  };
   const hmsToSeconds = (h: string, m: string, s: string) =>
     Number(h) * 3600 + Number(m) * 60 + parseFloat(s);
   const updateFromLine = (line: string) => {
@@ -619,38 +651,24 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (tm) {
       const secs = hmsToSeconds(tm[1], tm[2], tm[3]);
       // Ignore ffmpeg's initial bogus negative timestamp.
-      if (secs >= 0) {
-        const pct = Math.min(99, Math.round((secs / clipDuration) * 100));
-        if (pct > lastReported) {
-          lastReported = pct;
-          publishProgress(jobId, { phase: "downloading", percent: pct });
-        }
-      }
+      if (secs >= 0) report(secs / clipDuration);
       return;
     }
     // Fallback: honor a real yt-dlp download percentage if one is emitted.
     const dm = line.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
-    if (dm) {
-      const pct = Math.min(99, Math.round(parseFloat(dm[1])));
-      if (pct > lastReported) {
-        lastReported = pct;
-        publishProgress(jobId, { phase: "downloading", percent: pct });
-      }
-    }
+    if (dm) report(parseFloat(dm[1]) / 100);
   };
 
-  try {
-    publishProgress(jobId, { phase: "downloading", percent: 0 });
-    console.log(
-      `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
-    );
-    console.log(
-      `[server] /api/download exec url=${url} options=${JSON.stringify(options)}`,
-    );
-    let stderrTail = "";
-    await new Promise<void>((resolve, reject) => {
-      const child = yt!.exec(url, options, { env: childEnv() } as any);
+  // Spawn a child and stream its output through updateFromLine, rejecting with
+  // the trimmed stderr tail on non-zero exit.
+  const runStreaming = (
+    spawnChild: () => ChildProcess,
+    label: string,
+  ): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      const child = spawnChild();
       let buf = "";
+      let stderrTail = "";
       const onChunk = (chunk: Buffer | string) => {
         const s = chunk.toString();
         buf += s;
@@ -664,19 +682,117 @@ app.post("/api/download", async (req: Request, res: Response) => {
       child.on("error", reject);
       child.on("close", (code) => {
         if (buf) updateFromLine(buf);
-        if (code === 0) resolve();
-        else {
-          const tail = stderrTail
-            .split(/\r?\n/)
-            .filter((l) => l.trim() && !/^\[download\]\s+\d/.test(l))
-            .slice(-8)
-            .join("\n")
-            .trim();
-          console.error(`[server] yt-dlp exit ${code}:\n${tail}`);
-          reject(new Error(tail || `yt-dlp exited with code ${code}`));
-        }
+        if (code === 0) return resolve();
+        const tail = stderrTail
+          .split(/\r?\n/)
+          .filter((l) => l.trim() && !/^\[download\]\s+\d/.test(l))
+          .slice(-8)
+          .join("\n")
+          .trim();
+        console.error(`[server] ${label} exit ${code}:\n${tail}`);
+        const err: any = new Error(tail || `${label} exited with code ${code}`);
+        err.tail = tail;
+        reject(err);
       });
     });
+
+  // A 403 on the media URL (or the ffmpeg failure it causes) means the
+  // sectioned path is unusable for this video — retry the whole-file path.
+  const isForbidden = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : String(e);
+    return (
+      /403|Forbidden|ffmpeg exited with code 1|fragment.*not found/i.test(msg)
+    );
+  };
+
+  const findDownloaded = (): string | null => {
+    if (fs.existsSync(fullPath)) return fullPath;
+    const match = fs
+      .readdirSync(tempDir)
+      .filter((f) => f.startsWith("source."))
+      .map((f) => path.join(tempDir, f))[0];
+    return match ?? null;
+  };
+
+  try {
+    publishProgress(jobId, { phase: "downloading", percent: 0 });
+    console.log(
+      `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
+    );
+    console.log(
+      `[server] /api/download exec url=${url} options=${JSON.stringify(sectionOptions)}`,
+    );
+    try {
+      await runStreaming(
+        () => yt!.exec(url, sectionOptions, { env: childEnv() } as any),
+        "yt-dlp",
+      );
+    } catch (sectionErr) {
+      if (!isForbidden(sectionErr)) throw sectionErr;
+      console.warn(
+        "[server] sectioned download failed (403) — retrying with full download + local trim",
+      );
+      options = fullOptions;
+      lastReported = 0;
+      scaleFrom = 0;
+      scaleTo = 70;
+      publishProgress(jobId, { phase: "downloading", percent: 0 });
+      await runStreaming(
+        () => yt!.exec(url, fullOptions, { env: childEnv() } as any),
+        "yt-dlp (full)",
+      );
+
+      const source = findDownloaded();
+      if (!source) throw new Error("yt-dlp produced no output");
+
+      scaleFrom = 70;
+      scaleTo = 99;
+      lastReported = 70;
+      const trimArgs = isAudio
+        ? [
+            "-y",
+            "-ss",
+            String(start),
+            "-to",
+            String(end),
+            "-i",
+            source,
+            "-vn",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            `${quality}k`,
+            outputPath,
+          ]
+        : [
+            "-y",
+            "-ss",
+            String(start),
+            "-to",
+            String(end),
+            "-i",
+            source,
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            outputPath,
+          ];
+      await runStreaming(
+        () =>
+          spawn(resolvedFfmpeg as string, trimArgs, {
+            env: childEnv(),
+            windowsHide: true,
+            shell: false,
+          }),
+        "ffmpeg (trim)",
+      );
+      try {
+        fs.rmSync(source, { force: true });
+      } catch {
+        /* ignore */
+      }
+    }
 
     if (!fs.existsSync(outputPath)) {
       cleanup();
@@ -712,7 +828,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
   } catch (e) {
     logYtError("/api/download", url, options, e);
     cleanup();
-    const msg = fullErrMessage(e);
+    const raw = fullErrMessage(e);
+    const msg = isForbidden(e)
+      ? "YouTube refused the media request for this video. Try again in a moment, or pick a different quality."
+      : raw;
     publishProgress(jobId, { phase: "error", percent: 0, message: msg });
     res.status(500).json({ error: msg });
   }
