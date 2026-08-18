@@ -383,6 +383,29 @@ function errMessage(e: unknown): string {
   return (anyE?.stderr || anyE?.message || "").toString().trim();
 }
 
+// yt-dlp signals an unreadable cookie database in a handful of phrasings; all
+// of them mention the cookie source. Matched on the message only — never the
+// cookie values, which yt-dlp reads internally and never emits.
+function isCookieError(e: unknown): boolean {
+  const text = errMessage(e).toLowerCase();
+  if (!text) return false;
+  return (
+    text.includes("could not find") && text.includes("cookies") ||
+    text.includes("failed to decrypt") ||
+    text.includes("unsupported browser") ||
+    text.includes("cookie database") ||
+    (text.includes("cookies") &&
+      (text.includes("permission denied") ||
+        text.includes("no such file") ||
+        text.includes("is locked") ||
+        text.includes("database is locked")))
+  );
+}
+
+function cookieErrorMessage(browser: string): string {
+  return `Couldn't read ${browser}'s cookies. The browser may need to be fully closed, or that profile isn't supported. You can turn sign-in off and retry for standard quality.`;
+}
+
 // Log every field execa/youtube-dl-exec typically attaches, plus context
 // about what we invoked, so the real failure is visible in the server log.
 function logYtError(
