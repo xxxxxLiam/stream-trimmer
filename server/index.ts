@@ -623,12 +623,14 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // DASH video+audio URLs; only ANDROID_VR still does, and those URLs are bound
   // to that client's session so ffmpeg's range requests get 403'd. HLS (m3u8)
   // and progressive formats are still served to web clients and work fine with
-  // --download-sections, so they come first. The old DASH chain stays LAST as a
-  // fallback for videos where it is still fetchable.
+  // --download-sections. But preferring HLS unconditionally silently caps
+  // quality on videos whose HLS ladder tops out below the requested height, so
+  // each tier offers an HLS candidate AND a DASH candidate at the requested
+  // height before degrading to a lower resolution.
   const videoFormat =
     quality === "best"
-      ? "bestvideo[protocol*=m3u8]+bestaudio[protocol*=m3u8]/best[protocol*=m3u8]/best[ext=mp4]/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/best"
-      : `bestvideo[protocol*=m3u8][height<=${quality}]+bestaudio[protocol*=m3u8]/best[protocol*=m3u8][height<=${quality}]/best[ext=mp4][height<=${quality}]/bestvideo[ext=mp4][vcodec^=avc1][height<=${quality}]+bestaudio[ext=m4a][acodec^=mp4a]/best[height<=${quality}]`;
+      ? "bestvideo[protocol*=m3u8]+bestaudio[protocol*=m3u8]/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/best[protocol*=m3u8]/best[ext=mp4]/best"
+      : `bestvideo[height<=${quality}][protocol*=m3u8]+bestaudio[protocol*=m3u8]/bestvideo[height<=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/best[protocol*=m3u8][height<=${quality}]/best[ext=mp4][height<=${quality}]/best[height<=${quality}]`;
 
   // Attempt 1 pins web-based clients only. ANDROID_VR is kept out here because
   // its URLs are exactly the ones that 403 under ffmpeg; it is reintroduced in
