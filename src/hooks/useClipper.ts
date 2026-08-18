@@ -139,6 +139,11 @@ export function useClipper() {
         });
         if (!result.ok) throw new Error(result.error);
         setLastSavedPath(result.path ?? null);
+        setSavedNotice({
+          kind: "comments",
+          path: result.path ?? "",
+          label: filename,
+        });
       } else {
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -148,6 +153,7 @@ export function useClipper() {
         a.click();
         a.remove();
         URL.revokeObjectURL(objectUrl);
+        setSavedNotice({ kind: "comments", path: "", label: filename });
       }
       setCommentsNote(
         `Exported ${data.comments.length} comments (dislikes unavailable from YouTube)`,
