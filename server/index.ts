@@ -315,6 +315,12 @@ const downloadSchema = z
     end: z.number().positive(),
     format: z.enum(["mp4", "mp3"]).default("mp4"),
     quality: z.string().default("best"),
+    // Optional sign-in path: yt-dlp reads the logged-in YouTube session
+    // directly from the named browser at runtime. Cookie contents never touch
+    // this process — only the browser name is accepted, from an allowlist.
+    cookiesFromBrowser: z
+      .enum(["chrome", "safari", "edge", "firefox", "brave", "chromium"])
+      .optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -375,6 +381,29 @@ function parseVtt(raw: string): VttLine[] {
 function errMessage(e: unknown): string {
   const anyE = e as { stderr?: string; message?: string } | null;
   return (anyE?.stderr || anyE?.message || "").toString().trim();
+}
+
+// yt-dlp signals an unreadable cookie database in a handful of phrasings; all
+// of them mention the cookie source. Matched on the message only — never the
+// cookie values, which yt-dlp reads internally and never emits.
+function isCookieError(e: unknown): boolean {
+  const text = errMessage(e).toLowerCase();
+  if (!text) return false;
+  return (
+    text.includes("could not find") && text.includes("cookies") ||
+    text.includes("failed to decrypt") ||
+    text.includes("unsupported browser") ||
+    text.includes("cookie database") ||
+    (text.includes("cookies") &&
+      (text.includes("permission denied") ||
+        text.includes("no such file") ||
+        text.includes("is locked") ||
+        text.includes("database is locked")))
+  );
+}
+
+function cookieErrorMessage(browser: string): string {
+  return `Couldn't read ${browser}'s cookies. The browser may need to be fully closed, or that profile isn't supported. You can turn sign-in off and retry for standard quality.`;
 }
 
 // Log every field execa/youtube-dl-exec typically attaches, plus context
@@ -610,7 +639,19 @@ app.post("/api/download", async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const { url, start, end, format, quality }: DownloadInput = parsed.data;
+  const {
+    url,
+    start,
+    end,
+    format,
+    quality,
+    cookiesFromBrowser,
+  }: DownloadInput = parsed.data;
+  // Only the browser name ever enters the option object; yt-dlp reads the
+  // cookie jar itself and nothing is written to disk or logged here.
+  const cookieOptions: Record<string, unknown> = cookiesFromBrowser
+    ? { cookiesFromBrowser }
+    : {};
   const jobId =
     typeof req.query.jobId === "string" && req.query.jobId
       ? req.query.jobId
@@ -621,6 +662,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     dumpSingleJson: true,
     noWarnings: true,
     noPlaylist: true,
+    ...cookieOptions,
   };
   try {
     console.log(
@@ -631,6 +673,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "End exceeds video duration" });
     }
   } catch (e) {
+    if (cookiesFromBrowser && isCookieError(e)) {
+      return res
+        .status(400)
+        .json({ error: cookieErrorMessage(cookiesFromBrowser) });
+    }
     logYtError("/api/download probe", url, probeOptions, e);
     return res.status(400).json({ error: fullErrMessage(e) });
   }
@@ -674,6 +721,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     newline: true,
     progress: true,
     ffmpegLocation: resolvedFfmpeg,
+    ...cookieOptions,
   };
 
   const formatOptions: Record<string, unknown> = isAudio
@@ -937,6 +985,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
       cleanup();
     });
   } catch (e) {
+    if (cookiesFromBrowser && isCookieError(e)) {
+      cleanup();
+      const msg = cookieErrorMessage(cookiesFromBrowser);
+      publishProgress(jobId, { phase: "error", percent: 0, message: msg });
+      return res.status(400).json({ error: msg });
+    }
     logYtError("/api/download", url, options, e);
     cleanup();
     const raw = fullErrMessage(e);

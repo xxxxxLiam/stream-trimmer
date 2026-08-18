@@ -21,6 +21,7 @@ import {
   type TranscriptResponse,
   type VideoInfo,
   type CommentsResponse,
+  type CookieBrowser,
 } from "../lib/clip";
 
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
@@ -37,6 +38,10 @@ export function useClipper() {
   const [endText, setEndText] = useState("");
   const [format, setFormat] = useState<ClipFormat>("mp4");
   const [quality, setQuality] = useState<string>("best");
+  // Optional sign-in: when enabled, yt-dlp reuses the chosen browser's
+  // logged-in YouTube session to try for higher-quality renditions.
+  const [useBrowserCookies, setUseBrowserCookies] = useState(false);
+  const [cookieBrowser, setCookieBrowser] = useState<CookieBrowser>("chrome");
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -393,6 +398,7 @@ export function useClipper() {
             end,
             format,
             quality,
+            ...(useBrowserCookies ? { cookiesFromBrowser: cookieBrowser } : {}),
           }),
         },
       );
@@ -474,6 +480,8 @@ export function useClipper() {
     quality,
     isElectron,
     saveDir,
+    useBrowserCookies,
+    cookieBrowser,
   ]);
 
   return {
@@ -488,6 +496,10 @@ export function useClipper() {
     setFormat,
     quality,
     setQuality,
+    useBrowserCookies,
+    setUseBrowserCookies,
+    cookieBrowser,
+    setCookieBrowser,
     loadingInfo,
     downloading,
     downloadProgress,
