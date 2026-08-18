@@ -343,6 +343,9 @@ export function useClipper() {
     setDownloading(true);
     setDownloadProgress(0);
     setDownloadPhase("downloading");
+    setSavedNotice(null);
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let es: EventSource | null = null;
     try {
@@ -376,6 +379,7 @@ export function useClipper() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             url: normalizeYouTubeUrl(url),
             start,
@@ -403,6 +407,11 @@ export function useClipper() {
         });
         if (!result.ok) throw new Error(result.error);
         setLastSavedPath(result.path ?? null);
+        setSavedNotice({
+          kind: "clip",
+          path: result.path ?? "",
+          label: filename,
+        });
       } else {
         setLastSavedPath(null);
         const objectUrl = URL.createObjectURL(blob);
@@ -413,14 +422,20 @@ export function useClipper() {
         a.click();
         a.remove();
         URL.revokeObjectURL(objectUrl);
+        setSavedNotice({ kind: "clip", path: "", label: filename });
       }
       setDownloadProgress(100);
       setDownloadPhase("done");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Download failed");
-      setDownloadPhase("error");
+      if (e instanceof DOMException && e.name === "AbortError") {
+        setDownloadPhase("idle");
+      } else {
+        setError(e instanceof Error ? e.message : "Download failed");
+        setDownloadPhase("error");
+      }
     } finally {
       es?.close();
+      downloadAbortRef.current = null;
       setDownloading(false);
       window.setTimeout(() => {
         setDownloadPhase("idle");
@@ -488,6 +503,10 @@ export function useClipper() {
     pickSaveDir,
     lastSavedPath,
     revealLastSaved,
+    savedNotice,
+    dismissSavedNotice,
+    revealSaved,
+    cancelDownload,
     exportComments,
     exportingComments,
     commentsNote,
