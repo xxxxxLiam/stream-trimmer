@@ -330,6 +330,11 @@ export function useClipper() {
     return estimateBytes(kbps, Math.max(0, end - start));
   }, [info, format, quality, start, end]);
 
+  const cancelDownload = useCallback(() => {
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
+  }, []);
+
   const download = useCallback(async () => {
     if (!info) {
       setError("Load a video first");
