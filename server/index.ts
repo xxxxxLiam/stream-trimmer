@@ -639,7 +639,19 @@ app.post("/api/download", async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const { url, start, end, format, quality }: DownloadInput = parsed.data;
+  const {
+    url,
+    start,
+    end,
+    format,
+    quality,
+    cookiesFromBrowser,
+  }: DownloadInput = parsed.data;
+  // Only the browser name ever enters the option object; yt-dlp reads the
+  // cookie jar itself and nothing is written to disk or logged here.
+  const cookieOptions: Record<string, unknown> = cookiesFromBrowser
+    ? { cookiesFromBrowser }
+    : {};
   const jobId =
     typeof req.query.jobId === "string" && req.query.jobId
       ? req.query.jobId
@@ -650,6 +662,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     dumpSingleJson: true,
     noWarnings: true,
     noPlaylist: true,
+    ...cookieOptions,
   };
   try {
     console.log(
@@ -660,6 +673,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "End exceeds video duration" });
     }
   } catch (e) {
+    if (cookiesFromBrowser && isCookieError(e)) {
+      return res
+        .status(400)
+        .json({ error: cookieErrorMessage(cookiesFromBrowser) });
+    }
     logYtError("/api/download probe", url, probeOptions, e);
     return res.status(400).json({ error: fullErrMessage(e) });
   }
@@ -703,6 +721,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     newline: true,
     progress: true,
     ffmpegLocation: resolvedFfmpeg,
+    ...cookieOptions,
   };
 
   const formatOptions: Record<string, unknown> = isAudio
