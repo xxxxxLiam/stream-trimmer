@@ -9,7 +9,12 @@ import cors from "cors";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execSync, spawn, type ChildProcess } from "node:child_process";
+import {
+  execSync,
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from "node:child_process";
 import { z } from "zod";
 // We don't use youtube-dl-exec's runner: its underlying `tinyspawn` splits the
 // binary path on spaces (breaks `/Applications/YouTube Clipper.app/...`). We
@@ -235,6 +240,29 @@ const yt = resolveYtDlp();
 const packagedFfmpeg = packagedBinary("ffmpeg");
 const resolvedFfmpeg = packagedFfmpeg || ffmpegPath;
 const ffmpegOk = Boolean(resolvedFfmpeg && fs.existsSync(resolvedFfmpeg));
+
+// Read the actual video height / audio bitrate of a produced file by parsing
+// `ffmpeg -i <file>` stream info (ffprobe is not part of the bundled binaries).
+function probeDelivered(
+  filePath: string,
+  ffmpegBin: string,
+): { height?: number; audioKbps?: number } {
+  try {
+    const out = spawnSync(ffmpegBin, ["-hide_banner", "-i", filePath], {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    const text = `${out.stderr ?? ""}${out.stdout ?? ""}`;
+    const video = text.match(/Video:.*?,\s*(\d{2,5})x(\d{2,5})/);
+    const audio = text.match(/Audio:[^\n]*?,\s*(\d+)\s*kb\/s/);
+    return {
+      height: video ? Number(video[2]) : undefined,
+      audioKbps: audio ? Number(audio[1]) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
 
 function preflight(): boolean {
   const problems: string[] = [];
@@ -871,6 +899,23 @@ app.post("/api/download", async (req: Request, res: Response) => {
     }
 
     publishProgress(jobId, { phase: "processing", percent: 99 });
+
+    // Report what was actually delivered: YouTube's SABR rollout can leave a
+    // video whose only fetchable renditions sit below the requested height, so
+    // the clip legitimately completes at a lower resolution. Probed with the
+    // resolved ffmpeg (ffprobe is not bundled) and passed back as headers since
+    // the response body is the media stream itself.
+    const delivered = probeDelivered(outputPath, resolvedFfmpeg as string);
+    if (delivered.height) {
+      res.setHeader("X-Delivered-Height", String(delivered.height));
+    }
+    if (delivered.audioKbps) {
+      res.setHeader("X-Delivered-Audio-Kbps", String(delivered.audioKbps));
+    }
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps",
+    );
 
     const stat = fs.statSync(outputPath);
     const name = `clip.${ext}`;

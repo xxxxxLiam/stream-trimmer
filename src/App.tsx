@@ -205,6 +205,11 @@ function SavedToast() {
             <span className="max-w-[220px] truncate text-[11px] text-fg-faint">
               {savedNotice.label}
             </span>
+            {savedNotice.detail && (
+              <span className="max-w-[260px] text-[11px] text-fg-faint">
+                {savedNotice.detail}
+              </span>
+            )}
           </div>
           {canReveal && (
             <button
