@@ -3,7 +3,7 @@
  * Path: src/hooks/useClipper.ts
  * Description: Central clipper state — URL, info, range, format/quality, transcript, download.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MAX_CLIP_SECONDS,
   formatTimestamp,
@@ -44,6 +44,14 @@ export function useClipper() {
     "idle" | "downloading" | "processing" | "done" | "error"
   >("idle");
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
+  // Confirmation notice for a completed save (clip or comments CSV).
+  const [savedNotice, setSavedNotice] = useState<{
+    kind: "clip" | "comments";
+    path: string;
+    label: string;
+  } | null>(null);
+  const dismissSavedNotice = useCallback(() => setSavedNotice(null), []);
+  const downloadAbortRef = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
 
   const [showTranscript, setShowTranscript] = useState(false);
@@ -87,6 +95,13 @@ export function useClipper() {
       void window.electronAPI.showInFolder(lastSavedPath);
     }
   }, [isElectron, lastSavedPath]);
+
+  const revealSaved = useCallback(() => {
+    if (isElectron && window.electronAPI?.showInFolder && savedNotice?.path) {
+      void window.electronAPI.showInFolder(savedNotice.path);
+    }
+    setSavedNotice(null);
+  }, [isElectron, savedNotice]);
 
   const exportComments = useCallback(async () => {
     if (!info) {
