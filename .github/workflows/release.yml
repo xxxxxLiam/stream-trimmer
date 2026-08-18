@@ -1,4 +1,5 @@
 name: Release
+
 on:
   workflow_dispatch:
     inputs:
@@ -9,20 +10,21 @@ on:
         default: patch
 
 permissions:
-  contents: write   # required to push the commit/tag and create the release
+  contents: write # required to push the commit/tag and create the release
 
 jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.bump.outputs.version }}
+      sha: ${{ steps.bump.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version-file: .nvmrc
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
@@ -32,3 +34,36 @@ jobs:
           NEW=$(npm version ${{ inputs.bump }} -m "Release v%s")
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
           git push --follow-tags
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build: npx electron-builder --mac dmg --publish always
+          - os: windows-latest
+            build: npx electron-builder --win nsis --publish always
+          - os: ubuntu-latest
+            build: npx electron-builder --linux AppImage --publish always
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        env:
+          YOUTUBE_DL_SKIP_DOWNLOAD: "true"
+        run: npm ci
+      - name: Build front-end + bundle binaries + server
+        run: npm run build:electron
+      - name: Build & publish installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ${{ matrix.build }}
