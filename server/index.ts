@@ -985,6 +985,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
       cleanup();
     });
   } catch (e) {
+    if (cookiesFromBrowser && isCookieError(e)) {
+      cleanup();
+      const msg = cookieErrorMessage(cookiesFromBrowser);
+      publishProgress(jobId, { phase: "error", percent: 0, message: msg });
+      return res.status(400).json({ error: msg });
+    }
     logYtError("/api/download", url, options, e);
     cleanup();
     const raw = fullErrMessage(e);
