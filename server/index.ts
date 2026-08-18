@@ -236,6 +236,29 @@ const packagedFfmpeg = packagedBinary("ffmpeg");
 const resolvedFfmpeg = packagedFfmpeg || ffmpegPath;
 const ffmpegOk = Boolean(resolvedFfmpeg && fs.existsSync(resolvedFfmpeg));
 
+// Read the actual video height / audio bitrate of a produced file by parsing
+// `ffmpeg -i <file>` stream info (ffprobe is not part of the bundled binaries).
+function probeDelivered(
+  filePath: string,
+  ffmpegBin: string,
+): { height?: number; audioKbps?: number } {
+  try {
+    const out = spawnSync(ffmpegBin, ["-hide_banner", "-i", filePath], {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    const text = `${out.stderr ?? ""}${out.stdout ?? ""}`;
+    const video = text.match(/Video:.*?,\s*(\d{2,5})x(\d{2,5})/);
+    const audio = text.match(/Audio:[^\n]*?,\s*(\d+)\s*kb\/s/);
+    return {
+      height: video ? Number(video[2]) : undefined,
+      audioKbps: audio ? Number(audio[1]) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 function preflight(): boolean {
   const problems: string[] = [];
   if (!yt) problems.push("yt-dlp");
