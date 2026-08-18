@@ -34,12 +34,26 @@ export interface TranscriptResponse {
   note?: string;
 }
 
+// Browsers yt-dlp can read a logged-in YouTube session from.
+export const COOKIE_BROWSERS = [
+  "chrome",
+  "safari",
+  "edge",
+  "firefox",
+  "brave",
+  "chromium",
+] as const;
+
+export type CookieBrowser = (typeof COOKIE_BROWSERS)[number];
+
 export interface DownloadRequest {
   url: string;
   start: number;
   end: number;
   format: ClipFormat;
   quality: string;
+  /** Optional: browser whose YouTube session yt-dlp should reuse. */
+  cookiesFromBrowser?: CookieBrowser;
 }
 
 // Server → client shape from POST /api/comments.
