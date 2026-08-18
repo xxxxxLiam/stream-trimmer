@@ -872,6 +872,23 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
     publishProgress(jobId, { phase: "processing", percent: 99 });
 
+    // Report what was actually delivered: YouTube's SABR rollout can leave a
+    // video whose only fetchable renditions sit below the requested height, so
+    // the clip legitimately completes at a lower resolution. Probed with the
+    // resolved ffmpeg (ffprobe is not bundled) and passed back as headers since
+    // the response body is the media stream itself.
+    const delivered = probeDelivered(outputPath, resolvedFfmpeg as string);
+    if (delivered.height) {
+      res.setHeader("X-Delivered-Height", String(delivered.height));
+    }
+    if (delivered.audioKbps) {
+      res.setHeader("X-Delivered-Audio-Kbps", String(delivered.audioKbps));
+    }
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps",
+    );
+
     const stat = fs.statSync(outputPath);
     const name = `clip.${ext}`;
     res.setHeader("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
