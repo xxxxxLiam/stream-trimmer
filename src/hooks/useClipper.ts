@@ -49,6 +49,8 @@ export function useClipper() {
     kind: "clip" | "comments";
     path: string;
     label: string;
+    /** Informational line, e.g. the resolution actually delivered. */
+    detail?: string;
   } | null>(null);
   const dismissSavedNotice = useCallback(() => setSavedNotice(null), []);
   const downloadAbortRef = useRef<AbortController | null>(null);
