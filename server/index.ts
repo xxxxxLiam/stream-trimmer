@@ -675,7 +675,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
     // a local file. Older bundled ffmpeg builds crash fetching m3u8 themselves.
     hlsPreferNative: true,
     ...(isAudio
-      ? { format: "bestaudio[ext=m4a]/bestaudio/best" }
+      ? {
+          // Same HLS-first ordering as video: SABR withholds the DASH audio
+          // URL from web clients, so m4a-only selection lands on a 403 URL.
+          format:
+            "bestaudio[protocol*=m3u8]/best[protocol*=m3u8]/bestaudio[ext=m4a]/bestaudio/best",
+        }
       : { format: videoFormat, mergeOutputFormat: "mp4" }),
     output: fullPath,
   };
