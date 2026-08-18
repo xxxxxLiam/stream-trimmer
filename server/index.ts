@@ -9,7 +9,12 @@ import cors from "cors";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execSync, spawn, type ChildProcess } from "node:child_process";
+import {
+  execSync,
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from "node:child_process";
 import { z } from "zod";
 // We don't use youtube-dl-exec's runner: its underlying `tinyspawn` splits the
 // binary path on spaces (breaks `/Applications/YouTube Clipper.app/...`). We
