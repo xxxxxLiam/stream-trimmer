@@ -163,24 +163,71 @@ function makeRunner(binary: string, source: string): YtResolved {
   return { run, exec, source, binary };
 }
 
-// Resolve yt-dlp: prefer the bundled binary, fall back to one on system PATH.
-function resolveYtDlp(): YtResolved | null {
-  const packaged = packagedBinary("yt-dlp");
-  if (packaged) return makeRunner(packaged, `packaged (${packaged})`);
-  const devBundled = BIN_DIR
-    ? path.join(BIN_DIR, process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp")
-    : null;
-  if (devBundled && fs.existsSync(devBundled))
-    return makeRunner(devBundled, `bundled (${devBundled})`);
+// Read `yt-dlp --version` (e.g. "2026.07.04"). Null when the binary won't run.
+function ytDlpVersion(binary: string): string | null {
+  try {
+    const out = execSync(`"${binary}" --version`, {
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 10_000,
+    })
+      .toString()
+      .trim();
+    return out || null;
+  } catch {
+    return null;
+  }
+}
+
+// yt-dlp versions are date-based (YYYY.MM.DD[.N]) so a numeric component
+// compare is a correct ordering.
+function isNewer(a: string, b: string): boolean {
+  const pa = a.split(/[.\-]/).map((n) => Number(n) || 0);
+  const pb = b.split(/[.\-]/).map((n) => Number(n) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
+function systemYtDlp(): string | null {
   try {
     const lookup =
       process.platform === "win32" ? "where yt-dlp" : "command -v yt-dlp";
     const sysPath = execSync(lookup).toString().trim().split("\n")[0];
-    if (sysPath && fs.existsSync(sysPath))
-      return makeRunner(sysPath, `system (${sysPath})`);
+    return sysPath && fs.existsSync(sysPath) ? sysPath : null;
   } catch {
-    // not on PATH
+    return null;
   }
+}
+
+// Resolve yt-dlp: prefer the bundled binary, but defer to a system install when
+// it reports a newer version (YouTube breaks often; a fresher binary wins).
+function resolveYtDlp(): YtResolved | null {
+  const packaged = packagedBinary("yt-dlp");
+  const devBundled = BIN_DIR
+    ? path.join(BIN_DIR, process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp")
+    : null;
+  const bundled =
+    packaged ?? (devBundled && fs.existsSync(devBundled) ? devBundled : null);
+  const system = systemYtDlp();
+
+  if (bundled && system && system !== bundled) {
+    const bv = ytDlpVersion(bundled);
+    const sv = ytDlpVersion(system);
+    if (sv && (!bv || isNewer(sv, bv))) {
+      console.log(
+        `[server] system yt-dlp ${sv} is newer than bundled ${bv ?? "(unknown)"} — using system binary`,
+      );
+      return makeRunner(system, `system (${system})`);
+    }
+  }
+  if (bundled) {
+    const label = packaged ? "packaged" : "bundled";
+    return makeRunner(bundled, `${label} (${bundled})`);
+  }
+  if (system) return makeRunner(system, `system (${system})`);
   return null;
 }
 
@@ -572,16 +619,23 @@ app.post("/api/download", async (req: Request, res: Response) => {
     }
   };
 
+  // YouTube's SABR rollout means the web-type clients no longer expose separate
+  // DASH video+audio URLs; only ANDROID_VR still does, and those URLs are bound
+  // to that client's session so ffmpeg's range requests get 403'd. HLS (m3u8)
+  // and progressive formats are still served to web clients and work fine with
+  // --download-sections, so they come first. The old DASH chain stays LAST as a
+  // fallback for videos where it is still fetchable.
   const videoFormat =
     quality === "best"
-      ? "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[ext=mp4]/best"
-      : `bestvideo[ext=mp4][vcodec^=avc1][height<=${quality}]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[vcodec^=avc1][height<=${quality}]+bestaudio[acodec^=mp4a]/best[ext=mp4][height<=${quality}]/best[height<=${quality}]`;
+      ? "bestvideo[protocol*=m3u8]+bestaudio[protocol*=m3u8]/best[protocol*=m3u8]/best[ext=mp4]/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/best"
+      : `bestvideo[protocol*=m3u8][height<=${quality}]+bestaudio[protocol*=m3u8]/best[protocol*=m3u8][height<=${quality}]/best[ext=mp4][height<=${quality}]/bestvideo[ext=mp4][vcodec^=avc1][height<=${quality}]+bestaudio[ext=m4a][acodec^=mp4a]/best[height<=${quality}]`;
 
-  // yt-dlp otherwise picks clients like ANDROID_VR whose media URLs are bound
-  // to that client's request context. With --download-sections the URL is
-  // handed to ffmpeg, whose plain HTTPS range request then gets 403'd. Pinning
-  // web-based clients (mobile last) yields URLs ffmpeg can actually fetch.
-  const PLAYER_CLIENTS =
+  // Attempt 1 pins web-based clients only. ANDROID_VR is kept out here because
+  // its URLs are exactly the ones that 403 under ffmpeg; it is reintroduced in
+  // the whole-file fallback where yt-dlp fetches the media itself.
+  const PLAYER_CLIENTS_PRIMARY =
+    "youtube:player_client=web_safari,web,mweb,tv";
+  const PLAYER_CLIENTS_FALLBACK =
     "youtube:player_client=web_safari,web,mweb,tv,android_vr";
 
   const commonOptions: Record<string, unknown> = {
@@ -590,7 +644,6 @@ app.post("/api/download", async (req: Request, res: Response) => {
     newline: true,
     progress: true,
     ffmpegLocation: resolvedFfmpeg,
-    extractorArgs: PLAYER_CLIENTS,
   };
 
   const formatOptions: Record<string, unknown> = isAudio
@@ -601,6 +654,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
   const sectionOptions: Record<string, unknown> = {
     ...commonOptions,
     ...formatOptions,
+    extractorArgs: PLAYER_CLIENTS_PRIMARY,
     downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
     forceKeyframesAtCuts: true,
     output: outputPath,
@@ -616,6 +670,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
   const fullPath = path.join(tempDir, `source.${isAudio ? "m4a" : "mp4"}`);
   const fullOptions: Record<string, unknown> = {
     ...commonOptions,
+    extractorArgs: PLAYER_CLIENTS_FALLBACK,
+    // Fetch HLS with yt-dlp's own segment downloader so ffmpeg only ever sees
+    // a local file. Older bundled ffmpeg builds crash fetching m3u8 themselves.
+    hlsPreferNative: true,
     ...(isAudio
       ? { format: "bestaudio[ext=m4a]/bestaudio/best" }
       : { format: videoFormat, mergeOutputFormat: "mp4" }),
@@ -696,12 +754,13 @@ app.post("/api/download", async (req: Request, res: Response) => {
       });
     });
 
-  // A 403 on the media URL (or the ffmpeg failure it causes) means the
-  // sectioned path is unusable for this video — retry the whole-file path.
+  // A 403 on the media URL, or any ffmpeg failure while it fetches the stream
+  // itself (including crashes on m3u8 input), means the sectioned path is
+  // unusable for this video — retry via the whole-file + local-trim path.
   const isForbidden = (e: unknown) => {
     const msg = e instanceof Error ? e.message : String(e);
     return (
-      /403|Forbidden|ffmpeg exited with code 1|fragment.*not found/i.test(msg)
+      /403|Forbidden|ffmpeg exited with code|fragment.*not found/i.test(msg)
     );
   };
 
@@ -829,8 +888,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
     logYtError("/api/download", url, options, e);
     cleanup();
     const raw = fullErrMessage(e);
+    // Keep the friendly sentence but append the real yt-dlp stderr tail so the
+    // next YouTube-side change is diagnosable straight from the UI.
+    const tail = ((e as { tail?: string } | null)?.tail || raw || "").trim();
     const msg = isForbidden(e)
-      ? "YouTube refused the media request for this video. Try again in a moment, or pick a different quality."
+      ? `YouTube refused the media request for this video. Try again in a moment, or pick a different quality.${tail ? `\n${tail}` : ""}`
       : raw;
     publishProgress(jobId, { phase: "error", percent: 0, message: msg });
     res.status(500).json({ error: msg });

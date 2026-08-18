@@ -255,11 +255,9 @@ async function bundleDeno() {
       () => null,
       bundleFfmpeg,
     );
-    await cached(
-      platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
-      () => null,
-      bundleYtDlp,
-    );
+    // yt-dlp is NOT cached: YouTube changes often and a stale binary is the
+    // most common cause of download failures, so always fetch the latest.
+    await bundleYtDlp();
     await cached(
       platform === "win32" ? "deno.exe" : "deno",
       () => null,
