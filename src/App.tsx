@@ -83,6 +83,9 @@ function FooterBar() {
     estimatedBytes,
     isElectron,
     saveDir,
+    downloadProgress,
+    downloadPhase,
+    cancelDownload,
   } = useClipperContext();
   const needsSaveDir = isElectron && !saveDir;
   const disabled =
@@ -99,8 +102,11 @@ function FooterBar() {
       ? `~${formatBytes(estimatedBytes)} estimated`
       : "";
 
+  const pct = Math.max(0, Math.min(100, downloadProgress));
+  const processing = downloadPhase === "processing";
+
   return (
-    <div className="flex items-center justify-between border-t border-hairline bg-bg-deep/60 px-4 py-2.5">
+    <div className="relative flex items-center justify-between gap-4 border-t border-hairline bg-bg-deep/60 px-4 py-2.5">
       <div className="flex items-center gap-2 text-[12px] text-fg-muted">
         <Scissors size={12} />
         <span>{status}</span>
@@ -116,42 +122,70 @@ function FooterBar() {
           </>
         )}
       </div>
-      <button
-        type="button"
-        onClick={download}
-        disabled={disabled}
-        className="btn-primary text-[12px]"
-      >
-        <Download size={12} />
-        <span>
-          {downloading ? "Downloading" : `Download ${format.toUpperCase()}`}
-        </span>
-        <span className="kbd border-white/30 bg-white/10 text-white/90">
-          ⌘↵
-        </span>
-      </button>
+      {downloading ? (
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+          <span className="shrink-0 text-[12px] tabular-nums text-fg-muted">
+            {processing ? "Finishing up" : `Downloading ${Math.floor(pct)}%`}
+          </span>
+          <div className="relative h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-panel-raised">
+            {processing ? (
+              <motion.div
+                className="absolute inset-y-0 w-1/3 rounded-full bg-accent/70"
+                animate={{ x: ["-100%", "300%"] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ) : (
+              <motion.div
+                className="absolute inset-y-0 left-0 rounded-full bg-accent"
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+              />
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={cancelDownload}
+            className="btn shrink-0 px-2 py-1.5 text-[12px]"
+            aria-label="Cancel download"
+            title="Cancel download"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={download}
+          disabled={disabled}
+          className="btn-primary text-[12px]"
+        >
+          <Download size={12} />
+          <span>{`Download ${format.toUpperCase()}`}</span>
+          <span className="kbd border-white/30 bg-white/10 text-white/90">
+            ⌘↵
+          </span>
+        </button>
+      )}
     </div>
   );
 }
 
-function DownloadToast() {
-  const { downloadPhase, isElectron, saveDir, lastSavedPath, revealLastSaved } =
+function SavedToast() {
+  const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
     useClipperContext();
-  const [show, setShow] = useState(false);
 
-  // Show a confirmation toast when a desktop download finishes to a chosen
-  // folder. Browser downloads have no known path, so they never trigger it.
+  // Auto-dismiss after a while; any explicit interaction clears it sooner.
   useEffect(() => {
-    if (downloadPhase === "done" && isElectron && saveDir && lastSavedPath) {
-      setShow(true);
-      const t = window.setTimeout(() => setShow(false), 8000);
-      return () => window.clearTimeout(t);
-    }
-  }, [downloadPhase, isElectron, saveDir, lastSavedPath]);
+    if (!savedNotice) return;
+    const t = window.setTimeout(() => dismissSavedNotice(), 10000);
+    return () => window.clearTimeout(t);
+  }, [savedNotice, dismissSavedNotice]);
+
+  const canReveal = isElectron && Boolean(savedNotice?.path);
 
   return (
     <AnimatePresence>
-      {show && (
+      {savedNotice && (
         <motion.div
           key="dl-toast"
           initial={{ opacity: 0, y: 12 }}
@@ -163,22 +197,28 @@ function DownloadToast() {
         >
           <CheckCircleFill size={16} className="shrink-0 text-accent" />
           <div className="flex min-w-0 flex-col">
-            <span className="text-[13px] font-medium text-fg">Clip saved</span>
+            <span className="text-[13px] font-medium text-fg">
+              {savedNotice.kind === "comments"
+                ? "Comments exported"
+                : "Clip saved"}
+            </span>
             <span className="max-w-[220px] truncate text-[11px] text-fg-faint">
-              {saveDir}
+              {savedNotice.label}
             </span>
           </div>
+          {canReveal && (
+            <button
+              type="button"
+              onClick={revealSaved}
+              className="btn ml-1 shrink-0 text-[12px]"
+            >
+              <FolderSymlink size={12} />
+              <span>Open folder</span>
+            </button>
+          )}
           <button
             type="button"
-            onClick={revealLastSaved}
-            className="btn ml-1 shrink-0 text-[12px]"
-          >
-            <FolderSymlink size={12} />
-            <span>Open folder</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShow(false)}
+            onClick={dismissSavedNotice}
             className="shrink-0 rounded-chip p-1 text-fg-faint hover:bg-panel-hover hover:text-fg"
             aria-label="Dismiss"
           >
@@ -193,26 +233,19 @@ function DownloadToast() {
 function Layout() {
   const {
     loadingInfo,
-    downloading,
     loadingTranscript,
-    downloadProgress,
-    downloadPhase,
+    exportingComments,
   } = useClipperContext();
-  const overlayVisible = loadingInfo || downloading || loadingTranscript;
-  const overlayLabel = downloading
-    ? "Downloading clip"
+  const overlayVisible = loadingInfo || loadingTranscript || exportingComments;
+  const overlayLabel = exportingComments
+    ? "Exporting comments"
     : loadingInfo
       ? "Loading video info"
       : "Loading transcript";
 
   return (
     <>
-      <OverlayLoader
-        visible={overlayVisible}
-        label={overlayLabel}
-        progress={downloading ? downloadProgress : undefined}
-        phase={downloading ? downloadPhase : undefined}
-      />
+      <OverlayLoader visible={overlayVisible} label={overlayLabel} />
 
       <main className="flex h-screen w-full flex-col overflow-hidden bg-panel">
         {/* Title bar */}
@@ -250,7 +283,7 @@ function Layout() {
           <FooterBar />
         </div>
       </main>
-      <DownloadToast />
+      <SavedToast />
     </>
   );
 }
