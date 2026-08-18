@@ -315,6 +315,12 @@ const downloadSchema = z
     end: z.number().positive(),
     format: z.enum(["mp4", "mp3"]).default("mp4"),
     quality: z.string().default("best"),
+    // Optional sign-in path: yt-dlp reads the logged-in YouTube session
+    // directly from the named browser at runtime. Cookie contents never touch
+    // this process — only the browser name is accepted, from an allowlist.
+    cookiesFromBrowser: z
+      .enum(["chrome", "safari", "edge", "firefox", "brave", "chromium"])
+      .optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
