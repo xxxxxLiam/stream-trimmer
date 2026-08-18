@@ -405,6 +405,20 @@ export function useClipper() {
       const blob = await res.blob();
       const ext = format === "mp3" ? "mp3" : "mp4";
       const filename = buildClipFilename(info.title, start, end, ext);
+      // What the server actually produced — YouTube may only serve renditions
+      // below the requested height, in which case the clip is still valid.
+      const deliveredHeight = Number(res.headers.get("X-Delivered-Height"));
+      const deliveredKbps = Number(res.headers.get("X-Delivered-Audio-Kbps"));
+      const requestedHeight = Number(quality);
+      let detail: string | undefined;
+      if (format === "mp3") {
+        detail = deliveredKbps ? `Downloaded at ${deliveredKbps} kbps.` : undefined;
+      } else if (deliveredHeight) {
+        detail =
+          requestedHeight && deliveredHeight < requestedHeight
+            ? `Downloaded at ${deliveredHeight}p — ${requestedHeight}p isn't available for this video.`
+            : `Downloaded at ${deliveredHeight}p.`;
+      }
       if (isElectron && window.electronAPI && saveDir) {
         const arr = await blob.arrayBuffer();
         const result = await window.electronAPI.saveFile({
@@ -418,6 +432,7 @@ export function useClipper() {
           kind: "clip",
           path: result.path ?? "",
           label: filename,
+          detail,
         });
       } else {
         setLastSavedPath(null);
@@ -429,7 +444,7 @@ export function useClipper() {
         a.click();
         a.remove();
         URL.revokeObjectURL(objectUrl);
-        setSavedNotice({ kind: "clip", path: "", label: filename });
+        setSavedNotice({ kind: "clip", path: "", label: filename, detail });
       }
       setDownloadProgress(100);
       setDownloadPhase("done");
