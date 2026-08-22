@@ -669,7 +669,15 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
     cookiesFromBrowser: browser,
   };
   try {
-    await yt!.run(probeUrl, options, { env: childEnv() } as any);
+    // Hard cap so a stuck extraction can't hang the client's polling loop.
+    // A timed-out child still exits on its own; we just stop waiting.
+    const timeout = new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("Sign-in check timed out")), 30_000),
+    );
+    await Promise.race([
+      yt!.run(probeUrl, options, { env: childEnv() } as any),
+      timeout,
+    ]);
     res.json({ status: "signed_in" });
   } catch (e) {
     const msg = errMessage(e);
