@@ -1,99 +1,45 @@
-# Audit: "YouTube refused the media request" — findings and minimal fix
+# Guided YouTube sign-in with automatic detection
 
-## Step 1 — Bundled yt-dlp version
+## Goal
+Replace the passive "Sign in via my browser" checkbox with a guided flow: click **Sign in to YouTube** → your browser opens to YouTube's sign-in page → the app automatically recognizes when sign-in succeeds and starts using the session for higher-quality downloads. 100% free — no OAuth app, no Google Cloud project, no third-party service. Everything stays local.
 
-`scripts/bundle-binaries.cjs` (line 157) fetches:
-`https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp` — **not pinned**, always latest at build time.
+## Why this approach (free constraint)
+A real OAuth redirect flow does not work for this app's purpose, even setting cost aside: YouTube's official API never exposes downloadable media streams, and yt-dlp cannot use OAuth tokens for downloads. The only free, working authentication path is reusing the browser's logged-in session via yt-dlp's `--cookies-from-browser` — which the app already does. This task makes that path guided and self-confirming instead of manual and silent.
 
-Two caveats, but neither is the cause:
-- `cached()` writes a `.ok` marker in `resources/bin/.cache`, so a local rebuild reuses an older download. CI runners are fresh, so releases do get current binaries.
-- A shipped installer freezes whatever yt-dlp existed at release time; installed apps never self-update yt-dlp.
+## Changes
 
-I downloaded the current latest (**2026.07.04**) and reproduced the exact failure with it, so a stale pin is **refuted** as the root cause.
+### 1. Server: sign-in status probe — `server/index.ts`
+- New route `POST /api/auth/youtube/status` with body `{ browser }` (same `CookieBrowser` allowlist as `downloadSchema`).
+- Runs yt-dlp with `--cookies-from-browser <browser> --skip-download --simulate` against `https://www.youtube.com/playlist?list=WL` (Watch Later requires sign-in; logged out, YouTube returns a sign-in error page). Hard timeout ~20s per probe.
+- Response mapping:
+  - exit 0 → `{ status: "signed_in" }`
+  - stderr matches "sign in" / "Sign in" → `{ status: "signed_out" }`
+  - `isCookieError(e)` → `{ status: "unreadable", message: cookieErrorMessage(browser) }` (browser locked/unsupported profile)
+  - anything else → `{ status: "unknown", message }`
+- No cookie values are ever logged or returned — only the browser name crosses the API, as today.
+- Guard with `binariesOk` like the other routes.
 
-## Step 2 — The command the server builds
+### 2. Electron: open the sign-in page — `electron/main.cjs`, `electron/preload.cjs`, `src/vite-env.d.ts`
+- New IPC handler `shell:openYouTubeSignIn` calling `shell.openExternal("https://www.youtube.com/signin")` (YouTube redirects to Google sign-in).
+- Preload exposes `openYouTubeSignIn()` on `window.electronAPI`; type added to `ElectronAPI`.
+- Browser/dev fallback: `window.open(url, "_blank")` (works there too since the server is still local).
 
-`server/index.ts` `/api/download` (lines 575-612) runs, per attempt 1:
+### 3. Front-end: guided sign-in UI — `src/hooks/useClipper.ts`, `src/components/FormatQualityFields.tsx`
+- New state: `ytAuth: { status: "idle" | "checking" | "signed_in" | "signed_out" | "unreadable" | "unknown", message?: string }`.
+- `beginYouTubeSignIn()`: opens the sign-in page (IPC or `window.open`), then polls `POST /api/auth/youtube/status` every 3s for up to 2 minutes. Stops on `signed_in`/`unreadable`, timeout, or unmount.
+- On `signed_in`: automatically enable `useBrowserCookies` so subsequent downloads reuse the session, and show a success pill: "Signed in via Chrome — higher quality enabled".
+- On `unreadable`: show the existing clear message ("Couldn't read Chrome's cookies — fully quit the browser and retry"), with a **Retry check** button.
+- The manual checkbox + browser picker stay as a fallback underneath; the picker drives which browser the probe checks.
+- Copy note: Firefox is the most reliable cookie source; Chrome on Windows can block cookie reads entirely (app-bound encryption) — the `unreadable` state surfaces this instead of failing silently at download time.
 
-```text
-yt-dlp <url>
-  --no-playlist --no-warnings --newline --progress
-  --ffmpeg-location <bundled ffmpeg>
-  --extractor-args "youtube:player_client=web_safari,web,mweb,tv,android_vr"
-  --format "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/..."
-  --merge-output-format mp4 --remux-video mp4
-  --download-sections "*START-END" --force-keyframes-at-cuts
-  --add-header Referer:https://www.youtube.com/ --add-header Origin:https://www.youtube.com
-  -o <tmp>/clip.mp4
-```
+### 4. Small type additions — `src/lib/clip.ts`
+- `YouTubeAuthStatus` response type for the new endpoint.
 
-The generic message comes from line 832: any error matching `/403|Forbidden|ffmpeg exited with code 1|fragment.*not found/i`
-is replaced with "YouTube refused the media request for this video…". The raw stderr is already logged
-server-side by `logYtError`, but it never reaches the UI.
+## Out of scope / unchanged
+- Download pipeline, format chain, quality reporting — untouched; `cookiesFromBrowser` payload unchanged.
+- No accounts, tokens, or keys stored anywhere. No network calls beyond the existing loopback server and YouTube itself.
 
-## Step 3 — Raw yt-dlp stderr (reproduced with latest yt-dlp)
-
-```text
-[info] Downloading 1 format(s): 137+140
-[https @ ...] HTTP error 403 Forbidden
-Error opening input file https://rr5---sn-...googlevideo.com/videoplayback?...&c=ANDROID_VR&...
-ERROR: ffmpeg exited with code 8
-```
-
-Probing the clients individually explains why:
-
-```text
-yt-dlp -F --extractor-args "youtube:player_client=tv"
-WARNING: Some tv client https formats have been skipped as they are missing a URL.
-YouTube may have enabled the SABR-only streaming experiment for the current session.
-(only itag 18 remains)
-
-yt-dlp -F --extractor-args "youtube:player_client=web_safari"
-(only HLS m3u8 formats 91-96 + progressive itag 18 — no DASH video/audio pairs)
-```
-
-So under YouTube's SABR rollout the web/tv clients no longer expose separate DASH
-video+audio URLs. The only client still handing out DASH URLs is `android_vr`, and those
-URLs are bound to that client's request context — ffmpeg's range request gets 403.
-The current format string (`bestvideo[ext=mp4]+bestaudio[ext=m4a]`) can only be satisfied
-by those android_vr DASH pairs, so every download lands on the 403 path.
-
-The existing fallback does not save it either: retrying with yt-dlp's own native downloader on
-the same android_vr URLs also returned `ERROR: unable to download video data: HTTP Error 403: Forbidden`.
-
-Verified working alternative, same yt-dlp, same video, same `--download-sections`:
-
-```text
--f 93  (web_safari HLS, 360p)      -> clip written, 585 KB, exit 0
--f 18  (progressive 360p)          -> clip written, 587 KB, exit 0
-```
-
-## Root cause
-
-Not the app's trimming logic, not a stale yt-dlp pin. The format selector plus client list steers
-yt-dlp onto `android_vr` DASH URLs, which YouTube now 403s for any out-of-context fetcher.
-Confirms the user's suspicion that this is a YouTube-side change — it broke without any code change here.
-
-## Step 4 — Minimal fix (server/index.ts only)
-
-1. **Format selection: prefer HLS, then progressive, then DASH.** Change `videoFormat` so the first
-   candidates are the m3u8 formats the web clients still serve, e.g.
-   `bestvideo[protocol*=m3u8][height<=Q]+bestaudio[protocol*=m3u8]/best[protocol*=m3u8][height<=Q]/best[ext=mp4][height<=Q]/…`
-   with the current avc1+m4a DASH string kept last as a fallback. HLS covers up to 1080p on the test video
-   and works with `--download-sections` directly.
-2. **Client list: drop `android_vr` from the first attempt**, keep `web_safari,web,mweb,tv`. Retain
-   `android_vr` only in the whole-file fallback attempt, where a different quality may still be reachable.
-3. **Surface the real error.** Keep the friendly sentence but append the yt-dlp stderr tail (already
-   captured as `err.tail`) so the next YouTube change is diagnosable from the UI, not just the console.
-4. **Keep yt-dlp fresh.** Two small build-side changes: stop reusing the `.cache` `.ok` marker for
-   `yt-dlp` (always fetch latest at build time), and, when a system `yt-dlp` reports a newer version
-   string than the bundled one, prefer it in `resolveYtDlp()`. Optional but cheap insurance against
-   the next breakage.
-
-Quality options: if the requested height has no HLS rendition, selection degrades to the nearest
-available instead of failing.
-
-## Out of scope
-
-No front-end changes, no changes to trimming, progress reporting, comments export, or packaging beyond
-the yt-dlp freshness tweaks above.
+## Verification
+- `npx tsgo --noEmit` for types.
+- Manual: click Sign in → browser opens → sign in to YouTube → pill flips to "Signed in" within a few seconds; run a 1080p download and confirm the delivered-resolution header shows the higher tier where available.
+- Signed-out and browser-locked paths show their respective states and never break the standard anonymous download path.
