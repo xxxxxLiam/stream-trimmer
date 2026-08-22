@@ -22,10 +22,16 @@ import {
   type VideoInfo,
   type CommentsResponse,
   type CookieBrowser,
+  type YouTubeAuthState,
+  type YouTubeAuthStatus,
 } from "../lib/clip";
 
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
 export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
+
+// Guided sign-in polling: probe every 3s for up to 2 minutes.
+export const YT_AUTH_POLL_MS = 3000;
+export const YT_AUTH_MAX_POLLS = 40;
 
 export type Quality =
   | (typeof VIDEO_QUALITIES)[number]
