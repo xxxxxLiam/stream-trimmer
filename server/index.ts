@@ -308,6 +308,17 @@ const urlSchema = z
 
 const infoSchema = z.object({ url: urlSchema });
 
+// Browsers yt-dlp can read a logged-in YouTube session from. Only the browser
+// name ever crosses the API; cookie contents never touch this process.
+const cookieBrowserSchema = z.enum([
+  "chrome",
+  "safari",
+  "edge",
+  "firefox",
+  "brave",
+  "chromium",
+]);
+
 const downloadSchema = z
   .object({
     url: urlSchema,
@@ -318,9 +329,7 @@ const downloadSchema = z
     // Optional sign-in path: yt-dlp reads the logged-in YouTube session
     // directly from the named browser at runtime. Cookie contents never touch
     // this process — only the browser name is accepted, from an allowlist.
-    cookiesFromBrowser: z
-      .enum(["chrome", "safari", "edge", "firefox", "brave", "chromium"])
-      .optional(),
+    cookiesFromBrowser: cookieBrowserSchema.optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
