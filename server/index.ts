@@ -642,6 +642,55 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
   }
 });
 
+// Probe whether the chosen browser currently holds a logged-in YouTube
+// session. Uses the Watch Later playlist, which only resolves for signed-in
+// users; logged out, YouTube answers with a sign-in error page. Best-effort:
+// extraction success means signed in, an auth-flavoured stderr means signed
+// out, and a cookie-store failure means the browser profile was unreadable.
+// Only the browser name is accepted — cookie values are never logged, stored,
+// or returned.
+app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
+  const parsed = z
+    .object({ browser: cookieBrowserSchema })
+    .safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ error: "Unknown browser" });
+  if (!binariesOk) return binaryError(res);
+
+  const { browser } = parsed.data;
+  const probeUrl = "https://www.youtube.com/playlist?list=WL";
+  const options: Record<string, unknown> = {
+    dumpSingleJson: true,
+    skipDownload: true,
+    simulate: true,
+    noWarnings: true,
+    // Only resolve the first entry — extraction itself is the auth gate.
+    playlistEnd: 1,
+    cookiesFromBrowser: browser,
+  };
+  try {
+    await yt!.run(probeUrl, options, { env: childEnv() } as any);
+    res.json({ status: "signed_in" });
+  } catch (e) {
+    const msg = errMessage(e);
+    if (isCookieError(e)) {
+      return res.json({
+        status: "unreadable",
+        message: cookieErrorMessage(browser),
+      });
+    }
+    if (
+      /sign[ -]?in|log[ -]?in|login|private playlist|not available|this playlist/i.test(
+        msg,
+      )
+    ) {
+      return res.json({ status: "signed_out" });
+    }
+    // Unexpected failure (network, extractor change) — report, don't guess.
+    res.json({ status: "unknown", message: fullErrMessage(e).slice(0, 300) });
+  }
+});
+
 app.post("/api/download", async (req: Request, res: Response) => {
   const parsed = downloadSchema.safeParse(req.body);
   if (!parsed.success)
