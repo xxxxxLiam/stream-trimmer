@@ -283,6 +283,21 @@ function registerIpc() {
     }
   });
 
+  // Opens YouTube's sign-in page in the user's default browser. The app
+  // never sees credentials — it later reuses the browser's session cookies
+  // via yt-dlp. https://www.youtube.com/signin redirects to Google sign-in.
+  ipcMain.handle("shell:openYouTubeSignIn", async () => {
+    try {
+      await shell.openExternal("https://www.youtube.com/signin");
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err && err.message ? err.message : "Failed to open browser",
+      };
+    }
+  });
+
   ipcMain.handle("updater:quitAndInstall", () => {
     try {
       autoUpdater.quitAndInstall();

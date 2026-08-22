@@ -19,6 +19,7 @@ interface ElectronAPI {
   showInFolder: (
     targetPath: string,
   ) => Promise<{ ok: boolean; error?: string }>;
+  openYouTubeSignIn: () => Promise<{ ok: boolean; error?: string }>;
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string;
