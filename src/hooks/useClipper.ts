@@ -103,6 +103,89 @@ export function useClipper() {
     if (chosen) setSaveDir(chosen);
   }, [setSaveDir]);
 
+  // --- Guided YouTube sign-in --------------------------------------------
+  // Opens YouTube's sign-in page in the user's browser, then polls the local
+  // backend, which probes (via yt-dlp) whether the chosen browser now holds
+  // a logged-in session. Fully local and free — no OAuth app, no tokens;
+  // cookie contents never leave the browser's own store.
+  const [ytAuth, setYtAuth] = useState<{
+    status: YouTubeAuthState;
+    message?: string;
+  }>({ status: "idle" });
+  const ytAuthPollRef = useRef<number | null>(null);
+
+  const stopYtAuthPolling = useCallback(() => {
+    if (ytAuthPollRef.current !== null) {
+      window.clearInterval(ytAuthPollRef.current);
+      ytAuthPollRef.current = null;
+    }
+  }, []);
+
+  // Single probe. On success, automatically enable the cookie path so the
+  // next download reuses the session. Returns the server-reported status.
+  const checkYouTubeAuth = useCallback(async (): Promise<YouTubeAuthState> => {
+    try {
+      const res = await fetch(apiUrl("/api/auth/youtube/status"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ browser: cookieBrowser }),
+      });
+      const data = await parseJson<YouTubeAuthStatus>(res);
+      if (data.status === "signed_in") {
+        setUseBrowserCookies(true);
+        setYtAuth({ status: "signed_in" });
+      } else {
+        setYtAuth({ status: data.status, message: data.message });
+      }
+      return data.status;
+    } catch {
+      setYtAuth({
+        status: "unknown",
+        message: "Couldn't reach the local backend.",
+      });
+      return "unknown";
+    }
+  }, [cookieBrowser]);
+
+  const beginYouTubeSignIn = useCallback(async () => {
+    stopYtAuthPolling();
+    setYtAuth({ status: "checking" });
+    if (isElectron && window.electronAPI?.openYouTubeSignIn) {
+      await window.electronAPI.openYouTubeSignIn();
+    } else {
+      window.open("https://www.youtube.com/signin", "_blank", "noopener");
+    }
+    let attempts = 0;
+    ytAuthPollRef.current = window.setInterval(() => {
+      attempts += 1;
+      void checkYouTubeAuth().then((status) => {
+        const settled = status === "signed_in" || status === "unreadable";
+        if (settled || attempts >= YT_AUTH_MAX_POLLS) {
+          stopYtAuthPolling();
+          if (!settled) {
+            setYtAuth((prev) =>
+              prev.status === "checking"
+                ? {
+                    status: "signed_out",
+                    message:
+                      "No sign-in detected yet. Finish signing in, then run the check again.",
+                  }
+                : prev,
+            );
+          }
+        }
+      });
+    }, YT_AUTH_POLL_MS);
+  }, [isElectron, checkYouTubeAuth, stopYtAuthPolling]);
+
+  // Stop polling on unmount, and reset the status when the browser choice
+  // changes — a signed-in result only applies to the browser it probed.
+  useEffect(() => stopYtAuthPolling, [stopYtAuthPolling]);
+  useEffect(() => {
+    stopYtAuthPolling();
+    setYtAuth((prev) => (prev.status === "idle" ? prev : { status: "idle" }));
+  }, [cookieBrowser, stopYtAuthPolling]);
+
   const revealLastSaved = useCallback(() => {
     if (isElectron && window.electronAPI?.showInFolder && lastSavedPath) {
       void window.electronAPI.showInFolder(lastSavedPath);
