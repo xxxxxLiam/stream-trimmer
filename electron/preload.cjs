@@ -14,6 +14,7 @@ try {
     saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
     showInFolder: (targetPath) =>
       ipcRenderer.invoke("file:showInFolder", targetPath),
+    openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
     onUpdateStatus: (cb) => {

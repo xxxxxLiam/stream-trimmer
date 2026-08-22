@@ -308,6 +308,17 @@ const urlSchema = z
 
 const infoSchema = z.object({ url: urlSchema });
 
+// Browsers yt-dlp can read a logged-in YouTube session from. Only the browser
+// name ever crosses the API; cookie contents never touch this process.
+const cookieBrowserSchema = z.enum([
+  "chrome",
+  "safari",
+  "edge",
+  "firefox",
+  "brave",
+  "chromium",
+]);
+
 const downloadSchema = z
   .object({
     url: urlSchema,
@@ -318,9 +329,7 @@ const downloadSchema = z
     // Optional sign-in path: yt-dlp reads the logged-in YouTube session
     // directly from the named browser at runtime. Cookie contents never touch
     // this process — only the browser name is accepted, from an allowlist.
-    cookiesFromBrowser: z
-      .enum(["chrome", "safari", "edge", "firefox", "brave", "chromium"])
-      .optional(),
+    cookiesFromBrowser: cookieBrowserSchema.optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -630,6 +639,63 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
     logYtError("/api/transcript", parsed.data.url, options, e);
     cleanup();
     res.json({ lines: [], available: false, note: fullErrMessage(e) });
+  }
+});
+
+// Probe whether the chosen browser currently holds a logged-in YouTube
+// session. Uses the Watch Later playlist, which only resolves for signed-in
+// users; logged out, YouTube answers with a sign-in error page. Best-effort:
+// extraction success means signed in, an auth-flavoured stderr means signed
+// out, and a cookie-store failure means the browser profile was unreadable.
+// Only the browser name is accepted — cookie values are never logged, stored,
+// or returned.
+app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
+  const parsed = z
+    .object({ browser: cookieBrowserSchema })
+    .safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ error: "Unknown browser" });
+  if (!binariesOk) return binaryError(res);
+
+  const { browser } = parsed.data;
+  const probeUrl = "https://www.youtube.com/playlist?list=WL";
+  const options: Record<string, unknown> = {
+    dumpSingleJson: true,
+    skipDownload: true,
+    simulate: true,
+    noWarnings: true,
+    // Only resolve the first entry — extraction itself is the auth gate.
+    playlistEnd: 1,
+    cookiesFromBrowser: browser,
+  };
+  try {
+    // Hard cap so a stuck extraction can't hang the client's polling loop.
+    // A timed-out child still exits on its own; we just stop waiting.
+    const timeout = new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("Sign-in check timed out")), 30_000),
+    );
+    await Promise.race([
+      yt!.run(probeUrl, options, { env: childEnv() } as any),
+      timeout,
+    ]);
+    res.json({ status: "signed_in" });
+  } catch (e) {
+    const msg = errMessage(e);
+    if (isCookieError(e)) {
+      return res.json({
+        status: "unreadable",
+        message: cookieErrorMessage(browser),
+      });
+    }
+    if (
+      /sign[ -]?in|log[ -]?in|login|private playlist|not available|this playlist/i.test(
+        msg,
+      )
+    ) {
+      return res.json({ status: "signed_out" });
+    }
+    // Unexpected failure (network, extractor change) — report, don't guess.
+    res.json({ status: "unknown", message: fullErrMessage(e).slice(0, 300) });
   }
 });
 

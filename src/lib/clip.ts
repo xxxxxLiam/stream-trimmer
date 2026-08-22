@@ -46,6 +46,21 @@ export const COOKIE_BROWSERS = [
 
 export type CookieBrowser = (typeof COOKIE_BROWSERS)[number];
 
+// Server → client shape from POST /api/auth/youtube/status. "idle" and
+// "checking" are client-only states and never arrive from the server.
+export type YouTubeAuthState =
+  | "idle"
+  | "checking"
+  | "signed_in"
+  | "signed_out"
+  | "unreadable"
+  | "unknown";
+
+export interface YouTubeAuthStatus {
+  status: Exclude<YouTubeAuthState, "idle" | "checking">;
+  message?: string;
+}
+
 export interface DownloadRequest {
   url: string;
   start: number;
