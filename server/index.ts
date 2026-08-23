@@ -642,23 +642,26 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
   }
 });
 
-// Probe whether the chosen browser currently holds a logged-in YouTube
-// session. Uses the Watch Later playlist, which only resolves for signed-in
-// users; logged out, YouTube answers with a sign-in error page. Best-effort:
-// extraction success means signed in, an auth-flavoured stderr means signed
-// out, and a cookie-store failure means the browser profile was unreadable.
-// Only the browser name is accepted — cookie values are never logged, stored,
-// or returned.
-app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
-  const parsed = z
-    .object({ browser: cookieBrowserSchema })
-    .safeParse(req.body);
-  if (!parsed.success)
-    return res.status(400).json({ error: "Unknown browser" });
-  if (!binariesOk) return binaryError(res);
+// Probe whether a browser currently holds a logged-in YouTube session, using
+// the Watch Later playlist — it only resolves for signed-in users; logged
+// out, YouTube answers with a sign-in error page. Best-effort: extraction
+// success means signed in, an auth-flavoured stderr means signed out, and a
+// cookie-store failure means the profile was unreadable or absent. Only the
+// browser name is ever handled — cookie values are never logged, stored, or
+// returned.
+type CookieBrowserName = z.infer<typeof cookieBrowserSchema>;
 
-  const { browser } = parsed.data;
-  const probeUrl = "https://www.youtube.com/playlist?list=WL";
+type AuthProbeResult = {
+  browser: CookieBrowserName;
+  // "blocked" = installed but unreadable (decrypt/lock/permission);
+  // "unavailable" = browser or profile not present on this machine.
+  status: "signed_in" | "signed_out" | "blocked" | "unavailable" | "unknown";
+  message?: string;
+};
+
+async function probeBrowserAuth(
+  browser: CookieBrowserName,
+): Promise<AuthProbeResult> {
   const options: Record<string, unknown> = {
     dumpSingleJson: true,
     skipDownload: true,
@@ -670,33 +673,87 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   };
   try {
     // Hard cap so a stuck extraction can't hang the client's polling loop.
-    // A timed-out child still exits on its own; we just stop waiting.
     const timeout = new Promise<never>((_resolve, reject) =>
-      setTimeout(() => reject(new Error("Sign-in check timed out")), 30_000),
+      setTimeout(() => reject(new Error("Sign-in check timed out")), 20_000),
     );
     await Promise.race([
-      yt!.run(probeUrl, options, { env: childEnv() } as any),
+      yt!.run("https://www.youtube.com/playlist?list=WL", options, {
+        env: childEnv(),
+      } as any),
       timeout,
     ]);
-    res.json({ status: "signed_in" });
+    return { browser, status: "signed_in" };
   } catch (e) {
     const msg = errMessage(e);
     if (isCookieError(e)) {
-      return res.json({
-        status: "unreadable",
-        message: cookieErrorMessage(browser),
-      });
+      const lower = msg.toLowerCase();
+      const blocked =
+        lower.includes("failed to decrypt") ||
+        lower.includes("locked") ||
+        lower.includes("permission denied") ||
+        lower.includes("unsupported browser");
+      return { browser, status: blocked ? "blocked" : "unavailable" };
     }
     if (
       /sign[ -]?in|log[ -]?in|login|private playlist|not available|this playlist/i.test(
         msg,
       )
     ) {
-      return res.json({ status: "signed_out" });
+      return { browser, status: "signed_out" };
     }
     // Unexpected failure (network, extractor change) — report, don't guess.
-    res.json({ status: "unknown", message: fullErrMessage(e).slice(0, 300) });
+    return {
+      browser,
+      status: "unknown",
+      message: fullErrMessage(e).slice(0, 300),
+    };
   }
+}
+
+app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
+  const parsed = z
+    .object({ browser: cookieBrowserSchema.optional() })
+    .safeParse(req.body ?? {});
+  if (!parsed.success)
+    return res.status(400).json({ error: "Unknown browser" });
+  if (!binariesOk) return binaryError(res);
+
+  // Explicit single-browser probe.
+  if (parsed.data.browser) {
+    const r = await probeBrowserAuth(parsed.data.browser);
+    if (r.status === "signed_in")
+      return res.json({ status: "signed_in", browser: r.browser });
+    if (r.status === "blocked" || r.status === "unavailable")
+      return res.json({
+        status: "unreadable",
+        message: cookieErrorMessage(r.browser),
+      });
+    if (r.status === "signed_out") return res.json({ status: "signed_out" });
+    return res.json({ status: "unknown", message: r.message });
+  }
+
+  // Auto-detect: the sign-in page opens in the user's *default* browser,
+  // which may not be the one they'd pick manually — so scan every supported
+  // browser in parallel and adopt the first (allowlist order) that resolves
+  // a signed-in session.
+  const results = await Promise.all(
+    cookieBrowserSchema.options.map((b) => probeBrowserAuth(b)),
+  );
+  const signedIn = results.find((r) => r.status === "signed_in");
+  if (signedIn)
+    return res.json({ status: "signed_in", browser: signedIn.browser });
+  const blocked = results.find((r) => r.status === "blocked");
+  if (blocked) {
+    return res.json({
+      status: "unreadable",
+      message: `Couldn't read ${blocked.browser}'s cookies — fully quit that browser, then press Retry.`,
+    });
+  }
+  const probed = results.filter((r) => r.status !== "unavailable");
+  if (probed.length > 0 && probed.every((r) => r.status === "unknown")) {
+    return res.json({ status: "unknown", message: probed[0].message });
+  }
+  return res.json({ status: "signed_out" });
 });
 
 app.post("/api/download", async (req: Request, res: Response) => {

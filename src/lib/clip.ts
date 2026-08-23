@@ -58,6 +58,8 @@ export type YouTubeAuthState =
 
 export interface YouTubeAuthStatus {
   status: Exclude<YouTubeAuthState, "idle" | "checking">;
+  /** Set on signed_in — the browser the session was auto-detected in. */
+  browser?: CookieBrowser;
   message?: string;
 }
 
