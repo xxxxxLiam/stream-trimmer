@@ -29,9 +29,11 @@ import {
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
 export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
 
-// Guided sign-in polling: probe every 3s for up to 2 minutes.
+// Guided sign-in polling: re-probe every 3s for up to 2 minutes. Probes run
+// sequentially (each awaits the previous one) so slow auto-detect scans
+// can't stack up.
 export const YT_AUTH_POLL_MS = 3000;
-export const YT_AUTH_MAX_POLLS = 40;
+export const YT_AUTH_TIMEOUT_MS = 120_000;
 
 export type Quality =
   | (typeof VIDEO_QUALITIES)[number]
@@ -104,48 +106,74 @@ export function useClipper() {
   }, [setSaveDir]);
 
   // --- Guided YouTube sign-in --------------------------------------------
-  // Opens YouTube's sign-in page in the user's browser, then polls the local
-  // backend, which probes (via yt-dlp) whether the chosen browser now holds
-  // a logged-in session. Fully local and free — no OAuth app, no tokens;
-  // cookie contents never leave the browser's own store.
+  // Opens YouTube's sign-in page in the user's default browser, then polls
+  // the local backend, which auto-detects (via yt-dlp) which browser now
+  // holds a logged-in session. Fully local and free — no OAuth app, no
+  // tokens; cookie contents never leave the browser's own store.
   const [ytAuth, setYtAuth] = useState<{
     status: YouTubeAuthState;
     message?: string;
+    /** Browser the session was detected in (set on signed_in). */
+    browser?: CookieBrowser;
   }>({ status: "idle" });
   const ytAuthPollRef = useRef<number | null>(null);
 
   const stopYtAuthPolling = useCallback(() => {
     if (ytAuthPollRef.current !== null) {
-      window.clearInterval(ytAuthPollRef.current);
+      window.clearTimeout(ytAuthPollRef.current);
       ytAuthPollRef.current = null;
     }
   }, []);
 
-  // Single probe. On success, automatically enable the cookie path so the
-  // next download reuses the session. Returns the server-reported status.
+  // Single probe. The server scans every supported browser; on success we
+  // adopt the detected browser and enable the cookie path automatically so
+  // the next download reuses the session. Returns the server-reported status.
   const checkYouTubeAuth = useCallback(async (): Promise<YouTubeAuthState> => {
     try {
       const res = await fetch(apiUrl("/api/auth/youtube/status"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ browser: cookieBrowser }),
+        body: JSON.stringify({}),
       });
       const data = await parseJson<YouTubeAuthStatus>(res);
+      // Guard against non-probe responses (e.g. a proxy error body) so a
+      // missing/invalid status can never blank out the UI state.
+      if (
+        data.status !== "signed_in" &&
+        data.status !== "signed_out" &&
+        data.status !== "unreadable" &&
+        data.status !== "unknown"
+      ) {
+        throw new Error("Unexpected probe response");
+      }
       if (data.status === "signed_in") {
+        if (data.browser) setCookieBrowser(data.browser);
         setUseBrowserCookies(true);
-        setYtAuth({ status: "signed_in" });
+        setYtAuth({ status: "signed_in", browser: data.browser });
       } else {
-        setYtAuth({ status: data.status, message: data.message });
+        // While a poll loop is running, keep the "checking" face for
+        // transient results; only settled states replace it.
+        const transient =
+          data.status === "signed_out" || data.status === "unknown";
+        setYtAuth((prev) =>
+          prev.status === "checking" && transient
+            ? prev
+            : { status: data.status, message: data.message },
+        );
       }
       return data.status;
     } catch {
-      setYtAuth({
-        status: "unknown",
-        message: "Couldn't reach the local backend.",
-      });
+      setYtAuth((prev) =>
+        prev.status === "checking"
+          ? prev
+          : {
+              status: "unknown",
+              message: "Couldn't reach the local backend.",
+            },
+      );
       return "unknown";
     }
-  }, [cookieBrowser]);
+  }, []);
 
   const beginYouTubeSignIn = useCallback(async () => {
     stopYtAuthPolling();
@@ -155,36 +183,30 @@ export function useClipper() {
     } else {
       window.open("https://www.youtube.com/signin", "_blank", "noopener");
     }
-    let attempts = 0;
-    ytAuthPollRef.current = window.setInterval(() => {
-      attempts += 1;
-      void checkYouTubeAuth().then((status) => {
-        const settled = status === "signed_in" || status === "unreadable";
-        if (settled || attempts >= YT_AUTH_MAX_POLLS) {
-          stopYtAuthPolling();
-          if (!settled) {
-            setYtAuth((prev) =>
-              prev.status === "checking"
-                ? {
-                    status: "signed_out",
-                    message:
-                      "No sign-in detected yet. Finish signing in, then run the check again.",
-                  }
-                : prev,
-            );
-          }
-        }
-      });
-    }, YT_AUTH_POLL_MS);
+    // Sequential poll loop — each probe completes before the next is
+    // scheduled, so multi-browser auto-detect scans never overlap.
+    const deadline = Date.now() + YT_AUTH_TIMEOUT_MS;
+    const tick = async (): Promise<void> => {
+      const status = await checkYouTubeAuth();
+      if (status === "signed_in" || status === "unreadable") return;
+      if (Date.now() >= deadline) {
+        setYtAuth({
+          status: "signed_out",
+          message:
+            "No sign-in detected yet. Finish signing in, then press Re-check.",
+        });
+        return;
+      }
+      ytAuthPollRef.current = window.setTimeout(
+        () => void tick(),
+        YT_AUTH_POLL_MS,
+      );
+    };
+    void tick();
   }, [isElectron, checkYouTubeAuth, stopYtAuthPolling]);
 
-  // Stop polling on unmount, and reset the status when the browser choice
-  // changes — a signed-in result only applies to the browser it probed.
+  // Stop polling on unmount.
   useEffect(() => stopYtAuthPolling, [stopYtAuthPolling]);
-  useEffect(() => {
-    stopYtAuthPolling();
-    setYtAuth((prev) => (prev.status === "idle" ? prev : { status: "idle" }));
-  }, [cookieBrowser, stopYtAuthPolling]);
 
   const revealLastSaved = useCallback(() => {
     if (isElectron && window.electronAPI?.showInFolder && lastSavedPath) {
