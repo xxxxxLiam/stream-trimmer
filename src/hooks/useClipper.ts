@@ -136,6 +136,16 @@ export function useClipper() {
         body: JSON.stringify({}),
       });
       const data = await parseJson<YouTubeAuthStatus>(res);
+      // Guard against non-probe responses (e.g. a proxy error body) so a
+      // missing/invalid status can never blank out the UI state.
+      if (
+        data.status !== "signed_in" &&
+        data.status !== "signed_out" &&
+        data.status !== "unreadable" &&
+        data.status !== "unknown"
+      ) {
+        throw new Error("Unexpected probe response");
+      }
       if (data.status === "signed_in") {
         if (data.browser) setCookieBrowser(data.browser);
         setUseBrowserCookies(true);
