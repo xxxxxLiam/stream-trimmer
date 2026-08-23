@@ -402,6 +402,8 @@ function isCookieError(e: unknown): boolean {
     text.includes("could not find") && text.includes("cookies") ||
     text.includes("failed to decrypt") ||
     text.includes("unsupported browser") ||
+    // yt-dlp's Safari cookie reader emits this on non-macOS platforms.
+    text.includes("unsupported platform") ||
     text.includes("cookie database") ||
     (text.includes("cookies") &&
       (text.includes("permission denied") ||
@@ -752,6 +754,13 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   const probed = results.filter((r) => r.status !== "unavailable");
   if (probed.length > 0 && probed.every((r) => r.status === "unknown")) {
     return res.json({ status: "unknown", message: probed[0].message });
+  }
+  if (probed.length === 0) {
+    return res.json({
+      status: "signed_out",
+      message:
+        "No supported browser profile was found on this computer. Sign in to YouTube in your browser first, then Re-check.",
+    });
   }
   return res.json({ status: "signed_out" });
 });
