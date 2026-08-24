@@ -50,16 +50,19 @@ export type CookieBrowser = (typeof COOKIE_BROWSERS)[number];
 // "checking" are client-only states and never arrive from the server.
 export type YouTubeAuthState =
   | "idle"
+  | "ready"
   | "checking"
   | "signed_in"
   | "signed_out"
-  | "unreadable"
-  | "unknown";
+  | "profile_missing"
+  | "locked"
+  | "decrypt_failed"
+  | "timeout"
+  | "extractor_error";
 
 export interface YouTubeAuthStatus {
-  status: Exclude<YouTubeAuthState, "idle" | "checking">;
-  /** Set on signed_in — the browser the session was auto-detected in. */
-  browser?: CookieBrowser;
+  status: Exclude<YouTubeAuthState, "idle" | "ready" | "checking">;
+  browser: CookieBrowser;
   message?: string;
 }
 
