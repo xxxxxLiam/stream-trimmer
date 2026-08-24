@@ -115,10 +115,9 @@ export function useClipper() {
   }, [setSaveDir]);
 
   // --- Guided YouTube sign-in --------------------------------------------
-  // Opens YouTube's sign-in page in the user's default browser, then polls
-  // the local backend, which auto-detects (via yt-dlp) which browser now
-  // holds a logged-in session. Fully local and free — no OAuth app, no
-  // tokens; cookie contents never leave the browser's own store.
+  // Opens YouTube in the default browser, then lets the user explicitly check
+  // the selected local browser profile. Fully local and free — no OAuth app,
+  // no tokens; cookie contents never leave the browser's own store.
   const [ytAuth, setYtAuth] = useState<{
     status: YouTubeAuthState;
     message?: string;
