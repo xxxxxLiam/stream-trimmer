@@ -53,6 +53,8 @@ export function useClipper() {
   });
   const setCookieBrowser = useCallback((browser: CookieBrowser) => {
     setCookieBrowserState(browser);
+    setUseBrowserCookies(false);
+    setYtAuth({ status: "idle", browser });
     if (typeof window !== "undefined") {
       window.localStorage.setItem("clipper.cookieBrowser", browser);
     }
