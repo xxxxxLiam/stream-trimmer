@@ -12,6 +12,7 @@
     "dev:server": "tsx server/index.ts",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "test": "tsx --test server/*.test.ts",
     "preview": "vite preview",
     "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\"",
     "dev:electron": "cross-env ELECTRON_DEV=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"wait-on http://localhost:8080 && electron electron/main.cjs\"",

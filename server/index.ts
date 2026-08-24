@@ -22,6 +22,10 @@ import { z } from "zod";
 // transitive dep) to convert the same option-object shape into CLI flags.
 import dargs from "dargs";
 import ffmpegPath from "ffmpeg-static";
+import {
+  classifyYouTubeAuthOutput,
+  type YouTubeAuthProbeStatus,
+} from "./youtubeAuth";
 
 const PORT = Number(process.env.PORT || 5174);
 const MAX_CLIP_SECONDS = 600;
@@ -644,72 +648,66 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
   }
 });
 
-// Probe whether a browser currently holds a logged-in YouTube session, using
-// the Watch Later playlist — it only resolves for signed-in users; logged
-// out, YouTube answers with a sign-in error page. Best-effort: extraction
-// success means signed in, an auth-flavoured stderr means signed out, and a
-// cookie-store failure means the profile was unreadable or absent. Only the
-// browser name is ever handled — cookie values are never logged, stored, or
-// returned.
+// Probe whether yt-dlp can find YouTube account cookies in one explicitly
+// selected browser. YouTube does not redirect back to this local app, so this
+// checks the browser cookie store directly and returns only sanitized status.
 type CookieBrowserName = z.infer<typeof cookieBrowserSchema>;
 
-type AuthProbeResult = {
-  browser: CookieBrowserName;
-  // "blocked" = installed but unreadable (decrypt/lock/permission);
-  // "unavailable" = browser or profile not present on this machine.
-  status: "signed_in" | "signed_out" | "blocked" | "unavailable" | "unknown";
-  message?: string;
-};
+const AUTH_PROBE_TIMEOUT_MS = 15_000;
+const AUTH_PROBE_URL = "https://www.youtube.com/watch?v=BaW_jenozKc";
 
-async function probeBrowserAuth(
+function authProbeMessage(
   browser: CookieBrowserName,
-): Promise<AuthProbeResult> {
-  const options: Record<string, unknown> = {
-    dumpSingleJson: true,
-    skipDownload: true,
-    simulate: true,
-    noWarnings: true,
-    // Only resolve the first entry — extraction itself is the auth gate.
-    playlistEnd: 1,
-    cookiesFromBrowser: browser,
-  };
-  try {
-    // Hard cap so a stuck extraction can't hang the client's polling loop.
-    const timeout = new Promise<never>((_resolve, reject) =>
-      setTimeout(() => reject(new Error("Sign-in check timed out")), 20_000),
+  status: YouTubeAuthProbeStatus,
+): string | undefined {
+  const label = browser[0].toUpperCase() + browser.slice(1);
+  if (status === "signed_out")
+    return `No YouTube account cookies were found in ${label}.`;
+  if (status === "profile_missing")
+    return `No ${label} profile was found on this computer.`;
+  if (status === "locked")
+    return `Fully quit ${label}, including background windows, then check again.`;
+  if (status === "decrypt_failed")
+    return `${label}'s cookie security blocked access. Firefox is the most reliable alternative.`;
+  if (status === "timeout")
+    return `${label} took too long to respond. Quit it fully, then try again.`;
+  if (status === "extractor_error")
+    return "YouTube could not be checked right now. Update the app or try again later.";
+  return undefined;
+}
+
+function probeBrowserAuth(
+  browser: CookieBrowserName,
+  onChild: (child: ChildProcess | null) => void,
+): Promise<YouTubeAuthProbeStatus> {
+  return new Promise((resolve) => {
+    const child = yt!.exec(
+      AUTH_PROBE_URL,
+      { cookiesFromBrowser: browser, simulate: true, verbose: true },
+      { env: childEnv() },
     );
-    await Promise.race([
-      yt!.run("https://www.youtube.com/playlist?list=WL", options, {
-        env: childEnv(),
-      } as any),
-      timeout,
-    ]);
-    return { browser, status: "signed_in" };
-  } catch (e) {
-    const msg = errMessage(e);
-    if (isCookieError(e)) {
-      const lower = msg.toLowerCase();
-      const blocked =
-        lower.includes("failed to decrypt") ||
-        lower.includes("locked") ||
-        lower.includes("permission denied") ||
-        lower.includes("unsupported browser");
-      return { browser, status: blocked ? "blocked" : "unavailable" };
-    }
-    if (
-      /sign[ -]?in|log[ -]?in|login|private playlist|not available|this playlist/i.test(
-        msg,
-      )
-    ) {
-      return { browser, status: "signed_out" };
-    }
-    // Unexpected failure (network, extractor change) — report, don't guess.
-    return {
-      browser,
-      status: "unknown",
-      message: fullErrMessage(e).slice(0, 300),
+    onChild(child);
+    const chunks: Buffer[] = [];
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const finish = (status: YouTubeAuthProbeStatus) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      onChild(null);
+      resolve(status);
     };
-  }
+    child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
+    child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
+    child.on("error", (error) => finish(classifyYouTubeAuthOutput(String(error))));
+    child.on("close", () =>
+      finish(classifyYouTubeAuthOutput(Buffer.concat(chunks).toString())),
+    );
+    timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish("timeout");
+    }, AUTH_PROBE_TIMEOUT_MS);
+  });
 }
 
 app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
@@ -720,49 +718,21 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Unknown browser" });
   if (!binariesOk) return binaryError(res);
 
-  // Explicit single-browser probe.
-  if (parsed.data.browser) {
-    const r = await probeBrowserAuth(parsed.data.browser);
-    if (r.status === "signed_in")
-      return res.json({ status: "signed_in", browser: r.browser });
-    if (r.status === "blocked" || r.status === "unavailable")
-      return res.json({
-        status: "unreadable",
-        message: cookieErrorMessage(r.browser),
-      });
-    if (r.status === "signed_out") return res.json({ status: "signed_out" });
-    return res.json({ status: "unknown", message: r.message });
-  }
-
-  // Auto-detect: the sign-in page opens in the user's *default* browser,
-  // which may not be the one they'd pick manually — so scan every supported
-  // browser in parallel and adopt the first (allowlist order) that resolves
-  // a signed-in session.
-  const results = await Promise.all(
-    cookieBrowserSchema.options.map((b) => probeBrowserAuth(b)),
-  );
-  const signedIn = results.find((r) => r.status === "signed_in");
-  if (signedIn)
-    return res.json({ status: "signed_in", browser: signedIn.browser });
-  const blocked = results.find((r) => r.status === "blocked");
-  if (blocked) {
-    return res.json({
-      status: "unreadable",
-      message: `Couldn't read ${blocked.browser}'s cookies — fully quit that browser, then press Retry.`,
-    });
-  }
-  const probed = results.filter((r) => r.status !== "unavailable");
-  if (probed.length > 0 && probed.every((r) => r.status === "unknown")) {
-    return res.json({ status: "unknown", message: probed[0].message });
-  }
-  if (probed.length === 0) {
-    return res.json({
-      status: "signed_out",
-      message:
-        "No supported browser profile was found on this computer. Sign in to YouTube in your browser first, then Re-check.",
-    });
-  }
-  return res.json({ status: "signed_out" });
+  if (!parsed.data.browser)
+    return res.status(400).json({ error: "Choose a browser" });
+  let activeChild: ChildProcess | null = null;
+  res.on("close", () => {
+    if (!res.writableEnded && activeChild) activeChild.kill("SIGKILL");
+  });
+  const status = await probeBrowserAuth(parsed.data.browser, (child) => {
+    activeChild = child;
+  });
+  if (res.writableEnded || res.destroyed) return;
+  return res.json({
+    status,
+    browser: parsed.data.browser,
+    message: authProbeMessage(parsed.data.browser, status),
+  });
 });
 
 app.post("/api/download", async (req: Request, res: Response) => {

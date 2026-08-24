@@ -29,12 +29,6 @@ import {
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
 export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
 
-// Guided sign-in polling: re-probe every 3s for up to 2 minutes. Probes run
-// sequentially (each awaits the previous one) so slow auto-detect scans
-// can't stack up.
-export const YT_AUTH_POLL_MS = 3000;
-export const YT_AUTH_TIMEOUT_MS = 120_000;
-
 export type Quality =
   | (typeof VIDEO_QUALITIES)[number]
   | (typeof AUDIO_QUALITIES)[number];
@@ -49,7 +43,22 @@ export function useClipper() {
   // Optional sign-in: when enabled, yt-dlp reuses the chosen browser's
   // logged-in YouTube session to try for higher-quality renditions.
   const [useBrowserCookies, setUseBrowserCookies] = useState(false);
-  const [cookieBrowser, setCookieBrowser] = useState<CookieBrowser>("chrome");
+  const [cookieBrowser, setCookieBrowserState] = useState<CookieBrowser>(() => {
+    if (typeof window === "undefined") return "chrome";
+    const saved = window.localStorage.getItem("clipper.cookieBrowser");
+    return saved === "chrome" || saved === "safari" || saved === "edge" ||
+      saved === "firefox" || saved === "brave" || saved === "chromium"
+      ? saved
+      : "chrome";
+  });
+  const setCookieBrowser = useCallback((browser: CookieBrowser) => {
+    setCookieBrowserState(browser);
+    setUseBrowserCookies(false);
+    setYtAuth({ status: "idle", browser });
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("clipper.cookieBrowser", browser);
+    }
+  }, []);
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -106,34 +115,24 @@ export function useClipper() {
   }, [setSaveDir]);
 
   // --- Guided YouTube sign-in --------------------------------------------
-  // Opens YouTube's sign-in page in the user's default browser, then polls
-  // the local backend, which auto-detects (via yt-dlp) which browser now
-  // holds a logged-in session. Fully local and free — no OAuth app, no
-  // tokens; cookie contents never leave the browser's own store.
+  // Opens YouTube in the default browser, then lets the user explicitly check
+  // the selected local browser profile. Fully local and free — no OAuth app,
+  // no tokens; cookie contents never leave the browser's own store.
   const [ytAuth, setYtAuth] = useState<{
     status: YouTubeAuthState;
     message?: string;
     /** Browser the session was detected in (set on signed_in). */
     browser?: CookieBrowser;
   }>({ status: "idle" });
-  const ytAuthPollRef = useRef<number | null>(null);
-
-  const stopYtAuthPolling = useCallback(() => {
-    if (ytAuthPollRef.current !== null) {
-      window.clearTimeout(ytAuthPollRef.current);
-      ytAuthPollRef.current = null;
-    }
-  }, []);
-
-  // Single probe. The server scans every supported browser; on success we
-  // adopt the detected browser and enable the cookie path automatically so
-  // the next download reuses the session. Returns the server-reported status.
+  // Checks the one browser selected by the user. A visible browser login is
+  // not a redirect back to this app; yt-dlp must be able to read its cookies.
   const checkYouTubeAuth = useCallback(async (): Promise<YouTubeAuthState> => {
+    setYtAuth({ status: "checking", browser: cookieBrowser });
     try {
       const res = await fetch(apiUrl("/api/auth/youtube/status"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ browser: cookieBrowser }),
       });
       const data = await parseJson<YouTubeAuthStatus>(res);
       // Guard against non-probe responses (e.g. a proxy error body) so a
@@ -141,72 +140,48 @@ export function useClipper() {
       if (
         data.status !== "signed_in" &&
         data.status !== "signed_out" &&
-        data.status !== "unreadable" &&
-        data.status !== "unknown"
+        data.status !== "profile_missing" &&
+        data.status !== "locked" &&
+        data.status !== "decrypt_failed" &&
+        data.status !== "timeout" &&
+        data.status !== "extractor_error"
       ) {
         throw new Error("Unexpected probe response");
       }
       if (data.status === "signed_in") {
-        if (data.browser) setCookieBrowser(data.browser);
+        setCookieBrowser(data.browser);
         setUseBrowserCookies(true);
         setYtAuth({ status: "signed_in", browser: data.browser });
       } else {
-        // While a poll loop is running, keep the "checking" face for
-        // transient results; only settled states replace it.
-        const transient =
-          data.status === "signed_out" || data.status === "unknown";
-        setYtAuth((prev) =>
-          prev.status === "checking" && transient
-            ? prev
-            : { status: data.status, message: data.message },
-        );
+        setYtAuth({
+          status: data.status,
+          message: data.message,
+          browser: data.browser,
+        });
       }
       return data.status;
     } catch {
-      setYtAuth((prev) =>
-        prev.status === "checking"
-          ? prev
-          : {
-              status: "unknown",
-              message: "Couldn't reach the local backend.",
-            },
-      );
-      return "unknown";
+      setYtAuth({
+        status: "extractor_error",
+        browser: cookieBrowser,
+        message: "Couldn't reach the local backend.",
+      });
+      return "extractor_error";
     }
-  }, []);
+  }, [cookieBrowser, setCookieBrowser]);
 
   const beginYouTubeSignIn = useCallback(async () => {
-    stopYtAuthPolling();
-    setYtAuth({ status: "checking" });
     if (isElectron && window.electronAPI?.openYouTubeSignIn) {
       await window.electronAPI.openYouTubeSignIn();
     } else {
       window.open("https://www.youtube.com/signin", "_blank", "noopener");
     }
-    // Sequential poll loop — each probe completes before the next is
-    // scheduled, so multi-browser auto-detect scans never overlap.
-    const deadline = Date.now() + YT_AUTH_TIMEOUT_MS;
-    const tick = async (): Promise<void> => {
-      const status = await checkYouTubeAuth();
-      if (status === "signed_in" || status === "unreadable") return;
-      if (Date.now() >= deadline) {
-        setYtAuth({
-          status: "signed_out",
-          message:
-            "No sign-in detected yet. Finish signing in, then press Re-check.",
-        });
-        return;
-      }
-      ytAuthPollRef.current = window.setTimeout(
-        () => void tick(),
-        YT_AUTH_POLL_MS,
-      );
-    };
-    void tick();
-  }, [isElectron, checkYouTubeAuth, stopYtAuthPolling]);
-
-  // Stop polling on unmount.
-  useEffect(() => stopYtAuthPolling, [stopYtAuthPolling]);
+    setYtAuth({
+      status: "ready",
+      browser: cookieBrowser,
+      message: `When you return, check the ${cookieBrowser} session.`,
+    });
+  }, [isElectron, cookieBrowser]);
 
   const revealLastSaved = useCallback(() => {
     if (isElectron && window.electronAPI?.showInFolder && lastSavedPath) {
