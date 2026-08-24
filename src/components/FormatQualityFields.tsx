@@ -38,8 +38,8 @@ const BROWSER_LABELS: Record<CookieBrowser, string> = {
 
 /**
  * Compact one-row sign-in control — status text on the left, a single
- * contextual action on the right. The backend auto-detects which browser
- * holds the session, so there is no browser picker.
+ * contextual action on the right. The selected browser is the exact local
+ * cookie store checked by the backend.
  */
 function YouTubeSignInRow() {
   const {
@@ -147,17 +147,23 @@ function YouTubeSignInRow() {
 
   return (
     <div className="flex items-center gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-2">
-      <label className="sr-only" htmlFor="cookie-browser">Browser session</label>
+      <label className="sr-only" htmlFor="cookie-browser">
+        Browser session
+      </label>
       <select
         id="cookie-browser"
         value={cookieBrowser}
-        onChange={(event) => setCookieBrowser(event.target.value as CookieBrowser)}
+        onChange={(event) =>
+          setCookieBrowser(event.target.value as CookieBrowser)
+        }
         disabled={ytAuth.status === "checking"}
         className="max-w-[92px] shrink-0 bg-transparent text-xs text-fg outline-none"
         title="Browser session to check"
       >
         {Object.entries(BROWSER_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
+          <option key={value} value={value}>
+            {label}
+          </option>
         ))}
       </select>
       <span className={`shrink-0 ${textClass}`}>{icon}</span>
