@@ -263,6 +263,7 @@ app.on("second-instance", () => {
 
 app.whenReady().then(async () => {
   try {
+    createSplash();
     const port = await startBackend();
     await createWindow(port);
     loadSettings();
@@ -270,6 +271,7 @@ app.whenReady().then(async () => {
     setupAutoUpdater();
   } catch (err) {
     console.error("[electron] failed to start:", err);
+    closeSplash();
     app.quit();
   }
 });
