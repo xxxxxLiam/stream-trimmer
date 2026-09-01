@@ -22,7 +22,6 @@ import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
 import TranscriptPanel from "./components/TranscriptPanel";
-import CommentsExportCard from "./components/CommentsExportCard";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
 import UpdateStatus from "./components/UpdateStatus";
@@ -334,7 +333,6 @@ function Layout() {
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-              <CommentsExportCard />
               {/* Channel exporter stays hidden unless a passcode is baked in. */}
               {isLockConfigured() && (
                 <ChannelLockGate>
@@ -344,6 +342,7 @@ function Layout() {
             </div>
           </div>
         )}
+
       </main>
       <SavedToast />
     </>
