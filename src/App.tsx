@@ -3,7 +3,7 @@
  * Path: src/App.tsx
  * Description: Root layout — full-viewport two-column grid, overlay loader, form + preview.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Download,
@@ -21,6 +21,8 @@ import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
+import TranscriptPanel from "./components/TranscriptPanel";
+import CommentsExportCard from "./components/CommentsExportCard";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
 import UpdateStatus from "./components/UpdateStatus";
@@ -178,12 +180,8 @@ function SavedToast() {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
     useClipperContext();
 
-  // Auto-dismiss after a while; any explicit interaction clears it sooner.
-  useEffect(() => {
-    if (!savedNotice) return;
-    const t = window.setTimeout(() => dismissSavedNotice(), 10000);
-    return () => window.clearTimeout(t);
-  }, [savedNotice, dismissSavedNotice]);
+  // Deliberately sticky: the notice stays until the user opens the folder or
+  // dismisses it explicitly. No auto-dismiss timer.
 
   const canReveal = isElectron && Boolean(savedNotice?.path);
 
@@ -239,7 +237,7 @@ function SavedToast() {
   );
 }
 
-type Mode = "clip" | "channel";
+type Mode = "clip" | "transcript" | "export";
 
 function ModeTabs({
   mode,
@@ -250,12 +248,9 @@ function ModeTabs({
 }) {
   const tabs: { value: Mode; label: string }[] = [
     { value: "clip", label: "Clip" },
-    // Hidden entirely in builds with no passcode configured.
-    ...(isLockConfigured()
-      ? [{ value: "channel" as Mode, label: "Channel export" }]
-      : []),
+    { value: "transcript", label: "Transcript" },
+    { value: "export", label: "Export" },
   ];
-  if (tabs.length < 2) return null;
   return (
     <div className="flex rounded-row border border-hairline bg-panel-raised p-0.5">
       {tabs.map((t) => (
@@ -279,16 +274,13 @@ function ModeTabs({
 function Layout() {
   const {
     loadingInfo,
-    loadingTranscript,
     exportingComments,
   } = useClipperContext();
   const [mode, setMode] = useState<Mode>("clip");
-  const overlayVisible = loadingInfo || loadingTranscript || exportingComments;
+  const overlayVisible = loadingInfo || exportingComments;
   const overlayLabel = exportingComments
     ? "Exporting comments"
-    : loadingInfo
-      ? "Loading video info"
-      : "Loading transcript";
+    : "Loading video info";
 
   return (
     <>
@@ -333,12 +325,22 @@ function Layout() {
               <FooterBar />
             </div>
           </>
+        ) : mode === "transcript" ? (
+          <div className="flex min-h-0 flex-1 flex-col p-4 lg:p-5">
+            <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+              <TranscriptPanel />
+            </div>
+          </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
-            <div className="mx-auto w-full max-w-2xl">
-              <ChannelLockGate>
-                <ChannelExportPanel />
-              </ChannelLockGate>
+            <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+              <CommentsExportCard />
+              {/* Channel exporter stays hidden unless a passcode is baked in. */}
+              {isLockConfigured() && (
+                <ChannelLockGate>
+                  <ChannelExportPanel />
+                </ChannelLockGate>
+              )}
             </div>
           </div>
         )}

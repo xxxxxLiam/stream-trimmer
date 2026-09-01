@@ -372,6 +372,11 @@ export function useClipper() {
     });
   }, [transcript, loadTranscript]);
 
+  /** Fetch the transcript once, on demand (used by the Transcript tab). */
+  const ensureTranscript = useCallback(() => {
+    if (transcript === null && !loadingTranscript) void loadTranscript();
+  }, [transcript, loadingTranscript, loadTranscript]);
+
   const rangeTranscript = useMemo(() => {
     if (!transcript) return [];
     return transcript.filter((l) => l.end > start && l.start < end);
@@ -606,6 +611,7 @@ export function useClipper() {
     setEndFromSeconds,
     showTranscript,
     toggleTranscript,
+    ensureTranscript,
     loadingTranscript,
     transcript,
     rangeTranscript,
