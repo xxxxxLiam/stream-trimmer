@@ -13,6 +13,8 @@ import {
   X,
 } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
+import { ChannelExportProvider } from "./context/ChannelExportContext";
+import ChannelExportPanel from "./components/ChannelExportPanel";
 import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
