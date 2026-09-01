@@ -1525,6 +1525,9 @@ async function mapLimit<T, R>(
 // Optional local passcode gate: when a hash is baked into the build (or set in
 // a local .env during development), the exporter endpoint only answers
 // requests carrying the same hash.
+const DEFAULT_CHANNEL_PASSCODE_HASH =
+  "0cd257a54a58aa1c00862c07297225561f663bd746b5856c5e7dfaaa3d488add";
+
 function readPasscodeHash(): string {
   const fromEnv = (process.env.CHANNEL_EXPORT_PASSCODE_HASH || "").trim();
   if (fromEnv) return fromEnv;
@@ -1533,11 +1536,14 @@ function readPasscodeHash(): string {
     const line = raw
       .split(/\r?\n/)
       .find((l) => l.startsWith("CHANNEL_EXPORT_PASSCODE_HASH="));
-    return line ? line.split("=").slice(1).join("=").trim() : "";
+    const fromFile = line ? line.split("=").slice(1).join("=").trim() : "";
+    if (fromFile) return fromFile;
   } catch {
-    return "";
+    // fall through to the baked-in hash
   }
+  return DEFAULT_CHANNEL_PASSCODE_HASH;
 }
+
 
 const CHANNEL_PASSCODE_HASH = readPasscodeHash();
 

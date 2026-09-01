@@ -8,10 +8,15 @@ import { readSetting, writeSetting } from "./persist";
 
 const STORAGE_KEY = "clipper.channelUnlocked";
 
-/** SHA-256 hash baked in at build time; empty means the feature is hidden. */
+/** SHA-256 of the owner passcode. Baked in so packaged builds always gate. */
+const DEFAULT_PASSCODE_HASH =
+  "0cd257a54a58aa1c00862c07297225561f663bd746b5856c5e7dfaaa3d488add";
+
+/** Build-time override wins; otherwise the baked-in hash is used. */
 export const CHANNEL_PASSCODE_HASH: string =
-  (import.meta.env.VITE_CHANNEL_PASSCODE_HASH as string | undefined)?.trim() ??
-  "";
+  (import.meta.env.VITE_CHANNEL_PASSCODE_HASH as string | undefined)?.trim() ||
+  DEFAULT_PASSCODE_HASH;
+
 
 export function isLockConfigured(): boolean {
   return CHANNEL_PASSCODE_HASH.length > 0;
