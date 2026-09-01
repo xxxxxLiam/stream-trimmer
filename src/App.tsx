@@ -3,7 +3,7 @@
  * Path: src/App.tsx
  * Description: Root layout — full-viewport two-column grid, overlay loader, form + preview.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Download,
@@ -274,7 +274,6 @@ function ModeTabs({
 function Layout() {
   const {
     loadingInfo,
-    loadingTranscript,
     exportingComments,
   } = useClipperContext();
   const [mode, setMode] = useState<Mode>("clip");
