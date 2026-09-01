@@ -235,7 +235,7 @@ function SavedToast() {
   );
 }
 
-type Mode = "clip" | "channel";
+type Mode = "clip" | "transcript" | "export";
 
 function ModeTabs({
   mode,
@@ -246,12 +246,9 @@ function ModeTabs({
 }) {
   const tabs: { value: Mode; label: string }[] = [
     { value: "clip", label: "Clip" },
-    // Hidden entirely in builds with no passcode configured.
-    ...(isLockConfigured()
-      ? [{ value: "channel" as Mode, label: "Channel export" }]
-      : []),
+    { value: "transcript", label: "Transcript" },
+    { value: "export", label: "Export" },
   ];
-  if (tabs.length < 2) return null;
   return (
     <div className="flex rounded-row border border-hairline bg-panel-raised p-0.5">
       {tabs.map((t) => (
@@ -279,12 +276,10 @@ function Layout() {
     exportingComments,
   } = useClipperContext();
   const [mode, setMode] = useState<Mode>("clip");
-  const overlayVisible = loadingInfo || loadingTranscript || exportingComments;
+  const overlayVisible = loadingInfo || exportingComments;
   const overlayLabel = exportingComments
     ? "Exporting comments"
-    : loadingInfo
-      ? "Loading video info"
-      : "Loading transcript";
+    : "Loading video info";
 
   return (
     <>
@@ -329,12 +324,22 @@ function Layout() {
               <FooterBar />
             </div>
           </>
+        ) : mode === "transcript" ? (
+          <div className="flex min-h-0 flex-1 flex-col p-4 lg:p-5">
+            <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+              <TranscriptPanel />
+            </div>
+          </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
-            <div className="mx-auto w-full max-w-2xl">
-              <ChannelLockGate>
-                <ChannelExportPanel />
-              </ChannelLockGate>
+            <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+              <CommentsExportCard />
+              {/* Channel exporter stays hidden unless a passcode is baked in. */}
+              {isLockConfigured() && (
+                <ChannelLockGate>
+                  <ChannelExportPanel />
+                </ChannelLockGate>
+              )}
             </div>
           </div>
         )}
