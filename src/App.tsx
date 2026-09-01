@@ -21,6 +21,8 @@ import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
+import TranscriptPanel from "./components/TranscriptPanel";
+import CommentsExportCard from "./components/CommentsExportCard";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
 import UpdateStatus from "./components/UpdateStatus";
