@@ -172,6 +172,34 @@ async function startBackend() {
   return port;
 }
 
+function createSplash() {
+  splashWindow = new BrowserWindow({
+    width: 320,
+    height: 220,
+    frame: false,
+    resizable: false,
+    movable: true,
+    center: true,
+    show: false,
+    transparent: false,
+    backgroundColor: "#0B0B0C",
+    skipTaskbar: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  splashWindow.loadFile(path.join(__dirname, "splash.html"));
+  splashWindow.once("ready-to-show", () => {
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.show();
+  });
+  splashWindow.on("closed", () => {
+    splashWindow = null;
+  });
+}
+
+function closeSplash() {
+  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+  splashWindow = null;
+}
+
 async function createWindow(port) {
   mainWindow = new BrowserWindow({
     width: 1100,
@@ -180,6 +208,7 @@ async function createWindow(port) {
     minHeight: 600,
     backgroundColor: "#0B0B0C",
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -187,6 +216,11 @@ async function createWindow(port) {
       sandbox: true,
       additionalArguments: [`--api-base=http://127.0.0.1:${port}`],
     },
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    closeSplash();
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
   });
 
   // Open external links in the user's browser, not inside the app.
@@ -208,7 +242,16 @@ async function createWindow(port) {
       );
     }
   }
+
+  // Safety net: never leave the app invisible if ready-to-show never fires.
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      closeSplash();
+      mainWindow.show();
+    }
+  }, 8000);
 }
+
 
 app.on("second-instance", () => {
   if (mainWindow) {
