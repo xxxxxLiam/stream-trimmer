@@ -16,6 +16,7 @@ import {
   type ChannelExportProgress,
   type ChannelExportResponse,
 } from "../lib/channel";
+import { CHANNEL_PASSCODE_HASH } from "../lib/channelLock";
 
 export interface ChannelExportResult {
   folder: string;
