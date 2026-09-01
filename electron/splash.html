@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>YouTube Clipper</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #0b0b0c;
+        color: #f5f5f7;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+        overflow: hidden;
+        user-select: none;
+      }
+      .wrap {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        background:
+          radial-gradient(120% 90% at 50% 0%, rgba(255, 99, 99, 0.16), transparent 60%),
+          #0b0b0c;
+      }
+      .mark {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        background: #ff6363;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 10px 30px -12px rgba(255, 99, 99, 0.8);
+      }
+      .mark svg { display: block; }
+      .title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+      .sub { font-size: 11px; color: rgba(245, 245, 247, 0.45); }
+      .bar {
+        position: relative;
+        width: 160px;
+        height: 3px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .bar span {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        border-radius: 999px;
+        background: #ff6363;
+        animation: slide 1.2s ease-in-out infinite;
+      }
+      @keyframes slide {
+        0% { transform: translateX(-110%); }
+        100% { transform: translateX(280%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar span { animation: none; width: 100%; opacity: 0.5; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 16 16" fill="#0b0b0c">
+          <path d="M9.5 1a.5.5 0 0 1 .5.5v13a.5.5 0 0 1-1 0v-13a.5.5 0 0 1 .5-.5Z" opacity="0.35"/>
+          <path d="M3.5 3.5a2 2 0 1 0 1.1 3.67l1.9 1.19-1.9 1.2A2 2 0 1 0 5.7 11l6.1-3.83a.5.5 0 0 0 0-.85L5.7 2.5a2 2 0 0 0-2.2 1Zm0 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm0 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/>
+        </svg>
+      </div>
+      <div class="title">YouTube Clipper</div>
+      <div class="bar"><span></span></div>
+      <div class="sub">Starting local engine…</div>
+    </div>
+  </body>
+</html>
