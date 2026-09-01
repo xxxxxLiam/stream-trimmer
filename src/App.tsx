@@ -235,12 +235,46 @@ function SavedToast() {
   );
 }
 
+type Mode = "clip" | "channel";
+
+function ModeTabs({
+  mode,
+  setMode,
+}: {
+  mode: Mode;
+  setMode: (m: Mode) => void;
+}) {
+  const tabs: { value: Mode; label: string }[] = [
+    { value: "clip", label: "Clip" },
+    { value: "channel", label: "Channel export" },
+  ];
+  return (
+    <div className="flex rounded-row border border-hairline bg-panel-raised p-0.5">
+      {tabs.map((t) => (
+        <button
+          key={t.value}
+          type="button"
+          onClick={() => setMode(t.value)}
+          className={`rounded-chip px-2.5 py-1 text-[12px] transition-colors ${
+            mode === t.value
+              ? "bg-accent text-white"
+              : "text-fg-muted hover:text-fg"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Layout() {
   const {
     loadingInfo,
     loadingTranscript,
     exportingComments,
   } = useClipperContext();
+  const [mode, setMode] = useState<Mode>("clip");
   const overlayVisible = loadingInfo || loadingTranscript || exportingComments;
   const overlayLabel = exportingComments
     ? "Exporting comments"
@@ -254,39 +288,50 @@ function Layout() {
 
       <main className="flex h-screen w-full flex-col overflow-hidden bg-panel">
         {/* Title bar */}
-        <div className="flex items-center gap-2 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
+        <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
           <span className="text-[12px] font-medium tracking-tight text-fg-muted">
             YouTube Clipper
           </span>
+          <ModeTabs mode={mode} setMode={setMode} />
           <div className="ml-auto flex items-center gap-3">
             <UpdateStatus />
             <span className="text-[11px] text-fg-faint">Local · Private</span>
           </div>
         </div>
 
-        {/* Command bar */}
-        <div className="border-b border-hairline px-4 py-3">
-          <UrlBar />
-        </div>
+        {mode === "clip" ? (
+          <>
+            {/* Command bar */}
+            <div className="border-b border-hairline px-4 py-3">
+              <UrlBar />
+            </div>
 
-        {/* Body */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-4 lg:grid-cols-2 lg:items-stretch lg:overflow-hidden lg:p-5">
-          <section className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
-            <Meta />
-            <TimeRangeControls />
-            <FormatQualityFields />
-            <DestinationSelector />
-            <ErrorBanner />
-          </section>
+            {/* Body */}
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-4 lg:grid-cols-2 lg:items-stretch lg:overflow-hidden lg:p-5">
+              <section className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+                <Meta />
+                <TimeRangeControls />
+                <FormatQualityFields />
+                <DestinationSelector />
+                <ErrorBanner />
+              </section>
 
-          <section className="flex min-w-0 flex-col lg:min-h-0 lg:overflow-hidden">
-            <PreviewPanel />
-          </section>
-        </div>
+              <section className="flex min-w-0 flex-col lg:min-h-0 lg:overflow-hidden">
+                <PreviewPanel />
+              </section>
+            </div>
 
-        <div className="shrink-0">
-          <FooterBar />
-        </div>
+            <div className="shrink-0">
+              <FooterBar />
+            </div>
+          </>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
+            <div className="mx-auto w-full max-w-2xl">
+              <ChannelExportPanel />
+            </div>
+          </div>
+        )}
       </main>
       <SavedToast />
     </>
@@ -296,7 +341,9 @@ function Layout() {
 export default function App() {
   return (
     <ClipperProvider>
-      <Layout />
+      <ChannelExportProvider>
+        <Layout />
+      </ChannelExportProvider>
     </ClipperProvider>
   );
 }
