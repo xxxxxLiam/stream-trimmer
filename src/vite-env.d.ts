@@ -1,4 +1,13 @@
+/// <reference types="vite/client" />
 declare module "*.css";
+
+interface ImportMetaEnv {
+  readonly VITE_CHANNEL_PASSCODE_HASH?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
 
 type UpdateStatusPayload =
   | { state: "checking" }
