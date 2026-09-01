@@ -10,6 +10,14 @@ try {
   contextBridge.exposeInMainWorld("__API_BASE__", apiBase);
   contextBridge.exposeInMainWorld("electronAPI", {
     isElectron: true,
+    settingsSnapshot: (() => {
+      try {
+        return ipcRenderer.sendSync("settings:all") || {};
+      } catch {
+        return {};
+      }
+    })(),
+    setSetting: (key, value) => ipcRenderer.invoke("settings:set", key, value),
     pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"),
     saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
     saveFiles: (payload) => ipcRenderer.invoke("file:saveFiles", payload),

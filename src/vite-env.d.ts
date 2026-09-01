@@ -19,6 +19,8 @@ type UpdateStatusPayload =
 
 interface ElectronAPI {
   isElectron: true;
+  settingsSnapshot?: Record<string, unknown>;
+  setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean }>;
   pickDirectory: () => Promise<string | null>;
   saveFile: (payload: {
     dirPath: string;
