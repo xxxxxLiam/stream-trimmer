@@ -611,6 +611,7 @@ export function useClipper() {
     setEndFromSeconds,
     showTranscript,
     toggleTranscript,
+    ensureTranscript,
     loadingTranscript,
     transcript,
     rangeTranscript,
