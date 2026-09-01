@@ -4,6 +4,8 @@
  * Description: Local passcode gate for the channel exporter — hashing and unlock state.
  */
 
+import { readSetting, writeSetting } from "./persist";
+
 const STORAGE_KEY = "clipper.channelUnlocked";
 
 /** SHA-256 hash baked in at build time; empty means the feature is hidden. */
@@ -32,15 +34,15 @@ export async function verifyPasscode(passcode: string): Promise<boolean> {
 /** Unlock state persists the hash, never the passcode itself. */
 export function isUnlocked(): boolean {
   if (typeof window === "undefined" || !isLockConfigured()) return false;
-  return window.localStorage.getItem(STORAGE_KEY) === CHANNEL_PASSCODE_HASH;
+  return readSetting(STORAGE_KEY, "") === CHANNEL_PASSCODE_HASH;
 }
 
 export function rememberUnlock(): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, CHANNEL_PASSCODE_HASH);
+  writeSetting(STORAGE_KEY, CHANNEL_PASSCODE_HASH);
 }
 
 export function forgetUnlock(): void {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(STORAGE_KEY);
+  writeSetting(STORAGE_KEY, null);
 }
