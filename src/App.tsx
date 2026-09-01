@@ -15,6 +15,8 @@ import {
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
 import { ChannelExportProvider } from "./context/ChannelExportContext";
 import ChannelExportPanel from "./components/ChannelExportPanel";
+import ChannelLockGate from "./components/ChannelLockGate";
+import { isLockConfigured } from "./lib/channelLock";
 import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
