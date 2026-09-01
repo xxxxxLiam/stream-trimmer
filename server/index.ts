@@ -1522,11 +1522,24 @@ async function mapLimit<T, R>(
   return results;
 }
 
-// Optional local passcode gate: when a hash is baked into the build, the
-// exporter endpoint only answers requests carrying the same hash.
-const CHANNEL_PASSCODE_HASH = (
-  process.env.CHANNEL_EXPORT_PASSCODE_HASH || ""
-).trim();
+// Optional local passcode gate: when a hash is baked into the build (or set in
+// a local .env during development), the exporter endpoint only answers
+// requests carrying the same hash.
+function readPasscodeHash(): string {
+  const fromEnv = (process.env.CHANNEL_EXPORT_PASSCODE_HASH || "").trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const raw = fs.readFileSync(path.join(process.cwd(), ".env"), "utf8");
+    const line = raw
+      .split(/\r?\n/)
+      .find((l) => l.startsWith("CHANNEL_EXPORT_PASSCODE_HASH="));
+    return line ? line.split("=").slice(1).join("=").trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+const CHANNEL_PASSCODE_HASH = readPasscodeHash();
 
 app.post("/api/channel/export", async (req: Request, res: Response) => {
   if (
