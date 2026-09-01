@@ -78,7 +78,11 @@ export const VIDEO_COLUMNS = [
   "channel",
   "thumbnail",
   "tags",
+  "tag_count",
+  "hashtags",
+  "hashtags_in_title",
 ];
+
 
 export const COMMENT_COLUMNS = [
   "video_id",
