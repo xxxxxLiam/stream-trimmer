@@ -1522,7 +1522,19 @@ async function mapLimit<T, R>(
   return results;
 }
 
+// Optional local passcode gate: when a hash is baked into the build, the
+// exporter endpoint only answers requests carrying the same hash.
+const CHANNEL_PASSCODE_HASH = (
+  process.env.CHANNEL_EXPORT_PASSCODE_HASH || ""
+).trim();
+
 app.post("/api/channel/export", async (req: Request, res: Response) => {
+  if (
+    CHANNEL_PASSCODE_HASH &&
+    String(req.header("X-Channel-Key") || "").trim() !== CHANNEL_PASSCODE_HASH
+  ) {
+    return res.status(403).json({ error: "Channel exporter is locked." });
+  }
   const parsed = channelExportSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ error: parsed.error.issues[0].message });
