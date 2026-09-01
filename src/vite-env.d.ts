@@ -16,6 +16,11 @@ interface ElectronAPI {
     filename: string;
     data: ArrayBuffer | Uint8Array;
   }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  saveFiles: (payload: {
+    dirPath: string;
+    folder: string;
+    files: { name: string; contents: string }[];
+  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
   showInFolder: (
     targetPath: string,
   ) => Promise<{ ok: boolean; error?: string }>;

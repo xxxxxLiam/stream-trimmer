@@ -249,6 +249,39 @@ function registerIpc() {
       };
     }
   });
+  // Writes a set of text files into a new subfolder — used by the channel
+  // exporter, which produces several linked CSVs per run.
+  ipcMain.handle("file:saveFiles", async (_e, payload) => {
+    try {
+      if (
+        !payload ||
+        typeof payload.dirPath !== "string" ||
+        typeof payload.folder !== "string" ||
+        !Array.isArray(payload.files)
+      ) {
+        return { ok: false, error: "Invalid save payload" };
+      }
+      const safeFolder = payload.folder.replace(/[\\/]/g, "_");
+      const target = path.join(payload.dirPath, safeFolder);
+      await fsp.mkdir(target, { recursive: true });
+      for (const file of payload.files) {
+        if (!file || typeof file.name !== "string") continue;
+        const safeName = file.name.replace(/[\\/]/g, "_");
+        await fsp.writeFile(
+          path.join(target, safeName),
+          String(file.contents ?? ""),
+          "utf8",
+        );
+      }
+      return { ok: true, path: target };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err && err.message ? err.message : "Save failed",
+      };
+    }
+  });
+
 
   ipcMain.handle("file:showInFolder", (_e, targetPath) => {
     try {

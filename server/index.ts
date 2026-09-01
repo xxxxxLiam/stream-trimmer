@@ -1279,6 +1279,622 @@ app.get("/api/download/progress", (req: Request, res: Response) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Channel profile exporter — enumerate a channel, rank by views, and collect
+// metadata / comments / transcripts for the top N videos.
+// ---------------------------------------------------------------------------
+
+const CANDIDATE_CAP = 3000; // flat-listing depth used before ranking
+const SHORT_MAX_SECONDS = 60;
+const META_CONCURRENCY = 3;
+
+const channelExportSchema = z.object({
+  url: urlSchema,
+  contentType: z.enum(["shorts", "longform", "all"]).default("all"),
+  limit: z.number().int().min(1).max(500).default(100),
+  includeComments: z.boolean().default(true),
+  includeTranscripts: z.boolean().default(true),
+  cookiesFromBrowser: cookieBrowserSchema.optional(),
+});
+
+type ChannelExportInput = z.infer<typeof channelExportSchema>;
+
+interface ChannelProgress {
+  phase: "listing" | "metadata" | "details" | "done" | "error" | "cancelled";
+  current: number;
+  total: number;
+  label?: string;
+  message?: string;
+}
+
+interface ChannelJob {
+  clients: Set<Response>;
+  last: ChannelProgress;
+  cancelled: boolean;
+  children: Set<ChildProcess>;
+  cleanupTimer?: NodeJS.Timeout;
+}
+
+const channelJobs = new Map<string, ChannelJob>();
+
+function getOrCreateChannelJob(id: string): ChannelJob {
+  let job = channelJobs.get(id);
+  if (!job) {
+    job = {
+      clients: new Set(),
+      last: { phase: "listing", current: 0, total: 0 },
+      cancelled: false,
+      children: new Set(),
+    };
+    channelJobs.set(id, job);
+  }
+  return job;
+}
+
+function publishChannel(id: string, evt: ChannelProgress) {
+  const job = getOrCreateChannelJob(id);
+  job.last = evt;
+  const payload = `data: ${JSON.stringify(evt)}\n\n`;
+  for (const client of job.clients) {
+    try {
+      client.write(payload);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (evt.phase === "done" || evt.phase === "error" || evt.phase === "cancelled") {
+    if (job.cleanupTimer) clearTimeout(job.cleanupTimer);
+    job.cleanupTimer = setTimeout(() => {
+      for (const c of job.clients) {
+        try {
+          c.end();
+        } catch {
+          /* ignore */
+        }
+      }
+      channelJobs.delete(id);
+    }, 5000);
+  }
+}
+
+// Reduce any channel URL variant (@handle, /channel/UC…, /c/name, /user/name,
+// or a tab/video link under them) to the canonical channel root.
+function channelBaseUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (!/youtube\.com$/.test(u.hostname.replace(/^(www|m)\./, "")))
+      return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts.length === 0) return null;
+    if (parts[0].startsWith("@")) return `https://www.youtube.com/${parts[0]}`;
+    if (["channel", "c", "user"].includes(parts[0]) && parts[1])
+      return `https://www.youtube.com/${parts[0]}/${parts[1]}`;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Spawn yt-dlp for a job, registering the child so cancellation can kill it.
+function runForJob(
+  job: ChannelJob,
+  url: string,
+  opts: Record<string, unknown>,
+  timeoutMs = 180_000,
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if (job.cancelled) return reject(new Error("cancelled"));
+    const child = yt!.exec(url, opts, { env: childEnv() });
+    job.children.add(child);
+    const outChunks: Buffer[] = [];
+    const errChunks: Buffer[] = [];
+    let settled = false;
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        /* ignore */
+      }
+    }, timeoutMs);
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      job.children.delete(child);
+      fn();
+    };
+    child.stdout?.on("data", (c: Buffer) => outChunks.push(c));
+    child.stderr?.on("data", (c: Buffer) => errChunks.push(c));
+    child.on("error", (err) => finish(() => reject(err)));
+    child.on("close", (code) => {
+      const stdout = Buffer.concat(outChunks).toString();
+      const stderr = Buffer.concat(errChunks).toString();
+      finish(() => {
+        if (code === 0) {
+          try {
+            resolve(stdout.trim().startsWith("{") ? JSON.parse(stdout) : stdout);
+          } catch {
+            resolve(stdout);
+          }
+        } else {
+          const err: any = new Error(stderr.trim() || `yt-dlp exited ${code}`);
+          err.stderr = stderr;
+          err.exitCode = code;
+          reject(err);
+        }
+      });
+    });
+  });
+}
+
+interface FlatEntry {
+  id?: string;
+  title?: string;
+  duration?: number | null;
+  view_count?: number | null;
+  url?: string;
+}
+
+interface RankedVideo {
+  id: string;
+  title: string;
+  duration: number;
+  view_count: number;
+}
+
+async function listChannelTab(
+  job: ChannelJob,
+  tabUrl: string,
+  cookieOptions: Record<string, unknown>,
+): Promise<{ entries: FlatEntry[]; channelName: string; subs: number | "" }> {
+  const info = await runForJob(job, tabUrl, {
+    dumpSingleJson: true,
+    flatPlaylist: true,
+    noWarnings: true,
+    playlistEnd: CANDIDATE_CAP,
+    ...cookieOptions,
+  });
+  const entries: FlatEntry[] = Array.isArray(info?.entries) ? info.entries : [];
+  return {
+    entries,
+    channelName: info?.channel || info?.uploader || info?.title || "",
+    subs: typeof info?.channel_follower_count === "number"
+      ? info.channel_follower_count
+      : "",
+  };
+}
+
+async function fetchTranscript(
+  job: ChannelJob,
+  videoUrl: string,
+  cookieOptions: Record<string, unknown>,
+): Promise<VttLine[]> {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ytchan-"));
+  try {
+    await runForJob(job, videoUrl, {
+      skipDownload: true,
+      writeAutoSubs: true,
+      writeSubs: true,
+      subLangs: "en",
+      subFormat: "vtt",
+      noPlaylist: true,
+      noWarnings: true,
+      output: path.join(tempDir, "sub"),
+      ffmpegLocation: resolvedFfmpeg,
+      ...cookieOptions,
+    }, 120_000);
+    const files = fs.readdirSync(tempDir);
+    const vtt =
+      files.find((f) => /\.en\.vtt$/.test(f)) ||
+      files.find((f) => f.endsWith(".vtt"));
+    if (!vtt) return [];
+    return parseVtt(fs.readFileSync(path.join(tempDir, vtt), "utf8"));
+  } catch {
+    return [];
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// Run an async mapper over items with a small concurrency window, preserving
+// input order in the result array.
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () =>
+    (async () => {
+      for (;;) {
+        const i = cursor++;
+        if (i >= items.length) return;
+        results[i] = await fn(items[i], i);
+      }
+    })(),
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+app.post("/api/channel/export", async (req: Request, res: Response) => {
+  const parsed = channelExportSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  if (!binariesOk) return binaryError(res);
+
+  const input: ChannelExportInput = parsed.data;
+  const base = channelBaseUrl(input.url);
+  if (!base)
+    return res.status(400).json({
+      error:
+        "That doesn't look like a channel link. Use youtube.com/@handle or /channel/UC…",
+    });
+
+  const jobId =
+    typeof req.query.jobId === "string" && req.query.jobId
+      ? req.query.jobId
+      : `chan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const job = getOrCreateChannelJob(jobId);
+  const cookieOptions: Record<string, unknown> = input.cookiesFromBrowser
+    ? { cookiesFromBrowser: input.cookiesFromBrowser }
+    : {};
+
+  res.on("close", () => {
+    if (!res.writableEnded) cancelChannelJob(jobId);
+  });
+
+  const videos: Record<string, unknown>[] = [];
+  const comments: Record<string, unknown>[] = [];
+  const transcripts: Record<string, unknown>[] = [];
+  const statuses: Record<string, unknown>[] = [];
+  let channelName = "";
+  let subs: number | "" = "";
+
+  try {
+    publishChannel(jobId, {
+      phase: "listing",
+      current: 0,
+      total: 0,
+      label: "Reading the channel listing",
+    });
+
+    // Flat channel listings are inconsistent: the Videos tab carries duration
+    // but no view counts, the Shorts tab carries view counts but no duration.
+    // So each tab is pre-ranked with whatever signal it has (the Videos tab is
+    // requested in YouTube's own "most popular" order), a candidate pool is
+    // taken from the top of each, and the final ranking uses the real view
+    // counts from full metadata.
+    const tabs =
+      input.contentType === "shorts"
+        ? [`${base}/shorts`]
+        : input.contentType === "longform"
+          ? [`${base}/videos?view=0&sort=p`]
+          : [`${base}/videos?view=0&sort=p`, `${base}/shorts`];
+
+    const seen = new Map<string, RankedVideo>();
+    let listedAny = false;
+    let lastListError = "";
+    for (const tab of tabs) {
+      try {
+        const { entries, channelName: name, subs: s } = await listChannelTab(
+          job,
+          tab,
+          cookieOptions,
+        );
+        listedAny = true;
+        if (!channelName && name) channelName = name;
+        if (subs === "" && s !== "") subs = s;
+        const tabVideos: RankedVideo[] = [];
+        for (const e of entries) {
+          if (!e.id || seen.has(e.id)) continue;
+          tabVideos.push({
+            id: e.id,
+            title: e.title ?? "",
+            duration: Number(e.duration) || 0,
+            view_count: Number(e.view_count) || 0,
+          });
+        }
+        // Only re-sort when the tab actually reported view counts; otherwise
+        // the listing order (popularity) is the better signal.
+        if (tabVideos.some((v) => v.view_count > 0)) {
+          tabVideos.sort((a, b) => b.view_count - a.view_count);
+        }
+        for (const v of tabVideos.slice(0, input.limit * 2)) seen.set(v.id, v);
+      } catch (e) {
+        lastListError = fullErrMessage(e);
+        if (job.cancelled) break;
+      }
+    }
+    if (job.cancelled) throw new Error("cancelled");
+    if (!listedAny)
+      throw new Error(lastListError || "Couldn't read this channel's videos.");
+
+    const pool = [...seen.values()];
+    if (pool.length === 0)
+      throw new Error("No videos matched that filter on this channel.");
+
+    // Full metadata for the candidate pool (duration, views, likes, comments).
+    let metaDone = 0;
+    publishChannel(jobId, {
+      phase: "metadata",
+      current: 0,
+      total: pool.length,
+      label: "Collecting video details",
+    });
+    const metas = await mapLimit(pool, META_CONCURRENCY, async (v) => {
+      if (job.cancelled) return null;
+      try {
+        const info = await runForJob(
+          job,
+          `https://www.youtube.com/watch?v=${v.id}`,
+          {
+            dumpSingleJson: true,
+            noPlaylist: true,
+            noWarnings: true,
+            skipDownload: true,
+            ...cookieOptions,
+          },
+          90_000,
+        );
+        return info;
+      } catch {
+        return null;
+      } finally {
+        metaDone += 1;
+        publishChannel(jobId, {
+          phase: "metadata",
+          current: metaDone,
+          total: pool.length,
+          label: v.title || v.id,
+        });
+      }
+    });
+    if (job.cancelled) throw new Error("cancelled");
+
+    const rows = pool.map((v, i) => {
+      const m = (metas[i] ?? {}) as Record<string, any>;
+      const duration = Number(m.duration) || v.duration;
+      const views =
+        typeof m.view_count === "number" ? m.view_count : v.view_count;
+      return {
+        video_id: v.id,
+        url: `https://www.youtube.com/watch?v=${v.id}`,
+        title: m.title ?? v.title,
+        description: m.description ?? "",
+        upload_date: m.upload_date ?? "",
+        duration_seconds: duration,
+        is_short: duration > 0 && duration <= SHORT_MAX_SECONDS,
+        view_count: views,
+        like_count: typeof m.like_count === "number" ? m.like_count : "",
+        comment_count:
+          typeof m.comment_count === "number" ? m.comment_count : "",
+        channel: m.channel ?? channelName,
+        thumbnail: m.thumbnail ?? "",
+        tags: Array.isArray(m.tags) ? m.tags.join("; ") : "",
+      };
+    });
+
+    let ranked = rows;
+    if (input.contentType === "shorts") {
+      ranked = ranked.filter(
+        (r) => r.duration_seconds === 0 || r.is_short === true,
+      );
+    } else if (input.contentType === "longform") {
+      ranked = ranked.filter(
+        (r) => r.duration_seconds === 0 || r.is_short === false,
+      );
+    }
+    ranked.sort((a, b) => Number(b.view_count) - Number(a.view_count));
+    const selected = ranked.slice(0, input.limit).map((r) => ({
+      id: String(r.video_id),
+      title: String(r.title),
+    }));
+    if (selected.length === 0)
+      throw new Error("No videos matched that filter on this channel.");
+    videos.push(...ranked.slice(0, input.limit));
+
+
+    // Per-video comments + transcripts. Sequential: these are the heavy calls
+    // and YouTube throttles parallel comment scrapes aggressively.
+    if (input.includeComments || input.includeTranscripts) {
+      for (let i = 0; i < selected.length; i++) {
+        if (job.cancelled) break;
+        const v = selected[i];
+        const videoUrl = `https://www.youtube.com/watch?v=${v.id}`;
+        const notes: string[] = [];
+        publishChannel(jobId, {
+          phase: "details",
+          current: i,
+          total: selected.length,
+          label: v.title || v.id,
+        });
+
+        if (input.includeComments) {
+          try {
+            const info = await runForJob(
+              job,
+              videoUrl,
+              {
+                dumpSingleJson: true,
+                writeComments: true,
+                noPlaylist: true,
+                noWarnings: true,
+                skipDownload: true,
+                extractorArgs:
+                  "youtube:comment_sort=top;max_comments=50,50,0,0",
+                ...cookieOptions,
+              },
+              240_000,
+            );
+            const raw: RawComment[] = Array.isArray(info?.comments)
+              ? info.comments
+              : [];
+            if (raw.length === 0) notes.push("no comments");
+            for (const c of raw) {
+              const isReply = Boolean(c.parent && c.parent !== "root");
+              comments.push({
+                video_id: v.id,
+                comment_id: c.id ?? "",
+                parent_id: isReply ? c.parent ?? "" : "",
+                is_reply: isReply,
+                author: c.author ?? "",
+                author_channel_id: c.author_id ?? "",
+                text: c.text ?? "",
+                like_count: typeof c.like_count === "number" ? c.like_count : "",
+                is_pinned: Boolean(c.is_pinned),
+                is_uploader: Boolean(c.author_is_uploader),
+                published_time: c.time_text ?? "",
+                timestamp: typeof c.timestamp === "number" ? c.timestamp : "",
+              });
+            }
+          } catch (e) {
+            notes.push(
+              /comments are disabled/i.test(fullErrMessage(e))
+                ? "comments disabled"
+                : "comments unavailable",
+            );
+          }
+        }
+
+        if (!job.cancelled && input.includeTranscripts) {
+          const lines = await fetchTranscript(job, videoUrl, cookieOptions);
+          if (lines.length === 0) notes.push("no captions");
+          for (const l of lines) {
+            transcripts.push({
+              video_id: v.id,
+              start: l.start,
+              end: l.end,
+              text: l.text,
+            });
+          }
+        }
+
+        statuses.push({
+          video_id: v.id,
+          title: v.title,
+          status: notes.length === 0 ? "ok" : notes.join("; "),
+        });
+      }
+    }
+
+    const cancelled = job.cancelled;
+    publishChannel(jobId, {
+      phase: cancelled ? "cancelled" : "done",
+      current: selected.length,
+      total: selected.length,
+    });
+    return res.json({
+      jobId,
+      cancelled,
+      channel: {
+        name: channelName || base,
+        url: base,
+        subscriber_count: subs,
+        exported_at: new Date().toISOString(),
+        filter: input.contentType,
+        requested: input.limit,
+        exported: videos.length,
+      },
+      videos,
+      comments,
+      transcripts,
+      statuses,
+    });
+  } catch (e) {
+    const cancelled = job.cancelled || (e as Error)?.message === "cancelled";
+    if (cancelled) {
+      publishChannel(jobId, {
+        phase: "cancelled",
+        current: videos.length,
+        total: videos.length,
+      });
+      if (res.writableEnded || res.destroyed) return;
+      return res.json({
+        jobId,
+        cancelled: true,
+        channel: {
+          name: channelName || base,
+          url: base,
+          subscriber_count: subs,
+          exported_at: new Date().toISOString(),
+          filter: input.contentType,
+          requested: input.limit,
+          exported: videos.length,
+        },
+        videos,
+        comments,
+        transcripts,
+        statuses,
+      });
+    }
+    logYtError("/api/channel/export", input.url, { base }, e);
+    const msg = fullErrMessage(e);
+    publishChannel(jobId, {
+      phase: "error",
+      current: 0,
+      total: 0,
+      message: msg,
+    });
+    if (res.writableEnded || res.destroyed) return;
+    return res.status(500).json({ error: msg });
+  }
+});
+
+function cancelChannelJob(jobId: string) {
+  const job = channelJobs.get(jobId);
+  if (!job) return;
+  job.cancelled = true;
+  for (const child of job.children) {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      /* ignore */
+    }
+  }
+  job.children.clear();
+}
+
+app.post("/api/channel/export/cancel", (req: Request, res: Response) => {
+  const jobId = String((req.body ?? {}).jobId || "");
+  if (!jobId) return res.status(400).json({ error: "Missing jobId" });
+  cancelChannelJob(jobId);
+  res.json({ ok: true });
+});
+
+app.get("/api/channel/export/progress", (req: Request, res: Response) => {
+  const jobId = String(req.query.jobId || "");
+  if (!jobId) return res.status(400).end();
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const job = getOrCreateChannelJob(jobId);
+  job.clients.add(res);
+  res.write(`data: ${JSON.stringify(job.last)}\n\n`);
+
+  const ping = setInterval(() => {
+    try {
+      res.write(": ping\n\n");
+    } catch {
+      /* ignore */
+    }
+  }, 15000);
+
+  req.on("close", () => {
+    clearInterval(ping);
+    job.clients.delete(res);
+  });
+});
+
+
 // SPA fallback for the packaged UI — must be registered after all API routes.
 if (uiDir && fs.existsSync(uiDir)) {
   app.get(/^\/(?!api\/).*/, (_req: Request, res: Response) => {
