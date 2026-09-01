@@ -24,6 +24,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let mainWindow = null;
+let splashWindow = null;
 // --- Persistent settings -------------------------------------------------
 // The renderer is served from a random loopback port, so localStorage is
 // wiped on every launch. Settings therefore live in a JSON file in userData.
