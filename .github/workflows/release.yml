@@ -62,8 +62,13 @@ jobs:
           YOUTUBE_DL_SKIP_DOWNLOAD: "true"
         run: npm ci
       - name: Build front-end + bundle binaries + server
+        env:
+          VITE_CHANNEL_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
+          CHANNEL_EXPORT_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
         run: npm run build:electron
       - name: Build & publish installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_CHANNEL_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
+          CHANNEL_EXPORT_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
         run: ${{ matrix.build }}
