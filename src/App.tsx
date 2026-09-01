@@ -336,7 +336,9 @@ function Layout() {
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
             <div className="mx-auto w-full max-w-2xl">
-              <ChannelExportPanel />
+              <ChannelLockGate>
+                <ChannelExportPanel />
+              </ChannelLockGate>
             </div>
           </div>
         )}
