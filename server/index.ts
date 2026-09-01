@@ -1564,12 +1564,18 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       label: "Reading the channel listing",
     });
 
+    // Flat channel listings are inconsistent: the Videos tab carries duration
+    // but no view counts, the Shorts tab carries view counts but no duration.
+    // So each tab is pre-ranked with whatever signal it has (the Videos tab is
+    // requested in YouTube's own "most popular" order), a candidate pool is
+    // taken from the top of each, and the final ranking uses the real view
+    // counts from full metadata.
     const tabs =
       input.contentType === "shorts"
         ? [`${base}/shorts`]
         : input.contentType === "longform"
-          ? [`${base}/videos`]
-          : [`${base}/videos`, `${base}/shorts`];
+          ? [`${base}/videos?view=0&sort=p`]
+          : [`${base}/videos?view=0&sort=p`, `${base}/shorts`];
 
     const seen = new Map<string, RankedVideo>();
     let listedAny = false;
@@ -1584,15 +1590,22 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         listedAny = true;
         if (!channelName && name) channelName = name;
         if (subs === "" && s !== "") subs = s;
+        const tabVideos: RankedVideo[] = [];
         for (const e of entries) {
           if (!e.id || seen.has(e.id)) continue;
-          seen.set(e.id, {
+          tabVideos.push({
             id: e.id,
             title: e.title ?? "",
             duration: Number(e.duration) || 0,
             view_count: Number(e.view_count) || 0,
           });
         }
+        // Only re-sort when the tab actually reported view counts; otherwise
+        // the listing order (popularity) is the better signal.
+        if (tabVideos.some((v) => v.view_count > 0)) {
+          tabVideos.sort((a, b) => b.view_count - a.view_count);
+        }
+        for (const v of tabVideos.slice(0, input.limit * 2)) seen.set(v.id, v);
       } catch (e) {
         lastListError = fullErrMessage(e);
         if (job.cancelled) break;
@@ -1602,28 +1615,19 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
     if (!listedAny)
       throw new Error(lastListError || "Couldn't read this channel's videos.");
 
-    let candidates = [...seen.values()];
-    if (input.contentType === "shorts") {
-      candidates = candidates.filter(
-        (v) => v.duration === 0 || v.duration <= SHORT_MAX_SECONDS,
-      );
-    } else if (input.contentType === "longform") {
-      candidates = candidates.filter((v) => v.duration > SHORT_MAX_SECONDS);
-    }
-    candidates.sort((a, b) => b.view_count - a.view_count);
-    const selected = candidates.slice(0, input.limit);
-    if (selected.length === 0)
+    const pool = [...seen.values()];
+    if (pool.length === 0)
       throw new Error("No videos matched that filter on this channel.");
 
-    // Full metadata for the selected videos (views/likes/comment counts).
+    // Full metadata for the candidate pool (duration, views, likes, comments).
     let metaDone = 0;
     publishChannel(jobId, {
       phase: "metadata",
       current: 0,
-      total: selected.length,
+      total: pool.length,
       label: "Collecting video details",
     });
-    const metas = await mapLimit(selected, META_CONCURRENCY, async (v) => {
+    const metas = await mapLimit(pool, META_CONCURRENCY, async (v) => {
       if (job.cancelled) return null;
       try {
         const info = await runForJob(
@@ -1646,18 +1650,19 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         publishChannel(jobId, {
           phase: "metadata",
           current: metaDone,
-          total: selected.length,
+          total: pool.length,
           label: v.title || v.id,
         });
       }
     });
     if (job.cancelled) throw new Error("cancelled");
 
-    for (let i = 0; i < selected.length; i++) {
-      const v = selected[i];
+    const rows = pool.map((v, i) => {
       const m = (metas[i] ?? {}) as Record<string, any>;
       const duration = Number(m.duration) || v.duration;
-      videos.push({
+      const views =
+        typeof m.view_count === "number" ? m.view_count : v.view_count;
+      return {
         video_id: v.id,
         url: `https://www.youtube.com/watch?v=${v.id}`,
         title: m.title ?? v.title,
@@ -1665,15 +1670,35 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         upload_date: m.upload_date ?? "",
         duration_seconds: duration,
         is_short: duration > 0 && duration <= SHORT_MAX_SECONDS,
-        view_count: typeof m.view_count === "number" ? m.view_count : v.view_count,
+        view_count: views,
         like_count: typeof m.like_count === "number" ? m.like_count : "",
         comment_count:
           typeof m.comment_count === "number" ? m.comment_count : "",
         channel: m.channel ?? channelName,
         thumbnail: m.thumbnail ?? "",
         tags: Array.isArray(m.tags) ? m.tags.join("; ") : "",
-      });
+      };
+    });
+
+    let ranked = rows;
+    if (input.contentType === "shorts") {
+      ranked = ranked.filter(
+        (r) => r.duration_seconds === 0 || r.is_short === true,
+      );
+    } else if (input.contentType === "longform") {
+      ranked = ranked.filter(
+        (r) => r.duration_seconds === 0 || r.is_short === false,
+      );
     }
+    ranked.sort((a, b) => Number(b.view_count) - Number(a.view_count));
+    const selected = ranked.slice(0, input.limit).map((r) => ({
+      id: String(r.video_id),
+      title: String(r.title),
+    }));
+    if (selected.length === 0)
+      throw new Error("No videos matched that filter on this channel.");
+    videos.push(...ranked.slice(0, input.limit));
+
 
     // Per-video comments + transcripts. Sequential: these are the heavy calls
     // and YouTube throttles parallel comment scrapes aggressively.
