@@ -12,6 +12,7 @@ try {
     isElectron: true,
     pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"),
     saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
+    saveFiles: (payload) => ipcRenderer.invoke("file:saveFiles", payload),
     showInFolder: (targetPath) =>
       ipcRenderer.invoke("file:showInFolder", targetPath),
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
