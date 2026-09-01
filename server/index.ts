@@ -1286,6 +1286,40 @@ app.get("/api/download/progress", (req: Request, res: Response) => {
 
 const CANDIDATE_CAP = 3000; // flat-listing depth used before ranking
 const SHORT_MAX_SECONDS = 60;
+
+// Collects #hashtags from a string, keeping first-seen casing.
+function collectHashtags(text: string, into: Map<string, string>): void {
+  if (!text) return;
+  const re = /#([\p{L}\p{N}_]+)/gu;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const tag = m[1];
+    const key = tag.toLowerCase();
+    if (!into.has(key)) into.set(key, tag);
+  }
+}
+
+// Merges yt-dlp's hashtag field with hashtags found in the title/description.
+function extractHashtags(meta: Record<string, any>): {
+  hashtags: string;
+  hashtags_in_title: string;
+} {
+  const all = new Map<string, string>();
+  const titleOnly = new Map<string, string>();
+  const field = (meta as any).hashtags ?? (meta as any).hashtag;
+  if (Array.isArray(field)) {
+    for (const raw of field) {
+      collectHashtags(String(raw).startsWith("#") ? String(raw) : `#${raw}`, all);
+    }
+  }
+  collectHashtags(String(meta.title ?? ""), titleOnly);
+  for (const [k, v] of titleOnly) if (!all.has(k)) all.set(k, v);
+  collectHashtags(String(meta.description ?? ""), all);
+  const fmt = (m: Map<string, string>) =>
+    [...m.values()].map((t) => `#${t}`).join("; ");
+  return { hashtags: fmt(all), hashtags_in_title: fmt(titleOnly) };
+}
+
 const META_CONCURRENCY = 3;
 
 const channelExportSchema = z.object({
