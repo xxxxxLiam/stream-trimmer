@@ -248,8 +248,12 @@ function ModeTabs({
 }) {
   const tabs: { value: Mode; label: string }[] = [
     { value: "clip", label: "Clip" },
-    { value: "channel", label: "Channel export" },
+    // Hidden entirely in builds with no passcode configured.
+    ...(isLockConfigured()
+      ? [{ value: "channel" as Mode, label: "Channel export" }]
+      : []),
   ];
+  if (tabs.length < 2) return null;
   return (
     <div className="flex rounded-row border border-hairline bg-panel-raised p-0.5">
       {tabs.map((t) => (
