@@ -7,6 +7,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { LockFill, UnlockFill } from "react-bootstrap-icons";
 import {
+  forgetUnlock,
   isUnlocked,
   rememberUnlock,
   verifyPasscode,
