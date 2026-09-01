@@ -25,6 +25,7 @@ import {
   type YouTubeAuthState,
   type YouTubeAuthStatus,
 } from "../lib/clip";
+import { readSetting, writeSetting } from "../lib/persist";
 
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
 export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
@@ -45,7 +46,7 @@ export function useClipper() {
   const [useBrowserCookies, setUseBrowserCookies] = useState(false);
   const [cookieBrowser, setCookieBrowserState] = useState<CookieBrowser>(() => {
     if (typeof window === "undefined") return "chrome";
-    const saved = window.localStorage.getItem("clipper.cookieBrowser");
+    const saved = readSetting<string>("clipper.cookieBrowser", "chrome");
     return saved === "chrome" || saved === "safari" || saved === "edge" ||
       saved === "firefox" || saved === "brave" || saved === "chromium"
       ? saved
@@ -55,9 +56,7 @@ export function useClipper() {
     setCookieBrowserState(browser);
     setUseBrowserCookies(false);
     setYtAuth({ status: "idle", browser });
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("clipper.cookieBrowser", browser);
-    }
+    writeSetting("clipper.cookieBrowser", browser);
   }, []);
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -98,16 +97,44 @@ export function useClipper() {
 
   const isElectron =
     typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
+  // Saved locations: a small user-managed list with one active destination.
+  // Persisted via the settings store so they survive app restarts.
+  const [saveDirs, setSaveDirsState] = useState<string[]>(() =>
+    readSetting<string[]>("clipper.saveDirs", []),
+  );
   const [saveDir, setSaveDirState] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("clipper.saveDir");
+    const active = readSetting<string | null>("clipper.saveDir", null);
+    if (active) return active;
+    const list = readSetting<string[]>("clipper.saveDirs", []);
+    return list[0] ?? null;
   });
   const setSaveDir = useCallback((dir: string | null) => {
     setSaveDirState(dir);
-    if (typeof window === "undefined") return;
-    if (dir) window.localStorage.setItem("clipper.saveDir", dir);
-    else window.localStorage.removeItem("clipper.saveDir");
+    writeSetting("clipper.saveDir", dir);
+    if (!dir) return;
+    setSaveDirsState((prev) => {
+      if (prev.includes(dir)) return prev;
+      const next = [...prev, dir];
+      writeSetting("clipper.saveDirs", next);
+      return next;
+    });
   }, []);
+  const removeSaveDir = useCallback(
+    (dir: string) => {
+      setSaveDirsState((prev) => {
+        const next = prev.filter((d) => d !== dir);
+        writeSetting("clipper.saveDirs", next);
+        setSaveDirState((current) => {
+          if (current !== dir) return current;
+          const fallback = next[0] ?? null;
+          writeSetting("clipper.saveDir", fallback);
+          return fallback;
+        });
+        return next;
+      });
+    },
+    [],
+  );
   const pickSaveDir = useCallback(async () => {
     if (!window.electronAPI) return;
     const chosen = await window.electronAPI.pickDirectory();
@@ -628,7 +655,9 @@ export function useClipper() {
     estimatedBytes,
     isElectron,
     saveDir,
+    saveDirs,
     setSaveDir,
+    removeSaveDir,
     pickSaveDir,
     lastSavedPath,
     revealLastSaved,
