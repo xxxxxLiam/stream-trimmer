@@ -29,15 +29,20 @@
           #0b0b0c;
       }
       .mark {
-        width: 46px;
-        height: 46px;
-        border-radius: 12px;
-        background: #ff6363;
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        overflow: hidden;
         display: grid;
         place-items: center;
-        box-shadow: 0 10px 30px -12px rgba(255, 99, 99, 0.8);
+        box-shadow: 0 12px 32px -12px rgba(255, 99, 99, 0.7);
       }
-      .mark svg { display: block; }
+      .mark img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
       .title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
       .sub { font-size: 11px; color: rgba(245, 245, 247, 0.45); }
       .bar {
