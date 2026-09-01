@@ -1742,6 +1742,9 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         channel: m.channel ?? channelName,
         thumbnail: m.thumbnail ?? "",
         tags: Array.isArray(m.tags) ? m.tags.join("; ") : "",
+        tag_count: Array.isArray(m.tags) ? m.tags.length : 0,
+        ...extractHashtags(m),
+
       };
     });
 
