@@ -178,12 +178,8 @@ function SavedToast() {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
     useClipperContext();
 
-  // Auto-dismiss after a while; any explicit interaction clears it sooner.
-  useEffect(() => {
-    if (!savedNotice) return;
-    const t = window.setTimeout(() => dismissSavedNotice(), 10000);
-    return () => window.clearTimeout(t);
-  }, [savedNotice, dismissSavedNotice]);
+  // Deliberately sticky: the notice stays until the user opens the folder or
+  // dismisses it explicitly. No auto-dismiss timer.
 
   const canReveal = isElectron && Boolean(savedNotice?.path);
 
