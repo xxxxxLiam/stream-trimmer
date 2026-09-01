@@ -24,6 +24,31 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let mainWindow = null;
+// --- Persistent settings -------------------------------------------------
+// The renderer is served from a random loopback port, so localStorage is
+// wiped on every launch. Settings therefore live in a JSON file in userData.
+let settingsPath = null;
+let settingsCache = {};
+
+function loadSettings() {
+  try {
+    settingsPath = path.join(app.getPath("userData"), "settings.json");
+    settingsCache = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    if (!settingsCache || typeof settingsCache !== "object") settingsCache = {};
+  } catch {
+    settingsCache = {};
+  }
+}
+
+function persistSettings() {
+  try {
+    if (!settingsPath) return;
+    fs.writeFileSync(settingsPath, JSON.stringify(settingsCache, null, 2));
+  } catch (err) {
+    console.error("[electron] failed to persist settings:", err);
+  }
+}
+
 let serverHandle = null; // { close(cb) } returned by the bundled server
 
 function sendUpdateStatus(payload) {
@@ -196,6 +221,7 @@ app.whenReady().then(async () => {
   try {
     const port = await startBackend();
     await createWindow(port);
+    loadSettings();
     registerIpc();
     setupAutoUpdater();
   } catch (err) {
@@ -219,6 +245,18 @@ app.on("before-quit", () => {
 });
 
 function registerIpc() {
+  // Synchronous snapshot so the renderer can seed state before first paint.
+  ipcMain.on("settings:all", (e) => {
+    e.returnValue = settingsCache;
+  });
+  ipcMain.handle("settings:set", (_e, key, value) => {
+    if (typeof key !== "string" || !key) return { ok: false };
+    if (value === null || value === undefined) delete settingsCache[key];
+    else settingsCache[key] = value;
+    persistSettings();
+    return { ok: true };
+  });
+
   ipcMain.handle("dialog:pickDirectory", async () => {
     const res = await dialog.showOpenDialog(mainWindow, {
       title: "Choose download folder",
