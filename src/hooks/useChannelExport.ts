@@ -104,7 +104,12 @@ export function useChannelExport(options: {
         apiUrl(`/api/channel/export?jobId=${encodeURIComponent(jobId)}`),
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            // Local parity check so the endpoint isn't callable without the
+            // same passcode that unlocks the UI.
+            "X-Channel-Key": CHANNEL_PASSCODE_HASH,
+          },
           body: JSON.stringify({
             url: trimmed,
             contentType,
