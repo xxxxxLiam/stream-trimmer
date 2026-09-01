@@ -38,7 +38,23 @@ export default function ChannelLockGate({ children }: { children: ReactNode }) {
     [passcode],
   );
 
-  if (unlocked) return <>{children}</>;
+  if (unlocked)
+    return (
+      <div className="flex flex-col gap-2">
+        {children}
+        <button
+          type="button"
+          onClick={() => {
+            forgetUnlock();
+            setUnlocked(false);
+          }}
+          className="inline-flex items-center gap-1.5 self-start text-[12px] text-fg-faint transition-colors hover:text-fg-muted"
+        >
+          <LockFill size={11} />
+          Lock again
+        </button>
+      </div>
+    );
 
   return (
     <motion.form
