@@ -42,6 +42,13 @@ esbuild
       "ffmpeg-static",
       "youtube-dl-exec",
     ],
+    // Bake the channel-exporter passcode hash into the packaged server; the
+    // packaged app has no .env to read at runtime.
+    define: {
+      "process.env.CHANNEL_EXPORT_PASSCODE_HASH": JSON.stringify(
+        process.env.CHANNEL_EXPORT_PASSCODE_HASH || "",
+      ),
+    },
     logLevel: "info",
   })
   .then(() => {

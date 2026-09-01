@@ -38,3 +38,7 @@ resources/bin
 *.njsproj
 *.sln
 *.sw?
+
+# Local environment (passcode hashes)
+.env
+.env.local

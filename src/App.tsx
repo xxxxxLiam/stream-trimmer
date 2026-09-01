@@ -15,6 +15,8 @@ import {
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
 import { ChannelExportProvider } from "./context/ChannelExportContext";
 import ChannelExportPanel from "./components/ChannelExportPanel";
+import ChannelLockGate from "./components/ChannelLockGate";
+import { isLockConfigured } from "./lib/channelLock";
 import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
@@ -248,8 +250,12 @@ function ModeTabs({
 }) {
   const tabs: { value: Mode; label: string }[] = [
     { value: "clip", label: "Clip" },
-    { value: "channel", label: "Channel export" },
+    // Hidden entirely in builds with no passcode configured.
+    ...(isLockConfigured()
+      ? [{ value: "channel" as Mode, label: "Channel export" }]
+      : []),
   ];
+  if (tabs.length < 2) return null;
   return (
     <div className="flex rounded-row border border-hairline bg-panel-raised p-0.5">
       {tabs.map((t) => (
@@ -330,7 +336,9 @@ function Layout() {
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
             <div className="mx-auto w-full max-w-2xl">
-              <ChannelExportPanel />
+              <ChannelLockGate>
+                <ChannelExportPanel />
+              </ChannelLockGate>
             </div>
           </div>
         )}

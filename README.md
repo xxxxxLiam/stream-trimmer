@@ -196,3 +196,28 @@ npm run release:linux   # on Linux (x64)
 ## License
 
 [MIT](./LICENSE).
+
+## Channel exporter passcode
+
+The channel profile exporter is gated by a passcode so it stays yours. Only a
+SHA-256 hash of the passcode is stored — never the passcode itself.
+
+1. Generate the hash:
+
+   ```bash
+   node -e "console.log(require('crypto').createHash('sha256').update('your-passcode').digest('hex'))"
+   ```
+
+2. Put it in a local `.env` (gitignored, see `.env.example`):
+
+   ```
+   VITE_CHANNEL_PASSCODE_HASH=<hash>
+   CHANNEL_EXPORT_PASSCODE_HASH=<hash>
+   ```
+
+3. For released builds, add the same hash as the GitHub repository secret
+   `CHANNEL_PASSCODE_HASH`; the release workflow injects it at build time.
+
+Builds without a hash hide the channel exporter tab completely. Note that this
+is a local gate: it keeps the feature out of other people's hands in practice,
+but a determined technical user could patch a desktop bundle they own.
