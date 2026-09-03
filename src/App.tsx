@@ -331,8 +331,15 @@ function Layout() {
               <TranscriptPanel />
             </div>
           </div>
+        ) : mode === "downloads" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
+            <div className="mx-auto w-full max-w-2xl">
+              <DownloadsPanel />
+            </div>
+          </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
+
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
               {/* Channel exporter stays hidden unless a passcode is baked in. */}
               {isLockConfigured() && (
