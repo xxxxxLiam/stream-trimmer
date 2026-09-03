@@ -26,6 +26,17 @@ import {
   type YouTubeAuthStatus,
 } from "../lib/clip";
 import { readSetting, writeSetting } from "../lib/persist";
+import {
+  addDownload,
+  clearDownloads as clearDownloadHistory,
+  displayDirName,
+  getDownloads,
+  readSaveDirNames,
+  removeDownload as removeDownloadEntry,
+  subscribeDownloads,
+  writeSaveDirNames,
+  type DownloadEntry,
+} from "../lib/downloads";
 
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
 export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
