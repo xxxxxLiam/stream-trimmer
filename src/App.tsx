@@ -22,6 +22,7 @@ import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
 import TranscriptPanel from "./components/TranscriptPanel";
+import DownloadsPanel from "./components/DownloadsPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
 import UpdateStatus from "./components/UpdateStatus";
@@ -236,7 +237,7 @@ function SavedToast() {
   );
 }
 
-type Mode = "clip" | "transcript" | "export";
+type Mode = "clip" | "transcript" | "downloads" | "export";
 
 function ModeTabs({
   mode,
@@ -248,6 +249,7 @@ function ModeTabs({
   const tabs: { value: Mode; label: string }[] = [
     { value: "clip", label: "Clip" },
     { value: "transcript", label: "Transcript" },
+    { value: "downloads", label: "Downloads" },
     { value: "export", label: "Export" },
   ];
   return (
@@ -330,8 +332,15 @@ function Layout() {
               <TranscriptPanel />
             </div>
           </div>
+        ) : mode === "downloads" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
+            <div className="mx-auto w-full max-w-2xl">
+              <DownloadsPanel />
+            </div>
+          </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
+
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
               {/* Channel exporter stays hidden unless a passcode is baked in. */}
               {isLockConfigured() && (

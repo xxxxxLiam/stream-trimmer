@@ -3,7 +3,14 @@
  * Path: src/hooks/useClipper.ts
  * Description: Central clipper state — URL, info, range, format/quality, transcript, download.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   MAX_CLIP_SECONDS,
   formatTimestamp,
@@ -26,6 +33,17 @@ import {
   type YouTubeAuthStatus,
 } from "../lib/clip";
 import { readSetting, writeSetting } from "../lib/persist";
+import {
+  addDownload,
+  clearDownloads as clearDownloadHistory,
+  displayDirName,
+  getDownloads,
+  readSaveDirNames,
+  removeDownload as removeDownloadEntry,
+  subscribeDownloads,
+  writeSaveDirNames,
+  type DownloadEntry,
+} from "../lib/downloads";
 
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
 export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
@@ -140,6 +158,41 @@ export function useClipper() {
     const chosen = await window.electronAPI.pickDirectory();
     if (chosen) setSaveDir(chosen);
   }, [setSaveDir]);
+
+  // Optional nicknames for saved locations (path -> label).
+  const [saveDirNames, setSaveDirNames] = useState<Record<string, string>>(() =>
+    readSaveDirNames(),
+  );
+  const renameSaveDir = useCallback((dir: string, name: string) => {
+    setSaveDirNames((prev) => {
+      const next = { ...prev };
+      if (name.trim()) next[dir] = name.trim();
+      else delete next[dir];
+      writeSaveDirNames(next);
+      return next;
+    });
+  }, []);
+  const labelForDir = useCallback(
+    (dir: string | null) => (dir ? displayDirName(dir, saveDirNames) : ""),
+    [saveDirNames],
+  );
+
+  // --- Download history ---------------------------------------------------
+  const downloads = useSyncExternalStore(subscribeDownloads, getDownloads);
+  const revealDownload = useCallback(
+    (entry: DownloadEntry) => {
+      if (isElectron && window.electronAPI?.showInFolder && entry.path) {
+        void window.electronAPI.showInFolder(entry.path);
+      }
+    },
+    [isElectron],
+  );
+  const removeDownload = useCallback(
+    (id: string) => removeDownloadEntry(id),
+    [],
+  );
+  const clearDownloads = useCallback(() => clearDownloadHistory(), []);
+
 
   // --- Guided YouTube sign-in --------------------------------------------
   // Opens YouTube in the default browser, then lets the user explicitly check
@@ -264,6 +317,12 @@ export function useClipper() {
           path: result.path ?? "",
           label: filename,
         });
+        addDownload({
+          kind: "comments",
+          label: filename,
+          path: result.path ?? "",
+          dir: saveDir,
+        });
       } else {
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -274,6 +333,12 @@ export function useClipper() {
         a.remove();
         URL.revokeObjectURL(objectUrl);
         setSavedNotice({ kind: "comments", path: "", label: filename });
+        addDownload({
+          kind: "comments",
+          label: filename,
+          path: "",
+          dir: null,
+        });
       }
       setCommentsNote(
         `Exported ${data.comments.length} comments (dislikes unavailable from YouTube)`,
@@ -558,6 +623,15 @@ export function useClipper() {
           label: filename,
           detail,
         });
+        addDownload({
+          kind: "clip",
+          label: filename,
+          path: result.path ?? "",
+          dir: saveDir,
+          detail:
+            detail ??
+            `${formatTimestamp(start)} – ${formatTimestamp(end)} · ${format.toUpperCase()}`,
+        });
       } else {
         setLastSavedPath(null);
         const objectUrl = URL.createObjectURL(blob);
@@ -569,6 +643,13 @@ export function useClipper() {
         a.remove();
         URL.revokeObjectURL(objectUrl);
         setSavedNotice({ kind: "clip", path: "", label: filename, detail });
+        addDownload({
+          kind: "clip",
+          label: filename,
+          path: "",
+          dir: null,
+          detail,
+        });
       }
       setDownloadProgress(100);
       setDownloadPhase("done");
@@ -659,6 +740,13 @@ export function useClipper() {
     setSaveDir,
     removeSaveDir,
     pickSaveDir,
+    saveDirNames,
+    renameSaveDir,
+    labelForDir,
+    downloads,
+    revealDownload,
+    removeDownload,
+    clearDownloads,
     lastSavedPath,
     revealLastSaved,
     savedNotice,

@@ -17,6 +17,7 @@ import {
   type ChannelExportResponse,
 } from "../lib/channel";
 import { CHANNEL_PASSCODE_HASH } from "../lib/channelLock";
+import { addDownload } from "../lib/downloads";
 
 export interface ChannelExportResult {
   folder: string;
@@ -151,6 +152,15 @@ export function useChannelExport(options: {
           URL.revokeObjectURL(objectUrl);
         }
       }
+
+      addDownload({
+        kind: "export",
+        label: folder,
+        path: savedPath,
+        dir: savedPath ? saveDir : null,
+        detail: `${data.videos.length} videos · ${data.comments.length} comments · ${data.transcripts.length} transcripts`,
+      });
+
 
       setResult({
         folder,

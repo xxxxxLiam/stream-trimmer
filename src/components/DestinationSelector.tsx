@@ -1,19 +1,31 @@
 /**
  * File: DestinationSelector.tsx
  * Path: src/components/DestinationSelector.tsx
- * Description: Electron-only saved-locations list with an active destination; hidden in the browser.
+ * Description: Electron-only saved-locations list with renameable labels and an active destination.
  */
-import { CheckCircleFill, Circle, PlusLg, X } from "react-bootstrap-icons";
+import { useState } from "react";
+import {
+  CheckCircleFill,
+  Circle,
+  Pencil,
+  PlusLg,
+  X,
+} from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
 
-function folderName(dir: string): string {
-  const parts = dir.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] || dir;
-}
-
 export default function DestinationSelector() {
-  const { isElectron, saveDir, saveDirs, setSaveDir, removeSaveDir, pickSaveDir } =
-    useClipperContext();
+  const {
+    isElectron,
+    saveDir,
+    saveDirs,
+    setSaveDir,
+    removeSaveDir,
+    pickSaveDir,
+    labelForDir,
+    renameSaveDir,
+  } = useClipperContext();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
 
   if (!isElectron) {
     return (
@@ -23,6 +35,16 @@ export default function DestinationSelector() {
       </div>
     );
   }
+
+  const beginEdit = (dir: string) => {
+    setEditing(dir);
+    setDraft(labelForDir(dir));
+  };
+
+  const commit = () => {
+    if (editing) renameSaveDir(editing, draft);
+    setEditing(null);
+  };
 
   return (
     <div className="flex flex-col gap-1.5 rounded-row border border-hairline bg-panel-raised px-3 py-2">
@@ -53,6 +75,7 @@ export default function DestinationSelector() {
         <ul className="flex flex-col gap-0.5">
           {saveDirs.map((dir) => {
             const active = dir === saveDir;
+            const isEditing = editing === dir;
             return (
               <li key={dir} className="group flex items-center gap-2">
                 <button
@@ -67,17 +90,47 @@ export default function DestinationSelector() {
                     <Circle size={12} className="shrink-0 text-fg-faint" />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span
-                      className={`block truncate text-[12px] ${
-                        active ? "text-fg" : "text-fg-muted"
-                      }`}
-                    >
-                      {folderName(dir)}
-                    </span>
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onBlur={commit}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            commit();
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            setEditing(null);
+                          }
+                        }}
+                        placeholder="Name this location"
+                        className="w-full rounded-chip border border-hairline bg-panel px-1.5 py-0.5 text-[12px] text-fg outline-none focus:border-accent"
+                      />
+                    ) : (
+                      <span
+                        className={`block truncate text-[12px] ${
+                          active ? "text-fg" : "text-fg-muted"
+                        }`}
+                      >
+                        {labelForDir(dir)}
+                      </span>
+                    )}
                     <span className="block truncate text-[10px] text-fg-faint">
                       {dir}
                     </span>
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => beginEdit(dir)}
+                  className="shrink-0 rounded p-1 text-fg-faint opacity-0 transition-opacity hover:text-accent group-hover:opacity-100"
+                  title="Rename this location"
+                  aria-label={`Rename ${dir}`}
+                >
+                  <Pencil size={11} />
                 </button>
                 <button
                   type="button"
