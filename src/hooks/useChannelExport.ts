@@ -153,6 +153,15 @@ export function useChannelExport(options: {
         }
       }
 
+      addDownload({
+        kind: "export",
+        label: folder,
+        path: savedPath,
+        dir: savedPath ? saveDir : null,
+        detail: `${data.videos.length} videos · ${data.comments.length} comments · ${data.transcripts.length} transcripts`,
+      });
+
+
       setResult({
         folder,
         path: savedPath,
