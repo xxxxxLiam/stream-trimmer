@@ -159,6 +159,41 @@ export function useClipper() {
     if (chosen) setSaveDir(chosen);
   }, [setSaveDir]);
 
+  // Optional nicknames for saved locations (path -> label).
+  const [saveDirNames, setSaveDirNames] = useState<Record<string, string>>(() =>
+    readSaveDirNames(),
+  );
+  const renameSaveDir = useCallback((dir: string, name: string) => {
+    setSaveDirNames((prev) => {
+      const next = { ...prev };
+      if (name.trim()) next[dir] = name.trim();
+      else delete next[dir];
+      writeSaveDirNames(next);
+      return next;
+    });
+  }, []);
+  const labelForDir = useCallback(
+    (dir: string | null) => (dir ? displayDirName(dir, saveDirNames) : ""),
+    [saveDirNames],
+  );
+
+  // --- Download history ---------------------------------------------------
+  const downloads = useSyncExternalStore(subscribeDownloads, getDownloads);
+  const revealDownload = useCallback(
+    (entry: DownloadEntry) => {
+      if (isElectron && window.electronAPI?.showInFolder && entry.path) {
+        void window.electronAPI.showInFolder(entry.path);
+      }
+    },
+    [isElectron],
+  );
+  const removeDownload = useCallback(
+    (id: string) => removeDownloadEntry(id),
+    [],
+  );
+  const clearDownloads = useCallback(() => clearDownloadHistory(), []);
+
+
   // --- Guided YouTube sign-in --------------------------------------------
   // Opens YouTube in the default browser, then lets the user explicitly check
   // the selected local browser profile. Fully local and free — no OAuth app,
