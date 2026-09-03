@@ -8,7 +8,7 @@ import {
   Clock,
   FolderSymlink,
   FiletypeCsv,
-  FilmIcon,
+  Film,
   Trash,
   X,
 } from "react-bootstrap-icons";
@@ -26,7 +26,7 @@ function formatWhen(ts: number): string {
 }
 
 function KindIcon({ kind }: { kind: DownloadEntry["kind"] }) {
-  if (kind === "clip") return <FilmIcon size={14} className="text-accent" />;
+  if (kind === "clip") return <Film size={14} className="text-accent" />;
   return <FiletypeCsv size={14} className="text-accent" />;
 }
 
