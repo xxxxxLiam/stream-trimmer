@@ -3,7 +3,14 @@
  * Path: src/hooks/useClipper.ts
  * Description: Central clipper state — URL, info, range, format/quality, transcript, download.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   MAX_CLIP_SECONDS,
   formatTimestamp,
