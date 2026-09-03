@@ -22,6 +22,7 @@ import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
 import TranscriptPanel from "./components/TranscriptPanel";
+import DownloadsPanel from "./components/DownloadsPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
 import UpdateStatus from "./components/UpdateStatus";
