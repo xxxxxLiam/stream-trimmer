@@ -623,6 +623,15 @@ export function useClipper() {
           label: filename,
           detail,
         });
+        addDownload({
+          kind: "clip",
+          label: filename,
+          path: result.path ?? "",
+          dir: saveDir,
+          detail:
+            detail ??
+            `${formatTimestamp(start)} – ${formatTimestamp(end)} · ${format.toUpperCase()}`,
+        });
       } else {
         setLastSavedPath(null);
         const objectUrl = URL.createObjectURL(blob);
@@ -634,6 +643,13 @@ export function useClipper() {
         a.remove();
         URL.revokeObjectURL(objectUrl);
         setSavedNotice({ kind: "clip", path: "", label: filename, detail });
+        addDownload({
+          kind: "clip",
+          label: filename,
+          path: "",
+          dir: null,
+          detail,
+        });
       }
       setDownloadProgress(100);
       setDownloadPhase("done");
