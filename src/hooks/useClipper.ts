@@ -640,8 +640,8 @@ export function useClipper() {
     quality,
     isElectron,
     saveDir,
-    useBrowserCookies,
-    cookieBrowser,
+    connection,
+
   ]);
 
   return {
