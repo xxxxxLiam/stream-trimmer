@@ -181,74 +181,10 @@ export function useClipper() {
   const clearDownloads = useCallback(() => clearDownloadHistory(), []);
 
 
-  // --- Guided YouTube sign-in --------------------------------------------
-  // Opens YouTube in the default browser, then lets the user explicitly check
-  // the selected local browser profile. Fully local and free — no OAuth app,
-  // no tokens; cookie contents never leave the browser's own store.
-  const [ytAuth, setYtAuth] = useState<{
-    status: YouTubeAuthState;
-    message?: string;
-    /** Browser the session was detected in (set on signed_in). */
-    browser?: CookieBrowser;
-  }>({ status: "idle" });
-  // Checks the one browser selected by the user. A visible browser login is
-  // not a redirect back to this app; yt-dlp must be able to read its cookies.
-  const checkYouTubeAuth = useCallback(async (): Promise<YouTubeAuthState> => {
-    setYtAuth({ status: "checking", browser: cookieBrowser });
-    try {
-      const res = await fetch(apiUrl("/api/auth/youtube/status"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ browser: cookieBrowser }),
-      });
-      const data = await parseJson<YouTubeAuthStatus>(res);
-      // Guard against non-probe responses (e.g. a proxy error body) so a
-      // missing/invalid status can never blank out the UI state.
-      if (
-        data.status !== "signed_in" &&
-        data.status !== "signed_out" &&
-        data.status !== "profile_missing" &&
-        data.status !== "locked" &&
-        data.status !== "decrypt_failed" &&
-        data.status !== "timeout" &&
-        data.status !== "extractor_error"
-      ) {
-        throw new Error("Unexpected probe response");
-      }
-      if (data.status === "signed_in") {
-        setCookieBrowser(data.browser);
-        setUseBrowserCookies(true);
-        setYtAuth({ status: "signed_in", browser: data.browser });
-      } else {
-        setYtAuth({
-          status: data.status,
-          message: data.message,
-          browser: data.browser,
-        });
-      }
-      return data.status;
-    } catch {
-      setYtAuth({
-        status: "extractor_error",
-        browser: cookieBrowser,
-        message: "Couldn't reach the local backend.",
-      });
-      return "extractor_error";
-    }
-  }, [cookieBrowser, setCookieBrowser]);
+  // --- YouTube sign-in ----------------------------------------------------
+  // Connection state and actions live in the shared store (src/lib/
+  // youtubeConnection.ts) so every workspace tab sees one connection.
 
-  const beginYouTubeSignIn = useCallback(async () => {
-    if (isElectron && window.electronAPI?.openYouTubeSignIn) {
-      await window.electronAPI.openYouTubeSignIn();
-    } else {
-      window.open("https://www.youtube.com/signin", "_blank", "noopener");
-    }
-    setYtAuth({
-      status: "ready",
-      browser: cookieBrowser,
-      message: `When you return, check the ${cookieBrowser} session.`,
-    });
-  }, [isElectron, cookieBrowser]);
 
   const revealLastSaved = useCallback(() => {
     if (isElectron && window.electronAPI?.showInFolder && lastSavedPath) {
