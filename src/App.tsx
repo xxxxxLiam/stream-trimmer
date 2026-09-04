@@ -30,7 +30,7 @@ import UrlBar from "./components/UrlBar";
 import TimeRangeControls from "./components/TimeRangeControls";
 import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
-import TranscriptPanel from "./components/TranscriptPanel";
+import TranscriptDock from "./components/TranscriptDock";
 import DownloadsPanel from "./components/DownloadsPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
