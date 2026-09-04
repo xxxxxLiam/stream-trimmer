@@ -1355,6 +1355,8 @@ const channelExportSchema = z.object({
   includeComments: z.boolean().default(true),
   includeTranscripts: z.boolean().default(true),
   cookiesFromBrowser: cookieBrowserSchema.optional(),
+  cookieFile: cookieFileSchema.optional(),
+
 });
 
 type ChannelExportInput = z.infer<typeof channelExportSchema>;
