@@ -28,6 +28,12 @@ try {
     // synchronously within the drag gesture.
     startDrag: (targetPath) => ipcRenderer.send("file:startDrag", targetPath),
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
+    // In-app YouTube sign-in. Only booleans and a cookie-file path cross the
+    // bridge — never cookie values.
+    youtubeConnect: () => ipcRenderer.invoke("youtube:connect"),
+    youtubeProbe: () => ipcRenderer.invoke("youtube:probe"),
+    youtubeDisconnect: () => ipcRenderer.invoke("youtube:disconnect"),
+
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
     onUpdateStatus: (cb) => {
