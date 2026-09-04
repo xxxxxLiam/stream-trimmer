@@ -35,6 +35,7 @@ import DownloadsPanel from "./components/DownloadsPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
 import UpdateStatus from "./components/UpdateStatus";
+import DragOutHandle from "./components/DragOutHandle";
 import { formatTimestamp } from "./lib/clip";
 import { formatBytes } from "./lib/clip";
 
