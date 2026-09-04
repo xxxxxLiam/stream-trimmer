@@ -542,7 +542,7 @@ export function useClipper() {
             end,
             format,
             quality,
-            ...(useBrowserCookies ? { cookiesFromBrowser: cookieBrowser } : {}),
+            ...cookiePayload(),
           }),
         },
       );
