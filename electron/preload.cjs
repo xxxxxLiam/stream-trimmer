@@ -23,6 +23,10 @@ try {
     saveFiles: (payload) => ipcRenderer.invoke("file:saveFiles", payload),
     showInFolder: (targetPath) =>
       ipcRenderer.invoke("file:showInFolder", targetPath),
+    fileExists: (targetPath) => ipcRenderer.invoke("file:exists", targetPath),
+    // Fire-and-forget send, not invoke: the main process must call startDrag
+    // synchronously within the drag gesture.
+    startDrag: (targetPath) => ipcRenderer.send("file:startDrag", targetPath),
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
