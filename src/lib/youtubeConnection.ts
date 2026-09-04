@@ -212,9 +212,7 @@ export async function connectInApp(): Promise<boolean> {
     }
     set({
       busy: false,
-      message: result.error
-        ? result.error
-        : "Sign-in window closed before you were signed in.",
+      message: result.error || "Sign-in window closed before you were signed in.",
     });
     return false;
   } catch {
@@ -294,10 +292,13 @@ export async function connect(): Promise<boolean> {
   if (state.busy) return state.connected;
   set({ busy: true, message: undefined, step: undefined });
 
+  let signInError: string | undefined;
+
   if (isElectron && window.electronAPI?.youtubeConnect) {
     set({ step: "Opening sign-in…" });
     try {
       const result = await window.electronAPI.youtubeConnect();
+      if (!result.connected && result.error) signInError = result.error;
       if (result.connected) {
         const cookieFile = result.path ?? null;
         const validation = cookieFile
@@ -356,9 +357,11 @@ export async function connect(): Promise<boolean> {
     busy: false,
     step: undefined,
     browserStatus: "signed_out",
-    message: locked
-      ? "A browser's cookie store is locked. Fully quit it (Chrome: Quit, not just close the window) and try again."
-      : "No signed-in YouTube session found. Sign in to YouTube in your browser, then try again.",
+    message:
+      signInError ??
+      (locked
+        ? "A browser's cookie store is locked. Fully quit it (Chrome: Quit, not just close the window) and try again."
+        : "No signed-in YouTube session found. Sign in to YouTube in your browser, then try again."),
   });
   return false;
 }
