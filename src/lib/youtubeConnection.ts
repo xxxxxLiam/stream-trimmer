@@ -27,6 +27,8 @@ export interface YouTubeConnectionState {
   /** Status of the last browser-fallback probe. */
   browserStatus: YouTubeAuthState;
   busy: boolean;
+  /** Short progress line shown while connecting. */
+  step?: string;
   message?: string;
   /** True once the launch probe has run. */
   probed: boolean;
