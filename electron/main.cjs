@@ -79,6 +79,7 @@ function persistSettings() {
 }
 
 let serverHandle = null; // { close(cb) } returned by the bundled server
+let backendBaseUrl = null;
 
 function sendUpdateStatus(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -159,8 +160,10 @@ function resolveResourcesDir() {
 
 async function startBackend() {
   const port = await pickFreePort();
+  backendBaseUrl = `http://127.0.0.1:${port}`;
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
+  process.env.ELECTRON_USER_DATA = app.getPath("userData");
 
   // Serve the built UI from the same local server so the window loads over
   // http://127.0.0.1 instead of file://. YouTube embeds refuse to render in a
@@ -479,7 +482,17 @@ function registerIpc() {
   // owned by the app, then writes a cookies.txt yt-dlp can consume.
   ipcMain.handle("youtube:connect", async () => {
     try {
-      return await youtubeSession.openLoginWindow(mainWindow);
+      return await youtubeSession.openLoginWindow(mainWindow, async (cookieFile) => {
+        if (!backendBaseUrl) return false;
+        const response = await fetch(`${backendBaseUrl}/api/auth/youtube/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cookieFile }),
+        });
+        if (!response.ok) return false;
+        const result = await response.json();
+        return result && result.status === "signed_in";
+      });
     } catch (err) {
       return {
         connected: false,

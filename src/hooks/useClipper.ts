@@ -35,6 +35,7 @@ import {
 import { readSetting, writeSetting } from "../lib/persist";
 import {
   cookiePayload,
+  markDisconnected,
   useYouTubeConnection,
 } from "../lib/youtubeConnection";
 
@@ -552,9 +553,12 @@ export function useClipper() {
         },
       );
       if (!res.ok) {
-        const data = await parseJson<{ error?: string }>(res).catch(
-          () => ({}) as { error?: string },
+        const data = await parseJson<{ error?: string; code?: string }>(res).catch(
+          () => ({}) as { error?: string; code?: string },
         );
+        if (data.code === "YOUTUBE_AUTH_REQUIRED") {
+          markDisconnected(data.error);
+        }
         throw new Error(data.error || "Download failed");
       }
       const blob = await res.blob();
