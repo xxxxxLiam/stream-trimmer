@@ -1634,9 +1634,11 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       ? req.query.jobId
       : `chan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const job = getOrCreateChannelJob(jobId);
-  const cookieOptions: Record<string, unknown> = input.cookiesFromBrowser
-    ? { cookiesFromBrowser: input.cookiesFromBrowser }
-    : {};
+  const cookieOptions: Record<string, unknown> = resolveCookieOptions(
+    input.cookieFile,
+    input.cookiesFromBrowser,
+  );
+
 
   res.on("close", () => {
     if (!res.writableEnded) cancelChannelJob(jobId);
