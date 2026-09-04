@@ -272,13 +272,40 @@ function ModeTabs({
   );
 }
 
-function Layout() {
+/** Publishes this tab's title and busy state up to the workspace tab strip. */
+function TabReporter({ id }: { id: string }) {
+  const { info, downloading, exportingComments, loadingInfo, cancelDownload } =
+    useClipperContext();
+  const { exporting, channelUrl, cancelExport } = useChannelExportContext();
+  const { reportTab } = useWorkspace();
+
+  const title = info?.title || (channelUrl ? channelUrl : "");
+  const busy = downloading || exportingComments || loadingInfo || exporting;
+
+  const cancelRef = useRef<() => void>(() => {});
+  cancelRef.current = () => {
+    cancelDownload();
+    cancelExport();
+  };
+
+  useEffect(() => {
+    reportTab(id, {
+      title,
+      busy,
+      cancel: () => cancelRef.current(),
+    });
+  }, [id, title, busy, reportTab]);
+
+  return null;
+}
+
+function Layout({ active }: { active: boolean }) {
   const {
     loadingInfo,
     exportingComments,
   } = useClipperContext();
   const [mode, setMode] = useState<Mode>("clip");
-  const overlayVisible = loadingInfo || exportingComments;
+  const overlayVisible = active && (loadingInfo || exportingComments);
   const overlayLabel = exportingComments
     ? "Exporting comments"
     : "Loading video info";
@@ -287,17 +314,10 @@ function Layout() {
     <>
       <OverlayLoader visible={overlayVisible} label={overlayLabel} />
 
-      <main className="flex h-screen w-full flex-col overflow-hidden bg-panel">
-        {/* Title bar */}
-        <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
-          <span className="text-[12px] font-medium tracking-tight text-fg-muted">
-            YouTube Clipper
-          </span>
+      <main className="flex h-full w-full flex-col overflow-hidden bg-panel">
+        {/* Mode bar */}
+        <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-4 py-2">
           <ModeTabs mode={mode} setMode={setMode} />
-          <div className="ml-auto flex items-center gap-3">
-            <UpdateStatus />
-            <span className="text-[11px] text-fg-faint">Local · Private</span>
-          </div>
         </div>
 
         {mode === "clip" ? (
