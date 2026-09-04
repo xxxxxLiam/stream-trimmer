@@ -34,6 +34,11 @@ import {
 } from "../lib/clip";
 import { readSetting, writeSetting } from "../lib/persist";
 import {
+  cookiePayload,
+  useYouTubeConnection,
+} from "../lib/youtubeConnection";
+
+import {
   addDownload,
   clearDownloads as clearDownloadHistory,
   displayDirName,
