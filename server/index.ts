@@ -323,6 +323,27 @@ const cookieBrowserSchema = z.enum([
   "chromium",
 ]);
 
+// The app-managed cookie jar written by the in-app YouTube sign-in window.
+// Only that exact filename is accepted, and it must exist on disk — the value
+// is a path, never cookie contents.
+const cookieFileSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (v) => path.basename(v) === "yt-cookies.txt" && fs.existsSync(v),
+    "Unknown cookie file",
+  );
+
+/** Picks the cookie strategy for yt-dlp: app cookie file wins over browser. */
+function resolveCookieOptions(
+  cookieFile: string | undefined,
+  cookiesFromBrowser: string | undefined,
+): Record<string, unknown> {
+  if (cookieFile) return { cookies: cookieFile };
+  if (cookiesFromBrowser) return { cookiesFromBrowser };
+  return {};
+}
+
 const downloadSchema = z
   .object({
     url: urlSchema,
@@ -334,6 +355,7 @@ const downloadSchema = z
     // directly from the named browser at runtime. Cookie contents never touch
     // this process — only the browser name is accepted, from an allowlist.
     cookiesFromBrowser: cookieBrowserSchema.optional(),
+    cookieFile: cookieFileSchema.optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -341,6 +363,7 @@ const downloadSchema = z
   });
 
 type DownloadInput = z.infer<typeof downloadSchema>;
+
 
 const app = express();
 app.use(cors());
