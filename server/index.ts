@@ -748,12 +748,15 @@ app.post("/api/download", async (req: Request, res: Response) => {
     format,
     quality,
     cookiesFromBrowser,
+    cookieFile,
   }: DownloadInput = parsed.data;
-  // Only the browser name ever enters the option object; yt-dlp reads the
-  // cookie jar itself and nothing is written to disk or logged here.
-  const cookieOptions: Record<string, unknown> = cookiesFromBrowser
-    ? { cookiesFromBrowser }
-    : {};
+  // Either the app-managed cookies.txt (in-app sign-in) or a browser name.
+  // Cookie contents are never read or logged by this process.
+  const cookieOptions: Record<string, unknown> = resolveCookieOptions(
+    cookieFile,
+    cookiesFromBrowser,
+  );
+
   const jobId =
     typeof req.query.jobId === "string" && req.query.jobId
       ? req.query.jobId
