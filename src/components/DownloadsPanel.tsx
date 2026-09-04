@@ -109,7 +109,9 @@ export default function DownloadsPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.15 }}
-                className="group flex items-center gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2"
+                className={`group flex items-center gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2 ${
+                  missing[entry.id] ? "opacity-60" : ""
+                }`}
               >
                 <KindIcon kind={entry.kind} />
                 <DragOutHandle
