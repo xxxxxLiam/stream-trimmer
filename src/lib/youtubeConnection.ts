@@ -99,6 +99,44 @@ export function cookiePayload(): CookiePayload {
   return {};
 }
 
+/** Clears a rejected session so the shell immediately reopens the prompt. */
+export function markDisconnected(message?: string): void {
+  set({
+    connected: false,
+    mode: null,
+    cookieFile: null,
+    browserStatus: "signed_out",
+    message,
+    probed: true,
+  });
+}
+
+async function validateSession(payload: CookiePayload): Promise<{
+  valid: boolean;
+  message?: string;
+}> {
+  try {
+    const res = await fetch(apiUrl("/api/auth/youtube/status"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await parseJson<{
+      status?: YouTubeAuthState;
+      message?: string;
+    }>(res);
+    return {
+      valid: res.ok && data.status === "signed_in",
+      message: data.message,
+    };
+  } catch {
+    return {
+      valid: false,
+      message: "YouTube could not be verified right now.",
+    };
+  }
+}
+
 const isElectron = typeof window !== "undefined" && !!window.electronAPI?.isElectron;
 
 /**
@@ -114,22 +152,31 @@ export async function probeConnection(force = false): Promise<void> {
   }
   try {
     const result = await window.electronAPI.youtubeProbe();
-    const connected = !!result.connected;
+    const localSessionExists = !!result.connected && !!result.path;
+    const validation = localSessionExists && result.path
+      ? await validateSession({ cookieFile: result.path })
+      : { valid: false, message: undefined };
+    const connected = localSessionExists && validation.valid;
     set({
       probed: true,
       connected,
       // Browser-cookie sessions are not covered by the app probe; keep them.
       mode: connected ? "app" : state.mode === "browser" ? "browser" : null,
       cookieFile: connected ? (result.path ?? null) : null,
+      message: connected ? undefined : validation.message,
     });
   } catch {
     set({ probed: true });
   }
 }
 
-/** Re-checks an existing app connection; browser sessions are left alone. */
+/** Re-checks the active session against YouTube, not just local cookie presence. */
 export async function revalidateConnection(): Promise<void> {
-  if (state.mode === "browser") return;
+  if (state.mode === "browser") {
+    const result = await checkBrowserSession(state.browser);
+    if (result.status !== "signed_in") markDisconnected(result.message);
+    return;
+  }
   await probeConnection(true);
 }
 
@@ -140,11 +187,25 @@ export async function connectInApp(): Promise<boolean> {
   try {
     const result = await window.electronAPI.youtubeConnect();
     if (result.connected) {
+      const cookieFile = result.path ?? null;
+      const validation = cookieFile
+        ? await validateSession({ cookieFile })
+        : { valid: false, message: "YouTube did not return a valid session." };
+      if (!validation.valid) {
+        set({
+          busy: false,
+          connected: false,
+          mode: null,
+          cookieFile: null,
+          message: validation.message,
+        });
+        return false;
+      }
       set({
         busy: false,
         connected: true,
         mode: "app",
-        cookieFile: result.path ?? null,
+        cookieFile,
         message: undefined,
       });
       return true;
@@ -238,12 +299,27 @@ export async function connect(): Promise<boolean> {
     try {
       const result = await window.electronAPI.youtubeConnect();
       if (result.connected) {
+        const cookieFile = result.path ?? null;
+        const validation = cookieFile
+          ? await validateSession({ cookieFile })
+          : { valid: false, message: "YouTube did not return a valid session." };
+        if (!validation.valid) {
+          set({
+            busy: false,
+            step: undefined,
+            connected: false,
+            mode: null,
+            cookieFile: null,
+            message: validation.message,
+          });
+          return false;
+        }
         set({
           busy: false,
           step: undefined,
           connected: true,
           mode: "app",
-          cookieFile: result.path ?? null,
+          cookieFile,
           message: undefined,
         });
         return true;

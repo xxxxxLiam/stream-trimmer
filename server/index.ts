@@ -330,7 +330,11 @@ const cookieFileSchema = z
   .string()
   .min(1)
   .refine(
-    (v) => path.basename(v) === "yt-cookies.txt" && fs.existsSync(v),
+    (v) => {
+      if (path.basename(v) !== "yt-cookies.txt" || !fs.existsSync(v)) return false;
+      const userData = process.env.ELECTRON_USER_DATA;
+      return !userData || path.dirname(path.resolve(v)) === path.resolve(userData);
+    },
     "Unknown cookie file",
   );
 
@@ -680,14 +684,20 @@ const AUTH_PROBE_TIMEOUT_MS = 15_000;
 const AUTH_PROBE_URL = "https://www.youtube.com/watch?v=BaW_jenozKc";
 
 function authProbeMessage(
-  browser: CookieBrowserName,
+  source: CookieBrowserName | "app",
   status: YouTubeAuthProbeStatus,
 ): string | undefined {
-  const label = browser[0].toUpperCase() + browser.slice(1);
+  const label = source === "app"
+    ? "The in-app YouTube session"
+    : source[0].toUpperCase() + source.slice(1);
   if (status === "signed_out")
-    return `No YouTube account cookies were found in ${label}.`;
+    return source === "app"
+      ? `${label} is not signed in. Connect YouTube again.`
+      : `No YouTube account cookies were found in ${label}.`;
   if (status === "profile_missing")
-    return `No ${label} profile was found on this computer.`;
+    return source === "app"
+      ? `${label} could not be read. Connect YouTube again.`
+      : `No ${label} profile was found on this computer.`;
   if (status === "locked")
     return `Fully quit ${label}, including background windows, then check again.`;
   if (status === "decrypt_failed")
@@ -699,14 +709,14 @@ function authProbeMessage(
   return undefined;
 }
 
-function probeBrowserAuth(
-  browser: CookieBrowserName,
+function probeYouTubeAuth(
+  cookieOptions: Record<string, unknown>,
   onChild: (child: ChildProcess | null) => void,
 ): Promise<YouTubeAuthProbeStatus> {
   return new Promise((resolve) => {
     const child = yt!.exec(
       AUTH_PROBE_URL,
-      { cookiesFromBrowser: browser, simulate: true, verbose: true },
+      { ...cookieOptions, simulate: true, verbose: true },
       { env: childEnv() },
     );
     onChild(child);
@@ -735,26 +745,37 @@ function probeBrowserAuth(
 
 app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   const parsed = z
-    .object({ browser: cookieBrowserSchema.optional() })
+    .object({
+      browser: cookieBrowserSchema.optional(),
+      cookieFile: cookieFileSchema.optional(),
+    })
+    .refine((value) => Boolean(value.browser) !== Boolean(value.cookieFile), {
+      message: "Choose one YouTube session source",
+    })
     .safeParse(req.body ?? {});
   if (!parsed.success)
-    return res.status(400).json({ error: "Unknown browser" });
+    return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  if (!parsed.data.browser)
-    return res.status(400).json({ error: "Choose a browser" });
+  const source = parsed.data.cookieFile ? "app" : parsed.data.browser;
+  if (!source) return res.status(400).json({ error: "Choose a session source" });
+  const cookieOptions = resolveCookieOptions(
+    parsed.data.cookieFile,
+    parsed.data.browser,
+  );
   let activeChild: ChildProcess | null = null;
   res.on("close", () => {
     if (!res.writableEnded && activeChild) activeChild.kill("SIGKILL");
   });
-  const status = await probeBrowserAuth(parsed.data.browser, (child) => {
+  const status = await probeYouTubeAuth(cookieOptions, (child) => {
     activeChild = child;
   });
   if (res.writableEnded || res.destroyed) return;
   return res.json({
     status,
+    source,
     browser: parsed.data.browser,
-    message: authProbeMessage(parsed.data.browser, status),
+    message: authProbeMessage(source, status),
   });
 });
 
@@ -786,6 +807,24 @@ app.post("/api/download", async (req: Request, res: Response) => {
       : "none";
   console.log(`[server] /api/download auth mode=${cookieMode}`);
 
+  const requiresVerifiedSession =
+    format === "mp4" && (quality === "best" || Number(quality) > 360);
+  if (requiresVerifiedSession) {
+    if (cookieMode === "none") {
+      return res.status(401).json({
+        code: "YOUTUBE_AUTH_REQUIRED",
+        error: "Connect YouTube before downloading this quality.",
+      });
+    }
+    const authStatus = await probeYouTubeAuth(cookieOptions, () => undefined);
+    if (authStatus !== "signed_in") {
+      return res.status(401).json({
+        code: "YOUTUBE_AUTH_REQUIRED",
+        error: "Your YouTube connection is no longer valid. Connect again.",
+      });
+    }
+  }
+
   const jobId =
     typeof req.query.jobId === "string" && req.query.jobId
       ? req.query.jobId
@@ -812,16 +851,13 @@ app.post("/api/download", async (req: Request, res: Response) => {
     try {
       info = await runProbe(probeOptions);
     } catch (first) {
-      // An app cookies.txt that YouTube no longer accepts must not silently
-      // downgrade the download — retry with the browser session, then bare.
+      // Never turn a rejected app session into a signed-out download. That
+      // would silently replace the requested high-quality track with 360p.
       if (cookieMode !== "app") throw first;
-      console.warn(
-        "[server] app cookie file rejected — retrying with browser session/none",
-      );
-      cookieOptions = cookiesFromBrowser ? { cookiesFromBrowser } : {};
-      cookieMode = cookiesFromBrowser ? "browser" : "none";
-      probeOptions = probeWith(cookieOptions);
-      info = await runProbe(probeOptions);
+      return res.status(401).json({
+        code: "YOUTUBE_AUTH_REQUIRED",
+        error: "Your YouTube connection was rejected. Connect again.",
+      });
     }
     if (typeof info.duration === "number" && end > info.duration + 1) {
       return res.status(400).json({ error: "End exceeds video duration" });

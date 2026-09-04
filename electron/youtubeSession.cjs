@@ -112,7 +112,7 @@ let loginWindow = null;
  * Opens the sign-in window and resolves once a YouTube session exists (or the
  * user closes the window). The window closes itself on success.
  */
-function openLoginWindow(parent) {
+function openLoginWindow(parent, validate) {
   if (loginWindow && !loginWindow.isDestroyed()) {
     loginWindow.focus();
     return Promise.resolve({ connected: false, cancelled: true, path: null });
@@ -138,6 +138,7 @@ function openLoginWindow(parent) {
 
     let settled = false;
     let timer = null;
+    let validationInFlight = false;
     const finish = async (connected) => {
       if (settled) return;
       settled = true;
@@ -158,11 +159,25 @@ function openLoginWindow(parent) {
     };
 
     const check = async () => {
+      if (validationInFlight) return;
       try {
         const cookies = await readAuthCookies();
-        if (hasAuth(cookies)) await finish(true);
+        if (!hasAuth(cookies)) return;
+        validationInFlight = true;
+        win.setTitle("Verifying YouTube…");
+        const saved = await exportCookieFile();
+        const verified = saved && typeof validate === "function"
+          ? await validate(cookieFilePath())
+          : saved;
+        if (verified) {
+          await finish(true);
+          return;
+        }
+        win.setTitle("Sign in to YouTube");
       } catch {
         /* keep polling */
+      } finally {
+        validationInFlight = false;
       }
     };
 
