@@ -14,7 +14,12 @@ import {
 import { useClipperContext } from "../context/ClipperContext";
 import { formatTimestamp } from "../lib/clip";
 
-export default function TranscriptPanel() {
+export default function TranscriptPanel({
+  compact = false,
+}: {
+  /** Docked variant inside the Clip tab — hides the redundant title row. */
+  compact?: boolean;
+}) {
   const {
     info,
     loadingTranscript,
