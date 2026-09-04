@@ -3,7 +3,7 @@
  * Path: src/App.tsx
  * Description: Root layout — full-viewport two-column grid, overlay loader, form + preview.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Download,
@@ -13,7 +13,16 @@ import {
   X,
 } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
-import { ChannelExportProvider } from "./context/ChannelExportContext";
+import {
+  ChannelExportProvider,
+  useChannelExportContext,
+} from "./context/ChannelExportContext";
+import {
+  WorkspaceProvider,
+  TabActiveProvider,
+  useWorkspace,
+} from "./context/WorkspaceContext";
+import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
 import ChannelLockGate from "./components/ChannelLockGate";
 import { isLockConfigured } from "./lib/channelLock";
