@@ -246,7 +246,7 @@ function SavedToast() {
   );
 }
 
-type Mode = "clip" | "transcript" | "downloads" | "export";
+type Mode = "clip" | "downloads" | "export";
 
 function ModeTabs({
   mode,
@@ -257,7 +257,6 @@ function ModeTabs({
 }) {
   const tabs: { value: Mode; label: string }[] = [
     { value: "clip", label: "Clip" },
-    { value: "transcript", label: "Transcript" },
     { value: "downloads", label: "Downloads" },
     { value: "export", label: "Export" },
   ];
