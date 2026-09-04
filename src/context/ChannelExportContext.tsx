@@ -13,13 +13,8 @@ import { useClipperContext } from "./ClipperContext";
 const ChannelExportContext = createContext<ChannelExportState | null>(null);
 
 export function ChannelExportProvider({ children }: { children: ReactNode }) {
-  const { isElectron, saveDir, useBrowserCookies, cookieBrowser } =
-    useClipperContext();
-  const state = useChannelExport({
-    isElectron,
-    saveDir,
-    cookiesFromBrowser: useBrowserCookies ? cookieBrowser : undefined,
-  });
+  const { isElectron, saveDir } = useClipperContext();
+  const state = useChannelExport({ isElectron, saveDir });
   return (
     <ChannelExportContext.Provider value={state}>
       {children}

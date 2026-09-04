@@ -21,6 +21,8 @@ const fsp = require("node:fs/promises");
 // app is signed, mac users must download new versions manually; we handle
 // the resulting error gracefully instead of crashing.
 const { autoUpdater } = require("electron-updater");
+const youtubeSession = require("./youtubeSession.cjs");
+
 
 const isDev = process.env.ELECTRON_DEV === "1";
 
@@ -472,6 +474,25 @@ function registerIpc() {
       };
     }
   });
+
+  // In-app YouTube sign-in — the preferred path. Opens a real login window
+  // owned by the app, then writes a cookies.txt yt-dlp can consume.
+  ipcMain.handle("youtube:connect", async () => {
+    try {
+      return await youtubeSession.openLoginWindow(mainWindow);
+    } catch (err) {
+      return {
+        connected: false,
+        path: null,
+        error: err && err.message ? err.message : "Sign-in failed",
+      };
+    }
+  });
+
+  ipcMain.handle("youtube:probe", async () => youtubeSession.probe());
+
+  ipcMain.handle("youtube:disconnect", async () => youtubeSession.clear());
+
 
   ipcMain.handle("updater:quitAndInstall", () => {
     try {

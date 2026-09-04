@@ -323,6 +323,27 @@ const cookieBrowserSchema = z.enum([
   "chromium",
 ]);
 
+// The app-managed cookie jar written by the in-app YouTube sign-in window.
+// Only that exact filename is accepted, and it must exist on disk — the value
+// is a path, never cookie contents.
+const cookieFileSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (v) => path.basename(v) === "yt-cookies.txt" && fs.existsSync(v),
+    "Unknown cookie file",
+  );
+
+/** Picks the cookie strategy for yt-dlp: app cookie file wins over browser. */
+function resolveCookieOptions(
+  cookieFile: string | undefined,
+  cookiesFromBrowser: string | undefined,
+): Record<string, unknown> {
+  if (cookieFile) return { cookies: cookieFile };
+  if (cookiesFromBrowser) return { cookiesFromBrowser };
+  return {};
+}
+
 const downloadSchema = z
   .object({
     url: urlSchema,
@@ -334,6 +355,7 @@ const downloadSchema = z
     // directly from the named browser at runtime. Cookie contents never touch
     // this process — only the browser name is accepted, from an allowlist.
     cookiesFromBrowser: cookieBrowserSchema.optional(),
+    cookieFile: cookieFileSchema.optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -341,6 +363,7 @@ const downloadSchema = z
   });
 
 type DownloadInput = z.infer<typeof downloadSchema>;
+
 
 const app = express();
 app.use(cors());
@@ -748,12 +771,15 @@ app.post("/api/download", async (req: Request, res: Response) => {
     format,
     quality,
     cookiesFromBrowser,
+    cookieFile,
   }: DownloadInput = parsed.data;
-  // Only the browser name ever enters the option object; yt-dlp reads the
-  // cookie jar itself and nothing is written to disk or logged here.
-  const cookieOptions: Record<string, unknown> = cookiesFromBrowser
-    ? { cookiesFromBrowser }
-    : {};
+  // Either the app-managed cookies.txt (in-app sign-in) or a browser name.
+  // Cookie contents are never read or logged by this process.
+  const cookieOptions: Record<string, unknown> = resolveCookieOptions(
+    cookieFile,
+    cookiesFromBrowser,
+  );
+
   const jobId =
     typeof req.query.jobId === "string" && req.query.jobId
       ? req.query.jobId
@@ -1329,6 +1355,8 @@ const channelExportSchema = z.object({
   includeComments: z.boolean().default(true),
   includeTranscripts: z.boolean().default(true),
   cookiesFromBrowser: cookieBrowserSchema.optional(),
+  cookieFile: cookieFileSchema.optional(),
+
 });
 
 type ChannelExportInput = z.infer<typeof channelExportSchema>;
@@ -1606,9 +1634,11 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       ? req.query.jobId
       : `chan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const job = getOrCreateChannelJob(jobId);
-  const cookieOptions: Record<string, unknown> = input.cookiesFromBrowser
-    ? { cookiesFromBrowser: input.cookiesFromBrowser }
-    : {};
+  const cookieOptions: Record<string, unknown> = resolveCookieOptions(
+    input.cookieFile,
+    input.cookiesFromBrowser,
+  );
+
 
   res.on("close", () => {
     if (!res.writableEnded) cancelChannelJob(jobId);
