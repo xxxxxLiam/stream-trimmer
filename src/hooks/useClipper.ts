@@ -438,6 +438,44 @@ export function useClipper() {
     }
   }, [url]);
 
+  // Auto-search: load video info as soon as the URL resolves to a new video
+  // id. Debounced so typing doesn't spam the backend; re-entering the same
+  // link is a no-op. Partial / invalid text is ignored silently.
+  const loadInfoRef = useRef(loadInfo);
+  loadInfoRef.current = loadInfo;
+  const lastLoadedIdRef = useRef<string | null>(null);
+  const autoLoadNowRef = useRef(false);
+
+  useEffect(() => {
+    if (!videoId) return;
+    if (lastLoadedIdRef.current === videoId) return;
+    const immediate = autoLoadNowRef.current;
+    autoLoadNowRef.current = false;
+    const run = () => {
+      lastLoadedIdRef.current = videoId;
+      void loadInfoRef.current();
+    };
+    if (immediate) {
+      run();
+      return;
+    }
+    const t = window.setTimeout(run, 450);
+    return () => window.clearTimeout(t);
+  }, [videoId]);
+
+  /** Called by the URL bar on paste to skip the debounce. */
+  const flushAutoLoad = useCallback(() => {
+    autoLoadNowRef.current = true;
+  }, []);
+
+  /** Manual search (button / Enter) — always reloads the current URL. */
+  const searchNow = useCallback(() => {
+    lastLoadedIdRef.current = videoId;
+    void loadInfoRef.current();
+  }, [videoId]);
+
+
+
   const loadTranscript = useCallback(async () => {
     if (!url) return;
     setLoadingTranscript(true);
