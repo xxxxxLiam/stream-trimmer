@@ -21,6 +21,8 @@ const fsp = require("node:fs/promises");
 // app is signed, mac users must download new versions manually; we handle
 // the resulting error gracefully instead of crashing.
 const { autoUpdater } = require("electron-updater");
+const youtubeSession = require("./youtubeSession.cjs");
+
 
 const isDev = process.env.ELECTRON_DEV === "1";
 
