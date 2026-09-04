@@ -3,6 +3,7 @@
  * Path: src/components/DownloadsPanel.tsx
  * Description: Persisted download history with reveal-in-folder and per-row removal.
  */
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Clock,
