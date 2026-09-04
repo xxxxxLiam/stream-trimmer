@@ -12,9 +12,15 @@ import {
   ChevronBarRight,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
+import { useIsTabActive } from "../context/WorkspaceContext";
 import { formatTimestamp } from "../lib/clip";
 
-export default function TranscriptPanel() {
+export default function TranscriptPanel({
+  compact = false,
+}: {
+  /** Docked variant inside the Clip tab — hides the redundant title row. */
+  compact?: boolean;
+}) {
   const {
     info,
     loadingTranscript,
@@ -36,6 +42,24 @@ export default function TranscriptPanel() {
   useEffect(() => {
     if (info) ensureTranscript();
   }, [info, ensureTranscript]);
+
+  // Cmd/Ctrl+F focuses the transcript search box while this panel is mounted.
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const isTabActive = useIsTabActive();
+  useEffect(() => {
+    if (!isTabActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        if (!searchRef.current) return;
+        e.preventDefault();
+        searchRef.current.focus();
+        searchRef.current.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isTabActive]);
+
 
   const firstInRangeRef = useRef<HTMLDivElement | null>(null);
   const firstInRangeKey = displayTranscript.find(
@@ -80,21 +104,23 @@ export default function TranscriptPanel() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 items-center gap-3">
-        <span className="min-w-0 truncate text-[12px] text-fg-muted">
-          {info ? info.title : "Load a video in the Clip tab first"}
-        </span>
-        <button
-          type="button"
-          onClick={copyTranscript}
-          disabled={rangeTranscript.length === 0}
-          className="btn ml-auto shrink-0 text-[12px]"
-          title="Copy the transcript for the selected range"
-        >
-          <ClipboardCheck size={12} />
-          <span>Copy selection</span>
-        </button>
-      </div>
+      {!compact && (
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="min-w-0 truncate text-[12px] text-fg-muted">
+            {info ? info.title : "Load a video in the Clip tab first"}
+          </span>
+          <button
+            type="button"
+            onClick={copyTranscript}
+            disabled={rangeTranscript.length === 0}
+            className="btn ml-auto shrink-0 text-[12px]"
+            title="Copy the transcript for the selected range"
+          >
+            <ClipboardCheck size={12} />
+            <span>Copy selection</span>
+          </button>
+        </div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 4 }}
@@ -106,12 +132,14 @@ export default function TranscriptPanel() {
           <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-bg-deep/40 px-3 py-2">
             <Search size={12} className="text-fg-faint" />
             <input
+              ref={searchRef}
               type="text"
               value={transcriptQuery}
               onChange={(e) => setTranscriptQuery(e.target.value)}
               placeholder="Search transcript…"
               className="min-w-0 flex-1 bg-transparent text-[12px] text-fg outline-none"
             />
+
             {transcriptQuery && (
               <button
                 type="button"
