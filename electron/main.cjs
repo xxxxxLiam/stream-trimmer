@@ -2,7 +2,14 @@
 // backend on a free port, loads the built front-end, and shuts everything
 // down cleanly on quit. No dev server ships; this file is CommonJS because
 // the project's package.json sets "type": "module".
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeImage,
+  shell,
+} = require("electron");
 const path = require("node:path");
 const net = require("node:net");
 const fs = require("node:fs");
