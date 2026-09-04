@@ -24,6 +24,25 @@ const { autoUpdater } = require("electron-updater");
 
 const isDev = process.env.ELECTRON_DEV === "1";
 
+// Drag icon for native file drag-out, resolved once and reused. startDrag
+// needs a non-empty icon synchronously or Windows cancels the drag outright.
+let dragIcon = null;
+function getDragIcon() {
+  if (dragIcon && !dragIcon.isEmpty()) return dragIcon;
+  try {
+    const iconPath = path.join(__dirname, "icon.png");
+    if (fs.existsSync(iconPath)) {
+      dragIcon = nativeImage
+        .createFromPath(iconPath)
+        .resize({ width: 64, height: 64 });
+    }
+  } catch {
+    dragIcon = null;
+  }
+  if (!dragIcon || dragIcon.isEmpty()) dragIcon = nativeImage.createEmpty();
+  return dragIcon;
+}
+
 // Single-instance lock — no duplicate backend, no duplicate window.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
