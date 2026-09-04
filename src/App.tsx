@@ -373,17 +373,53 @@ function Layout({ active }: { active: boolean }) {
         )}
 
       </main>
-      <SavedToast />
+      {active && <SavedToast />}
     </>
+  );
+}
+
+function Shell() {
+  const { tabs, activeId } = useWorkspace();
+  return (
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-panel">
+      {/* Title bar with workspace tabs */}
+      <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-3 py-1.5">
+        <WorkspaceTabs />
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <UpdateStatus />
+          <span className="text-[11px] text-fg-faint">Local · Private</span>
+        </div>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        {tabs.map((tab) => {
+          const active = tab.id === activeId;
+          return (
+            <div
+              key={tab.id}
+              className="absolute inset-0"
+              style={{ display: active ? undefined : "none" }}
+            >
+              <ClipperProvider>
+                <ChannelExportProvider>
+                  <TabActiveProvider active={active}>
+                    <TabReporter id={tab.id} />
+                    <Layout active={active} />
+                  </TabActiveProvider>
+                </ChannelExportProvider>
+              </ClipperProvider>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
 export default function App() {
   return (
-    <ClipperProvider>
-      <ChannelExportProvider>
-        <Layout />
-      </ChannelExportProvider>
-    </ClipperProvider>
+    <WorkspaceProvider>
+      <Shell />
+    </WorkspaceProvider>
   );
 }
