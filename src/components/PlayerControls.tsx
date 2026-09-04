@@ -34,7 +34,7 @@ export default function PlayerControls({
   // I / O keyboard shortcuts, ignored while typing in a field.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!info || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!isTabActive || !info || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return;
       if (e.key === "i" || e.key === "I") {
