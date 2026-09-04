@@ -99,24 +99,36 @@ export function cookiePayload(): CookiePayload {
 
 const isElectron = typeof window !== "undefined" && !!window.electronAPI?.isElectron;
 
-/** Silent launch probe — never opens a window, never blocks the UI. */
-export async function probeConnection(): Promise<void> {
-  if (state.probed || state.busy) return;
+/**
+ * Silent probe — never opens a window, never blocks the UI. Runs once on
+ * launch, and again on `revalidateConnection()` so a YouTube-side logout is
+ * noticed instead of leaving a stale "connected" chip.
+ */
+export async function probeConnection(force = false): Promise<void> {
+  if ((state.probed && !force) || state.busy) return;
   if (!isElectron || !window.electronAPI?.youtubeProbe) {
     set({ probed: true });
     return;
   }
   try {
     const result = await window.electronAPI.youtubeProbe();
+    const connected = !!result.connected;
     set({
       probed: true,
-      connected: !!result.connected,
-      mode: result.connected ? "app" : state.mode,
-      cookieFile: result.path ?? null,
+      connected,
+      // Browser-cookie sessions are not covered by the app probe; keep them.
+      mode: connected ? "app" : state.mode === "browser" ? "browser" : null,
+      cookieFile: connected ? (result.path ?? null) : null,
     });
   } catch {
     set({ probed: true });
   }
+}
+
+/** Re-checks an existing app connection; browser sessions are left alone. */
+export async function revalidateConnection(): Promise<void> {
+  if (state.mode === "browser") return;
+  await probeConnection(true);
 }
 
 /** Opens the in-app login window and stores the resulting cookie file. */
@@ -228,14 +240,3 @@ export async function openExternalSignIn(): Promise<void> {
   set({ browserStatus: "ready" });
 }
 
-// --- Prompt dismissal ----------------------------------------------------
-
-const DISMISS_KEY = "clipper.ytPromptDismissed";
-
-export function isPromptSuppressed(): boolean {
-  return readSetting<boolean>(DISMISS_KEY, false) === true;
-}
-
-export function suppressPrompt(): void {
-  writeSetting(DISMISS_KEY, true);
-}

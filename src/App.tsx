@@ -41,9 +41,8 @@ import { formatBytes } from "./lib/clip";
 import YouTubeStatusChip from "./components/YouTubeStatusChip";
 import YouTubeConnectModal from "./components/YouTubeConnectModal";
 import {
-  isConnected,
-  isPromptSuppressed,
   probeConnection,
+  revalidateConnection,
   useYouTubeConnection,
 } from "./lib/youtubeConnection";
 
@@ -406,24 +405,32 @@ function Layout({ active }: { active: boolean }) {
   );
 }
 
+const REVALIDATE_INTERVAL_MS = 60_000;
+
 function Shell() {
   const { tabs, activeId } = useWorkspace();
   const [connectOpen, setConnectOpen] = useState(false);
   const connection = useYouTubeConnection();
 
-  // One silent probe per launch, shared by every workspace tab. When it comes
-  // back negative we prompt once, unless the user asked us not to.
+  // One silent probe per launch, shared by every workspace tab, then periodic
+  // re-checks so a YouTube-side logout reopens the prompt instead of leaving a
+  // stale chip. Connecting is the only action, so the prompt is never dismissed
+  // permanently.
   useEffect(() => {
-    let cancelled = false;
-    void probeConnection().then(() => {
-      if (cancelled) return;
-      if (!isPromptSuppressed() && !isConnected()) setConnectOpen(true);
-    });
+    void probeConnection();
+    const revalidate = () => void revalidateConnection();
+    const timer = window.setInterval(revalidate, REVALIDATE_INTERVAL_MS);
+    window.addEventListener("focus", revalidate);
     return () => {
-      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", revalidate);
     };
-    // Runs once on mount; probeConnection guards against repeats itself.
   }, []);
+
+  // Whenever the probe says we are disconnected, surface the one-click prompt.
+  useEffect(() => {
+    if (connection.probed && !connection.connected) setConnectOpen(true);
+  }, [connection.probed, connection.connected]);
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-panel">

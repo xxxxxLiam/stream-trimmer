@@ -20,7 +20,6 @@ import {
   disconnect,
   openExternalSignIn,
   setBrowser,
-  suppressPrompt,
   useYouTubeConnection,
 } from "../lib/youtubeConnection";
 
@@ -50,11 +49,6 @@ export default function YouTubeConnectModal({
   const handleConnect = async () => {
     const ok = await connectInApp();
     if (ok) onClose();
-  };
-
-  const handleNeverAsk = () => {
-    suppressPrompt();
-    onClose();
   };
 
   return (
@@ -119,16 +113,6 @@ export default function YouTubeConnectModal({
                   Connect YouTube
                 </button>
               ) : null}
-              <button type="button" className="btn" onClick={onClose}>
-                Not now
-              </button>
-              <button
-                type="button"
-                className="text-[11px] text-fg-faint hover:text-fg-muted"
-                onClick={handleNeverAsk}
-              >
-                Don&apos;t ask again
-              </button>
             </>
           )}
         </div>
