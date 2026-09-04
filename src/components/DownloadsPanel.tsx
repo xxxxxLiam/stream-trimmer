@@ -42,6 +42,34 @@ export default function DownloadsPanel() {
     isElectron,
   } = useClipperContext();
 
+  // Files can be moved or deleted outside the app, so probe once per mount
+  // (and whenever the list changes) rather than on every render.
+  const [missing, setMissing] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const probe = window.electronAPI?.fileExists;
+    if (!isElectron || !probe) return;
+    let cancelled = false;
+
+    void (async () => {
+      const results: Record<string, boolean> = {};
+      for (const entry of downloads) {
+        if (!entry.path) continue;
+        try {
+          results[entry.id] = !(await probe(entry.path));
+        } catch {
+          results[entry.id] = false;
+        }
+      }
+      if (!cancelled) setMissing(results);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isElectron, downloads]);
+
+
   return (
     <div className="flex min-h-0 flex-col gap-3">
       <div className="flex items-center justify-between">
