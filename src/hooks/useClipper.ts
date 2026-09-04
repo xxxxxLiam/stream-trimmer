@@ -751,6 +751,8 @@ export function useClipper() {
     end,
     validationError,
     loadInfo,
+    searchNow,
+    flushAutoLoad,
     download,
     pasteInto,
     setStartFromSeconds,
