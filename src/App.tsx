@@ -320,36 +320,13 @@ function TabReporter({ id }: { id: string }) {
   return null;
 }
 
-function ClipEmptyState() {
-  const { loadingInfo } = useClipperContext();
-  return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-      <div className="rounded-panel border border-dashed border-hairline px-8 py-10">
-        <p className="text-[15px] font-medium text-fg">
-          {loadingInfo ? "Loading video…" : "Paste a YouTube link to start"}
-        </p>
-        <p className="mt-1 text-[12px] text-fg-faint">
-          {loadingInfo
-            ? "Fetching title, duration and formats."
-            : "It loads automatically — no need to press Enter."}
-        </p>
-        <p className="mt-4 text-[11px] text-fg-faint">
-          Tip: press <span className="kbd">⌘L</span> to focus the URL bar.
-        </p>
-      </div>
-      <ErrorBanner />
-    </div>
-  );
-}
-
 function Layout({ active }: { active: boolean }) {
-  const { info, loadingInfo, exportingComments } = useClipperContext();
+  const { exportingComments } = useClipperContext();
   const [mode, setMode] = useState<Mode>("clip");
   // Loading video info now renders inline; the overlay is reserved for the
   // blocking comment export.
   const overlayVisible = active && exportingComments;
   const overlayLabel = "Exporting comments";
-  const hasVideo = Boolean(info);
 
   return (
     <>
@@ -369,11 +346,9 @@ function Layout({ active }: { active: boolean }) {
             </div>
 
             {/* Body */}
-            {!hasVideo ? (
-              <ClipEmptyState />
-            ) : (
-              <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-4 lg:grid-cols-2 lg:items-stretch lg:overflow-hidden lg:p-5">
-                <section className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:p-5">
+              <div className="grid shrink-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+                <section className="flex min-w-0 flex-col gap-3">
                   <Meta />
                   <TimeRangeControls />
                   <FormatQualityFields />
@@ -381,14 +356,16 @@ function Layout({ active }: { active: boolean }) {
                   <ErrorBanner />
                 </section>
 
-                <section className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
-                  <div className="shrink-0">
-                    <PreviewPanel />
-                  </div>
-                  <TranscriptDock />
+                <section className="flex min-w-0 flex-col gap-3">
+                  <PreviewPanel />
                 </section>
               </div>
-            )}
+
+              <div className="flex min-h-[180px] w-full flex-col">
+                <TranscriptDock />
+              </div>
+            </div>
+
 
             <div className="shrink-0">
               <FooterBar />
