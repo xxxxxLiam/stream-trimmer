@@ -5,7 +5,6 @@
  */
 import { useCallback, useRef, useState } from "react";
 import { apiUrl, parseJson } from "../lib/clip";
-import type { CookieBrowser } from "../lib/clip";
 import {
   buildExportFiles,
   buildExportFolderName,
