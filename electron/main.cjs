@@ -482,18 +482,35 @@ function registerIpc() {
   // owned by the app, then writes a cookies.txt yt-dlp can consume.
   ipcMain.handle("youtube:connect", async () => {
     try {
-      return await youtubeSession.openLoginWindow(mainWindow, async (cookieFile) => {
-        if (!backendBaseUrl) return false;
-        const response = await fetch(`${backendBaseUrl}/api/auth/youtube/status`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cookieFile }),
-        });
-        if (!response.ok) return false;
-        const result = await response.json();
-        return result && result.status === "signed_in";
-      });
+      return await youtubeSession.openLoginWindow(
+        mainWindow,
+        async (cookieFile) => {
+          if (!backendBaseUrl) return false;
+          try {
+            const response = await fetch(
+              `${backendBaseUrl}/api/auth/youtube/status`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ cookieFile }),
+                signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
+              },
+            );
+            if (!response.ok) {
+              logger.log("youtube", `verify http ${response.status}`);
+              return false;
+            }
+            const result = await response.json();
+            return !!result && result.status === "signed_in";
+          } catch (err) {
+            logger.log("youtube", `verify failed: ${logger.describe(err)}`);
+            return false;
+          }
+        },
+        (message) => logger.log("youtube", message),
+      );
     } catch (err) {
+      logger.log("youtube", `connect failed: ${logger.describe(err)}`);
       return {
         connected: false,
         path: null,
@@ -501,6 +518,7 @@ function registerIpc() {
       };
     }
   });
+
 
   ipcMain.handle("youtube:probe", async () => youtubeSession.probe());
 
