@@ -27,6 +27,8 @@ export interface YouTubeConnectionState {
   /** Status of the last browser-fallback probe. */
   browserStatus: YouTubeAuthState;
   busy: boolean;
+  /** Short progress line shown while connecting. */
+  step?: string;
   message?: string;
   /** True once the launch probe has run. */
   probed: boolean;
@@ -188,45 +190,27 @@ export function setBrowser(browser: CookieBrowser): void {
   });
 }
 
-/** Fallback path: probe the external browser's cookie store. */
-export async function checkBrowserSession(): Promise<YouTubeAuthState> {
-  set({ busy: true, browserStatus: "checking", message: undefined });
+/** Fallback path: probe one external browser's cookie store. */
+export async function checkBrowserSession(
+  browser: CookieBrowser = state.browser,
+): Promise<{ status: YouTubeAuthState; message?: string }> {
   try {
     const res = await fetch(apiUrl("/api/auth/youtube/status"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ browser: state.browser }),
+      body: JSON.stringify({ browser }),
     });
     const data = await parseJson<{
       status: YouTubeAuthState;
       browser: CookieBrowser;
       message?: string;
     }>(res);
-    if (data.status === "signed_in") {
-      set({
-        busy: false,
-        connected: true,
-        mode: "browser",
-        cookieFile: null,
-        browser: data.browser ?? state.browser,
-        browserStatus: "signed_in",
-        message: undefined,
-      });
-      return "signed_in";
-    }
-    set({
-      busy: false,
-      browserStatus: data.status ?? "extractor_error",
-      message: data.message,
-    });
-    return data.status ?? "extractor_error";
+    return { status: data.status ?? "extractor_error", message: data.message };
   } catch {
-    set({
-      busy: false,
-      browserStatus: "extractor_error",
+    return {
+      status: "extractor_error",
       message: "Couldn't reach the local backend.",
-    });
-    return "extractor_error";
+    };
   }
 }
 
@@ -239,4 +223,68 @@ export async function openExternalSignIn(): Promise<void> {
   }
   set({ browserStatus: "ready" });
 }
+
+/**
+ * The one and only connect action. Tries the in-app sign-in window first
+ * (desktop), then silently sweeps every supported browser's cookie store and
+ * connects with the first one that reports a signed-in session.
+ */
+export async function connect(): Promise<boolean> {
+  if (state.busy) return state.connected;
+  set({ busy: true, message: undefined, step: undefined });
+
+  if (isElectron && window.electronAPI?.youtubeConnect) {
+    set({ step: "Opening sign-in…" });
+    try {
+      const result = await window.electronAPI.youtubeConnect();
+      if (result.connected) {
+        set({
+          busy: false,
+          step: undefined,
+          connected: true,
+          mode: "app",
+          cookieFile: result.path ?? null,
+          message: undefined,
+        });
+        return true;
+      }
+    } catch {
+      /* fall through to the browser sweep */
+    }
+  }
+
+  // Preferred browser first, then the rest.
+  const order = [state.browser, ...BROWSERS.filter((b) => b !== state.browser)];
+  let locked = false;
+  for (const browser of order) {
+    set({ step: `Checking ${browser}…`, browserStatus: "checking" });
+    const { status } = await checkBrowserSession(browser);
+    if (status === "signed_in") {
+      writeSetting("clipper.cookieBrowser", browser);
+      set({
+        busy: false,
+        step: undefined,
+        connected: true,
+        mode: "browser",
+        cookieFile: null,
+        browser,
+        browserStatus: "signed_in",
+        message: undefined,
+      });
+      return true;
+    }
+    if (status === "locked") locked = true;
+  }
+
+  set({
+    busy: false,
+    step: undefined,
+    browserStatus: "signed_out",
+    message: locked
+      ? "A browser's cookie store is locked. Fully quit it (Chrome: Quit, not just close the window) and try again."
+      : "No signed-in YouTube session found. Sign in to YouTube in your browser, then try again.",
+  });
+  return false;
+}
+
 

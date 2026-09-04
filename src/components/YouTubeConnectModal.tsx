@@ -1,27 +1,18 @@
 /**
  * File: YouTubeConnectModal.tsx
  * Path: src/components/YouTubeConnectModal.tsx
- * Description: Connection prompt — one-click in-app YouTube sign-in, with the
- * browser-cookie flow kept as a secondary fallback. Cookie contents never
- * enter the renderer; only a status and a file path do.
+ * Description: Connection prompt — a single Connect YouTube button that tries
+ * the in-app sign-in window and then sweeps the installed browsers' sessions.
+ * Cookie contents never enter the renderer; only a status and a file path do.
  */
-import { useState } from "react";
 import {
   ArrowRepeat,
-  BoxArrowUpRight,
   CheckCircleFill,
   ExclamationTriangleFill,
   X,
 } from "react-bootstrap-icons";
 import type { CookieBrowser } from "../lib/clip";
-import {
-  checkBrowserSession,
-  connectInApp,
-  disconnect,
-  openExternalSignIn,
-  setBrowser,
-  useYouTubeConnection,
-} from "../lib/youtubeConnection";
+import { connect, disconnect, useYouTubeConnection } from "../lib/youtubeConnection";
 
 const BROWSER_LABELS: Record<CookieBrowser, string> = {
   chrome: "Chrome",
@@ -40,14 +31,11 @@ export default function YouTubeConnectModal({
   onClose: () => void;
 }) {
   const state = useYouTubeConnection();
-  const [showFallback, setShowFallback] = useState(false);
-  const isElectron =
-    typeof window !== "undefined" && !!window.electronAPI?.isElectron;
 
   if (!open) return null;
 
   const handleConnect = async () => {
-    const ok = await connectInApp();
+    const ok = await connect();
     if (ok) onClose();
   };
 
@@ -82,14 +70,14 @@ export default function YouTubeConnectModal({
           </div>
         ) : null}
 
-        {state.message ? (
+        {!state.connected && state.message ? (
           <div className="mt-4 flex items-start gap-2 rounded-chip bg-bg-deep/40 px-3 py-2 text-[12px] text-amber-400">
             <ExclamationTriangleFill className="mt-0.5 shrink-0" size={12} />
             <span>{state.message}</span>
           </div>
         ) : null}
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div className="mt-5 flex items-center gap-3">
           {state.connected ? (
             <button
               type="button"
@@ -100,75 +88,22 @@ export default function YouTubeConnectModal({
             </button>
           ) : (
             <>
-              {isElectron ? (
-                <button
-                  type="button"
-                  className="btn-primary flex items-center gap-2"
-                  disabled={state.busy}
-                  onClick={() => void handleConnect()}
-                >
-                  {state.busy ? (
-                    <ArrowRepeat className="animate-spin" size={12} />
-                  ) : null}
-                  Connect YouTube
-                </button>
+              <button
+                type="button"
+                className="btn-primary flex items-center gap-2"
+                disabled={state.busy}
+                onClick={() => void handleConnect()}
+              >
+                {state.busy ? (
+                  <ArrowRepeat className="animate-spin" size={12} />
+                ) : null}
+                Connect YouTube
+              </button>
+              {state.busy && state.step ? (
+                <span className="text-[11px] text-fg-faint">{state.step}</span>
               ) : null}
             </>
           )}
-        </div>
-
-        <div className="mt-5 border-t border-hairline pt-3">
-          <button
-            type="button"
-            className="text-[11px] text-fg-faint hover:text-fg-muted"
-            onClick={() => setShowFallback((v) => !v)}
-          >
-            {showFallback ? "Hide" : "Use my browser's session instead"}
-          </button>
-
-          {showFallback ? (
-            <div className="mt-3 flex flex-col gap-2">
-              <label className="flex items-center gap-2 text-[12px] text-fg-muted">
-                Browser
-                <select
-                  className="field appearance-none cursor-pointer"
-                  value={state.browser}
-                  onChange={(e) =>
-                    setBrowser(e.target.value as CookieBrowser)
-                  }
-                >
-                  {(
-                    Object.keys(BROWSER_LABELS) as CookieBrowser[]
-                  ).map((b) => (
-                    <option key={b} value={b}>
-                      {BROWSER_LABELS[b]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="btn flex items-center gap-1.5"
-                  onClick={() => void openExternalSignIn()}
-                >
-                  <BoxArrowUpRight size={11} />
-                  Open YouTube
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={state.busy}
-                  onClick={() => void checkBrowserSession()}
-                >
-                  Check session
-                </button>
-              </div>
-              <p className="text-[11px] leading-relaxed text-fg-faint">
-                Fully quit the browser first if its cookie store is locked.
-              </p>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
