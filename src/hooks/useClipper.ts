@@ -564,16 +564,33 @@ export function useClipper() {
       // below the requested height, in which case the clip is still valid.
       const deliveredHeight = Number(res.headers.get("X-Delivered-Height"));
       const deliveredKbps = Number(res.headers.get("X-Delivered-Audio-Kbps"));
+      const availableHeights = (res.headers.get("X-Available-Heights") || "")
+        .split(",")
+        .map((h) => Number(h))
+        .filter((h) => h > 0);
+      const authMode = res.headers.get("X-Auth-Mode") || "";
       const requestedHeight = Number(quality);
       let detail: string | undefined;
       if (format === "mp3") {
         detail = deliveredKbps ? `Downloaded at ${deliveredKbps} kbps.` : undefined;
       } else if (deliveredHeight) {
-        detail =
-          requestedHeight && deliveredHeight < requestedHeight
-            ? `Downloaded at ${deliveredHeight}p — ${requestedHeight}p isn't available for this video.`
-            : `Downloaded at ${deliveredHeight}p.`;
+        if (requestedHeight && deliveredHeight < requestedHeight) {
+          const offered = availableHeights.length
+            ? ` YouTube offered ${availableHeights
+                .slice(0, 6)
+                .map((h) => `${h}p`)
+                .join(", ")}.`
+            : "";
+          const signedOut =
+            authMode === "none"
+              ? " This download ran without a YouTube sign-in."
+              : "";
+          detail = `Downloaded at ${deliveredHeight}p instead of ${requestedHeight}p.${offered}${signedOut}`;
+        } else {
+          detail = `Downloaded at ${deliveredHeight}p.`;
+        }
       }
+
       if (isElectron && window.electronAPI && saveDir) {
         const arr = await blob.arrayBuffer();
         const result = await window.electronAPI.saveFile({

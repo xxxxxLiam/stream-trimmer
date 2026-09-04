@@ -775,10 +775,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
   }: DownloadInput = parsed.data;
   // Either the app-managed cookies.txt (in-app sign-in) or a browser name.
   // Cookie contents are never read or logged by this process.
-  const cookieOptions: Record<string, unknown> = resolveCookieOptions(
+  let cookieOptions: Record<string, unknown> = resolveCookieOptions(
     cookieFile,
     cookiesFromBrowser,
   );
+  let cookieMode: "app" | "browser" | "none" = cookieFile
+    ? "app"
+    : cookiesFromBrowser
+      ? "browser"
+      : "none";
+  console.log(`[server] /api/download auth mode=${cookieMode}`);
 
   const jobId =
     typeof req.query.jobId === "string" && req.query.jobId
@@ -786,20 +792,50 @@ app.post("/api/download", async (req: Request, res: Response) => {
       : `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   // Re-probe duration so the cap can't be bypassed by a crafted request.
-  const probeOptions: Record<string, unknown> = {
+  // Doubles as the source of truth for which heights YouTube actually offers.
+  let availableHeights: number[] = [];
+  const probeWith = (opts: Record<string, unknown>) => ({
     dumpSingleJson: true,
     noWarnings: true,
     noPlaylist: true,
-    ...cookieOptions,
+    ...opts,
+  });
+  let probeOptions: Record<string, unknown> = probeWith(cookieOptions);
+  const runProbe = async (opts: Record<string, unknown>) => {
+    console.log(
+      `[server] /api/download probe url=${url} options=${JSON.stringify(opts)}`,
+    );
+    return yt!.run(url, opts, { env: childEnv() } as any);
   };
   try {
-    console.log(
-      `[server] /api/download probe url=${url} options=${JSON.stringify(probeOptions)}`,
-    );
-    const info = await yt!.run(url, probeOptions, { env: childEnv() } as any);
+    let info: any;
+    try {
+      info = await runProbe(probeOptions);
+    } catch (first) {
+      // An app cookies.txt that YouTube no longer accepts must not silently
+      // downgrade the download — retry with the browser session, then bare.
+      if (cookieMode !== "app") throw first;
+      console.warn(
+        "[server] app cookie file rejected — retrying with browser session/none",
+      );
+      cookieOptions = cookiesFromBrowser ? { cookiesFromBrowser } : {};
+      cookieMode = cookiesFromBrowser ? "browser" : "none";
+      probeOptions = probeWith(cookieOptions);
+      info = await runProbe(probeOptions);
+    }
     if (typeof info.duration === "number" && end > info.duration + 1) {
       return res.status(400).json({ error: "End exceeds video duration" });
     }
+    availableHeights = Array.from(
+      new Set(
+        (Array.isArray(info.formats) ? info.formats : [])
+          .map((f: { height?: number | null }) => Number(f?.height) || 0)
+          .filter((h: number) => h > 0),
+      ),
+    ).sort((a, b) => (b as number) - (a as number)) as number[];
+    console.log(
+      `[server] /api/download available heights=${availableHeights.join(",") || "unknown"}`,
+    );
   } catch (e) {
     if (cookiesFromBrowser && isCookieError(e)) {
       return res
@@ -809,6 +845,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     logYtError("/api/download probe", url, probeOptions, e);
     return res.status(400).json({ error: fullErrMessage(e) });
   }
+
 
   const isAudio = format === "mp3";
   const ext = isAudio ? "mp3" : "mp4";
@@ -827,13 +864,34 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // to that client's session so ffmpeg's range requests get 403'd. HLS (m3u8)
   // and progressive formats are still served to web clients and work fine with
   // --download-sections. But preferring HLS unconditionally silently caps
-  // quality on videos whose HLS ladder tops out below the requested height, so
-  // each tier offers an HLS candidate AND a DASH candidate at the requested
-  // height before degrading to a lower resolution.
+  // quality: a 720p HLS rendition would beat a 1080p DASH one. So resolution
+  // is the primary key — the exact requested height is tried on HLS *and*
+  // DASH before anything lower, and only then does protocol preference apply.
   const videoFormat =
     quality === "best"
-      ? "bestvideo[protocol*=m3u8]+bestaudio[protocol*=m3u8]/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/best[protocol*=m3u8]/best[ext=mp4]/best"
-      : `bestvideo[height<=${quality}][protocol*=m3u8]+bestaudio[protocol*=m3u8]/bestvideo[height<=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/best[protocol*=m3u8][height<=${quality}]/best[ext=mp4][height<=${quality}]/best[height<=${quality}]`;
+      ? [
+          "bestvideo[protocol*=m3u8]+bestaudio[protocol*=m3u8]",
+          "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]",
+          "bestvideo+bestaudio",
+          "best[protocol*=m3u8]",
+          "best[ext=mp4]",
+          "best",
+        ].join("/")
+      : [
+          // Exact requested height first, either protocol.
+          `bestvideo[height=${quality}][protocol*=m3u8]+bestaudio[protocol*=m3u8]`,
+          `bestvideo[height=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]`,
+          `bestvideo[height=${quality}]+bestaudio`,
+          `best[height=${quality}]`,
+          // Then step down.
+          `bestvideo[height<=${quality}][protocol*=m3u8]+bestaudio[protocol*=m3u8]`,
+          `bestvideo[height<=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]`,
+          `bestvideo[height<=${quality}]+bestaudio`,
+          `best[protocol*=m3u8][height<=${quality}]`,
+          `best[ext=mp4][height<=${quality}]`,
+          `best[height<=${quality}]`,
+        ].join("/");
+
 
   // Attempt 1 pins web-based clients only. ANDROID_VR is kept out here because
   // its URLs are exactly the ones that 403 under ffmpeg; it is reintroduced in
@@ -915,7 +973,15 @@ app.post("/api/download", async (req: Request, res: Response) => {
   };
   const hmsToSeconds = (h: string, m: string, s: string) =>
     Number(h) * 3600 + Number(m) * 60 + parseFloat(s);
+  // yt-dlp announces its pick as "Downloading 1 format(s): 299+140" — keep it
+  // so a silent quality downgrade is diagnosable from the log and the client.
+  let chosenFormat = "";
   const updateFromLine = (line: string) => {
+    const fm = line.match(/Downloading\s+\d+\s+format\(s\):\s*([\w+\-.,]+)/);
+    if (fm) {
+      chosenFormat = fm[1];
+      console.log(`[server] yt-dlp selected format(s)=${chosenFormat}`);
+    }
     const tm = line.match(/time=\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/);
     if (tm) {
       const secs = hmsToSeconds(tm[1], tm[2], tm[3]);
@@ -927,6 +993,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     const dm = line.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
     if (dm) report(parseFloat(dm[1]) / 100);
   };
+
 
   // Spawn a child and stream its output through updateFromLine, rejecting with
   // the trimmed stderr tail on non-zero exit.
@@ -1088,10 +1155,18 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (delivered.audioKbps) {
       res.setHeader("X-Delivered-Audio-Kbps", String(delivered.audioKbps));
     }
+    if (chosenFormat) res.setHeader("X-Selected-Format", chosenFormat);
+    if (availableHeights.length)
+      res.setHeader("X-Available-Heights", availableHeights.join(","));
+    res.setHeader("X-Auth-Mode", cookieMode);
+    console.log(
+      `[server] /api/download done job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode}`,
+    );
     res.setHeader(
       "Access-Control-Expose-Headers",
-      "X-Delivered-Height, X-Delivered-Audio-Kbps",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode",
     );
+
 
     const stat = fs.statSync(outputPath);
     const name = `clip.${ext}`;
