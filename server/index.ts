@@ -775,10 +775,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
   }: DownloadInput = parsed.data;
   // Either the app-managed cookies.txt (in-app sign-in) or a browser name.
   // Cookie contents are never read or logged by this process.
-  const cookieOptions: Record<string, unknown> = resolveCookieOptions(
+  let cookieOptions: Record<string, unknown> = resolveCookieOptions(
     cookieFile,
     cookiesFromBrowser,
   );
+  let cookieMode: "app" | "browser" | "none" = cookieFile
+    ? "app"
+    : cookiesFromBrowser
+      ? "browser"
+      : "none";
+  console.log(`[server] /api/download auth mode=${cookieMode}`);
 
   const jobId =
     typeof req.query.jobId === "string" && req.query.jobId
@@ -786,20 +792,50 @@ app.post("/api/download", async (req: Request, res: Response) => {
       : `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   // Re-probe duration so the cap can't be bypassed by a crafted request.
-  const probeOptions: Record<string, unknown> = {
+  // Doubles as the source of truth for which heights YouTube actually offers.
+  let availableHeights: number[] = [];
+  const probeWith = (opts: Record<string, unknown>) => ({
     dumpSingleJson: true,
     noWarnings: true,
     noPlaylist: true,
-    ...cookieOptions,
+    ...opts,
+  });
+  let probeOptions: Record<string, unknown> = probeWith(cookieOptions);
+  const runProbe = async (opts: Record<string, unknown>) => {
+    console.log(
+      `[server] /api/download probe url=${url} options=${JSON.stringify(opts)}`,
+    );
+    return yt!.run(url, opts, { env: childEnv() } as any);
   };
   try {
-    console.log(
-      `[server] /api/download probe url=${url} options=${JSON.stringify(probeOptions)}`,
-    );
-    const info = await yt!.run(url, probeOptions, { env: childEnv() } as any);
+    let info: any;
+    try {
+      info = await runProbe(probeOptions);
+    } catch (first) {
+      // An app cookies.txt that YouTube no longer accepts must not silently
+      // downgrade the download — retry with the browser session, then bare.
+      if (cookieMode !== "app") throw first;
+      console.warn(
+        "[server] app cookie file rejected — retrying with browser session/none",
+      );
+      cookieOptions = cookiesFromBrowser ? { cookiesFromBrowser } : {};
+      cookieMode = cookiesFromBrowser ? "browser" : "none";
+      probeOptions = probeWith(cookieOptions);
+      info = await runProbe(probeOptions);
+    }
     if (typeof info.duration === "number" && end > info.duration + 1) {
       return res.status(400).json({ error: "End exceeds video duration" });
     }
+    availableHeights = Array.from(
+      new Set(
+        (Array.isArray(info.formats) ? info.formats : [])
+          .map((f: { height?: number | null }) => Number(f?.height) || 0)
+          .filter((h: number) => h > 0),
+      ),
+    ).sort((a, b) => (b as number) - (a as number)) as number[];
+    console.log(
+      `[server] /api/download available heights=${availableHeights.join(",") || "unknown"}`,
+    );
   } catch (e) {
     if (cookiesFromBrowser && isCookieError(e)) {
       return res
@@ -809,6 +845,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     logYtError("/api/download probe", url, probeOptions, e);
     return res.status(400).json({ error: fullErrMessage(e) });
   }
+
 
   const isAudio = format === "mp3";
   const ext = isAudio ? "mp3" : "mp4";
