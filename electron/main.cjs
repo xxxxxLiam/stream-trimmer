@@ -389,7 +389,6 @@ function registerIpc() {
   // Native OS drag-out. Must be ipcMain.on (not handle): startDrag has to run
   // synchronously inside the drag gesture or the OS drops it.
   ipcMain.on("file:startDrag", (event, targetPath) => {
-    void 0;
     try {
       if (typeof targetPath !== "string" || !targetPath) return;
       if (!fs.existsSync(targetPath)) return;
