@@ -387,38 +387,15 @@ function registerIpc() {
       if (!fs.existsSync(targetPath)) return;
 
       // Windows silently cancels a drag with a missing/empty icon, so always
-      // resolve to a real image: video thumbnail when possible, app icon else.
-      let icon = null;
-      try {
-        icon = nativeImage.createThumbnailFromPathSync
-          ? nativeImage.createThumbnailFromPathSync(targetPath, {
-              width: 96,
-              height: 96,
-            })
-          : null;
-      } catch {
-        icon = null;
-      }
-      if (!icon || icon.isEmpty()) {
-        try {
-          const fallback = path.join(__dirname, "icon.png");
-          if (fs.existsSync(fallback)) {
-            icon = nativeImage
-              .createFromPath(fallback)
-              .resize({ width: 64, height: 64 });
-          }
-        } catch {
-          icon = null;
-        }
-      }
-      if (!icon || icon.isEmpty()) {
-        // Last resort: a 1x1 transparent bitmap keeps the API happy.
-        icon = nativeImage.createEmpty();
-      }
-
-      event.sender.startDrag({ file: targetPath, icon });
+      // hand over a real image. Per-file thumbnails are deliberately not used:
+      // nativeImage.createThumbnailFromPath is async and startDrag must resolve
+      // its icon synchronously inside the gesture. The app icon is cached once.
+      event.sender.startDrag({ file: targetPath, icon: getDragIcon() });
     } catch (err) {
-      log("startDrag failed:", err && err.message ? err.message : err);
+      console.error(
+        "[electron] startDrag failed:",
+        err && err.message ? err.message : err,
+      );
     }
   });
 
