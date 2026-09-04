@@ -12,6 +12,7 @@ import {
   ChevronBarRight,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
+import { useIsTabActive } from "../context/WorkspaceContext";
 import { formatTimestamp } from "../lib/clip";
 
 export default function TranscriptPanel({
