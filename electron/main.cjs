@@ -491,7 +491,8 @@ function registerIpc() {
       return await youtubeSession.openLoginWindow(
         mainWindow,
         async (cookieFile) => {
-          if (!backendBaseUrl) return false;
+          if (!backendBaseUrl)
+            return { ok: false, message: "The local engine is not running yet." };
           try {
             const response = await fetch(
               `${backendBaseUrl}/api/auth/youtube/status`,
@@ -502,15 +503,26 @@ function registerIpc() {
                 signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
               },
             );
+            const result = await response.json().catch(() => null);
             if (!response.ok) {
               logger.log("youtube", `verify http ${response.status}`);
-              return false;
+              return {
+                ok: false,
+                message:
+                  (result && (result.message || result.error)) ||
+                  `YouTube check failed (HTTP ${response.status}).`,
+              };
             }
-            const result = await response.json();
-            return !!result && result.status === "signed_in";
+            if (result && result.status === "signed_in") return { ok: true };
+            return {
+              ok: false,
+              message:
+                (result && (result.message || result.error)) ||
+                "YouTube did not accept this sign-in.",
+            };
           } catch (err) {
             logger.log("youtube", `verify failed: ${logger.describe(err)}`);
-            return false;
+            return { ok: false, message: logger.describe(err) };
           }
         },
         (message) => logger.log("youtube", message),

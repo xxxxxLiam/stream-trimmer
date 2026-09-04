@@ -70,7 +70,7 @@ export default function YouTubeConnectModal({
           </div>
         ) : null}
 
-        {!state.connected && state.message ? (
+        {state.message ? (
           <div className="mt-4 flex items-start gap-2 rounded-chip bg-bg-deep/40 px-3 py-2 text-[12px] text-amber-400">
             <ExclamationTriangleFill className="mt-0.5 shrink-0" size={12} />
             <span>{state.message}</span>
