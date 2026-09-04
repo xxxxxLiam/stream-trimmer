@@ -22,6 +22,10 @@ const fsp = require("node:fs/promises");
 // the resulting error gracefully instead of crashing.
 const { autoUpdater } = require("electron-updater");
 const youtubeSession = require("./youtubeSession.cjs");
+const logger = require("./logger.cjs");
+
+// Hard limit for the "Verifying YouTube…" step, in ms.
+const VERIFY_TIMEOUT_MS = 20000;
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
@@ -294,14 +298,16 @@ app.on("second-instance", () => {
 
 app.whenReady().then(async () => {
   try {
+    logger.installCrashHandlers();
     createSplash();
     const port = await startBackend();
     await createWindow(port);
+    logger.watchWindow("main", mainWindow);
     loadSettings();
     registerIpc();
     setupAutoUpdater();
   } catch (err) {
-    console.error("[electron] failed to start:", err);
+    logger.log("app", `failed to start: ${logger.describe(err)}`);
     closeSplash();
     app.quit();
   }
