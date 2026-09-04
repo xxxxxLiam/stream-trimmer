@@ -38,6 +38,14 @@ import UpdateStatus from "./components/UpdateStatus";
 import DragOutHandle from "./components/DragOutHandle";
 import { formatTimestamp } from "./lib/clip";
 import { formatBytes } from "./lib/clip";
+import YouTubeStatusChip from "./components/YouTubeStatusChip";
+import YouTubeConnectModal from "./components/YouTubeConnectModal";
+import {
+  isConnected,
+  isPromptSuppressed,
+  probeConnection,
+  useYouTubeConnection,
+} from "./lib/youtubeConnection";
 
 function Meta() {
   const { info, duration, loadingInfo } = useClipperContext();
@@ -409,7 +417,7 @@ function Shell() {
     let cancelled = false;
     void probeConnection().then(() => {
       if (cancelled) return;
-      if (!isPromptSuppressed()) setConnectOpen((open) => open || !connectedNow());
+      if (!isPromptSuppressed() && !isConnected()) setConnectOpen(true);
     });
     return () => {
       cancelled = true;

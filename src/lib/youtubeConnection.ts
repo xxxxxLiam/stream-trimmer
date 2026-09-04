@@ -83,6 +83,11 @@ export function useYouTubeConnection(): YouTubeConnectionState {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
+/** Current connection flag, readable outside React. */
+export function isConnected(): boolean {
+  return state.connected;
+}
+
 /** Cookie options for an API request, or {} when not connected. */
 export function cookiePayload(): CookiePayload {
   if (!state.connected) return {};
