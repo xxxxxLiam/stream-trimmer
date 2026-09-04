@@ -85,21 +85,23 @@ export default function TranscriptPanel({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 items-center gap-3">
-        <span className="min-w-0 truncate text-[12px] text-fg-muted">
-          {info ? info.title : "Load a video in the Clip tab first"}
-        </span>
-        <button
-          type="button"
-          onClick={copyTranscript}
-          disabled={rangeTranscript.length === 0}
-          className="btn ml-auto shrink-0 text-[12px]"
-          title="Copy the transcript for the selected range"
-        >
-          <ClipboardCheck size={12} />
-          <span>Copy selection</span>
-        </button>
-      </div>
+      {!compact && (
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="min-w-0 truncate text-[12px] text-fg-muted">
+            {info ? info.title : "Load a video in the Clip tab first"}
+          </span>
+          <button
+            type="button"
+            onClick={copyTranscript}
+            disabled={rangeTranscript.length === 0}
+            className="btn ml-auto shrink-0 text-[12px]"
+            title="Copy the transcript for the selected range"
+          >
+            <ClipboardCheck size={12} />
+            <span>Copy selection</span>
+          </button>
+        </div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 4 }}
@@ -111,12 +113,14 @@ export default function TranscriptPanel({
           <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-bg-deep/40 px-3 py-2">
             <Search size={12} className="text-fg-faint" />
             <input
+              ref={searchRef}
               type="text"
               value={transcriptQuery}
               onChange={(e) => setTranscriptQuery(e.target.value)}
               placeholder="Search transcript…"
               className="min-w-0 flex-1 bg-transparent text-[12px] text-fg outline-none"
             />
+
             {transcriptQuery && (
               <button
                 type="button"
