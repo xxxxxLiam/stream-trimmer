@@ -400,12 +400,30 @@ function Layout({ active }: { active: boolean }) {
 
 function Shell() {
   const { tabs, activeId } = useWorkspace();
+  const [connectOpen, setConnectOpen] = useState(false);
+  const connection = useYouTubeConnection();
+
+  // One silent probe per launch, shared by every workspace tab. When it comes
+  // back negative we prompt once, unless the user asked us not to.
+  useEffect(() => {
+    let cancelled = false;
+    void probeConnection().then(() => {
+      if (cancelled) return;
+      if (!isPromptSuppressed()) setConnectOpen((open) => open || !connectedNow());
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Runs once on mount; probeConnection guards against repeats itself.
+  }, []);
+
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-panel">
       {/* Title bar with workspace tabs */}
       <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-3 py-1.5">
         <WorkspaceTabs />
         <div className="ml-auto flex shrink-0 items-center gap-3">
+          <YouTubeStatusChip onOpen={() => setConnectOpen(true)} />
           <UpdateStatus />
           <span className="text-[11px] text-fg-faint">Local · Private</span>
         </div>
@@ -432,9 +450,15 @@ function Shell() {
           );
         })}
       </div>
+
+      <YouTubeConnectModal
+        open={connectOpen && !connection.connected}
+        onClose={() => setConnectOpen(false)}
+      />
     </div>
   );
 }
+
 
 export default function App() {
   return (
