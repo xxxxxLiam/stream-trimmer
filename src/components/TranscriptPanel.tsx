@@ -42,6 +42,24 @@ export default function TranscriptPanel({
     if (info) ensureTranscript();
   }, [info, ensureTranscript]);
 
+  // Cmd/Ctrl+F focuses the transcript search box while this panel is mounted.
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const isTabActive = useIsTabActive();
+  useEffect(() => {
+    if (!isTabActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        if (!searchRef.current) return;
+        e.preventDefault();
+        searchRef.current.focus();
+        searchRef.current.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isTabActive]);
+
+
   const firstInRangeRef = useRef<HTMLDivElement | null>(null);
   const firstInRangeKey = displayTranscript.find(
     (l) => l.end > start && l.start < end,
