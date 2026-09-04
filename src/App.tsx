@@ -57,11 +57,18 @@ function Meta() {
             {formatTimestamp(duration)}
           </span>
         </motion.div>
+      ) : loadingInfo ? (
+        <div className="flex items-center gap-2 rounded-row bg-panel-hover px-3 py-2">
+          <div className="h-3 w-1/2 animate-pulse rounded-chip bg-hairlineStrong" />
+          <div className="ml-auto h-3 w-10 animate-pulse rounded-chip bg-hairlineStrong" />
+        </div>
       ) : (
-        <div className="rounded-row border border-dashed border-hairline px-3 py-2 text-[12px] text-fg-faint">
-          Paste a YouTube URL and press Search to begin
+        <div className="flex items-center gap-2 rounded-row bg-panel-hover px-3 py-2 text-[12px] text-fg-faint">
+          <span className="truncate">No video loaded</span>
+          <span className="ml-auto shrink-0 tabular-nums">--:--</span>
         </div>
       )}
+
     </AnimatePresence>
   );
 }
