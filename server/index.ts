@@ -973,7 +973,15 @@ app.post("/api/download", async (req: Request, res: Response) => {
   };
   const hmsToSeconds = (h: string, m: string, s: string) =>
     Number(h) * 3600 + Number(m) * 60 + parseFloat(s);
+  // yt-dlp announces its pick as "Downloading 1 format(s): 299+140" — keep it
+  // so a silent quality downgrade is diagnosable from the log and the client.
+  let chosenFormat = "";
   const updateFromLine = (line: string) => {
+    const fm = line.match(/Downloading\s+\d+\s+format\(s\):\s*([\w+\-.,]+)/);
+    if (fm) {
+      chosenFormat = fm[1];
+      console.log(`[server] yt-dlp selected format(s)=${chosenFormat}`);
+    }
     const tm = line.match(/time=\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/);
     if (tm) {
       const secs = hmsToSeconds(tm[1], tm[2], tm[3]);
@@ -985,6 +993,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     const dm = line.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
     if (dm) report(parseFloat(dm[1]) / 100);
   };
+
 
   // Spawn a child and stream its output through updateFromLine, rejecting with
   // the trimmed stderr tail on non-zero exit.
