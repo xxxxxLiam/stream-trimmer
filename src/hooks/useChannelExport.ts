@@ -18,6 +18,7 @@ import {
 } from "../lib/channel";
 import { CHANNEL_PASSCODE_HASH } from "../lib/channelLock";
 import { addDownload } from "../lib/downloads";
+import { cookiePayload } from "../lib/youtubeConnection";
 
 export interface ChannelExportResult {
   folder: string;
@@ -31,9 +32,8 @@ export interface ChannelExportResult {
 export function useChannelExport(options: {
   isElectron: boolean;
   saveDir: string | null;
-  cookiesFromBrowser?: CookieBrowser;
 }) {
-  const { isElectron, saveDir, cookiesFromBrowser } = options;
+  const { isElectron, saveDir } = options;
 
   const [channelUrl, setChannelUrl] = useState("");
   const [contentType, setContentType] = useState<ChannelContentType>("all");
@@ -118,7 +118,7 @@ export function useChannelExport(options: {
             limit: safeLimit,
             includeComments,
             includeTranscripts,
-            ...(cookiesFromBrowser ? { cookiesFromBrowser } : {}),
+            ...cookiePayload(),
           }),
         },
       );
@@ -184,7 +184,6 @@ export function useChannelExport(options: {
     limit,
     includeComments,
     includeTranscripts,
-    cookiesFromBrowser,
     isElectron,
     saveDir,
   ]);
