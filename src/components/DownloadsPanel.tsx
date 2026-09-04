@@ -14,6 +14,7 @@ import {
   X,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
+import DragOutHandle from "./DragOutHandle";
 import type { DownloadEntry } from "../lib/downloads";
 
 function formatWhen(ts: number): string {
