@@ -160,6 +160,7 @@ function openLoginWindow(parent, validate, onEvent) {
     trace("sign-in window opened");
 
     let settled = false;
+    let lastError = null;
     let destroyed = false;
     let timer = null;
     let validationInFlight = false;
@@ -206,6 +207,7 @@ function openLoginWindow(parent, validate, onEvent) {
         connected: saved,
         cancelled: !connected,
         path: saved ? cookieFilePath() : null,
+        error: saved ? undefined : lastError || undefined,
       });
     };
 
@@ -218,10 +220,19 @@ function openLoginWindow(parent, validate, onEvent) {
         trace("cookies found, verifying");
         setTitleSafely("Verifying YouTube…");
         const saved = await exportCookieFile();
-        const verified =
-          saved && typeof validate === "function"
-            ? await validate(cookieFilePath())
-            : saved;
+        let verified = saved;
+        if (saved && typeof validate === "function") {
+          const outcome = await validate(cookieFilePath());
+          if (outcome && typeof outcome === "object") {
+            verified = !!outcome.ok;
+            lastError = outcome.ok ? null : outcome.message || null;
+          } else {
+            verified = !!outcome;
+            if (!verified) lastError = null;
+          }
+        } else if (!saved) {
+          lastError = "YouTube did not hand over a usable session.";
+        }
         // The window may have been closed while verification was running.
         if (settled || !alive()) return;
         if (verified) {
@@ -232,6 +243,7 @@ function openLoginWindow(parent, validate, onEvent) {
         trace("verification rejected, staying open");
         setTitleSafely("Sign in to YouTube");
       } catch (err) {
+        lastError = err && err.message ? err.message : null;
         trace(`check failed: ${err && err.message ? err.message : "unknown"}`);
       } finally {
         validationInFlight = false;
