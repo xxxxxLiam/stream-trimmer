@@ -35,6 +35,7 @@ import DownloadsPanel from "./components/DownloadsPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DestinationSelector from "./components/DestinationSelector";
 import UpdateStatus from "./components/UpdateStatus";
+import DragOutHandle from "./components/DragOutHandle";
 import { formatTimestamp } from "./lib/clip";
 import { formatBytes } from "./lib/clip";
 
@@ -207,6 +208,11 @@ function SavedToast() {
           role="status"
         >
           <CheckCircleFill size={16} className="shrink-0 text-accent" />
+          <DragOutHandle
+            path={savedNotice.path}
+            isElectron={isElectron}
+            label={savedNotice.label}
+          />
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium text-fg">
               {savedNotice.kind === "comments"

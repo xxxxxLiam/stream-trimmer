@@ -35,6 +35,8 @@ interface ElectronAPI {
   showInFolder: (
     targetPath: string,
   ) => Promise<{ ok: boolean; error?: string }>;
+  fileExists?: (targetPath: string) => Promise<boolean>;
+  startDrag?: (targetPath: string) => void;
   openYouTubeSignIn: () => Promise<{ ok: boolean; error?: string }>;
   checkForUpdates: () => Promise<{
     ok: boolean;

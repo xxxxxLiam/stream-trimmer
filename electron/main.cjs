@@ -2,7 +2,14 @@
 // backend on a free port, loads the built front-end, and shuts everything
 // down cleanly on quit. No dev server ships; this file is CommonJS because
 // the project's package.json sets "type": "module".
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeImage,
+  shell,
+} = require("electron");
 const path = require("node:path");
 const net = require("node:net");
 const fs = require("node:fs");
@@ -16,6 +23,25 @@ const fsp = require("node:fs/promises");
 const { autoUpdater } = require("electron-updater");
 
 const isDev = process.env.ELECTRON_DEV === "1";
+
+// Drag icon for native file drag-out, resolved once and reused. startDrag
+// needs a non-empty icon synchronously or Windows cancels the drag outright.
+let dragIcon = null;
+function getDragIcon() {
+  if (dragIcon && !dragIcon.isEmpty()) return dragIcon;
+  try {
+    const iconPath = path.join(__dirname, "icon.png");
+    if (fs.existsSync(iconPath)) {
+      dragIcon = nativeImage
+        .createFromPath(iconPath)
+        .resize({ width: 64, height: 64 });
+    }
+  } catch {
+    dragIcon = null;
+  }
+  if (!dragIcon || dragIcon.isEmpty()) dragIcon = nativeImage.createEmpty();
+  return dragIcon;
+}
 
 // Single-instance lock — no duplicate backend, no duplicate window.
 if (!app.requestSingleInstanceLock()) {
@@ -366,6 +392,38 @@ function registerIpc() {
     }
   });
 
+
+  // Cheap existence probe so the Downloads list can dim rows whose file was
+  // moved or deleted outside the app.
+  ipcMain.handle("file:exists", (_e, targetPath) => {
+    try {
+      return typeof targetPath === "string" && targetPath
+        ? fs.existsSync(targetPath)
+        : false;
+    } catch {
+      return false;
+    }
+  });
+
+  // Native OS drag-out. Must be ipcMain.on (not handle): startDrag has to run
+  // synchronously inside the drag gesture or the OS drops it.
+  ipcMain.on("file:startDrag", (event, targetPath) => {
+    try {
+      if (typeof targetPath !== "string" || !targetPath) return;
+      if (!fs.existsSync(targetPath)) return;
+
+      // Windows silently cancels a drag with a missing/empty icon, so always
+      // hand over a real image. Per-file thumbnails are deliberately not used:
+      // nativeImage.createThumbnailFromPath is async and startDrag must resolve
+      // its icon synchronously inside the gesture. The app icon is cached once.
+      event.sender.startDrag({ file: targetPath, icon: getDragIcon() });
+    } catch (err) {
+      console.error(
+        "[electron] startDrag failed:",
+        err && err.message ? err.message : err,
+      );
+    }
+  });
 
   ipcMain.handle("file:showInFolder", (_e, targetPath) => {
     try {

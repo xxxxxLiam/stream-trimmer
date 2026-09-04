@@ -3,6 +3,7 @@
  * Path: src/components/DownloadsPanel.tsx
  * Description: Persisted download history with reveal-in-folder and per-row removal.
  */
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Clock,
@@ -13,6 +14,7 @@ import {
   X,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
+import DragOutHandle from "./DragOutHandle";
 import type { DownloadEntry } from "../lib/downloads";
 
 function formatWhen(ts: number): string {
@@ -39,6 +41,34 @@ export default function DownloadsPanel() {
     labelForDir,
     isElectron,
   } = useClipperContext();
+
+  // Files can be moved or deleted outside the app, so probe once per mount
+  // (and whenever the list changes) rather than on every render.
+  const [missing, setMissing] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const probe = window.electronAPI?.fileExists;
+    if (!isElectron || !probe) return;
+    let cancelled = false;
+
+    void (async () => {
+      const results: Record<string, boolean> = {};
+      for (const entry of downloads) {
+        if (!entry.path) continue;
+        try {
+          results[entry.id] = !(await probe(entry.path));
+        } catch {
+          results[entry.id] = false;
+        }
+      }
+      if (!cancelled) setMissing(results);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isElectron, downloads]);
+
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
@@ -79,9 +109,17 @@ export default function DownloadsPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.15 }}
-                className="group flex items-center gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2"
+                className={`group flex items-center gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2 ${
+                  missing[entry.id] ? "opacity-60" : ""
+                }`}
               >
                 <KindIcon kind={entry.kind} />
+                <DragOutHandle
+                  path={entry.path}
+                  isElectron={isElectron}
+                  exists={!missing[entry.id]}
+                  label={entry.label}
+                />
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] text-fg">
                     {entry.label}
@@ -96,8 +134,13 @@ export default function DownloadsPanel() {
                       {entry.path}
                     </span>
                   )}
+                  {missing[entry.id] && (
+                    <span className="block text-[10px] text-fg-faint">
+                      File missing — moved or deleted outside the app
+                    </span>
+                  )}
                 </div>
-                {isElectron && entry.path && (
+                {isElectron && entry.path && !missing[entry.id] && (
                   <button
                     type="button"
                     onClick={() => revealDownload(entry)}
