@@ -38,6 +38,20 @@ interface ElectronAPI {
   fileExists?: (targetPath: string) => Promise<boolean>;
   startDrag?: (targetPath: string) => void;
   openYouTubeSignIn: () => Promise<{ ok: boolean; error?: string }>;
+  /** In-app YouTube login window; resolves once a session exists. */
+  youtubeConnect?: () => Promise<{
+    connected: boolean;
+    cancelled?: boolean;
+    path?: string | null;
+    error?: string;
+  }>;
+  youtubeProbe?: () => Promise<{
+    connected: boolean;
+    path?: string | null;
+    error?: string;
+  }>;
+  youtubeDisconnect?: () => Promise<{ ok: boolean }>;
+
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string;
