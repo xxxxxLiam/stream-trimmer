@@ -367,6 +367,61 @@ function registerIpc() {
   });
 
 
+  // Cheap existence probe so the Downloads list can dim rows whose file was
+  // moved or deleted outside the app.
+  ipcMain.handle("file:exists", (_e, targetPath) => {
+    try {
+      return typeof targetPath === "string" && targetPath
+        ? fs.existsSync(targetPath)
+        : false;
+    } catch {
+      return false;
+    }
+  });
+
+  // Native OS drag-out. Must be ipcMain.on (not handle): startDrag has to run
+  // synchronously inside the drag gesture or the OS drops it.
+  ipcMain.on("file:startDrag", (event, targetPath) => {
+    try {
+      if (typeof targetPath !== "string" || !targetPath) return;
+      if (!fs.existsSync(targetPath)) return;
+
+      // Windows silently cancels a drag with a missing/empty icon, so always
+      // resolve to a real image: video thumbnail when possible, app icon else.
+      let icon = null;
+      try {
+        icon = nativeImage.createThumbnailFromPathSync
+          ? nativeImage.createThumbnailFromPathSync(targetPath, {
+              width: 96,
+              height: 96,
+            })
+          : null;
+      } catch {
+        icon = null;
+      }
+      if (!icon || icon.isEmpty()) {
+        try {
+          const fallback = path.join(__dirname, "icon.png");
+          if (fs.existsSync(fallback)) {
+            icon = nativeImage
+              .createFromPath(fallback)
+              .resize({ width: 64, height: 64 });
+          }
+        } catch {
+          icon = null;
+        }
+      }
+      if (!icon || icon.isEmpty()) {
+        // Last resort: a 1x1 transparent bitmap keeps the API happy.
+        icon = nativeImage.createEmpty();
+      }
+
+      event.sender.startDrag({ file: targetPath, icon });
+    } catch (err) {
+      log("startDrag failed:", err && err.message ? err.message : err);
+    }
+  });
+
   ipcMain.handle("file:showInFolder", (_e, targetPath) => {
     try {
       if (typeof targetPath !== "string" || !targetPath) {
