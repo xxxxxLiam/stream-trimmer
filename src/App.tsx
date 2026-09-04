@@ -3,7 +3,7 @@
  * Path: src/App.tsx
  * Description: Root layout — full-viewport two-column grid, overlay loader, form + preview.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Download,
@@ -13,7 +13,16 @@ import {
   X,
 } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
-import { ChannelExportProvider } from "./context/ChannelExportContext";
+import {
+  ChannelExportProvider,
+  useChannelExportContext,
+} from "./context/ChannelExportContext";
+import {
+  WorkspaceProvider,
+  TabActiveProvider,
+  useWorkspace,
+} from "./context/WorkspaceContext";
+import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
 import ChannelLockGate from "./components/ChannelLockGate";
 import { isLockConfigured } from "./lib/channelLock";
@@ -272,13 +281,40 @@ function ModeTabs({
   );
 }
 
-function Layout() {
+/** Publishes this tab's title and busy state up to the workspace tab strip. */
+function TabReporter({ id }: { id: string }) {
+  const { info, downloading, exportingComments, loadingInfo, cancelDownload } =
+    useClipperContext();
+  const { exporting, channelUrl, cancelExport } = useChannelExportContext();
+  const { reportTab } = useWorkspace();
+
+  const title = info?.title || (channelUrl ? channelUrl : "");
+  const busy = downloading || exportingComments || loadingInfo || exporting;
+
+  const cancelRef = useRef<() => void>(() => {});
+  cancelRef.current = () => {
+    cancelDownload();
+    cancelExport();
+  };
+
+  useEffect(() => {
+    reportTab(id, {
+      title,
+      busy,
+      cancel: () => cancelRef.current(),
+    });
+  }, [id, title, busy, reportTab]);
+
+  return null;
+}
+
+function Layout({ active }: { active: boolean }) {
   const {
     loadingInfo,
     exportingComments,
   } = useClipperContext();
   const [mode, setMode] = useState<Mode>("clip");
-  const overlayVisible = loadingInfo || exportingComments;
+  const overlayVisible = active && (loadingInfo || exportingComments);
   const overlayLabel = exportingComments
     ? "Exporting comments"
     : "Loading video info";
@@ -287,17 +323,10 @@ function Layout() {
     <>
       <OverlayLoader visible={overlayVisible} label={overlayLabel} />
 
-      <main className="flex h-screen w-full flex-col overflow-hidden bg-panel">
-        {/* Title bar */}
-        <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-4 py-2.5">
-          <span className="text-[12px] font-medium tracking-tight text-fg-muted">
-            YouTube Clipper
-          </span>
+      <main className="flex h-full w-full flex-col overflow-hidden bg-panel">
+        {/* Mode bar */}
+        <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-4 py-2">
           <ModeTabs mode={mode} setMode={setMode} />
-          <div className="ml-auto flex items-center gap-3">
-            <UpdateStatus />
-            <span className="text-[11px] text-fg-faint">Local · Private</span>
-          </div>
         </div>
 
         {mode === "clip" ? (
@@ -353,17 +382,53 @@ function Layout() {
         )}
 
       </main>
-      <SavedToast />
+      {active && <SavedToast />}
     </>
+  );
+}
+
+function Shell() {
+  const { tabs, activeId } = useWorkspace();
+  return (
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-panel">
+      {/* Title bar with workspace tabs */}
+      <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-3 py-1.5">
+        <WorkspaceTabs />
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <UpdateStatus />
+          <span className="text-[11px] text-fg-faint">Local · Private</span>
+        </div>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        {tabs.map((tab) => {
+          const active = tab.id === activeId;
+          return (
+            <div
+              key={tab.id}
+              className="absolute inset-0"
+              style={{ display: active ? undefined : "none" }}
+            >
+              <ClipperProvider>
+                <ChannelExportProvider>
+                  <TabActiveProvider active={active}>
+                    <TabReporter id={tab.id} />
+                    <Layout active={active} />
+                  </TabActiveProvider>
+                </ChannelExportProvider>
+              </ClipperProvider>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
 export default function App() {
   return (
-    <ClipperProvider>
-      <ChannelExportProvider>
-        <Layout />
-      </ChannelExportProvider>
-    </ClipperProvider>
+    <WorkspaceProvider>
+      <Shell />
+    </WorkspaceProvider>
   );
 }

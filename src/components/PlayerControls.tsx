@@ -12,6 +12,7 @@ import {
   Repeat,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
+import { useIsTabActive } from "../context/WorkspaceContext";
 import { formatTimestamp } from "../lib/clip";
 import type { YouTubePlayerApi } from "../hooks/useYouTubePlayer";
 
@@ -26,6 +27,7 @@ export default function PlayerControls({
 }) {
   const { info, start, end, duration, setStartFromSeconds, setEndFromSeconds } =
     useClipperContext();
+  const isTabActive = useIsTabActive();
   const { currentTime, playing, play, pause, seekTo, ready } = player;
 
   const setIn = () => setStartFromSeconds(Math.floor(currentTime));
@@ -34,7 +36,7 @@ export default function PlayerControls({
   // I / O keyboard shortcuts, ignored while typing in a field.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!info || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!isTabActive || !info || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return;
       if (e.key === "i" || e.key === "I") {
