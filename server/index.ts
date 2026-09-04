@@ -1155,10 +1155,18 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (delivered.audioKbps) {
       res.setHeader("X-Delivered-Audio-Kbps", String(delivered.audioKbps));
     }
+    if (chosenFormat) res.setHeader("X-Selected-Format", chosenFormat);
+    if (availableHeights.length)
+      res.setHeader("X-Available-Heights", availableHeights.join(","));
+    res.setHeader("X-Auth-Mode", cookieMode);
+    console.log(
+      `[server] /api/download done job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode}`,
+    );
     res.setHeader(
       "Access-Control-Expose-Headers",
-      "X-Delivered-Height, X-Delivered-Audio-Kbps",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode",
     );
+
 
     const stat = fs.statSync(outputPath);
     const name = `clip.${ext}`;
