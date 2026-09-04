@@ -59,23 +59,10 @@ export function useClipper() {
   const [endText, setEndText] = useState("");
   const [format, setFormat] = useState<ClipFormat>("mp4");
   const [quality, setQuality] = useState<string>("best");
-  // Optional sign-in: when enabled, yt-dlp reuses the chosen browser's
-  // logged-in YouTube session to try for higher-quality renditions.
-  const [useBrowserCookies, setUseBrowserCookies] = useState(false);
-  const [cookieBrowser, setCookieBrowserState] = useState<CookieBrowser>(() => {
-    if (typeof window === "undefined") return "chrome";
-    const saved = readSetting<string>("clipper.cookieBrowser", "chrome");
-    return saved === "chrome" || saved === "safari" || saved === "edge" ||
-      saved === "firefox" || saved === "brave" || saved === "chromium"
-      ? saved
-      : "chrome";
-  });
-  const setCookieBrowser = useCallback((browser: CookieBrowser) => {
-    setCookieBrowserState(browser);
-    setUseBrowserCookies(false);
-    setYtAuth({ status: "idle", browser });
-    writeSetting("clipper.cookieBrowser", browser);
-  }, []);
+  // Sign-in lives in an app-wide store shared by every workspace tab; the
+  // connection UI is a modal in the shell, not part of this form.
+  const connection = useYouTubeConnection();
+
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
