@@ -112,45 +112,96 @@ let loginWindow = null;
  * Opens the sign-in window and resolves once a YouTube session exists (or the
  * user closes the window). The window closes itself on success.
  */
-function openLoginWindow(parent, validate) {
+function openLoginWindow(parent, validate, onEvent) {
+  const trace = (msg) => {
+    if (typeof onEvent === "function") {
+      try {
+        onEvent(msg);
+      } catch {
+        /* logging must never break sign-in */
+      }
+    }
+  };
+
   if (loginWindow && !loginWindow.isDestroyed()) {
     loginWindow.focus();
     return Promise.resolve({ connected: false, cancelled: true, path: null });
   }
 
   return new Promise((resolve) => {
-    const win = new BrowserWindow({
-      width: 520,
-      height: 720,
-      parent: parent || undefined,
-      modal: false,
-      show: true,
-      title: "Sign in to YouTube",
-      autoHideMenuBar: true,
-      webPreferences: {
-        partition: PARTITION,
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
+    let win;
+    try {
+      win = new BrowserWindow({
+        width: 520,
+        height: 720,
+        parent: parent && !parent.isDestroyed() ? parent : undefined,
+        modal: false,
+        show: true,
+        title: "Sign in to YouTube",
+        autoHideMenuBar: true,
+        webPreferences: {
+          partition: PARTITION,
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      });
+    } catch (err) {
+      trace(`window failed: ${err && err.message ? err.message : "unknown"}`);
+      resolve({
+        connected: false,
+        cancelled: true,
+        path: null,
+        error: "Could not open the sign-in window.",
+      });
+      return;
+    }
     loginWindow = win;
+    trace("sign-in window opened");
 
     let settled = false;
+    let destroyed = false;
     let timer = null;
     let validationInFlight = false;
+
+    const stopTimer = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const alive = () => !destroyed && win && !win.isDestroyed();
+
+    const setTitleSafely = (title) => {
+      if (!alive()) return;
+      try {
+        win.setTitle(title);
+      } catch {
+        /* window went away mid-call */
+      }
+    };
+
     const finish = async (connected) => {
       if (settled) return;
       settled = true;
-      if (timer) clearInterval(timer);
+      stopTimer();
       let saved = false;
       try {
         saved = connected ? await exportCookieFile() : false;
-      } catch {
+      } catch (err) {
+        trace(`cookie export failed: ${err && err.message ? err.message : "unknown"}`);
         saved = false;
       }
-      if (!win.isDestroyed()) win.close();
+      if (alive()) {
+        try {
+          win.close();
+        } catch {
+          /* already closing */
+        }
+      }
       loginWindow = null;
+      trace(connected ? `finished connected=${saved}` : "finished cancelled");
       resolve({
         connected: saved,
         cancelled: !connected,
@@ -159,23 +210,29 @@ function openLoginWindow(parent, validate) {
     };
 
     const check = async () => {
-      if (validationInFlight) return;
+      if (validationInFlight || settled || !alive()) return;
       try {
         const cookies = await readAuthCookies();
-        if (!hasAuth(cookies)) return;
+        if (!hasAuth(cookies) || settled || !alive()) return;
         validationInFlight = true;
-        win.setTitle("Verifying YouTube…");
+        trace("cookies found, verifying");
+        setTitleSafely("Verifying YouTube…");
         const saved = await exportCookieFile();
-        const verified = saved && typeof validate === "function"
-          ? await validate(cookieFilePath())
-          : saved;
+        const verified =
+          saved && typeof validate === "function"
+            ? await validate(cookieFilePath())
+            : saved;
+        // The window may have been closed while verification was running.
+        if (settled || !alive()) return;
         if (verified) {
+          trace("verified");
           await finish(true);
           return;
         }
-        win.setTitle("Sign in to YouTube");
-      } catch {
-        /* keep polling */
+        trace("verification rejected, staying open");
+        setTitleSafely("Sign in to YouTube");
+      } catch (err) {
+        trace(`check failed: ${err && err.message ? err.message : "unknown"}`);
       } finally {
         validationInFlight = false;
       }
@@ -183,15 +240,28 @@ function openLoginWindow(parent, validate) {
 
     win.webContents.on("did-navigate", () => void check());
     win.webContents.on("did-navigate-in-page", () => void check());
+    win.webContents.on("render-process-gone", (_e, details) => {
+      trace(`sign-in renderer gone reason=${details && details.reason}`);
+      destroyed = true;
+      stopTimer();
+      void finish(false);
+    });
+    win.on("unresponsive", () => trace("sign-in window unresponsive"));
     timer = setInterval(() => void check(), 1500);
     win.on("closed", () => {
+      destroyed = true;
+      stopTimer();
       loginWindow = null;
       void finish(false);
     });
 
-    win.loadURL(SIGNIN_URL).catch(() => void finish(false));
+    win.loadURL(SIGNIN_URL).catch((err) => {
+      trace(`load failed: ${err && err.message ? err.message : "unknown"}`);
+      void finish(false);
+    });
   });
 }
+
 
 async function clear() {
   try {
