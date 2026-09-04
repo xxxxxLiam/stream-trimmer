@@ -207,6 +207,11 @@ function SavedToast() {
           role="status"
         >
           <CheckCircleFill size={16} className="shrink-0 text-accent" />
+          <DragOutHandle
+            path={savedNotice.path}
+            isElectron={isElectron}
+            label={savedNotice.label}
+          />
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium text-fg">
               {savedNotice.kind === "comments"
