@@ -112,6 +112,12 @@ export default function DownloadsPanel() {
                 className="group flex items-center gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2"
               >
                 <KindIcon kind={entry.kind} />
+                <DragOutHandle
+                  path={entry.path}
+                  isElectron={isElectron}
+                  exists={!missing[entry.id]}
+                  label={entry.label}
+                />
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] text-fg">
                     {entry.label}
@@ -126,8 +132,13 @@ export default function DownloadsPanel() {
                       {entry.path}
                     </span>
                   )}
+                  {missing[entry.id] && (
+                    <span className="block text-[10px] text-fg-faint">
+                      File missing — moved or deleted outside the app
+                    </span>
+                  )}
                 </div>
-                {isElectron && entry.path && (
+                {isElectron && entry.path && !missing[entry.id] && (
                   <button
                     type="button"
                     onClick={() => revealDownload(entry)}
