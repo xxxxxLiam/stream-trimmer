@@ -41,8 +41,9 @@ import { formatBytes } from "./lib/clip";
 import YouTubeStatusChip from "./components/YouTubeStatusChip";
 import YouTubeConnectModal from "./components/YouTubeConnectModal";
 import {
-  probeConnection,
-  revalidateConnection,
+  checkConnection,
+  initBrowserSelection,
+
   useYouTubeConnection,
 } from "./lib/youtubeConnection";
 
