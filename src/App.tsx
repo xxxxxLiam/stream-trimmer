@@ -405,11 +405,10 @@ function Layout({ active }: { active: boolean }) {
   );
 }
 
-const REVALIDATE_INTERVAL_MS = 60_000;
+const REVALIDATE_INTERVAL_MS = 30_000;
 
 function Shell() {
   const { tabs, activeId } = useWorkspace();
-  const [connectOpen, setConnectOpen] = useState(false);
   const connection = useYouTubeConnection();
 
   // One silent probe per launch, shared by every workspace tab, then periodic
@@ -427,18 +426,13 @@ function Shell() {
     };
   }, []);
 
-  // Whenever the probe says we are disconnected, surface the one-click prompt.
-  useEffect(() => {
-    if (connection.probed && !connection.connected) setConnectOpen(true);
-  }, [connection.probed, connection.connected]);
-
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-panel">
       {/* Title bar with workspace tabs */}
       <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-3 py-1.5">
         <WorkspaceTabs />
         <div className="ml-auto flex shrink-0 items-center gap-3">
-          <YouTubeStatusChip onOpen={() => setConnectOpen(true)} />
+          <YouTubeStatusChip onOpen={() => void revalidateConnection()} />
           <UpdateStatus />
           <span className="text-[11px] text-fg-faint">Local · Private</span>
         </div>
@@ -466,10 +460,7 @@ function Shell() {
         })}
       </div>
 
-      <YouTubeConnectModal
-        open={connectOpen && !connection.connected}
-        onClose={() => setConnectOpen(false)}
-      />
+      <YouTubeConnectModal open={!connection.connected} />
     </div>
   );
 }
