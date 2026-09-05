@@ -28,9 +28,6 @@ import {
   type TranscriptResponse,
   type VideoInfo,
   type CommentsResponse,
-  type CookieBrowser,
-  type YouTubeAuthState,
-  type YouTubeAuthStatus,
 } from "../lib/clip";
 import { readSetting, writeSetting } from "../lib/persist";
 import {

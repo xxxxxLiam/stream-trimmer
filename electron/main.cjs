@@ -80,7 +80,6 @@ function persistSettings() {
 }
 
 let serverHandle = null; // { close(cb) } returned by the bundled server
-let backendBaseUrl = null;
 
 function sendUpdateStatus(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -161,7 +160,6 @@ function resolveResourcesDir() {
 
 async function startBackend() {
   const port = await pickFreePort();
-  backendBaseUrl = `http://127.0.0.1:${port}`;
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
   process.env.ELECTRON_USER_DATA = app.getPath("userData");
