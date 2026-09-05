@@ -405,25 +405,14 @@ function Layout({ active }: { active: boolean }) {
   );
 }
 
-const REVALIDATE_INTERVAL_MS = 30_000;
-
 function Shell() {
   const { tabs, activeId } = useWorkspace();
   const connection = useYouTubeConnection();
 
-  // One silent probe per launch, shared by every workspace tab, then periodic
-  // re-checks so a YouTube-side logout reopens the prompt instead of leaving a
-  // stale chip. Connecting is the only action, so the prompt is never dismissed
-  // permanently.
+  // No background polling: the user checks the connection when they choose to.
+  // We only pre-select a sensible browser in the dropdown on first launch.
   useEffect(() => {
-    void probeConnection();
-    const revalidate = () => void revalidateConnection();
-    const timer = window.setInterval(revalidate, REVALIDATE_INTERVAL_MS);
-    window.addEventListener("focus", revalidate);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", revalidate);
-    };
+    void initBrowserSelection();
   }, []);
 
   return (
@@ -432,7 +421,8 @@ function Shell() {
       <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-3 py-1.5">
         <WorkspaceTabs />
         <div className="ml-auto flex shrink-0 items-center gap-3">
-          <YouTubeStatusChip onOpen={() => void revalidateConnection()} />
+          <YouTubeStatusChip onOpen={() => void checkConnection()} />
+
           <UpdateStatus />
           <span className="text-[11px] text-fg-faint">Local · Private</span>
         </div>
