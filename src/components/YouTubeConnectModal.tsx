@@ -8,11 +8,14 @@ import {
   BoxArrowUpRight,
   ExclamationTriangleFill,
 } from "react-bootstrap-icons";
+import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
 import {
   checkConnection,
   openYouTubeSignIn,
+  selectBrowser,
   useYouTubeConnection,
 } from "../lib/youtubeConnection";
+
 
 export default function YouTubeConnectModal({
   open,
@@ -62,17 +65,35 @@ export default function YouTubeConnectModal({
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-medium">Return here and verify</p>
               <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">
-                Once YouTube shows your account, come back and check the connection.
+                Pick the browser you signed in with, then check the connection.
               </p>
-              <button
-                type="button"
-                className="btn-primary mt-3 flex items-center gap-2"
-                disabled={state.busy}
-                onClick={() => void checkConnection()}
-              >
-                {state.busy ? <ArrowRepeat className="animate-spin" size={12} /> : null}
-                {state.busy ? "Checking…" : "Check Connection"}
-              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  className="input h-8 rounded-chip border border-hairline bg-panel-raised px-2 text-[12px] capitalize"
+                  aria-label="Browser to check"
+                  value={state.browser}
+                  disabled={state.busy}
+                  onChange={(event) =>
+                    selectBrowser(event.target.value as CookieBrowser)
+                  }
+                >
+                  {COOKIE_BROWSERS.map((browser) => (
+                    <option key={browser} value={browser} className="capitalize">
+                      {browser}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-primary flex items-center gap-2"
+                  disabled={state.busy}
+                  onClick={() => void checkConnection()}
+                >
+                  {state.busy ? <ArrowRepeat className="animate-spin" size={12} /> : null}
+                  {state.busy ? "Checking…" : "Check Connection"}
+                </button>
+              </div>
+
             </div>
           </li>
         </ol>
