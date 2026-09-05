@@ -117,86 +117,67 @@ async function checkBrowserSession(
   }
 }
 
-async function browserOrder(): Promise<CookieBrowser[]> {
-  const detected = await defaultBrowser();
-  return [...new Set([detected, state.browser, ...COOKIE_BROWSERS])].filter(
-    isCookieBrowser,
-  );
-}
-
-function bestFailure(
-  failures: Array<{ status: YouTubeAuthState; message?: string }>,
-): string {
-  const important = failures.find(({ status }) =>
-    ["locked", "decrypt_failed", "timeout", "extractor_error"].includes(status),
-  );
+function failureMessage(result: { status: YouTubeAuthState; message?: string }): string {
   return (
-    important?.message ??
-    "No signed-in YouTube session was found. Sign in in your browser, leave the tab open, then check again."
+    result.message ??
+    "No signed-in YouTube session was found in that browser. Sign in there, leave the tab open, then check again."
   );
 }
 
-async function runConnectionCheck(): Promise<boolean> {
-  set({ busy: true, step: "Finding your browser…", message: undefined });
-  const order = await browserOrder();
-  const failures: Array<{ status: YouTubeAuthState; message?: string }> = [];
-
-  for (const browser of order) {
-    set({ step: `Checking ${browser}…`, browserStatus: "checking" });
-    const result = await checkBrowserSession(browser);
-    if (result.status === "signed_in") {
-      writeSetting("clipper.cookieBrowser", browser);
-      set({
-        connected: true,
-        browser,
-        browserStatus: "signed_in",
-        busy: false,
-        step: undefined,
-        message: undefined,
-        probed: true,
-      });
-      return true;
-    }
-    failures.push(result);
+async function runConnectionCheck(browser: CookieBrowser): Promise<boolean> {
+  set({
+    busy: true,
+    browser,
+    step: `Checking ${browser}…`,
+    browserStatus: "checking",
+    message: undefined,
+  });
+  const result = await checkBrowserSession(browser);
+  if (result.status === "signed_in") {
+    writeSetting("clipper.cookieBrowser", browser);
+    set({
+      connected: true,
+      browserStatus: "signed_in",
+      busy: false,
+      step: undefined,
+      message: undefined,
+      probed: true,
+    });
+    return true;
   }
-
   set({
     connected: false,
-    browserStatus: "signed_out",
+    browserStatus: result.status,
     busy: false,
     step: undefined,
-    message: bestFailure(failures),
+    message: failureMessage(result),
     probed: true,
   });
   return false;
 }
 
+/** Selects the browser to check without starting a check. */
+export function selectBrowser(browser: CookieBrowser): void {
+  writeSetting("clipper.cookieBrowser", browser);
+  set({ browser, message: undefined });
+}
+
+/** Detects the system default browser once, for the initial dropdown value. */
+export async function initBrowserSelection(): Promise<void> {
+  if (readSetting<string>("clipper.cookieBrowser", "") ) return;
+  const detected = await defaultBrowser();
+  if (detected) selectBrowser(detected);
+}
+
 /** Runs at most one browser-cookie check at a time. */
-export function checkConnection(): Promise<boolean> {
+export function checkConnection(browser?: CookieBrowser): Promise<boolean> {
   if (activeCheck) return activeCheck;
-  activeCheck = runConnectionCheck().finally(() => {
+  activeCheck = runConnectionCheck(browser ?? state.browser).finally(() => {
     activeCheck = null;
   });
   return activeCheck;
 }
 
-export async function probeConnection(force = false): Promise<void> {
-  if (state.probed && !force) return;
-  await checkConnection();
-}
-
-export async function revalidateConnection(): Promise<void> {
-  if (activeCheck) return;
-  if (state.connected) {
-    set({ busy: true, step: "Checking YouTube…" });
-    const current = await checkBrowserSession(state.browser);
-    if (current.status === "signed_in") {
-      set({ busy: false, step: undefined, message: undefined, probed: true });
-      return;
-    }
-  }
-  await checkConnection();
-}
 
 export async function openYouTubeSignIn(): Promise<void> {
   set({ message: undefined });
