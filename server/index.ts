@@ -323,27 +323,9 @@ const cookieBrowserSchema = z.enum([
   "chromium",
 ]);
 
-// The app-managed cookie jar written by the in-app YouTube sign-in window.
-// Only that exact filename is accepted, and it must exist on disk — the value
-// is a path, never cookie contents.
-const cookieFileSchema = z
-  .string()
-  .min(1)
-  .refine(
-    (v) => {
-      if (path.basename(v) !== "yt-cookies.txt" || !fs.existsSync(v)) return false;
-      const userData = process.env.ELECTRON_USER_DATA;
-      return !userData || path.dirname(path.resolve(v)) === path.resolve(userData);
-    },
-    "Unknown cookie file",
-  );
-
-/** Picks the cookie strategy for yt-dlp: app cookie file wins over browser. */
 function resolveCookieOptions(
-  cookieFile: string | undefined,
   cookiesFromBrowser: string | undefined,
 ): Record<string, unknown> {
-  if (cookieFile) return { cookies: cookieFile };
   if (cookiesFromBrowser) return { cookiesFromBrowser };
   return {};
 }
@@ -359,7 +341,6 @@ const downloadSchema = z
     // directly from the named browser at runtime. Cookie contents never touch
     // this process — only the browser name is accepted, from an allowlist.
     cookiesFromBrowser: cookieBrowserSchema.optional(),
-    cookieFile: cookieFileSchema.optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -684,20 +665,14 @@ const AUTH_PROBE_TIMEOUT_MS = 15_000;
 const AUTH_PROBE_URL = "https://www.youtube.com/watch?v=BaW_jenozKc";
 
 function authProbeMessage(
-  source: CookieBrowserName | "app",
+  source: CookieBrowserName,
   status: YouTubeAuthProbeStatus,
 ): string | undefined {
-  const label = source === "app"
-    ? "The in-app YouTube session"
-    : source[0].toUpperCase() + source.slice(1);
+  const label = source[0].toUpperCase() + source.slice(1);
   if (status === "signed_out")
-    return source === "app"
-      ? `${label} is not signed in. Connect YouTube again.`
-      : `No YouTube account cookies were found in ${label}.`;
+    return `No YouTube account cookies were found in ${label}.`;
   if (status === "profile_missing")
-    return source === "app"
-      ? `${label} could not be read. Connect YouTube again.`
-      : `No ${label} profile was found on this computer.`;
+    return `No ${label} profile was found on this computer.`;
   if (status === "locked")
     return `Fully quit ${label}, including background windows, then check again.`;
   if (status === "decrypt_failed")
@@ -745,24 +720,14 @@ function probeYouTubeAuth(
 
 app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   const parsed = z
-    .object({
-      browser: cookieBrowserSchema.optional(),
-      cookieFile: cookieFileSchema.optional(),
-    })
-    .refine((value) => Boolean(value.browser) !== Boolean(value.cookieFile), {
-      message: "Choose one YouTube session source",
-    })
+    .object({ browser: cookieBrowserSchema })
     .safeParse(req.body ?? {});
   if (!parsed.success)
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const source = parsed.data.cookieFile ? "app" : parsed.data.browser;
-  if (!source) return res.status(400).json({ error: "Choose a session source" });
-  const cookieOptions = resolveCookieOptions(
-    parsed.data.cookieFile,
-    parsed.data.browser,
-  );
+  const source = parsed.data.browser;
+  const cookieOptions = resolveCookieOptions(source);
   let activeChild: ChildProcess | null = null;
   res.on("close", () => {
     if (!res.writableEnded && activeChild) activeChild.kill("SIGKILL");
@@ -792,19 +757,9 @@ app.post("/api/download", async (req: Request, res: Response) => {
     format,
     quality,
     cookiesFromBrowser,
-    cookieFile,
   }: DownloadInput = parsed.data;
-  // Either the app-managed cookies.txt (in-app sign-in) or a browser name.
-  // Cookie contents are never read or logged by this process.
-  let cookieOptions: Record<string, unknown> = resolveCookieOptions(
-    cookieFile,
-    cookiesFromBrowser,
-  );
-  let cookieMode: "app" | "browser" | "none" = cookieFile
-    ? "app"
-    : cookiesFromBrowser
-      ? "browser"
-      : "none";
+  const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
+  const cookieMode: "browser" | "none" = cookiesFromBrowser ? "browser" : "none";
   console.log(`[server] /api/download auth mode=${cookieMode}`);
 
   const requiresVerifiedSession =
@@ -851,13 +806,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     try {
       info = await runProbe(probeOptions);
     } catch (first) {
-      // Never turn a rejected app session into a signed-out download. That
-      // would silently replace the requested high-quality track with 360p.
-      if (cookieMode !== "app") throw first;
-      return res.status(401).json({
-        code: "YOUTUBE_AUTH_REQUIRED",
-        error: "Your YouTube connection was rejected. Connect again.",
-      });
+      throw first;
     }
     if (typeof info.duration === "number" && end > info.duration + 1) {
       return res.status(400).json({ error: "End exceeds video duration" });
@@ -1466,7 +1415,6 @@ const channelExportSchema = z.object({
   includeComments: z.boolean().default(true),
   includeTranscripts: z.boolean().default(true),
   cookiesFromBrowser: cookieBrowserSchema.optional(),
-  cookieFile: cookieFileSchema.optional(),
 
 });
 
@@ -1746,7 +1694,6 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       : `chan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const job = getOrCreateChannelJob(jobId);
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(
-    input.cookieFile,
     input.cookiesFromBrowser,
   );
 

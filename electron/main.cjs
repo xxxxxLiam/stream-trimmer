@@ -21,11 +21,8 @@ const fsp = require("node:fs/promises");
 // app is signed, mac users must download new versions manually; we handle
 // the resulting error gracefully instead of crashing.
 const { autoUpdater } = require("electron-updater");
-const youtubeSession = require("./youtubeSession.cjs");
+const { detectDefaultBrowser } = require("./defaultBrowser.cjs");
 const logger = require("./logger.cjs");
-
-// Hard limit for the "Verifying YouTube…" step, in ms.
-const VERIFY_TIMEOUT_MS = 20000;
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
@@ -83,7 +80,6 @@ function persistSettings() {
 }
 
 let serverHandle = null; // { close(cb) } returned by the bundled server
-let backendBaseUrl = null;
 
 function sendUpdateStatus(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -164,7 +160,6 @@ function resolveResourcesDir() {
 
 async function startBackend() {
   const port = await pickFreePort();
-  backendBaseUrl = `http://127.0.0.1:${port}`;
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
   process.env.ELECTRON_USER_DATA = app.getPath("userData");
@@ -484,63 +479,11 @@ function registerIpc() {
     }
   });
 
-  // In-app YouTube sign-in — the preferred path. Opens a real login window
-  // owned by the app, then writes a cookies.txt yt-dlp can consume.
-  ipcMain.handle("youtube:connect", async () => {
-    try {
-      return await youtubeSession.openLoginWindow(
-        mainWindow,
-        async (cookieFile) => {
-          if (!backendBaseUrl)
-            return { ok: false, message: "The local engine is not running yet." };
-          try {
-            const response = await fetch(
-              `${backendBaseUrl}/api/auth/youtube/status`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ cookieFile }),
-                signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
-              },
-            );
-            const result = await response.json().catch(() => null);
-            if (!response.ok) {
-              logger.log("youtube", `verify http ${response.status}`);
-              return {
-                ok: false,
-                message:
-                  (result && (result.message || result.error)) ||
-                  `YouTube check failed (HTTP ${response.status}).`,
-              };
-            }
-            if (result && result.status === "signed_in") return { ok: true };
-            return {
-              ok: false,
-              message:
-                (result && (result.message || result.error)) ||
-                "YouTube did not accept this sign-in.",
-            };
-          } catch (err) {
-            logger.log("youtube", `verify failed: ${logger.describe(err)}`);
-            return { ok: false, message: logger.describe(err) };
-          }
-        },
-        (message) => logger.log("youtube", message),
-      );
-    } catch (err) {
-      logger.log("youtube", `connect failed: ${logger.describe(err)}`);
-      return {
-        connected: false,
-        path: null,
-        error: err && err.message ? err.message : "Sign-in failed",
-      };
-    }
-  });
-
-
-  ipcMain.handle("youtube:probe", async () => youtubeSession.probe());
-
-  ipcMain.handle("youtube:disconnect", async () => youtubeSession.clear());
+  // Returns only the supported browser name. Cookie values remain private to
+  // the browser and are read directly by the local yt-dlp process.
+  ipcMain.handle("system:defaultBrowser", () => ({
+    browser: detectDefaultBrowser(app),
+  }));
 
 
   ipcMain.handle("updater:quitAndInstall", () => {

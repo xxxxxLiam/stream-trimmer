@@ -1,64 +1,43 @@
 /**
  * File: youtubeConnection.ts
  * Path: src/lib/youtubeConnection.ts
- * Description: App-wide YouTube connection store shared by every workspace tab.
- *
- * Two ways to connect, both fully local and free:
- *  - "app"     : an in-app Electron login window whose cookies are exported to
- *                a cookies.txt yt-dlp reads (preferred — one click, no locks).
- *  - "browser" : the legacy fallback reading the external browser's cookie
- *                store via yt-dlp --cookies-from-browser.
- * Cookie values never enter this module — only booleans, a file path and a
- * browser name.
+ * Description: Required app-wide YouTube connection backed by local browser cookies.
  */
 import { useSyncExternalStore } from "react";
-import { apiUrl, parseJson, type CookieBrowser, type YouTubeAuthState } from "./clip";
+import {
+  COOKIE_BROWSERS,
+  apiUrl,
+  parseJson,
+  type CookieBrowser,
+  type YouTubeAuthState,
+} from "./clip";
 import { readSetting, writeSetting } from "./persist";
 
-export type ConnectionMode = "app" | "browser";
-
 export interface YouTubeConnectionState {
-  /** True when downloads will be authenticated. */
   connected: boolean;
-  mode: ConnectionMode | null;
-  /** Path of the app-managed cookies.txt (Electron only). */
-  cookieFile: string | null;
   browser: CookieBrowser;
-  /** Status of the last browser-fallback probe. */
   browserStatus: YouTubeAuthState;
   busy: boolean;
-  /** Short progress line shown while connecting. */
   step?: string;
   message?: string;
-  /** True once the launch probe has run. */
   probed: boolean;
 }
 
 export interface CookiePayload {
-  cookieFile?: string;
   cookiesFromBrowser?: CookieBrowser;
 }
 
-const BROWSERS: CookieBrowser[] = [
-  "chrome",
-  "safari",
-  "edge",
-  "firefox",
-  "brave",
-  "chromium",
-];
+function isCookieBrowser(value: unknown): value is CookieBrowser {
+  return typeof value === "string" && COOKIE_BROWSERS.includes(value as CookieBrowser);
+}
 
 function initialBrowser(): CookieBrowser {
   const saved = readSetting<string>("clipper.cookieBrowser", "chrome");
-  return (BROWSERS as string[]).includes(saved)
-    ? (saved as CookieBrowser)
-    : "chrome";
+  return isCookieBrowser(saved) ? saved : "chrome";
 }
 
 let state: YouTubeConnectionState = {
   connected: false,
-  mode: null,
-  cookieFile: null,
   browser: initialBrowser(),
   browserStatus: "idle",
   busy: false,
@@ -66,10 +45,11 @@ let state: YouTubeConnectionState = {
 };
 
 const listeners = new Set<() => void>();
+let activeCheck: Promise<boolean> | null = null;
 
 function set(patch: Partial<YouTubeConnectionState>) {
   state = { ...state, ...patch };
-  listeners.forEach((l) => l());
+  listeners.forEach((listener) => listener());
 }
 
 function subscribe(listener: () => void) {
@@ -85,285 +65,155 @@ export function useYouTubeConnection(): YouTubeConnectionState {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
-/** Current connection flag, readable outside React. */
 export function isConnected(): boolean {
   return state.connected;
 }
 
-/** Cookie options for an API request, or {} when not connected. */
 export function cookiePayload(): CookiePayload {
-  if (!state.connected) return {};
-  if (state.mode === "app" && state.cookieFile)
-    return { cookieFile: state.cookieFile };
-  if (state.mode === "browser") return { cookiesFromBrowser: state.browser };
-  return {};
+  return state.connected ? { cookiesFromBrowser: state.browser } : {};
 }
 
-/** Clears a rejected session so the shell immediately reopens the prompt. */
 export function markDisconnected(message?: string): void {
   set({
     connected: false,
-    mode: null,
-    cookieFile: null,
     browserStatus: "signed_out",
     message,
     probed: true,
   });
 }
 
-async function validateSession(payload: CookiePayload): Promise<{
-  valid: boolean;
-  message?: string;
-}> {
+async function defaultBrowser(): Promise<CookieBrowser | null> {
+  if (!window.electronAPI?.getDefaultBrowser) return null;
   try {
-    const res = await fetch(apiUrl("/api/auth/youtube/status"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await parseJson<{
-      status?: YouTubeAuthState;
-      message?: string;
-    }>(res);
-    return {
-      valid: res.ok && data.status === "signed_in",
-      message: data.message,
-    };
+    const result = await window.electronAPI.getDefaultBrowser();
+    return isCookieBrowser(result.browser) ? result.browser : null;
   } catch {
-    return {
-      valid: false,
-      message: "YouTube could not be verified right now.",
-    };
+    return null;
   }
 }
 
-const isElectron = typeof window !== "undefined" && !!window.electronAPI?.isElectron;
-
-/**
- * Silent probe — never opens a window, never blocks the UI. Runs once on
- * launch, and again on `revalidateConnection()` so a YouTube-side logout is
- * noticed instead of leaving a stale "connected" chip.
- */
-export async function probeConnection(force = false): Promise<void> {
-  if ((state.probed && !force) || state.busy) return;
-  if (!isElectron || !window.electronAPI?.youtubeProbe) {
-    set({ probed: true });
-    return;
-  }
-  try {
-    const result = await window.electronAPI.youtubeProbe();
-    const localSessionExists = !!result.connected && !!result.path;
-    const validation = localSessionExists && result.path
-      ? await validateSession({ cookieFile: result.path })
-      : { valid: false, message: undefined };
-    const connected = localSessionExists && validation.valid;
-    set({
-      probed: true,
-      connected,
-      // Browser-cookie sessions are not covered by the app probe; keep them.
-      mode: connected ? "app" : state.mode === "browser" ? "browser" : null,
-      cookieFile: connected ? (result.path ?? null) : null,
-      message: connected ? undefined : validation.message,
-    });
-  } catch {
-    set({ probed: true });
-  }
-}
-
-/** Re-checks the active session against YouTube, not just local cookie presence. */
-export async function revalidateConnection(): Promise<void> {
-  if (state.mode === "browser") {
-    const result = await checkBrowserSession(state.browser);
-    if (result.status !== "signed_in") markDisconnected(result.message);
-    return;
-  }
-  await probeConnection(true);
-}
-
-/** Opens the in-app login window and stores the resulting cookie file. */
-export async function connectInApp(): Promise<boolean> {
-  if (!isElectron || !window.electronAPI?.youtubeConnect) return false;
-  set({ busy: true, message: undefined });
-  try {
-    const result = await window.electronAPI.youtubeConnect();
-    if (result.connected) {
-      const cookieFile = result.path ?? null;
-      const validation = cookieFile
-        ? await validateSession({ cookieFile })
-        : { valid: false, message: "YouTube did not return a valid session." };
-      if (!validation.valid) {
-        set({
-          busy: false,
-          connected: false,
-          mode: null,
-          cookieFile: null,
-          message: validation.message,
-        });
-        return false;
-      }
-      set({
-        busy: false,
-        connected: true,
-        mode: "app",
-        cookieFile,
-        message: undefined,
-      });
-      return true;
-    }
-    set({
-      busy: false,
-      message: result.error || "Sign-in window closed before you were signed in.",
-    });
-    return false;
-  } catch {
-    set({ busy: false, message: "Could not open the sign-in window." });
-    return false;
-  }
-}
-
-export async function disconnect(): Promise<void> {
-  if (isElectron && window.electronAPI?.youtubeDisconnect) {
-    try {
-      await window.electronAPI.youtubeDisconnect();
-    } catch {
-      /* ignore */
-    }
-  }
-  set({
-    connected: false,
-    mode: null,
-    cookieFile: null,
-    browserStatus: "idle",
-    message: undefined,
-  });
-}
-
-export function setBrowser(browser: CookieBrowser): void {
-  writeSetting("clipper.cookieBrowser", browser);
-  set({
-    browser,
-    browserStatus: "idle",
-    ...(state.mode === "browser"
-      ? { connected: false, mode: null }
-      : {}),
-  });
-}
-
-/** Fallback path: probe one external browser's cookie store. */
-export async function checkBrowserSession(
-  browser: CookieBrowser = state.browser,
+async function checkBrowserSession(
+  browser: CookieBrowser,
 ): Promise<{ status: YouTubeAuthState; message?: string }> {
   try {
-    const res = await fetch(apiUrl("/api/auth/youtube/status"), {
+    const response = await fetch(apiUrl("/api/auth/youtube/status"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ browser }),
     });
     const data = await parseJson<{
-      status: YouTubeAuthState;
-      browser: CookieBrowser;
+      status?: YouTubeAuthState;
       message?: string;
-    }>(res);
-    return { status: data.status ?? "extractor_error", message: data.message };
+    }>(response);
+    return {
+      status: data.status ?? "extractor_error",
+      message: data.message,
+    };
   } catch {
     return {
       status: "extractor_error",
-      message: "Couldn't reach the local backend.",
+      message: "Couldn't reach the local engine.",
     };
   }
 }
 
-/** Opens YouTube in the user's default browser (fallback flow helper). */
-export async function openExternalSignIn(): Promise<void> {
-  if (isElectron && window.electronAPI?.openYouTubeSignIn) {
-    await window.electronAPI.openYouTubeSignIn();
-  } else {
-    window.open("https://www.youtube.com/signin", "_blank", "noopener");
-  }
-  set({ browserStatus: "ready" });
+async function browserOrder(): Promise<CookieBrowser[]> {
+  const detected = await defaultBrowser();
+  return [...new Set([detected, state.browser, ...COOKIE_BROWSERS])].filter(
+    isCookieBrowser,
+  );
 }
 
-/**
- * The one and only connect action. Tries the in-app sign-in window first
- * (desktop), then silently sweeps every supported browser's cookie store and
- * connects with the first one that reports a signed-in session.
- */
-export async function connect(): Promise<boolean> {
-  if (state.busy) return state.connected;
-  set({ busy: true, message: undefined, step: undefined });
+function bestFailure(
+  failures: Array<{ status: YouTubeAuthState; message?: string }>,
+): string {
+  const important = failures.find(({ status }) =>
+    ["locked", "decrypt_failed", "timeout", "extractor_error"].includes(status),
+  );
+  return (
+    important?.message ??
+    "No signed-in YouTube session was found. Sign in in your browser, leave the tab open, then check again."
+  );
+}
 
-  let signInError: string | undefined;
+async function runConnectionCheck(): Promise<boolean> {
+  set({ busy: true, step: "Finding your browser…", message: undefined });
+  const order = await browserOrder();
+  const failures: Array<{ status: YouTubeAuthState; message?: string }> = [];
 
-  if (isElectron && window.electronAPI?.youtubeConnect) {
-    set({ step: "Opening sign-in…" });
-    try {
-      const result = await window.electronAPI.youtubeConnect();
-      if (!result.connected && result.error) signInError = result.error;
-      if (result.connected) {
-        const cookieFile = result.path ?? null;
-        const validation = cookieFile
-          ? await validateSession({ cookieFile })
-          : { valid: false, message: "YouTube did not return a valid session." };
-        if (!validation.valid) {
-          set({
-            busy: false,
-            step: undefined,
-            connected: false,
-            mode: null,
-            cookieFile: null,
-            message: validation.message,
-          });
-          return false;
-        }
-        set({
-          busy: false,
-          step: undefined,
-          connected: true,
-          mode: "app",
-          cookieFile,
-          message: undefined,
-        });
-        return true;
-      }
-    } catch {
-      /* fall through to the browser sweep */
-    }
-  }
-
-  // Preferred browser first, then the rest.
-  const order = [state.browser, ...BROWSERS.filter((b) => b !== state.browser)];
-  let locked = false;
   for (const browser of order) {
     set({ step: `Checking ${browser}…`, browserStatus: "checking" });
-    const { status } = await checkBrowserSession(browser);
-    if (status === "signed_in") {
+    const result = await checkBrowserSession(browser);
+    if (result.status === "signed_in") {
       writeSetting("clipper.cookieBrowser", browser);
       set({
-        busy: false,
-        step: undefined,
         connected: true,
-        mode: "browser",
-        cookieFile: null,
         browser,
         browserStatus: "signed_in",
+        busy: false,
+        step: undefined,
         message: undefined,
+        probed: true,
       });
       return true;
     }
-    if (status === "locked") locked = true;
+    failures.push(result);
   }
 
   set({
+    connected: false,
+    browserStatus: "signed_out",
     busy: false,
     step: undefined,
-    browserStatus: "signed_out",
-    message:
-      signInError ??
-      (locked
-        ? "A browser's cookie store is locked. Fully quit it (Chrome: Quit, not just close the window) and try again."
-        : "No signed-in YouTube session found. Sign in to YouTube in your browser, then try again."),
+    message: bestFailure(failures),
+    probed: true,
   });
   return false;
 }
 
+/** Runs at most one browser-cookie check at a time. */
+export function checkConnection(): Promise<boolean> {
+  if (activeCheck) return activeCheck;
+  activeCheck = runConnectionCheck().finally(() => {
+    activeCheck = null;
+  });
+  return activeCheck;
+}
 
+export async function probeConnection(force = false): Promise<void> {
+  if (state.probed && !force) return;
+  await checkConnection();
+}
+
+export async function revalidateConnection(): Promise<void> {
+  if (activeCheck) return;
+  if (state.connected) {
+    set({ busy: true, step: "Checking YouTube…" });
+    const current = await checkBrowserSession(state.browser);
+    if (current.status === "signed_in") {
+      set({ busy: false, step: undefined, message: undefined, probed: true });
+      return;
+    }
+  }
+  await checkConnection();
+}
+
+export async function openYouTubeSignIn(): Promise<void> {
+  set({ message: undefined });
+  try {
+    if (window.electronAPI?.openYouTubeSignIn) {
+      const result = await window.electronAPI.openYouTubeSignIn();
+      if (!result.ok) throw new Error(result.error || "Could not open YouTube.");
+    } else {
+      window.open("https://www.youtube.com/signin", "_blank", "noopener");
+    }
+    set({
+      browserStatus: "ready",
+      message: "Sign in to YouTube, leave the browser tab open, then return here.",
+    });
+  } catch (error) {
+    set({
+      message: error instanceof Error ? error.message : "Could not open YouTube.",
+    });
+  }
+}
