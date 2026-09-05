@@ -8,11 +8,14 @@ import {
   BoxArrowUpRight,
   ExclamationTriangleFill,
 } from "react-bootstrap-icons";
+import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
 import {
   checkConnection,
   openYouTubeSignIn,
+  selectBrowser,
   useYouTubeConnection,
 } from "../lib/youtubeConnection";
+
 
 export default function YouTubeConnectModal({
   open,
