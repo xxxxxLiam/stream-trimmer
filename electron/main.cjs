@@ -308,12 +308,14 @@ app.on("second-instance", () => {
 app.whenReady().then(async () => {
   try {
     logger.installCrashHandlers();
+    // Settings and IPC must be ready BEFORE the window exists: the preload
+    // reads the settings snapshot synchronously during window creation.
+    loadSettings();
+    registerIpc();
     createSplash();
     const port = await startBackend();
     await createWindow(port);
     logger.watchWindow("main", mainWindow);
-    loadSettings();
-    registerIpc();
     setupAutoUpdater();
   } catch (err) {
     logger.log("app", `failed to start: ${logger.describe(err)}`);
