@@ -60,20 +60,34 @@ let splashWindow = null;
 let settingsPath = null;
 let settingsCache = {};
 
-function loadSettings() {
+function readSettingsFile() {
   try {
-    settingsPath = path.join(app.getPath("userData"), "settings.json");
-    settingsCache = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    if (!settingsCache || typeof settingsCache !== "object") settingsCache = {};
+    const raw = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   } catch {
-    settingsCache = {};
+    return {};
   }
 }
 
+function loadSettings() {
+  settingsPath = path.join(app.getPath("userData"), "settings.json");
+  settingsCache = readSettingsFile();
+}
+
+// Atomic write (temp file + rename) so a quit mid-write can't truncate the
+// file, and merge over whatever is on disk so a stale in-memory copy can
+// never wipe keys written by another path.
 function persistSettings() {
   try {
     if (!settingsPath) return;
-    fs.writeFileSync(settingsPath, JSON.stringify(settingsCache, null, 2));
+    const merged = { ...readSettingsFile(), ...settingsCache };
+    for (const key of Object.keys(merged)) {
+      if (!(key in settingsCache)) delete merged[key];
+    }
+    settingsCache = merged;
+    const tmp = `${settingsPath}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(settingsCache, null, 2));
+    fs.renameSync(tmp, settingsPath);
   } catch (err) {
     console.error("[electron] failed to persist settings:", err);
   }
