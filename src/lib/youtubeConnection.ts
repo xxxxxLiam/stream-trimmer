@@ -37,7 +37,19 @@ export interface YouTubeConnectionState {
   restoring: boolean;
   /** Whether the in-app sign-in window is available (desktop build only). */
   canSignInApp: boolean;
+  /** Current stage of an in-app sign-in, while one is running. */
+  phase?: YouTubeConnectPhase;
+  /** Epoch ms the current verification started, for an elapsed-time readout. */
+  verifyStartedAt?: number;
 }
+
+/** Human-readable label for each sign-in stage. */
+export const PHASE_LABEL: Record<YouTubeConnectPhase, string> = {
+  waiting: "Waiting for you to sign in…",
+  verifying: "Checking your sign-in with YouTube…",
+  rejected: "YouTube didn't accept that sign-in. Try again in the window.",
+  verified: "Signed in — finishing up…",
+};
 
 export interface CookiePayload {
   cookiesFromBrowser?: AuthSource;
@@ -83,6 +95,17 @@ let state: YouTubeConnectionState = {
 
 const listeners = new Set<() => void>();
 let activeCheck: Promise<boolean> | null = null;
+
+// Sign-in progress arrives from the main process; without it the UI has no
+// way to tell "waiting for the user" apart from "verifying with YouTube",
+// which is the slow stage.
+electron()?.onYouTubeProgress?.(({ phase }) => {
+  set({
+    phase,
+    step: PHASE_LABEL[phase] ?? undefined,
+    verifyStartedAt: phase === "verifying" ? Date.now() : undefined,
+  });
+});
 
 function set(patch: Partial<YouTubeConnectionState>) {
   state = { ...state, ...patch };
@@ -168,6 +191,8 @@ function failureMessage(result: ProbeResult, source: AuthSource): string {
 function markConnected(source: AuthSource) {
   writeSetting(SOURCE_KEY, source);
   set({
+    phase: undefined,
+    verifyStartedAt: undefined,
     connected: true,
     source,
     browserStatus: "signed_in",
@@ -182,6 +207,8 @@ function markConnected(source: AuthSource) {
 
 function markFailed(result: ProbeResult, source: AuthSource) {
   set({
+    phase: undefined,
+    verifyStartedAt: undefined,
     connected: false,
     source,
     browserStatus: result.status,
@@ -249,7 +276,9 @@ export async function connectInApp(): Promise<boolean> {
   }
   set({
     busy: true,
-    step: "Waiting for you to sign in…",
+    phase: "waiting",
+    step: PHASE_LABEL.waiting,
+    verifyStartedAt: undefined,
     message: undefined,
     reason: undefined,
   });
@@ -258,7 +287,9 @@ export async function connectInApp(): Promise<boolean> {
     if (!result.connected) {
       set({
         busy: false,
+        phase: undefined,
         step: undefined,
+        verifyStartedAt: undefined,
         probed: true,
         restoring: false,
         message: result.cancelled
@@ -267,17 +298,18 @@ export async function connectInApp(): Promise<boolean> {
       });
       return false;
     }
-    const verified = await checkSource("app");
-    if (verified.status === "signed_in") {
-      markConnected("app");
-      return true;
-    }
-    markFailed(verified, "app");
-    return false;
+    // No second check here. `connected` already means the main process ran
+    // the engine's real verification against YouTube through the very same
+    // endpoint — re-running it doubled the slowest part of the flow for no
+    // extra confidence.
+    markConnected("app");
+    return true;
   } catch (error) {
     set({
       busy: false,
+      phase: undefined,
       step: undefined,
+      verifyStartedAt: undefined,
       probed: true,
       restoring: false,
       message: error instanceof Error ? error.message : "Sign-in failed.",
@@ -297,6 +329,8 @@ export async function signOut(): Promise<void> {
   writeSetting(SOURCE_KEY, null);
   set({
     connected: false,
+    phase: undefined,
+    verifyStartedAt: undefined,
     source: hasInAppSignIn() ? "app" : state.browser,
     browserStatus: "idle",
     busy: false,

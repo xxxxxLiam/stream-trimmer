@@ -33,6 +33,13 @@ try {
     connectYouTube: () => ipcRenderer.invoke("youtube:connect"),
     probeYouTube: () => ipcRenderer.invoke("youtube:probe"),
     disconnectYouTube: () => ipcRenderer.invoke("youtube:disconnect"),
+    // Coarse sign-in progress, so the main window can show which stage the
+    // flow is in instead of one indefinite spinner.
+    onYouTubeProgress: (cb) => {
+      const listener = (_e, payload) => cb(payload);
+      ipcRenderer.on("youtube:progress", listener);
+      return () => ipcRenderer.removeListener("youtube:progress", listener);
+    },
     // Fallback path: opens YouTube in the user's own browser so yt-dlp can
     // read that browser's cookie store instead.
     // Diagnostics: reads the app's own local log so a crash can be reported.
