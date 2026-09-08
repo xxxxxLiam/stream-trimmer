@@ -323,10 +323,29 @@ const cookieBrowserSchema = z.enum([
   "chromium",
 ]);
 
-function resolveCookieOptions(
-  cookiesFromBrowser: string | undefined,
+// "app" = the session the user signed into inside the app. The cookie file
+// path is never accepted from the client; it is resolved here from the path
+// Electron hands the server at startup.
+const authSourceSchema = z.union([z.literal("app"), cookieBrowserSchema]);
+
+export function appCookieFile(): string | null {
+  const target = process.env.YT_CLIPPER_COOKIE_FILE;
+  if (!target) return null;
+  try {
+    return fs.existsSync(target) ? target : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveCookieOptions(
+  source: string | undefined,
 ): Record<string, unknown> {
-  if (cookiesFromBrowser) return { cookiesFromBrowser };
+  if (source === "app") {
+    const file = appCookieFile();
+    return file ? { cookies: file } : {};
+  }
+  if (source) return { cookiesFromBrowser: source };
   return {};
 }
 
