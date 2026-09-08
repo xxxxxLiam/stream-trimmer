@@ -4,7 +4,7 @@
  * Description: Types and CSV builders for the channel profile exporter.
  */
 import { sanitizeFilename } from "./clip";
-import type { CookieBrowser } from "./clip";
+import type { AuthSource } from "./clip";
 
 export type ChannelContentType = "shorts" | "longform" | "all";
 
@@ -17,7 +17,7 @@ export interface ChannelExportRequest {
   limit: number;
   includeComments: boolean;
   includeTranscripts: boolean;
-  cookiesFromBrowser?: CookieBrowser;
+  cookiesFromBrowser?: AuthSource;
 }
 
 export interface ChannelExportProgress {

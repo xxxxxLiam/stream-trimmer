@@ -27,6 +27,14 @@ try {
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.
     startDrag: (targetPath) => ipcRenderer.send("file:startDrag", targetPath),
+    // In-app YouTube sign-in. Cookie values never cross this bridge — the
+    // main process keeps them in its own session and writes them to a file
+    // only yt-dlp reads.
+    connectYouTube: () => ipcRenderer.invoke("youtube:connect"),
+    probeYouTube: () => ipcRenderer.invoke("youtube:probe"),
+    disconnectYouTube: () => ipcRenderer.invoke("youtube:disconnect"),
+    // Fallback path: opens YouTube in the user's own browser so yt-dlp can
+    // read that browser's cookie store instead.
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
     getDefaultBrowser: () => ipcRenderer.invoke("system:defaultBrowser"),
 

@@ -1,30 +1,45 @@
 /**
  * File: YouTubeConnectModal.tsx
  * Path: src/components/YouTubeConnectModal.tsx
- * Description: Required two-step prompt for connecting through the default browser.
+ * Description: One-time YouTube sign-in. Primary path signs in inside the app;
+ * reading a desktop browser's cookies is a collapsed fallback.
  */
+import { useState } from "react";
 import {
   ArrowRepeat,
   BoxArrowUpRight,
+  ChevronDown,
+  ChevronRight,
   ExclamationTriangleFill,
+  ShieldLock,
 } from "react-bootstrap-icons";
 import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
 import {
-  checkConnection,
+  checkBrowserConnection,
+  connectInApp,
   openYouTubeSignIn,
   selectBrowser,
   useYouTubeConnection,
 } from "../lib/youtubeConnection";
 
-
-export default function YouTubeConnectModal({
-  open,
-}: {
-  open: boolean;
-}) {
+export default function YouTubeConnectModal({ open }: { open: boolean }) {
   const state = useYouTubeConnection();
+  const [showFallback, setShowFallback] = useState(false);
 
   if (!open) return null;
+
+  // Silent launch-time restore: show a quiet placeholder rather than the
+  // sign-in prompt, so a still-valid session never flashes a false "connect".
+  if (state.restoring) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/90 p-6">
+        <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+          <ArrowRepeat className="animate-spin" size={12} />
+          Restoring your YouTube sign-in…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -34,40 +49,89 @@ export default function YouTubeConnectModal({
       aria-labelledby="youtube-connect-title"
     >
       <div className="w-full max-w-md rounded-row border border-hairline bg-panel p-5 shadow-xl">
-        <div>
-            <h2 id="youtube-connect-title" className="text-[15px] font-medium">Connect YouTube</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">
-              A verified YouTube session is required for reliable, high-quality downloads.
-              Your sign-in stays in your browser and is never uploaded.
-            </p>
-        </div>
+        <h2 id="youtube-connect-title" className="text-[15px] font-medium">
+          Connect YouTube
+        </h2>
+        <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">
+          Sign in once, inside the app. The session is stored on this computer
+          only, stays signed in across restarts, and is never uploaded.
+        </p>
 
-        <ol className="mt-5 space-y-4">
-          <li className="flex gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-panel-hover text-[11px] text-fg-muted">1</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium">Sign in in your browser</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">
-                Open YouTube, sign in, and leave that browser tab open.
-              </p>
-              <button
-                type="button"
-                className="btn mt-3 flex items-center gap-2"
-                onClick={() => void openYouTubeSignIn()}
-              >
-                <BoxArrowUpRight size={12} />
-                Connect YouTube
-              </button>
-            </div>
-          </li>
-          <li className="flex gap-3 border-t border-hairline pt-4">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-panel-hover text-[11px] text-fg-muted">2</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium">Return here and verify</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">
-                Pick the browser you signed in with, then check the connection.
+        {state.canSignInApp ? (
+          <>
+            <button
+              type="button"
+              className="btn-primary mt-5 flex w-full items-center justify-center gap-2"
+              disabled={state.busy}
+              onClick={() => void connectInApp()}
+            >
+              {state.busy ? (
+                <ArrowRepeat className="animate-spin" size={12} />
+              ) : (
+                <ShieldLock size={12} />
+              )}
+              {state.busy ? "Waiting for sign-in…" : "Sign in to YouTube"}
+            </button>
+            <p className="mt-2 text-[11px] leading-relaxed text-fg-faint">
+              A YouTube login window opens inside the app. Once you're in, it
+              closes itself and you won't be asked again.
+            </p>
+          </>
+        ) : (
+          <p className="mt-5 text-[12px] text-fg-muted">
+            In-app sign-in needs the desktop app. Use the browser option below.
+          </p>
+        )}
+
+        {state.message ? (
+          <div className="mt-4 flex items-start gap-2 rounded-chip bg-bg-deep/40 px-3 py-2 text-[12px] text-amber-400">
+            <ExclamationTriangleFill className="mt-0.5 shrink-0" size={12} />
+            <span>{state.message}</span>
+          </div>
+        ) : null}
+
+        {state.reason ? (
+          <details className="mt-2">
+            <summary className="cursor-pointer text-[11px] text-fg-faint">
+              Technical details
+            </summary>
+            <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-[10px] leading-relaxed text-fg-faint">
+              {state.reason}
+            </pre>
+          </details>
+        ) : null}
+
+        {state.busy && state.step ? (
+          <p className="mt-3 text-[11px] text-fg-faint">{state.step}</p>
+        ) : null}
+
+        <div className="mt-5 border-t border-hairline pt-3">
+          <button
+            type="button"
+            className="flex items-center gap-1 text-[11px] text-fg-faint hover:text-fg-muted"
+            aria-expanded={showFallback}
+            onClick={() => setShowFallback((v) => !v)}
+          >
+            {showFallback ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+            Use my browser session instead
+          </button>
+
+          {showFallback ? (
+            <div className="mt-3">
+              <p className="text-[11px] leading-relaxed text-fg-faint">
+                Reads the YouTube cookies from a browser you're already signed
+                into. Newer Chrome versions encrypt those cookies, so this can
+                fail even when you are signed in — quit the browser fully first.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn flex items-center gap-2"
+                  onClick={() => void openYouTubeSignIn()}
+                >
+                  <BoxArrowUpRight size={12} />
+                  Open YouTube
+                </button>
                 <select
                   className="input h-8 rounded-chip border border-hairline bg-panel-raised px-2 text-[12px] capitalize"
                   aria-label="Browser to check"
@@ -85,29 +149,19 @@ export default function YouTubeConnectModal({
                 </select>
                 <button
                   type="button"
-                  className="btn-primary flex items-center gap-2"
+                  className="btn flex items-center gap-2"
                   disabled={state.busy}
-                  onClick={() => void checkConnection()}
+                  onClick={() => void checkBrowserConnection()}
                 >
-                  {state.busy ? <ArrowRepeat className="animate-spin" size={12} /> : null}
-                  {state.busy ? "Checking…" : "Check Connection"}
+                  {state.busy ? (
+                    <ArrowRepeat className="animate-spin" size={12} />
+                  ) : null}
+                  {state.busy ? "Checking…" : "Check browser"}
                 </button>
               </div>
-
             </div>
-          </li>
-        </ol>
-
-        {state.message ? (
-          <div className="mt-4 flex items-start gap-2 rounded-chip bg-bg-deep/40 px-3 py-2 text-[12px] text-amber-400">
-            <ExclamationTriangleFill className="mt-0.5 shrink-0" size={12} />
-            <span>{state.message}</span>
-          </div>
-        ) : null}
-
-        {state.busy && state.step ? (
-          <p className="mt-3 text-[11px] text-fg-faint">{state.step}</p>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   );
