@@ -14,6 +14,7 @@ import {
   ShieldLock,
 } from "react-bootstrap-icons";
 import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
+import DiagnosticsDisclosure from "./DiagnosticsDisclosure";
 import {
   checkBrowserConnection,
   connectInApp,
@@ -161,6 +162,8 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
               </div>
             </div>
           ) : null}
+
+          <DiagnosticsDisclosure />
         </div>
       </div>
     </div>
