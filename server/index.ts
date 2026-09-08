@@ -323,10 +323,29 @@ const cookieBrowserSchema = z.enum([
   "chromium",
 ]);
 
-function resolveCookieOptions(
-  cookiesFromBrowser: string | undefined,
+// "app" = the session the user signed into inside the app. The cookie file
+// path is never accepted from the client; it is resolved here from the path
+// Electron hands the server at startup.
+const authSourceSchema = z.union([z.literal("app"), cookieBrowserSchema]);
+
+export function appCookieFile(): string | null {
+  const target = process.env.YT_CLIPPER_COOKIE_FILE;
+  if (!target) return null;
+  try {
+    return fs.existsSync(target) ? target : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveCookieOptions(
+  source: string | undefined,
 ): Record<string, unknown> {
-  if (cookiesFromBrowser) return { cookiesFromBrowser };
+  if (source === "app") {
+    const file = appCookieFile();
+    return file ? { cookies: file } : {};
+  }
+  if (source) return { cookiesFromBrowser: source };
   return {};
 }
 
@@ -337,10 +356,10 @@ const downloadSchema = z
     end: z.number().positive(),
     format: z.enum(["mp4", "mp3"]).default("mp4"),
     quality: z.string().default("best"),
-    // Optional sign-in path: yt-dlp reads the logged-in YouTube session
-    // directly from the named browser at runtime. Cookie contents never touch
-    // this process — only the browser name is accepted, from an allowlist.
-    cookiesFromBrowser: cookieBrowserSchema.optional(),
+    // Optional sign-in path. "app" uses the session the user signed into
+    // inside the app; a browser name lets yt-dlp read that browser's session.
+    // Cookie contents never cross the API — only the source label.
+    cookiesFromBrowser: authSourceSchema.optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -426,6 +445,8 @@ function isCookieError(e: unknown): boolean {
 }
 
 function cookieErrorMessage(browser: string): string {
+  if (browser === "app")
+    return "Your in-app YouTube sign-in is no longer valid. Sign in again from the YouTube button.";
   return `Couldn't read ${browser}'s cookies. The browser may need to be fully closed, or that profile isn't supported. You can turn sign-in off and retry for standard quality.`;
 }
 
@@ -664,10 +685,20 @@ type CookieBrowserName = z.infer<typeof cookieBrowserSchema>;
 const AUTH_PROBE_TIMEOUT_MS = 15_000;
 const AUTH_PROBE_URL = "https://www.youtube.com/watch?v=BaW_jenozKc";
 
+type AuthSourceName = CookieBrowserName | "app";
+
 function authProbeMessage(
-  source: CookieBrowserName,
+  source: AuthSourceName,
   status: YouTubeAuthProbeStatus,
 ): string | undefined {
+  if (source === "app") {
+    if (status === "signed_in") return undefined;
+    if (status === "signed_out")
+      return "Your in-app YouTube sign-in has expired. Sign in again.";
+    if (status === "timeout")
+      return "YouTube took too long to answer. Try again.";
+    return "YouTube rejected the saved sign-in. Sign in again.";
+  }
   const label = source[0].toUpperCase() + source.slice(1);
   if (status === "signed_out")
     return `No YouTube account cookies were found in ${label}.`;
@@ -676,7 +707,7 @@ function authProbeMessage(
   if (status === "locked")
     return `Fully quit ${label}, including background windows, then check again.`;
   if (status === "decrypt_failed")
-    return `${label}'s cookie security blocked access. Firefox is the most reliable alternative.`;
+    return `${label}'s cookie security blocked access. Signing in inside the app is the reliable alternative.`;
   if (status === "timeout")
     return `${label} took too long to respond. Quit it fully, then try again.`;
   if (status === "extractor_error")
@@ -684,10 +715,26 @@ function authProbeMessage(
   return undefined;
 }
 
+// Keeps the last few lines of yt-dlp's own output so the UI can show the real
+// reason a check failed instead of only a friendly summary.
+function tailReason(output: string): string | undefined {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /error|warning|unable|failed/i.test(line));
+  if (lines.length === 0) return undefined;
+  return lines.slice(-3).join("\n").slice(0, 600);
+}
+
+interface AuthProbeResult {
+  status: YouTubeAuthProbeStatus;
+  reason?: string;
+}
+
 function probeYouTubeAuth(
   cookieOptions: Record<string, unknown>,
   onChild: (child: ChildProcess | null) => void,
-): Promise<YouTubeAuthProbeStatus> {
+): Promise<AuthProbeResult> {
   return new Promise((resolve) => {
     const child = yt!.exec(
       AUTH_PROBE_URL,
@@ -698,41 +745,57 @@ function probeYouTubeAuth(
     const chunks: Buffer[] = [];
     let settled = false;
     let timer: NodeJS.Timeout | undefined;
-    const finish = (status: YouTubeAuthProbeStatus) => {
+    const finish = (status: YouTubeAuthProbeStatus, output: string) => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
       onChild(null);
-      resolve(status);
+      if (status !== "signed_in" && output)
+        console.log(`[server] youtube auth probe ${status}: ${tailReason(output) ?? "no detail"}`);
+      resolve({
+        status,
+        reason: status === "signed_in" ? undefined : tailReason(output),
+      });
     };
     child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
     child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
-    child.on("error", (error) => finish(classifyYouTubeAuthOutput(String(error))));
-    child.on("close", () =>
-      finish(classifyYouTubeAuthOutput(Buffer.concat(chunks).toString())),
+    child.on("error", (error) =>
+      finish(classifyYouTubeAuthOutput(String(error)), String(error)),
     );
+    child.on("close", () => {
+      const output = Buffer.concat(chunks).toString();
+      finish(classifyYouTubeAuthOutput(output), output);
+    });
     timer = setTimeout(() => {
       child.kill("SIGKILL");
-      finish("timeout");
+      finish("timeout", Buffer.concat(chunks).toString());
     }, AUTH_PROBE_TIMEOUT_MS);
   });
 }
 
 app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   const parsed = z
-    .object({ browser: cookieBrowserSchema })
+    .object({ browser: authSourceSchema })
     .safeParse(req.body ?? {});
   if (!parsed.success)
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
   const source = parsed.data.browser;
+  if (source === "app" && !appCookieFile()) {
+    return res.json({
+      status: "signed_out" satisfies YouTubeAuthProbeStatus,
+      source,
+      browser: source,
+      message: "No in-app YouTube sign-in yet.",
+    });
+  }
   const cookieOptions = resolveCookieOptions(source);
   let activeChild: ChildProcess | null = null;
   res.on("close", () => {
     if (!res.writableEnded && activeChild) activeChild.kill("SIGKILL");
   });
-  const status = await probeYouTubeAuth(cookieOptions, (child) => {
+  const { status, reason } = await probeYouTubeAuth(cookieOptions, (child) => {
     activeChild = child;
   });
   if (res.writableEnded || res.destroyed) return;
@@ -741,6 +804,7 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
     source,
     browser: parsed.data.browser,
     message: authProbeMessage(source, status),
+    reason,
   });
 });
 
@@ -759,7 +823,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
     cookiesFromBrowser,
   }: DownloadInput = parsed.data;
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
-  const cookieMode: "browser" | "none" = cookiesFromBrowser ? "browser" : "none";
+  const cookieMode: "app" | "browser" | "none" = !cookiesFromBrowser
+    ? "none"
+    : cookiesFromBrowser === "app"
+      ? "app"
+      : "browser";
   console.log(`[server] /api/download auth mode=${cookieMode}`);
 
   const requiresVerifiedSession =
@@ -771,11 +839,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
         error: "Connect YouTube before downloading this quality.",
       });
     }
-    const authStatus = await probeYouTubeAuth(cookieOptions, () => undefined);
-    if (authStatus !== "signed_in") {
+    const auth = await probeYouTubeAuth(cookieOptions, () => undefined);
+    if (auth.status !== "signed_in") {
       return res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
         error: "Your YouTube connection is no longer valid. Connect again.",
+        reason: auth.reason,
       });
     }
   }
@@ -1414,7 +1483,7 @@ const channelExportSchema = z.object({
   limit: z.number().int().min(1).max(500).default(100),
   includeComments: z.boolean().default(true),
   includeTranscripts: z.boolean().default(true),
-  cookiesFromBrowser: cookieBrowserSchema.optional(),
+  cookiesFromBrowser: authSourceSchema.optional(),
 
 });
 

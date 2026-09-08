@@ -60,20 +60,34 @@ let splashWindow = null;
 let settingsPath = null;
 let settingsCache = {};
 
-function loadSettings() {
+function readSettingsFile() {
   try {
-    settingsPath = path.join(app.getPath("userData"), "settings.json");
-    settingsCache = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    if (!settingsCache || typeof settingsCache !== "object") settingsCache = {};
+    const raw = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   } catch {
-    settingsCache = {};
+    return {};
   }
 }
 
+function loadSettings() {
+  settingsPath = path.join(app.getPath("userData"), "settings.json");
+  settingsCache = readSettingsFile();
+}
+
+// Atomic write (temp file + rename) so a quit mid-write can't truncate the
+// file, and merge over whatever is on disk so a stale in-memory copy can
+// never wipe keys written by another path.
 function persistSettings() {
   try {
     if (!settingsPath) return;
-    fs.writeFileSync(settingsPath, JSON.stringify(settingsCache, null, 2));
+    const merged = { ...readSettingsFile(), ...settingsCache };
+    for (const key of Object.keys(merged)) {
+      if (!(key in settingsCache)) delete merged[key];
+    }
+    settingsCache = merged;
+    const tmp = `${settingsPath}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(settingsCache, null, 2));
+    fs.renameSync(tmp, settingsPath);
   } catch (err) {
     console.error("[electron] failed to persist settings:", err);
   }
@@ -294,12 +308,14 @@ app.on("second-instance", () => {
 app.whenReady().then(async () => {
   try {
     logger.installCrashHandlers();
+    // Settings and IPC must be ready BEFORE the window exists: the preload
+    // reads the settings snapshot synchronously during window creation.
+    loadSettings();
+    registerIpc();
     createSplash();
     const port = await startBackend();
     await createWindow(port);
     logger.watchWindow("main", mainWindow);
-    loadSettings();
-    registerIpc();
     setupAutoUpdater();
   } catch (err) {
     logger.log("app", `failed to start: ${logger.describe(err)}`);
@@ -464,9 +480,44 @@ function registerIpc() {
     }
   });
 
-  // Opens YouTube's sign-in page in the user's default browser. The app
-  // never sees credentials — it later reuses the browser's session cookies
-  // via yt-dlp. https://www.youtube.com/signin redirects to Google sign-in.
+  // In-app sign-in: opens a real YouTube login window in the app's own
+  // persistent session and exports those cookies to a file yt-dlp can use.
+  // Cookie values never reach the renderer — only a boolean.
+  ipcMain.handle("youtube:connect", async () => {
+    try {
+      const result = await youtubeSession.openLoginWindow(
+        mainWindow,
+        (file) => verifyCookieFile(file),
+        (msg) => logger.log("youtube", msg),
+      );
+      return {
+        connected: !!result.connected,
+        cancelled: !!result.cancelled,
+        error: result.error,
+      };
+    } catch (err) {
+      return {
+        connected: false,
+        cancelled: false,
+        error: err && err.message ? err.message : "Sign-in failed",
+      };
+    }
+  });
+
+  // Cheap, offline check plus a cookie-file refresh so the session rolls
+  // forward from the app's own storage on every launch.
+  ipcMain.handle("youtube:probe", async () => {
+    const result = await youtubeSession.probe();
+    return { connected: !!result.connected, error: result.error };
+  });
+
+  ipcMain.handle("youtube:disconnect", async () => {
+    await youtubeSession.clear();
+    return { ok: true };
+  });
+
+  // Fallback path only: opens YouTube in the user's default browser so
+  // yt-dlp can read that browser's session instead.
   ipcMain.handle("shell:openYouTubeSignIn", async () => {
     try {
       await shell.openExternal("https://www.youtube.com/signin");
