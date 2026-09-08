@@ -823,7 +823,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
     cookiesFromBrowser,
   }: DownloadInput = parsed.data;
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
-  const cookieMode: "browser" | "none" = cookiesFromBrowser ? "browser" : "none";
+  const cookieMode: "app" | "browser" | "none" = !cookiesFromBrowser
+    ? "none"
+    : cookiesFromBrowser === "app"
+      ? "app"
+      : "browser";
   console.log(`[server] /api/download auth mode=${cookieMode}`);
 
   const requiresVerifiedSession =
@@ -835,11 +839,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
         error: "Connect YouTube before downloading this quality.",
       });
     }
-    const authStatus = await probeYouTubeAuth(cookieOptions, () => undefined);
-    if (authStatus !== "signed_in") {
+    const auth = await probeYouTubeAuth(cookieOptions, () => undefined);
+    if (auth.status !== "signed_in") {
       return res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
         error: "Your YouTube connection is no longer valid. Connect again.",
+        reason: auth.reason,
       });
     }
   }
