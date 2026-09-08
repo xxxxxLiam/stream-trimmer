@@ -41,9 +41,7 @@ import { formatBytes } from "./lib/clip";
 import YouTubeStatusChip from "./components/YouTubeStatusChip";
 import YouTubeConnectModal from "./components/YouTubeConnectModal";
 import {
-  checkConnection,
-  initBrowserSelection,
-
+  restoreConnection,
   useYouTubeConnection,
 } from "./lib/youtubeConnection";
 
@@ -410,10 +408,10 @@ function Shell() {
   const { tabs, activeId } = useWorkspace();
   const connection = useYouTubeConnection();
 
-  // No background polling: the user checks the connection when they choose to.
-  // We only pre-select a sensible browser in the dropdown on first launch.
+  // No background polling. On launch we restore the stored in-app sign-in
+  // once and verify it silently; after that the user checks when they choose.
   useEffect(() => {
-    void initBrowserSelection();
+    void restoreConnection();
   }, []);
 
   return (
@@ -422,7 +420,7 @@ function Shell() {
       <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-3 py-1.5">
         <WorkspaceTabs />
         <div className="ml-auto flex shrink-0 items-center gap-3">
-          <YouTubeStatusChip onOpen={() => void checkConnection()} />
+          <YouTubeStatusChip />
 
           <UpdateStatus />
           <span className="text-[11px] text-fg-faint">Local · Private</span>
@@ -451,7 +449,7 @@ function Shell() {
         })}
       </div>
 
-      <YouTubeConnectModal open={!connection.connected} />
+      <YouTubeConnectModal open={!connection.connected || connection.restoring} />
     </div>
   );
 }

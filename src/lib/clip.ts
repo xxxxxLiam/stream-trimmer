@@ -46,6 +46,11 @@ export const COOKIE_BROWSERS = [
 
 export type CookieBrowser = (typeof COOKIE_BROWSERS)[number];
 
+// Where a verified YouTube session comes from. "app" is the session the user
+// signed into inside the app (a cookie file only yt-dlp reads); a browser name
+// is the fallback that reads that browser's own cookie store.
+export type AuthSource = "app" | CookieBrowser;
+
 // Server → client shape from POST /api/auth/youtube/status. "idle" and
 // "checking" are client-only states and never arrive from the server.
 export type YouTubeAuthState =
@@ -62,8 +67,10 @@ export type YouTubeAuthState =
 
 export interface YouTubeAuthStatus {
   status: Exclude<YouTubeAuthState, "idle" | "ready" | "checking">;
-  browser: CookieBrowser;
+  browser: AuthSource;
   message?: string;
+  /** Raw tail of yt-dlp's own output when a check fails. */
+  reason?: string;
 }
 
 export interface DownloadRequest {
@@ -72,8 +79,8 @@ export interface DownloadRequest {
   end: number;
   format: ClipFormat;
   quality: string;
-  /** Optional: browser whose YouTube session yt-dlp should reuse. */
-  cookiesFromBrowser?: CookieBrowser;
+  /** Optional: which signed-in YouTube session yt-dlp should reuse. */
+  cookiesFromBrowser?: AuthSource;
 }
 
 // Server → client shape from POST /api/comments.

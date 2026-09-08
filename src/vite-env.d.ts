@@ -37,6 +37,16 @@ interface ElectronAPI {
   ) => Promise<{ ok: boolean; error?: string }>;
   fileExists?: (targetPath: string) => Promise<boolean>;
   startDrag?: (targetPath: string) => void;
+  /** Opens the in-app YouTube login window. Cookie values never cross this bridge. */
+  connectYouTube?: () => Promise<{
+    connected: boolean;
+    cancelled: boolean;
+    error?: string;
+  }>;
+  /** Refreshes the stored cookie file and reports whether a session exists. */
+  probeYouTube?: () => Promise<{ connected: boolean; error?: string }>;
+  /** Clears the stored in-app YouTube session. */
+  disconnectYouTube?: () => Promise<{ ok: boolean }>;
   openYouTubeSignIn: () => Promise<{ ok: boolean; error?: string }>;
   getDefaultBrowser?: () => Promise<{
     browser: import("./lib/clip").CookieBrowser | null;

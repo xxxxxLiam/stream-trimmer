@@ -22,6 +22,8 @@ const fsp = require("node:fs/promises");
 // the resulting error gracefully instead of crashing.
 const { autoUpdater } = require("electron-updater");
 const { detectDefaultBrowser } = require("./defaultBrowser.cjs");
+const youtubeSession = require("./youtubeSession.cjs");
+const { createSettingsStore } = require("./settingsStore.cjs");
 const logger = require("./logger.cjs");
 
 
@@ -55,45 +57,56 @@ if (!app.requestSingleInstanceLock()) {
 let mainWindow = null;
 let splashWindow = null;
 // --- Persistent settings -------------------------------------------------
-// The renderer is served from a random loopback port, so localStorage is
-// wiped on every launch. Settings therefore live in a JSON file in userData.
-let settingsPath = null;
-let settingsCache = {};
-
-function readSettingsFile() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  } catch {
-    return {};
-  }
-}
+// Backed by a JSON file in userData (see settingsStore.cjs). Loaded and its
+// IPC registered BEFORE the window exists, because the preload reads the
+// snapshot synchronously while the window is being created.
+let settings = null;
 
 function loadSettings() {
-  settingsPath = path.join(app.getPath("userData"), "settings.json");
-  settingsCache = readSettingsFile();
-}
-
-// Atomic write (temp file + rename) so a quit mid-write can't truncate the
-// file, and merge over whatever is on disk so a stale in-memory copy can
-// never wipe keys written by another path.
-function persistSettings() {
-  try {
-    if (!settingsPath) return;
-    const merged = { ...readSettingsFile(), ...settingsCache };
-    for (const key of Object.keys(merged)) {
-      if (!(key in settingsCache)) delete merged[key];
-    }
-    settingsCache = merged;
-    const tmp = `${settingsPath}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(settingsCache, null, 2));
-    fs.renameSync(tmp, settingsPath);
-  } catch (err) {
-    console.error("[electron] failed to persist settings:", err);
-  }
+  settings = createSettingsStore(
+    path.join(app.getPath("userData"), "settings.json"),
+  );
+  settings.load();
 }
 
 let serverHandle = null; // { close(cb) } returned by the bundled server
+// Loopback port the bundled backend listens on. Needed by verifyCookieFile,
+// which asks the backend (and therefore yt-dlp) whether a saved sign-in is
+// actually accepted by YouTube.
+let backendPort = null;
+
+// Verifies a freshly exported cookie file for real: the backend runs yt-dlp
+// against YouTube with `--cookies <file>` and reports what it found. Returns
+// { ok, message } so the sign-in window can stay open with the true reason.
+async function verifyCookieFile(file) {
+  if (!file || !fs.existsSync(file)) {
+    return { ok: false, message: "No cookie file was written." };
+  }
+  if (!backendPort) {
+    return { ok: false, message: "The local engine is not running yet." };
+  }
+  try {
+    const res = await fetch(
+      `http://127.0.0.1:${backendPort}/api/auth/youtube/status`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ browser: "app" }),
+        signal: AbortSignal.timeout(45000),
+      },
+    );
+    const data = await res.json();
+    return {
+      ok: data && data.status === "signed_in",
+      message: (data && (data.message || data.reason)) || undefined,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err && err.message ? err.message : "Verification failed.",
+    };
+  }
+}
 
 function sendUpdateStatus(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -177,6 +190,9 @@ async function startBackend() {
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
   process.env.ELECTRON_USER_DATA = app.getPath("userData");
+  // Where the in-app sign-in stores its cookies. The backend resolves the
+  // path from here and never accepts it from the renderer.
+  process.env.YT_CLIPPER_COOKIE_FILE = youtubeSession.cookieFilePath();
 
   // Serve the built UI from the same local server so the window loads over
   // http://127.0.0.1 instead of file://. YouTube embeds refuse to render in a
@@ -214,6 +230,7 @@ async function startBackend() {
   // The bundled server exports a { server } object (see scripts/build-server.cjs).
   const mod = require(bundledServer);
   serverHandle = mod && mod.server ? mod.server : null;
+  backendPort = port;
   return port;
 }
 
@@ -298,6 +315,26 @@ async function createWindow(port) {
 }
 
 
+// Keeps the exported cookie file in step with the app's own YouTube session,
+// so a session that is still alive never reads as expired. Local only — this
+// reads Electron's own cookie jar and writes a file; it makes no network call.
+let cookieRefreshTimer = null;
+const COOKIE_REFRESH_MS = 60 * 60 * 1000;
+
+function refreshCookieFile() {
+  youtubeSession
+    .probe()
+    .catch((err) => logger.log("youtube", `cookie refresh failed: ${logger.describe(err)}`));
+}
+
+function startCookieRefresh() {
+  refreshCookieFile();
+  if (cookieRefreshTimer) clearInterval(cookieRefreshTimer);
+  cookieRefreshTimer = setInterval(refreshCookieFile, COOKIE_REFRESH_MS);
+  cookieRefreshTimer.unref?.();
+  app.on("browser-window-focus", refreshCookieFile);
+}
+
 app.on("second-instance", () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -316,6 +353,7 @@ app.whenReady().then(async () => {
     const port = await startBackend();
     await createWindow(port);
     logger.watchWindow("main", mainWindow);
+    startCookieRefresh();
     setupAutoUpdater();
   } catch (err) {
     logger.log("app", `failed to start: ${logger.describe(err)}`);
@@ -329,6 +367,10 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  if (cookieRefreshTimer) {
+    clearInterval(cookieRefreshTimer);
+    cookieRefreshTimer = null;
+  }
   if (serverHandle && typeof serverHandle.close === "function") {
     try {
       serverHandle.close();
@@ -341,14 +383,11 @@ app.on("before-quit", () => {
 function registerIpc() {
   // Synchronous snapshot so the renderer can seed state before first paint.
   ipcMain.on("settings:all", (e) => {
-    e.returnValue = settingsCache;
+    e.returnValue = settings ? settings.all() : {};
   });
   ipcMain.handle("settings:set", (_e, key, value) => {
-    if (typeof key !== "string" || !key) return { ok: false };
-    if (value === null || value === undefined) delete settingsCache[key];
-    else settingsCache[key] = value;
-    persistSettings();
-    return { ok: true };
+    if (!settings) return { ok: false };
+    return { ok: settings.set(key, value) };
   });
 
   ipcMain.handle("dialog:pickDirectory", async () => {
