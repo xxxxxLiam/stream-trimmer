@@ -5,9 +5,11 @@
 const {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   nativeImage,
+  net: electronNet,
   shell,
 } = require("electron");
 const path = require("node:path");
@@ -86,7 +88,10 @@ async function verifyCookieFile(file) {
     return { ok: false, message: "The local engine is not running yet." };
   }
   try {
-    const res = await fetch(
+    logger.log("youtube", "verify: asking the local engine");
+    // Electron's net.fetch, not Node's global fetch: it is the supported
+    // main-process HTTP client and goes through Chromium's stack.
+    const res = await electronNet.fetch(
       `http://127.0.0.1:${backendPort}/api/auth/youtube/status`,
       {
         method: "POST",
@@ -95,12 +100,21 @@ async function verifyCookieFile(file) {
         signal: AbortSignal.timeout(45000),
       },
     );
-    const data = await res.json();
+    const text = await res.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      logger.log("youtube", `verify: non-JSON reply status=${res.status}`);
+      return { ok: false, message: "The local engine returned an unexpected reply." };
+    }
+    logger.log("youtube", `verify: status=${data && data.status}`);
     return {
-      ok: data && data.status === "signed_in",
+      ok: Boolean(data && data.status === "signed_in"),
       message: (data && (data.message || data.reason)) || undefined,
     };
   } catch (err) {
+    logger.log("youtube", `verify failed: ${logger.describe(err)}`);
     return {
       ok: false,
       message: err && err.message ? err.message : "Verification failed.",
@@ -321,18 +335,30 @@ async function createWindow(port) {
 let cookieRefreshTimer = null;
 const COOKIE_REFRESH_MS = 60 * 60 * 1000;
 
-function refreshCookieFile() {
+let lastCookieRefresh = 0;
+const COOKIE_REFRESH_MIN_GAP_MS = 60 * 1000;
+
+function refreshCookieFile(why) {
+  // The sign-in window runs its own export loop; a second one racing it only
+  // risks writing the cookie file from two places at once.
+  if (youtubeSession.isSigningIn()) return;
+  const now = Date.now();
+  if (now - lastCookieRefresh < COOKIE_REFRESH_MIN_GAP_MS) return;
+  lastCookieRefresh = now;
   youtubeSession
     .probe()
-    .catch((err) => logger.log("youtube", `cookie refresh failed: ${logger.describe(err)}`));
+    .then((r) => logger.log("youtube", `cookie refresh (${why}) connected=${!!r.connected}`))
+    .catch((err) =>
+      logger.log("youtube", `cookie refresh (${why}) failed: ${logger.describe(err)}`),
+    );
 }
 
 function startCookieRefresh() {
-  refreshCookieFile();
+  refreshCookieFile("launch");
   if (cookieRefreshTimer) clearInterval(cookieRefreshTimer);
-  cookieRefreshTimer = setInterval(refreshCookieFile, COOKIE_REFRESH_MS);
+  cookieRefreshTimer = setInterval(() => refreshCookieFile("timer"), COOKIE_REFRESH_MS);
   cookieRefreshTimer.unref?.();
-  app.on("browser-window-focus", refreshCookieFile);
+  app.on("browser-window-focus", () => refreshCookieFile("focus"));
 }
 
 app.on("second-instance", () => {
@@ -363,6 +389,14 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
+  // Defensive: the sign-in window closing has previously coincided with the
+  // whole app disappearing. If the main window is still alive, this event is
+  // spurious and must not be read as "the user quit".
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    logger.log("app", "window-all-closed ignored — main window still alive");
+    return;
+  }
+  logger.log("app", "window-all-closed — quitting");
   app.quit();
 });
 
@@ -523,11 +557,16 @@ function registerIpc() {
   // persistent session and exports those cookies to a file yt-dlp can use.
   // Cookie values never reach the renderer — only a boolean.
   ipcMain.handle("youtube:connect", async () => {
+    logger.log("youtube", "connect: requested");
     try {
       const result = await youtubeSession.openLoginWindow(
         mainWindow,
         (file) => verifyCookieFile(file),
         (msg) => logger.log("youtube", msg),
+      );
+      logger.log(
+        "youtube",
+        `connect: finished connected=${!!result.connected} cancelled=${!!result.cancelled}`,
       );
       return {
         connected: !!result.connected,
@@ -535,6 +574,9 @@ function registerIpc() {
         error: result.error,
       };
     } catch (err) {
+      // A sign-in problem returns a normal failure to the UI; it never
+      // escapes and takes the app with it.
+      logger.log("youtube", `connect: threw ${logger.describe(err)}`);
       return {
         connected: false,
         cancelled: false,
@@ -546,13 +588,54 @@ function registerIpc() {
   // Cheap, offline check plus a cookie-file refresh so the session rolls
   // forward from the app's own storage on every launch.
   ipcMain.handle("youtube:probe", async () => {
-    const result = await youtubeSession.probe();
-    return { connected: !!result.connected, error: result.error };
+    try {
+      const result = await youtubeSession.probe();
+      return { connected: !!result.connected, error: result.error };
+    } catch (err) {
+      logger.log("youtube", `probe: threw ${logger.describe(err)}`);
+      return { connected: false, error: logger.describe(err) };
+    }
   });
 
   ipcMain.handle("youtube:disconnect", async () => {
-    await youtubeSession.clear();
-    return { ok: true };
+    try {
+      await youtubeSession.clear();
+      logger.log("youtube", "disconnect: cleared");
+      return { ok: true };
+    } catch (err) {
+      logger.log("youtube", `disconnect: threw ${logger.describe(err)}`);
+      return { ok: false };
+    }
+  });
+
+  // --- Diagnostics ------------------------------------------------------
+  // Surfaces the local log so a crash can be reported without hunting for a
+  // hidden folder. Only event names and error messages are ever recorded.
+  ipcMain.handle("diagnostics:read", () => ({
+    path: logger.logFilePath(),
+    text: logger.tail(500),
+  }));
+
+  ipcMain.handle("diagnostics:reveal", () => {
+    try {
+      const target = logger.logFilePath();
+      if (!target || !fs.existsSync(target)) {
+        return { ok: false, error: "No log file yet." };
+      }
+      shell.showItemInFolder(target);
+      return { ok: true, path: target };
+    } catch (err) {
+      return { ok: false, error: logger.describe(err) };
+    }
+  });
+
+  ipcMain.handle("diagnostics:copy", () => {
+    try {
+      clipboard.writeText(logger.tail(500));
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: logger.describe(err) };
+    }
   });
 
   // Fallback path only: opens YouTube in the user's default browser so

@@ -47,6 +47,14 @@ interface ElectronAPI {
   probeYouTube?: () => Promise<{ connected: boolean; error?: string }>;
   /** Clears the stored in-app YouTube session. */
   disconnectYouTube?: () => Promise<{ ok: boolean }>;
+  /** Reads the tail of the local diagnostic log, plus its path on disk. */
+  readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
+  revealDiagnostics?: () => Promise<{
+    ok: boolean;
+    path?: string;
+    error?: string;
+  }>;
+  copyDiagnostics?: () => Promise<{ ok: boolean; error?: string }>;
   openYouTubeSignIn: () => Promise<{ ok: boolean; error?: string }>;
   getDefaultBrowser?: () => Promise<{
     browser: import("./lib/clip").CookieBrowser | null;

@@ -14,9 +14,27 @@ const PARTITION = "persist:youtube";
 const SIGNIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube";
 // Presence of any of these means a usable signed-in YouTube session.
 const AUTH_COOKIES = ["SID", "__Secure-3PSID", "__Secure-1PSID"];
+// Ceiling for one verification attempt (the backend's own yt-dlp probe caps
+// out well below this).
+const VERIFY_TIMEOUT_MS = 60000;
 
 function ytSession() {
   return session.fromPartition(PARTITION);
+}
+
+// Google refuses to sign you in from something it recognises as an embedded
+// browser ("this browser or app may not be secure"), and Electron's default
+// user agent announces itself as exactly that. Present the plain Chrome UA
+// for the underlying Chromium this app already ships.
+function browserUserAgent() {
+  const chrome = process.versions.chrome || "130.0.0.0";
+  const platform =
+    process.platform === "win32"
+      ? "Windows NT 10.0; Win64; x64"
+      : process.platform === "darwin"
+        ? "Macintosh; Intel Mac OS X 10_15_7"
+        : "X11; Linux x86_64";
+  return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chrome} Safari/537.36`;
 }
 
 function cookieFilePath() {
@@ -38,6 +56,15 @@ async function readAuthCookies() {
     all.push(cookie);
   }
   return all;
+}
+
+/** Host only — never the full URL, which can carry sign-in tokens. */
+function safeHost(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "unknown";
+  }
 }
 
 function hasAuth(cookies) {
@@ -72,18 +99,33 @@ function toNetscape(cookies) {
   return `${lines.join("\n")}\n`;
 }
 
-/** Writes the current partition cookies to disk. Returns true when signed in. */
-async function exportCookieFile() {
+// Exports can be triggered from several places at once (the 1.5s sign-in
+// poll, the launch refresh, an explicit probe). Overlapping writes to the
+// same path interleave — and on Windows they fail outright with EBUSY — so
+// every export goes through one queue and writes atomically.
+let exportQueue = Promise.resolve(false);
+
+async function writeCookieFile() {
   const cookies = await readAuthCookies();
   if (!hasAuth(cookies)) return false;
   const target = cookieFilePath();
-  await fsp.writeFile(target, toNetscape(cookies), { mode: 0o600 });
+  const tmp = `${target}.tmp`;
+  await fsp.writeFile(tmp, toNetscape(cookies), { mode: 0o600 });
+  await fsp.rename(tmp, target);
   try {
     await fsp.chmod(target, 0o600);
   } catch {
     /* best effort on Windows */
   }
   return true;
+}
+
+/** Writes the current partition cookies to disk. Returns true when signed in. */
+function exportCookieFile() {
+  // Chain onto the previous export regardless of how it settled, so one
+  // failure cannot wedge the queue.
+  exportQueue = exportQueue.then(writeCookieFile, writeCookieFile);
+  return exportQueue;
 }
 
 /** Cheap check used on launch — no network call. */
@@ -130,12 +172,14 @@ function openLoginWindow(parent, validate, onEvent) {
 
   return new Promise((resolve) => {
     let win;
+    const userAgent = browserUserAgent();
     try {
+      // Deliberately NOT a child of the main window: a parent/child pair has
+      // been implicated in the app disappearing when this window closes, and
+      // the sign-in window has no need to be modal.
       win = new BrowserWindow({
         width: 520,
         height: 720,
-        parent: parent && !parent.isDestroyed() ? parent : undefined,
-        modal: false,
         show: true,
         title: "Sign in to YouTube",
         autoHideMenuBar: true,
@@ -146,6 +190,29 @@ function openLoginWindow(parent, validate, onEvent) {
           sandbox: true,
         },
       });
+      try {
+        ytSession().setUserAgent(userAgent);
+      } catch (err) {
+        trace(`could not set session UA: ${err && err.message}`);
+      }
+      win.webContents.setUserAgent(userAgent);
+      // Google opens popups mid-flow. Left unhandled, Electron spawns
+      // unmanaged windows that outlive this one; keep them in the same
+      // session and same lifecycle instead.
+      win.webContents.setWindowOpenHandler(() => ({
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          width: 520,
+          height: 720,
+          autoHideMenuBar: true,
+          webPreferences: {
+            partition: PARTITION,
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+          },
+        },
+      }));
     } catch (err) {
       trace(`window failed: ${err && err.message ? err.message : "unknown"}`);
       resolve({
@@ -157,7 +224,11 @@ function openLoginWindow(parent, validate, onEvent) {
       return;
     }
     loginWindow = win;
-    trace("sign-in window opened");
+    // `parent` is accepted but deliberately not used as a window parent (see
+    // above); logged so the relationship is visible when reading a crash log.
+    trace(
+      `sign-in window opened id=${win.id} mainAlive=${Boolean(parent && !parent.isDestroyed())}`,
+    );
 
     let settled = false;
     let lastError = null;
@@ -222,7 +293,17 @@ function openLoginWindow(parent, validate, onEvent) {
         const saved = await exportCookieFile();
         let verified = saved;
         if (saved && typeof validate === "function") {
-          const outcome = await validate(cookieFilePath());
+          // Hard ceiling: a verification that never settles must not leave the
+          // window stuck on "Verifying…" forever.
+          const outcome = await Promise.race([
+            validate(cookieFilePath()),
+            new Promise((r) =>
+              setTimeout(
+                () => r({ ok: false, message: "Verification timed out." }),
+                VERIFY_TIMEOUT_MS,
+              ),
+            ),
+          ]);
           if (outcome && typeof outcome === "object") {
             verified = !!outcome.ok;
             lastError = outcome.ok ? null : outcome.message || null;
@@ -250,8 +331,15 @@ function openLoginWindow(parent, validate, onEvent) {
       }
     };
 
-    win.webContents.on("did-navigate", () => void check());
+    win.webContents.on("did-navigate", (_e, url) => {
+      trace(`did-navigate host=${safeHost(url)}`);
+      void check();
+    });
     win.webContents.on("did-navigate-in-page", () => void check());
+    win.webContents.on("did-fail-load", (_e, code, desc, url) => {
+      trace(`did-fail-load code=${code} desc=${desc} host=${safeHost(url)}`);
+    });
+    win.webContents.on("did-finish-load", () => trace("did-finish-load"));
     win.webContents.on("render-process-gone", (_e, details) => {
       trace(`sign-in renderer gone reason=${details && details.reason}`);
       destroyed = true;
@@ -289,4 +377,15 @@ async function clear() {
   return { ok: true };
 }
 
-module.exports = { openLoginWindow, probe, clear, cookieFilePath };
+/** True while a sign-in window is open, so other work can stay out of the way. */
+function isSigningIn() {
+  return Boolean(loginWindow && !loginWindow.isDestroyed());
+}
+
+module.exports = {
+  openLoginWindow,
+  probe,
+  clear,
+  cookieFilePath,
+  isSigningIn,
+};

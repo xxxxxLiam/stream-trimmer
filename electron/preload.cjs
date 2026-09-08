@@ -35,6 +35,10 @@ try {
     disconnectYouTube: () => ipcRenderer.invoke("youtube:disconnect"),
     // Fallback path: opens YouTube in the user's own browser so yt-dlp can
     // read that browser's cookie store instead.
+    // Diagnostics: reads the app's own local log so a crash can be reported.
+    readDiagnostics: () => ipcRenderer.invoke("diagnostics:read"),
+    revealDiagnostics: () => ipcRenderer.invoke("diagnostics:reveal"),
+    copyDiagnostics: () => ipcRenderer.invoke("diagnostics:copy"),
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
     getDefaultBrowser: () => ipcRenderer.invoke("system:defaultBrowser"),
 

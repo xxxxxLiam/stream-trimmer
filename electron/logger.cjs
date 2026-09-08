@@ -23,6 +23,24 @@ function resolveLogFile() {
   return logFile;
 }
 
+/** Absolute path of the diagnostic log, or null if it could not be created. */
+function logFilePath() {
+  return resolveLogFile();
+}
+
+/** Last `lines` lines of the log, for the in-app diagnostics view. */
+function tail(lines = 400) {
+  const target = resolveLogFile();
+  if (!target) return "";
+  try {
+    const text = fs.readFileSync(target, "utf8");
+    const all = text.split(/\r?\n/);
+    return all.slice(Math.max(0, all.length - lines)).join("\n");
+  } catch {
+    return "";
+  }
+}
+
 function rotate(target) {
   try {
     const { size } = fs.statSync(target);
@@ -81,7 +99,18 @@ function installCrashHandlers() {
   app.on("gpu-process-crashed", (_event, killed) => {
     log("crash", `gpu-process-crashed killed=${killed}`);
   });
-  log("app", "crash handlers installed");
+  // Distinguishes "the app decided to quit" from "the app was killed". Without
+  // these, a self-inflicted quit and a hard crash look identical in the log.
+  app.on("before-quit", () => log("app", "before-quit"));
+  app.on("will-quit", () => log("app", "will-quit"));
+  app.on("quit", (_e, code) => log("app", `quit exitCode=${code}`));
+  app.on("window-all-closed", () => log("app", "window-all-closed"));
+  process.on("exit", (code) => log("app", `process exit code=${code}`));
+  process.on("SIGTERM", () => log("app", "received SIGTERM"));
+  log(
+    "app",
+    `crash handlers installed pid=${process.pid} electron=${process.versions.electron} chrome=${process.versions.chrome} node=${process.versions.node} platform=${process.platform}`,
+  );
 }
 
 /** Attaches per-window diagnostics (unresponsive / renderer death). */
@@ -97,4 +126,11 @@ function watchWindow(name, win) {
   });
 }
 
-module.exports = { log, watchWindow, installCrashHandlers, describe };
+module.exports = {
+  log,
+  watchWindow,
+  installCrashHandlers,
+  describe,
+  logFilePath,
+  tail,
+};
