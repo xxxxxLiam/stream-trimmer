@@ -480,9 +480,44 @@ function registerIpc() {
     }
   });
 
-  // Opens YouTube's sign-in page in the user's default browser. The app
-  // never sees credentials — it later reuses the browser's session cookies
-  // via yt-dlp. https://www.youtube.com/signin redirects to Google sign-in.
+  // In-app sign-in: opens a real YouTube login window in the app's own
+  // persistent session and exports those cookies to a file yt-dlp can use.
+  // Cookie values never reach the renderer — only a boolean.
+  ipcMain.handle("youtube:connect", async () => {
+    try {
+      const result = await youtubeSession.openLoginWindow(
+        mainWindow,
+        (file) => verifyCookieFile(file),
+        (msg) => logger.log("youtube", msg),
+      );
+      return {
+        connected: !!result.connected,
+        cancelled: !!result.cancelled,
+        error: result.error,
+      };
+    } catch (err) {
+      return {
+        connected: false,
+        cancelled: false,
+        error: err && err.message ? err.message : "Sign-in failed",
+      };
+    }
+  });
+
+  // Cheap, offline check plus a cookie-file refresh so the session rolls
+  // forward from the app's own storage on every launch.
+  ipcMain.handle("youtube:probe", async () => {
+    const result = await youtubeSession.probe();
+    return { connected: !!result.connected, error: result.error };
+  });
+
+  ipcMain.handle("youtube:disconnect", async () => {
+    await youtubeSession.clear();
+    return { ok: true };
+  });
+
+  // Fallback path only: opens YouTube in the user's default browser so
+  // yt-dlp can read that browser's session instead.
   ipcMain.handle("shell:openYouTubeSignIn", async () => {
     try {
       await shell.openExternal("https://www.youtube.com/signin");
