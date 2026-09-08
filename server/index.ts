@@ -685,10 +685,20 @@ type CookieBrowserName = z.infer<typeof cookieBrowserSchema>;
 const AUTH_PROBE_TIMEOUT_MS = 15_000;
 const AUTH_PROBE_URL = "https://www.youtube.com/watch?v=BaW_jenozKc";
 
+type AuthSourceName = CookieBrowserName | "app";
+
 function authProbeMessage(
-  source: CookieBrowserName,
+  source: AuthSourceName,
   status: YouTubeAuthProbeStatus,
 ): string | undefined {
+  if (source === "app") {
+    if (status === "signed_in") return undefined;
+    if (status === "signed_out")
+      return "Your in-app YouTube sign-in has expired. Sign in again.";
+    if (status === "timeout")
+      return "YouTube took too long to answer. Try again.";
+    return "YouTube rejected the saved sign-in. Sign in again.";
+  }
   const label = source[0].toUpperCase() + source.slice(1);
   if (status === "signed_out")
     return `No YouTube account cookies were found in ${label}.`;
@@ -697,7 +707,7 @@ function authProbeMessage(
   if (status === "locked")
     return `Fully quit ${label}, including background windows, then check again.`;
   if (status === "decrypt_failed")
-    return `${label}'s cookie security blocked access. Firefox is the most reliable alternative.`;
+    return `${label}'s cookie security blocked access. Signing in inside the app is the reliable alternative.`;
   if (status === "timeout")
     return `${label} took too long to respond. Quit it fully, then try again.`;
   if (status === "extractor_error")
@@ -705,10 +715,26 @@ function authProbeMessage(
   return undefined;
 }
 
+// Keeps the last few lines of yt-dlp's own output so the UI can show the real
+// reason a check failed instead of only a friendly summary.
+function tailReason(output: string): string | undefined {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /error|warning|unable|failed/i.test(line));
+  if (lines.length === 0) return undefined;
+  return lines.slice(-3).join("\n").slice(0, 600);
+}
+
+interface AuthProbeResult {
+  status: YouTubeAuthProbeStatus;
+  reason?: string;
+}
+
 function probeYouTubeAuth(
   cookieOptions: Record<string, unknown>,
   onChild: (child: ChildProcess | null) => void,
-): Promise<YouTubeAuthProbeStatus> {
+): Promise<AuthProbeResult> {
   return new Promise((resolve) => {
     const child = yt!.exec(
       AUTH_PROBE_URL,
@@ -719,22 +745,30 @@ function probeYouTubeAuth(
     const chunks: Buffer[] = [];
     let settled = false;
     let timer: NodeJS.Timeout | undefined;
-    const finish = (status: YouTubeAuthProbeStatus) => {
+    const finish = (status: YouTubeAuthProbeStatus, output: string) => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
       onChild(null);
-      resolve(status);
+      if (status !== "signed_in" && output)
+        console.log(`[server] youtube auth probe ${status}: ${tailReason(output) ?? "no detail"}`);
+      resolve({
+        status,
+        reason: status === "signed_in" ? undefined : tailReason(output),
+      });
     };
     child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
     child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
-    child.on("error", (error) => finish(classifyYouTubeAuthOutput(String(error))));
-    child.on("close", () =>
-      finish(classifyYouTubeAuthOutput(Buffer.concat(chunks).toString())),
+    child.on("error", (error) =>
+      finish(classifyYouTubeAuthOutput(String(error)), String(error)),
     );
+    child.on("close", () => {
+      const output = Buffer.concat(chunks).toString();
+      finish(classifyYouTubeAuthOutput(output), output);
+    });
     timer = setTimeout(() => {
       child.kill("SIGKILL");
-      finish("timeout");
+      finish("timeout", Buffer.concat(chunks).toString());
     }, AUTH_PROBE_TIMEOUT_MS);
   });
 }
@@ -748,12 +782,20 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   if (!binariesOk) return binaryError(res);
 
   const source = parsed.data.browser;
+  if (source === "app" && !appCookieFile()) {
+    return res.json({
+      status: "signed_out" satisfies YouTubeAuthProbeStatus,
+      source,
+      browser: source,
+      message: "No in-app YouTube sign-in yet.",
+    });
+  }
   const cookieOptions = resolveCookieOptions(source);
   let activeChild: ChildProcess | null = null;
   res.on("close", () => {
     if (!res.writableEnded && activeChild) activeChild.kill("SIGKILL");
   });
-  const status = await probeYouTubeAuth(cookieOptions, (child) => {
+  const { status, reason } = await probeYouTubeAuth(cookieOptions, (child) => {
     activeChild = child;
   });
   if (res.writableEnded || res.destroyed) return;
@@ -762,6 +804,7 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
     source,
     browser: parsed.data.browser,
     message: authProbeMessage(source, status),
+    reason,
   });
 });
 
