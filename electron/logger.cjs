@@ -8,6 +8,15 @@ const path = require("node:path");
 const fs = require("node:fs");
 
 const MAX_BYTES = 1024 * 1024;
+const MAX_LINE = 600;
+
+// Captured before anything can wrap them, so log() never recurses through a
+// patched console (see captureConsole below).
+const nativeConsole = {
+  log: console.log.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console),
+};
 
 let logFile = null;
 
@@ -53,9 +62,17 @@ function rotate(target) {
 
 /** Appends one timestamped line. Never throws. */
 function log(scope, message) {
-  const line = `${new Date().toISOString()} [${scope}] ${message}`;
+  const text = String(message);
+  const line = `${new Date().toISOString()} [${scope}] ${
+    text.length > MAX_LINE ? `${text.slice(0, MAX_LINE)}…` : text
+  }`;
   // Keep console output too — useful when run from a terminal.
-  console.log(line);
+  nativeConsole.log(line);
+  writeLine(line);
+}
+
+/** Appends one already-formatted line. Never throws. */
+function writeLine(line) {
   const target = resolveLogFile();
   if (!target) return;
   try {
@@ -64,6 +81,31 @@ function log(scope, message) {
   } catch {
     /* logging must never break the app */
   }
+}
+
+/**
+ * Routes the bundled backend's console output into the same log file. The
+ * backend runs in this process and its console goes nowhere in a packaged
+ * app, so the reason yt-dlp rejected a session was previously invisible —
+ * the one thing needed to explain a session that exists but will not verify.
+ */
+function captureConsole() {
+  const forward = (level) => (...args) => {
+    nativeConsole[level](...args);
+    try {
+      const text = args
+        .map((a) => (typeof a === "string" ? a : describe(a)))
+        .join(" ");
+      if (text.trim()) writeLine(`${new Date().toISOString()} [${level}] ${
+        text.length > MAX_LINE ? `${text.slice(0, MAX_LINE)}…` : text
+      }`);
+    } catch {
+      /* capturing output must never break the app */
+    }
+  };
+  console.log = forward("log");
+  console.warn = forward("warn");
+  console.error = forward("error");
 }
 
 function describe(err) {
@@ -128,6 +170,7 @@ function watchWindow(name, win) {
 
 module.exports = {
   log,
+  captureConsole,
   watchWindow,
   installCrashHandlers,
   describe,

@@ -97,7 +97,7 @@ async function verifyCookieFile(file) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ browser: "app" }),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(60000),
       },
     );
     const text = await res.text();
@@ -345,6 +345,7 @@ function refreshCookieFile(why) {
   const now = Date.now();
   if (now - lastCookieRefresh < COOKIE_REFRESH_MIN_GAP_MS) return;
   lastCookieRefresh = now;
+  logger.log("youtube", `cookie refresh (${why}) starting`);
   youtubeSession
     .probe()
     .then((r) => logger.log("youtube", `cookie refresh (${why}) connected=${!!r.connected}`))
@@ -371,6 +372,9 @@ app.on("second-instance", () => {
 app.whenReady().then(async () => {
   try {
     logger.installCrashHandlers();
+    // Must precede startBackend(): the backend runs in this process and its
+    // console output is the only record of why yt-dlp rejected a session.
+    logger.captureConsole();
     // Settings and IPC must be ready BEFORE the window exists: the preload
     // reads the settings snapshot synchronously during window creation.
     loadSettings();

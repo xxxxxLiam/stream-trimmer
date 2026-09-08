@@ -682,7 +682,11 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
 // checks the browser cookie store directly and returns only sanitized status.
 type CookieBrowserName = z.infer<typeof cookieBrowserSchema>;
 
-const AUTH_PROBE_TIMEOUT_MS = 15_000;
+// A full yt-dlp extraction can involve a JS challenge solved through the
+// bundled deno, which comfortably exceeds 15s on a cold run or a slow link.
+// Timing out there reports a perfectly good session as unverified, so the
+// ceiling sits well above the slow case; callers cap themselves above this.
+const AUTH_PROBE_TIMEOUT_MS = 40_000;
 const AUTH_PROBE_URL = "https://www.youtube.com/watch?v=BaW_jenozKc";
 
 type AuthSourceName = CookieBrowserName | "app";
@@ -750,8 +754,12 @@ function probeYouTubeAuth(
       settled = true;
       if (timer) clearTimeout(timer);
       onChild(null);
-      if (status !== "signed_in" && output)
-        console.log(`[server] youtube auth probe ${status}: ${tailReason(output) ?? "no detail"}`);
+      console.log(
+        `[server] youtube auth probe ${status}` +
+          (status === "signed_in"
+            ? ""
+            : `: ${tailReason(output) ?? "no detail"}`),
+      );
       resolve({
         status,
         reason: status === "signed_in" ? undefined : tailReason(output),
@@ -782,6 +790,11 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   if (!binariesOk) return binaryError(res);
 
   const source = parsed.data.browser;
+  console.log(
+    `[server] /api/auth/youtube/status source=${source} cookieFile=${
+      source === "app" ? Boolean(appCookieFile()) : "n/a"
+    }`,
+  );
   if (source === "app" && !appCookieFile()) {
     return res.json({
       status: "signed_out" satisfies YouTubeAuthProbeStatus,
