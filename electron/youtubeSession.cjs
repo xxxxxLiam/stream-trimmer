@@ -9,6 +9,10 @@ const { app, BrowserWindow, session } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
+const {
+  isBenignLoadFailure,
+  isSupersededNavigation,
+} = require("./navigation.cjs");
 
 const PARTITION = "persist:youtube";
 const SIGNIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube";
@@ -16,7 +20,7 @@ const SIGNIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube";
 const AUTH_COOKIES = ["SID", "__Secure-3PSID", "__Secure-1PSID"];
 // Ceiling for one verification attempt (the backend's own yt-dlp probe caps
 // out well below this).
-const VERIFY_TIMEOUT_MS = 60000;
+const VERIFY_TIMEOUT_MS = 75000;
 
 function ytSession() {
   return session.fromPartition(PARTITION);
@@ -337,7 +341,12 @@ function openLoginWindow(parent, validate, onEvent) {
     });
     win.webContents.on("did-navigate-in-page", () => void check());
     win.webContents.on("did-fail-load", (_e, code, desc, url) => {
-      trace(`did-fail-load code=${code} desc=${desc} host=${safeHost(url)}`);
+      // -3 is a superseded navigation, not a broken page. Logged, never acted on.
+      trace(
+        `did-fail-load code=${code} desc=${desc} host=${safeHost(url)}${
+          isBenignLoadFailure(code) ? " (benign)" : ""
+        }`,
+      );
     });
     win.webContents.on("did-finish-load", () => trace("did-finish-load"));
     win.webContents.on("render-process-gone", (_e, details) => {
@@ -348,7 +357,9 @@ function openLoginWindow(parent, validate, onEvent) {
     });
     win.on("unresponsive", () => trace("sign-in window unresponsive"));
     timer = setInterval(() => void check(), 1500);
+    win.on("close", () => trace("sign-in window closing"));
     win.on("closed", () => {
+      trace(`sign-in window closed settled=${settled}`);
       destroyed = true;
       stopTimer();
       loginWindow = null;
@@ -356,7 +367,18 @@ function openLoginWindow(parent, validate, onEvent) {
     });
 
     win.loadURL(SIGNIN_URL).catch((err) => {
-      trace(`load failed: ${err && err.message ? err.message : "unknown"}`);
+      const message = err && err.message ? err.message : "unknown";
+      // ERR_ABORTED (-3) is not a failure. Electron rejects loadURL whenever a
+      // navigation is superseded, and Google's sign-in is a chain of redirects
+      // — so an account that is ALREADY signed in reliably aborts the original
+      // load on its way through. Treating that as fatal closed the window and
+      // reported "cancelled" every single time, which is exactly what the
+      // diagnostic log showed on every attempt since Sept 5.
+      if (isSupersededNavigation(message)) {
+        trace(`load superseded (ignored): ${message}`);
+        return;
+      }
+      trace(`load failed: ${message}`);
       void finish(false);
     });
   });
