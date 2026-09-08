@@ -1,101 +1,140 @@
-# Download a specific language / auto-dub audio track
+# Make the YouTube sign-in stick, and stop losing saved folders
 
-## Summary
+Two separate problems. One of them I found a concrete bug for; the other has a
+likely cause plus a design that removes the fragility entirely.
 
-Today a clip always gets whatever audio YouTube hands back by default, which for
-multi-language videos can be a region dub rather than the original. This adds a
-**Language** picker next to Format and Quality on the Clip tab. When a video has
-more than one audio track, the picker lists them ("Original — English", "Spanish
-(auto-dubbed)", …); when it doesn't, it shows a single "Original" entry and is
-disabled. The chosen track is used for the download and merged with the video.
+## Problem 1 — Saved folders (and your browser choice) vanish on restart
 
-Everything reuses what already exists: the same `/api/info` probe that fills the
-title/duration, the same yt-dlp runner in `server/index.ts`, the same format
-selector chain, the same ffmpeg merge. No new dependencies.
+This is a real, confirmed bug in the app's startup order.
 
-## How the pieces fit
+Settings live in a `settings.json` file inside the app's data folder. On launch
+the app does, in this order:
 
-### 1. Discover the tracks (`server/index.ts`, `/api/info`)
-
-`/api/info` already runs `--dump-single-json` and passes `info.formats` to
-`computeBitrates`. A new `collectAudioTracks(info)` helper reads the same array
-and returns one entry per distinct language:
-
-- Keep formats where `acodec !== "none"` and `vcodec === "none"`.
-- Read `language` / `format_id` (yt-dlp suffixes language variants, e.g.
-  `251-es`, `140-hi`) and `format_note` (carries "original" / "dubbed"
-  wording).
-- Drop `-drc` format ids and anything under ~120 kbps so duplicate
-  low-bitrate/compressed copies don't create phantom entries.
-- Group by language code, keep the highest-bitrate id per language, mark the
-  one yt-dlp flags as original.
-- Human labels from `Intl.DisplayNames` on the client, with the raw code as
-  fallback.
-
-The probe gains `extractorArgs: "youtube:player_client=all"` **only when the
-first probe returns fewer than two audio languages** — alternate tracks often
-don't surface otherwise. This keeps the fast path fast and only pays the extra
-cost on videos that might be multi-language. Cookie options are passed through
-unchanged, since some dubs only appear to a signed-in session.
-
-`/api/info` response gains `audioTracks: { id, language, label, original,
-dubbed }[]` (empty array = single-track video).
-
-### 2. Pass the choice through
-
-- `src/lib/clip.ts`: add the `AudioTrack` type, `audioTracks` on `VideoInfo`,
-  and optional `audioLanguage` on `DownloadRequest`.
-- `src/hooks/useClipper.ts`: `audioLanguage` state (default `"original"`),
-  reset whenever a new video loads, included in the download body.
-- `src/components/FormatQualityFields.tsx`: third select, hidden for MP3-only?
-  No — it applies to MP3 too (an MP3 of the Spanish dub is valid), so it stays
-  visible for both formats and is disabled when there's no video or only one
-  track.
-
-### 3. Download with the selected track (`/api/download`)
-
-`downloadSchema` accepts `audioLanguage`. When it is set and not `"original"`,
-the format chain currently built for the requested height is rebuilt with the
-audio half pinned to that language, using yt-dlp's language filter rather than
-a hard-coded id so the existing HLS-first / step-down ladder is preserved:
-
-```
-bestvideo[height=1080][protocol*=m3u8]+bestaudio[language=es][format_id!$=-drc]
-... (same ladder, audio side pinned) ...
-/ <existing unpinned ladder as last resort>
+```text
+1. start the engine
+2. create the window   <-- the page immediately asks for the saved settings
+3. load settings.json  <-- too late
+4. register the settings handlers  <-- much too late
 ```
 
-The unpinned ladder stays at the end so a track that vanished between probe and
-download degrades to a normal download instead of failing. `player_client=all`
-is added to the download's extractor args in this case, matching the probe.
-The already-existing `chosenFormat` log line and `X-Selected-Format` header make
-the actual pick visible, and a new `X-Audio-Language` header reports what was
-delivered so a silent fallback to the default dub is diagnosable.
+The page asks for your saved settings during step 2, but nothing is listening
+yet and nothing has been read from disk, so it always starts with **no saved
+folders, no folder names, and no remembered browser**. The moment you then add
+or change a folder, that empty list is written back over the good one — which
+is why the folders are gone for good after a restart.
 
-For MP3, `extractAudio` selection gets the same language pin.
+**Fix:** load `settings.json` and register the settings handlers *before* the
+window is created, i.e. reorder startup to `loadSettings() → registerIpc() →
+startBackend() → createWindow()`. Also make writes merge into the file on disk
+rather than overwrite the in-memory copy blindly, and write the file
+atomically (temp file + rename) so a quit mid-write can't truncate it.
+
+This alone restores saved folders, custom folder names, download history, the
+channel passcode, and the remembered browser.
+
+## Problem 2 — "Connect YouTube" fails even though you are signed in
+
+### Why it broke
+
+The app currently verifies your session by asking yt-dlp to read cookies
+**directly out of your browser's cookie database** (`--cookies-from-browser
+chrome`). That method has become unreliable, and the most likely reason it
+"worked before and stopped" is that Chrome now encrypts its cookie store with
+App-Bound Encryption — yt-dlp can no longer decrypt it on a normal desktop
+profile, and a running Chrome also locks the database. Nothing changed on your
+side; the browser did.
+
+It is also inherently fragile: it depends on which browser, which profile,
+whether the browser is open, and OS keychain permissions. There is no way to
+make that path guaranteed.
+
+Before building, the first step is to confirm this: surface the raw yt-dlp
+error text from a failed check into the app (currently it is replaced with a
+friendly sentence), run one check, and read the actual reason. The rest of the
+plan holds either way, but this tells us exactly what your machine is hitting.
+
+### The guaranteed method
+
+Stop reading the browser's cookie jar. Sign in **once inside the app**, in its
+own private window, and keep that session in the app forever.
+
+The app already contains this code (`electron/youtubeSession.cjs`) from an
+earlier version — it opens a real Google/YouTube login window in an isolated,
+persistent app session and writes the resulting cookies to a `yt-cookies.txt`
+file in the app's data folder. yt-dlp then runs with `--cookies <that file>`,
+which is the most reliable path yt-dlp offers.
+
+Why this is durable:
+
+- The session lives in the app's own storage, so closing or updating Chrome
+  cannot affect it.
+- Google sessions last months; the cookie file is refreshed automatically from
+  the app's session on every launch and after every download, so it keeps
+  rolling forward and effectively never expires.
+- You sign in once. On later launches the app verifies silently and opens
+  straight into the main UI — no prompt, no button.
+
+### New connection flow
+
+```text
+launch
+  └─ cookie file present? ── yes ─▶ verify quietly against YouTube
+  │                                   └─ ok ─▶ app opens, chip = Connected
+  │                                   └─ no ─▶ show Connect screen
+  └─ no ──────────────────────────▶ show Connect screen
+
+Connect screen: one button, "Sign in to YouTube"
+  └─ opens the in-app sign-in window
+  └─ detects sign-in, verifies it for real against YouTube
+  └─ closes itself, app unlocks. Never asked again.
+```
+
+- **No browser dropdown, no "Open YouTube then come back and check"** — those
+  disappear, along with the whole browser-cookie path as the primary route.
+- **"Use my browser session instead"** stays as a small secondary link on the
+  Connect screen, for anyone the in-app window doesn't suit. It keeps the
+  browser dropdown behind it. It is a fallback, not the main road.
+- **"Sign out of YouTube"** is added to the status chip menu so the stored
+  session can be cleared deliberately.
+- The periodic re-checking you disliked stays off. Verification happens on
+  launch and only when a download is actually rejected for auth — never on a
+  timer.
+
+## Files and responsibilities
+
+| File | Change |
+| --- | --- |
+| `electron/main.cjs` | Reorder startup (settings + IPC before window); atomic, merging settings writes; re-register `youtube:connect` / `youtube:probe` / `youtube:disconnect` IPC |
+| `electron/youtubeSession.cjs` | Already present; refresh the cookie file on launch and after each download so the session rolls forward |
+| `electron/preload.cjs` | Re-expose `youtubeConnect`, `youtubeProbe`, `youtubeDisconnect` |
+| `src/vite-env.d.ts` | Type declarations for those three |
+| `src/lib/youtubeConnection.ts` | Cookie-file session becomes the primary path; browser-cookie check demoted to fallback; remembered connection state persisted; no timer-based re-checks |
+| `src/components/YouTubeConnectModal.tsx` | Single "Sign in to YouTube" button; failure shows the real yt-dlp reason; secondary "use my browser session" disclosure with the dropdown |
+| `src/components/YouTubeStatusChip.tsx` | Adds a "Sign out of YouTube" action |
+| `server/index.ts` | Prefer the app cookie file over browser cookies; return the raw failure reason on a rejected check |
 
 ## Edge cases
 
-| Case | Handling |
-| --- | --- |
-| Single-track video | `audioTracks: []`, picker shows "Original" and is disabled |
-| Tracks hidden on first probe | Re-probe with `player_client=all` before giving up |
-| Auto-dub vs creator dub | Label from `format_note`; auto-dubs shown as "(auto-dubbed)" |
-| Duplicate `-drc` / low-bitrate copies | Filtered out during grouping |
-| Region default != original | Original is explicitly marked and is the default selection, so the pick is never implicit |
-| Track disappears at download time | Format ladder falls through to the unpinned chain; delivered language reported back |
-| ffmpeg missing | Existing binary check and install-command error path already covers this |
-| Signed-out session | Existing auth gate is unchanged; cookies are forwarded to the probe as they are now |
+- **Sign-in window closed early** — Connect screen stays, no false "connected".
+- **Cookie file present but rejected by YouTube** — treated as signed out, one
+  prompt to sign in again, with the real reason shown.
+- **Session actually expires** — the next download returns an auth error and
+  the Connect screen reappears once. This is the only time you'd sign in again.
+- **Non-desktop / browser preview** — falls back to the browser-cookie check,
+  since there is no in-app window there.
+- **Cookie file contents** never reach the page; only a boolean and a path.
 
-## No new dependencies, config, or migrations.
+## Order of work
 
-## Implementation order
+1. Startup-order and atomic-write fix for settings — verify folders, names and
+   history survive a restart.
+2. Surface the raw yt-dlp reason on a failed check; run one check and confirm
+   the Chrome decryption diagnosis.
+3. Re-wire the in-app sign-in window end to end (main, preload, types, client).
+4. Backend prefers the cookie file; refresh it on launch and after downloads.
+5. Connect screen and status chip rework, browser path demoted to a fallback.
+6. Tests: settings survive a simulated relaunch, cookie-file-first selection,
+   expired-session re-prompt fires exactly once.
 
-1. `collectAudioTracks` + `/api/info` response field, with the conditional
-   `player_client=all` re-probe. Verify against a known multi-dub video.
-2. Types in `src/lib/clip.ts` and `audioLanguage` state in `useClipper.ts`.
-3. Language select in `FormatQualityFields.tsx`.
-4. `/api/download` schema + language-pinned format ladder + `X-Audio-Language`.
-5. Tests for `collectAudioTracks` (grouping, `-drc` filtering, original
-   detection) and for the format-string builder, in the existing server test
-   style.
+The multi-language / auto-dub audio track feature you asked about earlier is
+parked and will be picked up after this.
