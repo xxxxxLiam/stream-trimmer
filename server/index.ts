@@ -356,10 +356,10 @@ const downloadSchema = z
     end: z.number().positive(),
     format: z.enum(["mp4", "mp3"]).default("mp4"),
     quality: z.string().default("best"),
-    // Optional sign-in path: yt-dlp reads the logged-in YouTube session
-    // directly from the named browser at runtime. Cookie contents never touch
-    // this process — only the browser name is accepted, from an allowlist.
-    cookiesFromBrowser: cookieBrowserSchema.optional(),
+    // Optional sign-in path. "app" uses the session the user signed into
+    // inside the app; a browser name lets yt-dlp read that browser's session.
+    // Cookie contents never cross the API — only the source label.
+    cookiesFromBrowser: authSourceSchema.optional(),
   })
   .refine((v) => v.end > v.start, { message: "End must be greater than start" })
   .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
@@ -445,6 +445,8 @@ function isCookieError(e: unknown): boolean {
 }
 
 function cookieErrorMessage(browser: string): string {
+  if (browser === "app")
+    return "Your in-app YouTube sign-in is no longer valid. Sign in again from the YouTube button.";
   return `Couldn't read ${browser}'s cookies. The browser may need to be fully closed, or that profile isn't supported. You can turn sign-in off and retry for standard quality.`;
 }
 
@@ -739,7 +741,7 @@ function probeYouTubeAuth(
 
 app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   const parsed = z
-    .object({ browser: cookieBrowserSchema })
+    .object({ browser: authSourceSchema })
     .safeParse(req.body ?? {});
   if (!parsed.success)
     return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1433,7 +1435,7 @@ const channelExportSchema = z.object({
   limit: z.number().int().min(1).max(500).default(100),
   includeComments: z.boolean().default(true),
   includeTranscripts: z.boolean().default(true),
-  cookiesFromBrowser: cookieBrowserSchema.optional(),
+  cookiesFromBrowser: authSourceSchema.optional(),
 
 });
 
