@@ -257,7 +257,10 @@ export function useClipper() {
         document.body.appendChild(a);
         a.click();
         a.remove();
-        URL.revokeObjectURL(objectUrl);
+        // Revoking on this tick cancels the download the click just started:
+        // the browser has not read the blob yet, and the request fails with
+        // a bare ERR_FAILED. Hold the URL until the transfer can have run.
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
         setSavedNotice({ kind: "comments", path: "", label: filename });
         addDownload({
           kind: "comments",
@@ -505,6 +508,12 @@ export function useClipper() {
     setSavedNotice(null);
     const controller = new AbortController();
     downloadAbortRef.current = controller;
+    // When the desktop app has somewhere to put the clip, the engine hands
+    // back its location and the main process moves the file. Only then does
+    // the media avoid the UI entirely; every other case still streams.
+    const deliverPath = Boolean(
+      isElectron && window.electronAPI?.saveClip && saveDir,
+    );
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let es: EventSource | null = null;
     try {
@@ -545,6 +554,7 @@ export function useClipper() {
             end,
             format,
             quality,
+            deliver: deliverPath ? "path" : "stream",
             ...cookiePayload(),
           }),
         },
@@ -558,7 +568,12 @@ export function useClipper() {
         }
         throw new Error(data.error || "Download failed");
       }
-      const blob = await res.blob();
+      // For `deliver: "path"` the body is a few bytes of JSON naming the
+      // finished file, not the clip itself.
+      const handoff = deliverPath
+        ? await parseJson<{ path: string; size: number }>(res)
+        : null;
+      const blob = deliverPath ? null : await res.blob();
       const ext = format === "mp3" ? "mp3" : "mp4";
       const filename = buildClipFilename(info.title, start, end, ext);
       // What the server actually produced — YouTube may only serve renditions
@@ -593,12 +608,17 @@ export function useClipper() {
       }
 
       if (isElectron && window.electronAPI && saveDir) {
-        const arr = await blob.arrayBuffer();
-        const result = await window.electronAPI.saveFile({
-          dirPath: saveDir,
-          filename,
-          data: arr,
-        });
+        const result = handoff
+          ? await window.electronAPI.saveClip!({
+              tempPath: handoff.path,
+              dirPath: saveDir,
+              filename,
+            })
+          : await window.electronAPI.saveFile({
+              dirPath: saveDir,
+              filename,
+              data: await blob!.arrayBuffer(),
+            });
         if (!result.ok) throw new Error(result.error);
         setLastSavedPath(result.path ?? null);
         setSavedNotice({
@@ -618,14 +638,17 @@ export function useClipper() {
         });
       } else {
         setLastSavedPath(null);
-        const objectUrl = URL.createObjectURL(blob);
+        const objectUrl = URL.createObjectURL(blob!);
         const a = document.createElement("a");
         a.href = objectUrl;
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
-        URL.revokeObjectURL(objectUrl);
+        // Revoking on this tick cancels the download the click just started:
+        // the browser has not read the blob yet, and the request fails with
+        // a bare ERR_FAILED. Hold the URL until the transfer can have run.
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
         setSavedNotice({ kind: "clip", path: "", label: filename, detail });
         addDownload({
           kind: "clip",
@@ -641,7 +664,20 @@ export function useClipper() {
       if (e instanceof DOMException && e.name === "AbortError") {
         setDownloadPhase("idle");
       } else {
-        setError(e instanceof Error ? e.message : "Download failed");
+        const raw = e instanceof Error ? e.message : "Download failed";
+        // A bare "Failed to fetch" is what fetch() rejects with for any
+        // transport-level failure. Left as-is it sends people hunting for a
+        // YouTube or sign-in problem, when the clip itself built fine and
+        // only the local transfer broke.
+        const transportFailure =
+          /failed to fetch|networkerror|load failed|network request failed/i.test(
+            raw,
+          );
+        setError(
+          transportFailure
+            ? "The clip was built, but the transfer from the local engine broke before it finished. This is not a YouTube or sign-in problem — copy the diagnostics log for the reason."
+            : raw,
+        );
         setDownloadPhase("error");
       }
     } finally {

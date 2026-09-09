@@ -20,6 +20,9 @@ try {
     setSetting: (key, value) => ipcRenderer.invoke("settings:set", key, value),
     pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"),
     saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
+    // Moves a finished clip out of the engine's temp dir. Only the path
+    // crosses the bridge — never the media itself.
+    saveClip: (payload) => ipcRenderer.invoke("clip:save", payload),
     saveFiles: (payload) => ipcRenderer.invoke("file:saveFiles", payload),
     showInFolder: (targetPath) =>
       ipcRenderer.invoke("file:showInFolder", targetPath),

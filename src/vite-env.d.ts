@@ -34,6 +34,15 @@ interface ElectronAPI {
     filename: string;
     data: ArrayBuffer | Uint8Array;
   }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  /**
+   * Moves a finished clip from the engine's temp directory to `dirPath`.
+   * Only the path crosses the bridge, never the media.
+   */
+  saveClip?: (payload: {
+    tempPath: string;
+    dirPath: string;
+    filename: string;
+  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
   saveFiles: (payload: {
     dirPath: string;
     folder: string;

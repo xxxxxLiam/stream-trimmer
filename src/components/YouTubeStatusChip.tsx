@@ -14,6 +14,7 @@ import {
 export default function YouTubeStatusChip() {
   const { connected, busy, restoring, source } = useYouTubeConnection();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [copied, setCopied] = useState("");
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // Close the menu on any click outside it.
@@ -79,6 +80,23 @@ export default function YouTubeStatusChip() {
           >
             Check connection
           </button>
+          {/* The diagnostics log otherwise lives only inside the Connect
+              screen, which is hidden exactly when you are connected — i.e.
+              whenever a download fails and the log is what you need. */}
+          {window.electronAPI?.copyDiagnostics ? (
+            <button
+              type="button"
+              className="block w-full px-3 py-1.5 text-left text-[11px] text-fg-muted hover:bg-panel-hover"
+              onClick={async () => {
+                setMenuOpen(false);
+                const result = await window.electronAPI?.copyDiagnostics?.();
+                setCopied(result?.ok ? "Log copied" : "Copy failed");
+                window.setTimeout(() => setCopied(""), 2500);
+              }}
+            >
+              Copy diagnostics log
+            </button>
+          ) : null}
           <button
             type="button"
             className="block w-full px-3 py-1.5 text-left text-[11px] text-amber-400 hover:bg-panel-hover"
@@ -90,6 +108,12 @@ export default function YouTubeStatusChip() {
             Sign out of YouTube
           </button>
         </div>
+      ) : null}
+
+      {copied ? (
+        <span className="absolute right-0 top-full mt-1 whitespace-nowrap rounded-chip bg-panel-raised px-2 py-1 text-[10px] text-fg-muted shadow-xl">
+          {copied}
+        </span>
       ) : null}
     </div>
   );

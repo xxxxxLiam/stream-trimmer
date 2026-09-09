@@ -169,17 +169,23 @@ Read from the commit messages since the last release tag. First match wins:
 
 | Bump      | Triggered by                                              |
 | --------- | --------------------------------------------------------- |
-| **major** | `[major]`, a `BREAKING CHANGE:` footer, or `feat!:` / `fix!:` (any type with `!`) |
-| **minor** | `[minor]`, or `feat:` / `feat(scope):`                    |
+| **major** | `[major]` in a commit **subject**, a `BREAKING CHANGE:` footer, or `feat!:` / `fix!:` (any type with `!`) |
+| **minor** | `[minor]` in a commit **subject**, or `feat:` / `feat(scope):` |
 | **patch** | anything else — the default                               |
 
 Plain-English commit messages therefore get a **patch**. To ask for something
-else, either put `[minor]` / `[major]` anywhere in a commit message or PR
-title, or use the Conventional-Commits prefix.
+else, put `[minor]` / `[major]` in a commit's first line, or use the
+Conventional-Commits prefix.
 
-`BREAKING CHANGE:` is matched case-sensitively at the start of a line — an
-ordinary sentence like "this is not a breaking change" will not trigger a
-major bump.
+Markers are read from commit **subjects** only — never bodies. Bodies are
+prose, and anything matched there gets matched by accident eventually: the
+first version of this read bodies, and a commit whose body merely *described*
+the markers released v3.0.0 for a bugfix. `BREAKING CHANGE:` is the one
+body-level signal, and must start a line, case-sensitively, with its colon —
+so "this is not a breaking change" cannot trigger a major.
+
+The logic is in `scripts/detectBump.cjs` and covered by
+`server/detectBump.test.ts`, so it can be changed without guessing.
 
 #### Overrides
 

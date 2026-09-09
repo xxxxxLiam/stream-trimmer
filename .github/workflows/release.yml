@@ -65,53 +65,27 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # Works out the bump from the commits added since the last release.
+      # Bump detection lives in scripts/detectBump.cjs, not inline here,
+      # because it needs tests. The first inline version read markers out of
+      # commit BODIES, so a commit whose body merely documented the markers
+      # tripped a major bump and shipped v3.0.0 for a bugfix.
       #
-      # An explicit marker wins, then Conventional-Commit syntax, then patch —
-      # because a plain-English commit message is far more often a fix than a
-      # new capability, and an over-eager minor bump is the harder mistake to
-      # undo.
-      #
-      #   major   [major]  |  "BREAKING CHANGE:" footer  |  feat!: (type + "!")
-      #   minor   [minor]  |  feat:  feat(scope):
-      #   patch   [patch]  |  anything else
+      #   major   [major] in a subject | "BREAKING CHANGE:" footer | type!:
+      #   minor   [minor] in a subject | feat: / feat(scope):
+      #   patch   anything else
       - id: detect
         run: |
           set -euo pipefail
-          MANUAL="${{ github.event.inputs.bump || 'auto' }}"
-          if [ "$MANUAL" != "auto" ]; then
-            echo "bump=$MANUAL"                        >> "$GITHUB_OUTPUT"
-            echo "reason=forced by the manual run"     >> "$GITHUB_OUTPUT"
-            echo "Bump: $MANUAL (forced)"              >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          PREV="$(git describe --tags --abbrev=0 2>/dev/null || true)"
-          if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD"; fi
-          LOG="$(git log --format='%B' "$RANGE")"
-
-          # BREAKING CHANGE is matched case-sensitively, line-anchored and
-          # with its colon — the Conventional-Commits footer form. Matching it
-          # loosely turns an ordinary sentence ("this is not a breaking change")
-          # into a major bump, and a wrong major is the hardest one to undo.
-          if printf '%s' "$LOG" | grep -qiE '\[major\]' \
-            || printf '%s' "$LOG" | grep -qE '^BREAKING[ -]CHANGE:' \
-            || printf '%s' "$LOG" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:'; then
-            BUMP=major; WHY="a breaking change was flagged"
-          elif printf '%s' "$LOG" | grep -qiE '\[minor\]' \
-            || printf '%s' "$LOG" | grep -qE '^feat(\([^)]*\))?:'; then
-            BUMP=minor; WHY="a new feature was flagged"
-          else
-            BUMP=patch; WHY="no breaking change or feature marker found"
-          fi
-
+          BUMP="$(node scripts/detectBump.cjs "${{ github.event.inputs.bump || 'auto' }}")"
           echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          PREV="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          RANGE="${PREV:+$PREV..}HEAD"
           {
             echo "### Release"
             echo ""
-            echo "**Bump:** \`$BUMP\` — $WHY."
+            echo "**Bump:** \`$BUMP\`"
             echo ""
-            echo "Commits considered (\`${RANGE}\`):"
+            echo "Commits considered (\`$RANGE\`):"
             echo ""
             git log --no-merges --format='- %s' "$RANGE"
           } >> "$GITHUB_STEP_SUMMARY"

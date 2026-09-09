@@ -356,6 +356,11 @@ const downloadSchema = z
     end: z.number().positive(),
     format: z.enum(["mp4", "mp3"]).default("mp4"),
     quality: z.string().default("best"),
+    // How the finished clip is handed back. "stream" sends the media as the
+    // response body. "path" returns only its location on disk, for the
+    // desktop app, whose main process can move the file itself — the media
+    // then never travels through the UI at all.
+    deliver: z.enum(["stream", "path"]).default("stream"),
     // Optional sign-in path. "app" uses the session the user signed into
     // inside the app; a browser name lets yt-dlp read that browser's session.
     // Cookie contents never cross the API — only the source label.
@@ -833,6 +838,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     end,
     format,
     quality,
+    deliver,
     cookiesFromBrowser,
   }: DownloadInput = parsed.data;
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
@@ -1227,7 +1233,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       res.setHeader("X-Available-Heights", availableHeights.join(","));
     res.setHeader("X-Auth-Mode", cookieMode);
     console.log(
-      `[server] /api/download done job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode}`,
+      `[server] /api/download built job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode}`,
     );
     res.setHeader(
       "Access-Control-Expose-Headers",
@@ -1236,24 +1242,69 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
 
     const stat = fs.statSync(outputPath);
+
+    // Desktop app: hand back the location, not the media. Sending a clip as
+    // an HTTP body means the UI buffers the whole file, converts it to an
+    // ArrayBuffer and copies it across IPC to be written — several complete
+    // copies of a file that can run to hundreds of megabytes, purely to move
+    // it between two processes on the same machine. The main process opens
+    // the file directly instead. `tempDir` is deliberately NOT cleaned up
+    // here; whoever moves the file removes it (and startup sweeps orphans).
+    if (deliver === "path") {
+      console.log(
+        `[server] /api/download handing off job=${jobId} bytes=${stat.size}`,
+      );
+      publishProgress(jobId, { phase: "done", percent: 100 });
+      return res.json({ path: outputPath, size: stat.size });
+    }
+
     const name = `clip.${ext}`;
     res.setHeader("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
     res.setHeader("Content-Length", stat.size);
     res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+    console.log(
+      `[server] /api/download sending job=${jobId} bytes=${stat.size}`,
+    );
+
+    // The clip is finished at this point; everything below is the transfer.
+    // It used to be untraced: a connection that broke mid-body left no log
+    // line at all, and an 'error' on the response with no listener is an
+    // unhandled stream error in-process. A client that sees "failed to fetch"
+    // after a completed download is exactly this window, so it is now
+    // reported with the byte count that got through.
     const stream = fs.createReadStream(outputPath);
+    let sent = 0;
+    let settled = false;
+    const settle = (why: string, err?: unknown) => {
+      if (settled) return;
+      settled = true;
+      if (sent === stat.size && res.writableEnded) {
+        console.log(
+          `[server] /api/download sent job=${jobId} bytes=${sent}`,
+        );
+        publishProgress(jobId, { phase: "done", percent: 100 });
+      } else {
+        const detail = err instanceof Error ? `: ${err.message}` : "";
+        console.error(
+          `[server] /api/download transfer failed job=${jobId} ${why} sent=${sent}/${stat.size}${detail}`,
+        );
+        publishProgress(jobId, {
+          phase: "error",
+          percent: 0,
+          message: `The clip was built but only ${sent} of ${stat.size} bytes reached the app (${why}).`,
+        });
+      }
+      stream.destroy();
+      cleanup();
+    };
+
+    stream.on("data", (chunk) => {
+      sent += chunk.length;
+    });
+    stream.on("error", (err) => settle("read error", err));
+    res.on("error", (err) => settle("response error", err));
+    res.on("close", () => settle("connection closed early"));
     stream.pipe(res);
-    stream.on("close", () => {
-      publishProgress(jobId, { phase: "done", percent: 100 });
-      cleanup();
-    });
-    stream.on("error", () => {
-      publishProgress(jobId, {
-        phase: "error",
-        percent: 0,
-        message: "stream error",
-      });
-      cleanup();
-    });
   } catch (e) {
     if (cookiesFromBrowser && isCookieError(e)) {
       cleanup();
