@@ -137,36 +137,60 @@ matching metadata file that `electron-builder` uploads:
 
 Without those `.yml` files the app cannot detect a new version.
 
-### Recommended: cut a release via GitHub Actions (free, native builds)
+### Releases are automatic
 
-The workflow at `.github/workflows/release.yml` runs on tag push and builds
-native installers on their own OS runners in parallel:
+`.github/workflows/release.yml` runs on every push to `main` — so **merging a
+pull request cuts a release**. There is nothing to do by hand.
 
-- `macos-latest` → `YouTube-Clipper-<version>-macOS-AppleSilicon.dmg` (arm64)
-- `windows-latest` → `YouTube-Clipper-<version>-Windows-x64-Setup.exe`
-- `ubuntu-latest` → `YouTube-Clipper-<version>-Linux-x64.AppImage`
+The workflow, in order:
 
-It publishes to the matching GitHub Release using the built-in
-`GITHUB_TOKEN` — no personal access token needed.
+1. **verify** — `npm ci`, `tsc --noEmit`, `npm test`. Nothing is tagged unless
+   these pass.
+2. **version** — works out the bump (below), runs `npm version`, pushes the
+   `Release vX.Y.Z` commit and its tag.
+3. **build** — native installers, in parallel on their own OS runners:
+   - `macos-latest` → `YouTube-Clipper-<version>-macOS-AppleSilicon.dmg` (arm64)
+   - `windows-latest` → `YouTube-Clipper-<version>-Windows-x64-Setup.exe`
+   - `ubuntu-latest` → `YouTube-Clipper-<version>-Linux-x64.AppImage`
+4. **publish** — flips the release public, marks it latest, and writes notes
+   from the commits since the previous tag.
 
-Steps:
+Steps 3 and 4 are separate on purpose. `electron-builder` uploads into a
+*draft* release, so a half-finished one — macOS uploaded, Windows still
+building — is never visible. If any platform fails, the draft stays a draft
+and nothing is published.
 
-1. Bump `version` in `package.json` (e.g. `1.0.0` → `1.0.1`) and commit.
-2. Tag and push:
+Authentication uses the built-in `GITHUB_TOKEN`; no personal access token is
+needed.
 
-   ```sh
-   git tag v1.0.1
-   git push origin main --tags
-   ```
+#### How the version bump is chosen
 
-3. Watch the **Actions** tab. When all three jobs finish, the release
-   appears on the **Releases** page with all three installers and the
-   matching `latest.yml` / `latest-mac.yml` / `latest-linux.yml` metadata
-   files that `electron-updater` reads.
+Read from the commit messages since the last release tag. First match wins:
 
-The tag's `v` prefix (`v1.0.1`) must match the `version` in `package.json`
-(`1.0.1`) — `electron-builder` uses the `package.json` version for the
-release name.
+| Bump      | Triggered by                                              |
+| --------- | --------------------------------------------------------- |
+| **major** | `[major]`, a `BREAKING CHANGE:` footer, or `feat!:` / `fix!:` (any type with `!`) |
+| **minor** | `[minor]`, or `feat:` / `feat(scope):`                    |
+| **patch** | anything else — the default                               |
+
+Plain-English commit messages therefore get a **patch**. To ask for something
+else, either put `[minor]` / `[major]` anywhere in a commit message or PR
+title, or use the Conventional-Commits prefix.
+
+`BREAKING CHANGE:` is matched case-sensitively at the start of a line — an
+ordinary sentence like "this is not a breaking change" will not trigger a
+major bump.
+
+#### Overrides
+
+- **Force a bump:** Actions → Release → *Run workflow*, and pick
+  `patch` / `minor` / `major` instead of `auto`.
+- **Skip the release for one merge:** put `[skip release]` in the merge
+  commit message.
+
+The release's own `Release vX.Y.Z` commit never re-triggers the workflow —
+GitHub does not fire workflows for pushes made with `GITHUB_TOKEN`, and the
+job additionally skips any commit whose message starts with `Release v`.
 
 ### Optional fallback: build locally
 
