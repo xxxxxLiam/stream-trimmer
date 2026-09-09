@@ -1,42 +1,135 @@
 name: Release
 
+# One workflow, end to end: merging to main verifies the code, works out
+# whether the change is a patch/minor/major, bumps and tags it, builds the
+# installers for all three platforms, and publishes the release publicly.
+#
+# Manual runs are still available (Actions -> Release -> Run workflow) and can
+# force a specific bump instead of the automatic one.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version bump type"
+        description: "Version bump (auto = decide from the commits)"
         type: choice
-        options: [patch, minor, major]
-        default: patch
+        options: [auto, patch, minor, major]
+        default: auto
 
 permissions:
-  contents: write # required to push the commit/tag and create the release
+  contents: write # required to push the commit/tag and publish the release
+
+# Never let two releases run at once — they would race for the same tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  # Nothing gets tagged until the code passes the checks a contributor runs
+  # locally. Without this, an auto-release on every merge would happily tag a
+  # commit whose installers then fail to build.
+  verify:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!startsWith(github.event.head_commit.message, 'Release v') &&
+       !contains(github.event.head_commit.message, '[skip release]'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        env:
+          YOUTUBE_DL_SKIP_DOWNLOAD: "true"
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Tests
+        run: npm test
+
   version:
+    needs: verify
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.bump.outputs.version }}
       sha: ${{ steps.bump.outputs.sha }}
+      level: ${{ steps.detect.outputs.bump }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # full history + tags, so the range below can be found
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+
+      # Works out the bump from the commits added since the last release.
+      #
+      # An explicit marker wins, then Conventional-Commit syntax, then patch —
+      # because a plain-English commit message is far more often a fix than a
+      # new capability, and an over-eager minor bump is the harder mistake to
+      # undo.
+      #
+      #   major   [major]  |  "BREAKING CHANGE:" footer  |  feat!: (type + "!")
+      #   minor   [minor]  |  feat:  feat(scope):
+      #   patch   [patch]  |  anything else
+      - id: detect
+        run: |
+          set -euo pipefail
+          MANUAL="${{ github.event.inputs.bump || 'auto' }}"
+          if [ "$MANUAL" != "auto" ]; then
+            echo "bump=$MANUAL"                        >> "$GITHUB_OUTPUT"
+            echo "reason=forced by the manual run"     >> "$GITHUB_OUTPUT"
+            echo "Bump: $MANUAL (forced)"              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          PREV="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD"; fi
+          LOG="$(git log --format='%B' "$RANGE")"
+
+          # BREAKING CHANGE is matched case-sensitively, line-anchored and
+          # with its colon — the Conventional-Commits footer form. Matching it
+          # loosely turns an ordinary sentence ("this is not a breaking change")
+          # into a major bump, and a wrong major is the hardest one to undo.
+          if printf '%s' "$LOG" | grep -qiE '\[major\]' \
+            || printf '%s' "$LOG" | grep -qE '^BREAKING[ -]CHANGE:' \
+            || printf '%s' "$LOG" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:'; then
+            BUMP=major; WHY="a breaking change was flagged"
+          elif printf '%s' "$LOG" | grep -qiE '\[minor\]' \
+            || printf '%s' "$LOG" | grep -qE '^feat(\([^)]*\))?:'; then
+            BUMP=minor; WHY="a new feature was flagged"
+          else
+            BUMP=patch; WHY="no breaking change or feature marker found"
+          fi
+
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release"
+            echo ""
+            echo "**Bump:** \`$BUMP\` — $WHY."
+            echo ""
+            echo "Commits considered (\`${RANGE}\`):"
+            echo ""
+            git log --no-merges --format='- %s' "$RANGE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - id: bump
         run: |
-          NEW=$(npm version ${{ inputs.bump }} -m "Release v%s")
+          set -euo pipefail
+          NEW=$(npm version "${{ steps.detect.outputs.bump }}" -m "Release v%s")
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
           git push --follow-tags
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  release:
+  build:
     needs: version
     strategy:
       fail-fast: false
@@ -66,9 +159,49 @@ jobs:
           VITE_CHANNEL_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
           CHANNEL_EXPORT_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
         run: npm run build:electron
-      - name: Build & publish installer
+      # Uploads into a DRAFT release (see build.publish.releaseType in
+      # package.json). Draft is deliberate: it keeps a half-finished release
+      # — macOS uploaded, Windows still building — from ever being visible.
+      # The publish job below flips it public once all three have succeeded.
+      - name: Build & upload installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_CHANNEL_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
           CHANNEL_EXPORT_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
         run: ${{ matrix.build }}
+
+  # Runs only if every platform built, so a partial release is never made
+  # public. If one platform fails, the draft stays a draft for inspection.
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.version.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+
+          # Notes: everything since the previous release tag.
+          PREV="$(git tag --sort=-creatordate | grep -vFx "$TAG" | head -n1 || true)"
+          if [ -n "$PREV" ]; then
+            NOTES="$(git log --no-merges --format='- %s' "$PREV..$TAG")"
+          else
+            # No previous tag (first release): cap it rather than dumping
+            # the project's entire history into the release notes.
+            NOTES="$(git log --no-merges --format='- %s' -n 50 "$TAG")"
+          fi
+          [ -n "$NOTES" ] || NOTES="Maintenance release."
+
+          gh release edit "$TAG" \
+            --draft=false \
+            --latest \
+            --notes "$NOTES"
+
+          echo "Published $TAG (${{ needs.version.outputs.level }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
