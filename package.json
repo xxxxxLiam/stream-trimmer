@@ -1,7 +1,7 @@
 {
   "name": "youtube-clipper",
   "private": true,
-  "version": "2.3.2",
+  "version": "3.0.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
