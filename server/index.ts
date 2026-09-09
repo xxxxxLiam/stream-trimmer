@@ -356,6 +356,11 @@ const downloadSchema = z
     end: z.number().positive(),
     format: z.enum(["mp4", "mp3"]).default("mp4"),
     quality: z.string().default("best"),
+    // How the finished clip is handed back. "stream" sends the media as the
+    // response body. "path" returns only its location on disk, for the
+    // desktop app, whose main process can move the file itself — the media
+    // then never travels through the UI at all.
+    deliver: z.enum(["stream", "path"]).default("stream"),
     // Optional sign-in path. "app" uses the session the user signed into
     // inside the app; a browser name lets yt-dlp read that browser's session.
     // Cookie contents never cross the API — only the source label.
@@ -833,6 +838,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     end,
     format,
     quality,
+    deliver,
     cookiesFromBrowser,
   }: DownloadInput = parsed.data;
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
@@ -1236,6 +1242,22 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
 
     const stat = fs.statSync(outputPath);
+
+    // Desktop app: hand back the location, not the media. Sending a clip as
+    // an HTTP body means the UI buffers the whole file, converts it to an
+    // ArrayBuffer and copies it across IPC to be written — several complete
+    // copies of a file that can run to hundreds of megabytes, purely to move
+    // it between two processes on the same machine. The main process opens
+    // the file directly instead. `tempDir` is deliberately NOT cleaned up
+    // here; whoever moves the file removes it (and startup sweeps orphans).
+    if (deliver === "path") {
+      console.log(
+        `[server] /api/download handing off job=${jobId} bytes=${stat.size}`,
+      );
+      publishProgress(jobId, { phase: "done", percent: 100 });
+      return res.json({ path: outputPath, size: stat.size });
+    }
+
     const name = `clip.${ext}`;
     res.setHeader("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
     res.setHeader("Content-Length", stat.size);

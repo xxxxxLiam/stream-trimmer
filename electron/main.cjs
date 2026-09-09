@@ -16,6 +16,7 @@ const path = require("node:path");
 const net = require("node:net");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
+const os = require("node:os");
 // electron-updater — free auto-updates via GitHub Releases. Reads
 // latest.yml / latest-mac.yml / latest-linux.yml uploaded by
 // electron-builder alongside each release's installer.
@@ -362,6 +363,30 @@ function startCookieRefresh() {
   app.on("browser-window-focus", () => refreshCookieFile("focus"));
 }
 
+// A clip handed to the renderer but never saved (a crash, a quit mid-save)
+// leaves its temp directory behind. Clear anything older than a day.
+function sweepStaleClips() {
+  try {
+    const root = os.tmpdir();
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    let removed = 0;
+    for (const name of fs.readdirSync(root)) {
+      if (!name.startsWith("ytclip-")) continue;
+      const dir = path.join(root, name);
+      try {
+        if (fs.statSync(dir).mtimeMs > cutoff) continue;
+        fs.rmSync(dir, { recursive: true, force: true });
+        removed += 1;
+      } catch {
+        /* in use, or gone already */
+      }
+    }
+    if (removed) logger.log("clip", `swept ${removed} stale temp folder(s)`);
+  } catch (err) {
+    logger.log("clip", `sweep failed: ${logger.describe(err)}`);
+  }
+}
+
 app.on("second-instance", () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -383,6 +408,7 @@ app.whenReady().then(async () => {
     const port = await startBackend();
     await createWindow(port);
     logger.watchWindow("main", mainWindow);
+    sweepStaleClips();
     startCookieRefresh();
     setupAutoUpdater();
   } catch (err) {
@@ -435,6 +461,50 @@ function registerIpc() {
     });
     if (res.canceled || res.filePaths.length === 0) return null;
     return res.filePaths[0];
+  });
+
+  // Moves a finished clip from the engine's temp directory to where the user
+  // wants it. The media never enters the renderer: it is written once by
+  // yt-dlp and moved once here, instead of being streamed into the UI,
+  // buffered, and copied back across IPC.
+  ipcMain.handle("clip:save", async (_e, payload) => {
+    try {
+      if (
+        !payload ||
+        typeof payload.tempPath !== "string" ||
+        typeof payload.dirPath !== "string" ||
+        typeof payload.filename !== "string"
+      ) {
+        return { ok: false, error: "Invalid save payload" };
+      }
+
+      // The path comes back from the local engine, but never trust it blindly:
+      // only ever move a file the engine just created inside its own temp dir.
+      const source = fs.realpathSync(payload.tempPath);
+      const tempRoot = fs.realpathSync(os.tmpdir());
+      const prefix = path.join(tempRoot, "ytclip-");
+      if (!path.dirname(source).startsWith(prefix)) {
+        logger.log("clip", `refused save from outside the temp dir`);
+        return { ok: false, error: "Unexpected clip location" };
+      }
+
+      const safeName = payload.filename.replace(/[\\/]/g, "_");
+      const target = path.join(payload.dirPath, safeName);
+      try {
+        await fsp.rename(source, target);
+      } catch (err) {
+        // rename cannot cross devices, and the temp dir often is one.
+        if (!err || err.code !== "EXDEV") throw err;
+        await fsp.copyFile(source, target);
+        await fsp.rm(source, { force: true });
+      }
+      await fsp.rm(path.dirname(source), { recursive: true, force: true });
+      logger.log("clip", `saved ${safeName}`);
+      return { ok: true, path: target };
+    } catch (err) {
+      logger.log("clip", `save failed: ${logger.describe(err)}`);
+      return { ok: false, error: logger.describe(err) };
+    }
   });
 
   ipcMain.handle("file:save", async (_e, payload) => {

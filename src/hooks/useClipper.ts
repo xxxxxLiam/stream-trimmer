@@ -508,6 +508,12 @@ export function useClipper() {
     setSavedNotice(null);
     const controller = new AbortController();
     downloadAbortRef.current = controller;
+    // When the desktop app has somewhere to put the clip, the engine hands
+    // back its location and the main process moves the file. Only then does
+    // the media avoid the UI entirely; every other case still streams.
+    const deliverPath = Boolean(
+      isElectron && window.electronAPI?.saveClip && saveDir,
+    );
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let es: EventSource | null = null;
     try {
@@ -548,6 +554,7 @@ export function useClipper() {
             end,
             format,
             quality,
+            deliver: deliverPath ? "path" : "stream",
             ...cookiePayload(),
           }),
         },
@@ -561,7 +568,12 @@ export function useClipper() {
         }
         throw new Error(data.error || "Download failed");
       }
-      const blob = await res.blob();
+      // For `deliver: "path"` the body is a few bytes of JSON naming the
+      // finished file, not the clip itself.
+      const handoff = deliverPath
+        ? await parseJson<{ path: string; size: number }>(res)
+        : null;
+      const blob = deliverPath ? null : await res.blob();
       const ext = format === "mp3" ? "mp3" : "mp4";
       const filename = buildClipFilename(info.title, start, end, ext);
       // What the server actually produced — YouTube may only serve renditions
@@ -596,12 +608,17 @@ export function useClipper() {
       }
 
       if (isElectron && window.electronAPI && saveDir) {
-        const arr = await blob.arrayBuffer();
-        const result = await window.electronAPI.saveFile({
-          dirPath: saveDir,
-          filename,
-          data: arr,
-        });
+        const result = handoff
+          ? await window.electronAPI.saveClip!({
+              tempPath: handoff.path,
+              dirPath: saveDir,
+              filename,
+            })
+          : await window.electronAPI.saveFile({
+              dirPath: saveDir,
+              filename,
+              data: await blob!.arrayBuffer(),
+            });
         if (!result.ok) throw new Error(result.error);
         setLastSavedPath(result.path ?? null);
         setSavedNotice({
@@ -621,7 +638,7 @@ export function useClipper() {
         });
       } else {
         setLastSavedPath(null);
-        const objectUrl = URL.createObjectURL(blob);
+        const objectUrl = URL.createObjectURL(blob!);
         const a = document.createElement("a");
         a.href = objectUrl;
         a.download = filename;
