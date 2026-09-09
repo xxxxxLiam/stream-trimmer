@@ -5,6 +5,7 @@
  * reading a desktop browser's cookies is a collapsed fallback.
  */
 import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   ArrowRepeat,
   BoxArrowUpRight,
@@ -14,6 +15,7 @@ import {
   ShieldLock,
 } from "react-bootstrap-icons";
 import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
+import ConnectProgress from "./ConnectProgress";
 import DiagnosticsDisclosure from "./DiagnosticsDisclosure";
 import {
   checkBrowserConnection,
@@ -33,10 +35,24 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
   // sign-in prompt, so a still-valid session never flashes a false "connect".
   if (state.restoring) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/90 p-6">
-        <div className="flex items-center gap-2 text-[12px] text-fg-muted">
-          <ArrowRepeat className="animate-spin" size={12} />
-          Restoring your YouTube sign-in…
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/90 p-6"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="w-full max-w-[280px]">
+          <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+            <ArrowRepeat className="animate-spin" size={12} />
+            Restoring your YouTube sign-in…
+          </div>
+          {/* Same check as sign-in verification, so it can take a while too. */}
+          <div className="relative mt-2 h-1 w-full overflow-hidden rounded-full bg-panel-raised">
+            <motion.div
+              className="absolute inset-y-0 w-1/3 rounded-full bg-accent/70"
+              animate={{ x: ["-100%", "300%"] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -71,12 +87,18 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
               ) : (
                 <ShieldLock size={12} />
               )}
-              {state.busy ? "Waiting for sign-in…" : "Sign in to YouTube"}
+              {!state.busy
+                ? "Sign in to YouTube"
+                : state.phase === "verifying"
+                  ? "Verifying…"
+                  : "Waiting for sign-in…"}
             </button>
-            <p className="mt-2 text-[11px] leading-relaxed text-fg-faint">
-              A YouTube login window opens inside the app. Once you're in, it
-              closes itself and you won't be asked again.
-            </p>
+            {!state.busy ? (
+              <p className="mt-2 text-[11px] leading-relaxed text-fg-faint">
+                A YouTube login window opens inside the app. Once you're in, it
+                closes itself and you won't be asked again.
+              </p>
+            ) : null}
           </>
         ) : (
           <p className="mt-5 text-[12px] text-fg-muted">
@@ -102,9 +124,7 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
           </details>
         ) : null}
 
-        {state.busy && state.step ? (
-          <p className="mt-3 text-[11px] text-fg-faint">{state.step}</p>
-        ) : null}
+        <ConnectProgress />
 
         <div className="mt-5 border-t border-hairline pt-3">
           <button

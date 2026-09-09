@@ -158,13 +158,26 @@ let loginWindow = null;
  * Opens the sign-in window and resolves once a YouTube session exists (or the
  * user closes the window). The window closes itself on success.
  */
-function openLoginWindow(parent, validate, onEvent) {
+function openLoginWindow(parent, validate, onEvent, onPhase) {
   const trace = (msg) => {
     if (typeof onEvent === "function") {
       try {
         onEvent(msg);
       } catch {
         /* logging must never break sign-in */
+      }
+    }
+  };
+  // Coarse, user-facing progress. Verification runs a real yt-dlp check
+  // against YouTube and can take the better part of a minute, so the main
+  // window needs to be told which stage we are in rather than sitting on
+  // "waiting for sign-in" the whole time.
+  const phase = (name) => {
+    if (typeof onPhase === "function") {
+      try {
+        onPhase(name);
+      } catch {
+        /* progress reporting must never break sign-in */
       }
     }
   };
@@ -233,6 +246,7 @@ function openLoginWindow(parent, validate, onEvent) {
     trace(
       `sign-in window opened id=${win.id} mainAlive=${Boolean(parent && !parent.isDestroyed())}`,
     );
+    phase("waiting");
 
     let settled = false;
     let lastError = null;
@@ -293,6 +307,7 @@ function openLoginWindow(parent, validate, onEvent) {
         if (!hasAuth(cookies) || settled || !alive()) return;
         validationInFlight = true;
         trace("cookies found, verifying");
+        phase("verifying");
         setTitleSafely("Verifying YouTube…");
         const saved = await exportCookieFile();
         let verified = saved;
@@ -322,10 +337,12 @@ function openLoginWindow(parent, validate, onEvent) {
         if (settled || !alive()) return;
         if (verified) {
           trace("verified");
+          phase("verified");
           await finish(true);
           return;
         }
         trace("verification rejected, staying open");
+        phase("rejected");
         setTitleSafely("Sign in to YouTube");
       } catch (err) {
         lastError = err && err.message ? err.message : null;

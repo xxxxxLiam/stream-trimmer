@@ -567,6 +567,11 @@ function registerIpc() {
         mainWindow,
         (file) => verifyCookieFile(file),
         (msg) => logger.log("youtube", msg),
+        (phase) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("youtube:progress", { phase });
+          }
+        },
       );
       logger.log(
         "youtube",

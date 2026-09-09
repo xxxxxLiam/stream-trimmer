@@ -9,6 +9,13 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+/** Stages the in-app YouTube sign-in reports back to the main window. */
+type YouTubeConnectPhase =
+  | "waiting"
+  | "verifying"
+  | "rejected"
+  | "verified";
+
 type UpdateStatusPayload =
   | { state: "checking" }
   | { state: "available"; version?: string }
@@ -47,6 +54,10 @@ interface ElectronAPI {
   probeYouTube?: () => Promise<{ connected: boolean; error?: string }>;
   /** Clears the stored in-app YouTube session. */
   disconnectYouTube?: () => Promise<{ ok: boolean }>;
+  /** Subscribes to sign-in progress. Returns an unsubscribe function. */
+  onYouTubeProgress?: (
+    cb: (payload: { phase: YouTubeConnectPhase }) => void,
+  ) => () => void;
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
   revealDiagnostics?: () => Promise<{
