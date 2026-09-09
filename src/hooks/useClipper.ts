@@ -257,7 +257,10 @@ export function useClipper() {
         document.body.appendChild(a);
         a.click();
         a.remove();
-        URL.revokeObjectURL(objectUrl);
+        // Revoking on this tick cancels the download the click just started:
+        // the browser has not read the blob yet, and the request fails with
+        // a bare ERR_FAILED. Hold the URL until the transfer can have run.
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
         setSavedNotice({ kind: "comments", path: "", label: filename });
         addDownload({
           kind: "comments",
@@ -625,7 +628,10 @@ export function useClipper() {
         document.body.appendChild(a);
         a.click();
         a.remove();
-        URL.revokeObjectURL(objectUrl);
+        // Revoking on this tick cancels the download the click just started:
+        // the browser has not read the blob yet, and the request fails with
+        // a bare ERR_FAILED. Hold the URL until the transfer can have run.
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
         setSavedNotice({ kind: "clip", path: "", label: filename, detail });
         addDownload({
           kind: "clip",
@@ -641,7 +647,20 @@ export function useClipper() {
       if (e instanceof DOMException && e.name === "AbortError") {
         setDownloadPhase("idle");
       } else {
-        setError(e instanceof Error ? e.message : "Download failed");
+        const raw = e instanceof Error ? e.message : "Download failed";
+        // A bare "Failed to fetch" is what fetch() rejects with for any
+        // transport-level failure. Left as-is it sends people hunting for a
+        // YouTube or sign-in problem, when the clip itself built fine and
+        // only the local transfer broke.
+        const transportFailure =
+          /failed to fetch|networkerror|load failed|network request failed/i.test(
+            raw,
+          );
+        setError(
+          transportFailure
+            ? "The clip was built, but the transfer from the local engine broke before it finished. This is not a YouTube or sign-in problem — copy the diagnostics log for the reason."
+            : raw,
+        );
         setDownloadPhase("error");
       }
     } finally {
