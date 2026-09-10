@@ -1318,7 +1318,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
     const settle = (why: string, err?: unknown) => {
       if (settled) return;
       settled = true;
-      if (sent === stat.size && res.writableEnded) {
+      const ok = sent === stat.size && res.writableEnded;
+      if (ok) {
         console.log(
           `[server] /api/download sent job=${jobId} bytes=${sent}`,
         );
@@ -1335,8 +1336,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
         });
       }
       stream.destroy();
-      cleanup();
+      // Only a completed transfer clears the work folder; a broken one keeps
+      // the finished clip so the retry is instant.
+      if (ok) cleanup();
     };
+
 
     stream.on("data", (chunk) => {
       sent += chunk.length;
