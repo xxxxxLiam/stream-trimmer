@@ -114,6 +114,7 @@ function FooterBar() {
     saveDir,
     downloadProgress,
     downloadPhase,
+    downloadNote,
     cancelDownload,
   } = useClipperContext();
   const needsSaveDir = isElectron && !saveDir;
@@ -154,7 +155,11 @@ function FooterBar() {
       {downloading ? (
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
           <span className="shrink-0 text-[12px] tabular-nums text-fg-muted">
-            {processing ? "Finishing up" : `Downloading ${Math.floor(pct)}%`}
+            {processing
+              ? "Finishing up"
+              : downloadNote && pct === 0
+                ? downloadNote
+                : `Downloading ${Math.floor(pct)}%`}
           </span>
           <div className="relative h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-panel-raised">
             {processing ? (

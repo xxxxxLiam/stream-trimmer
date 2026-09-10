@@ -26,6 +26,20 @@ import {
   classifyYouTubeAuthOutput,
   type YouTubeAuthProbeStatus,
 } from "./youtubeAuth";
+import {
+  CLIP_PREFIX,
+  EXPORT_PREFIX,
+  appendJsonl,
+  cacheUsage,
+  clearCache,
+  partialBytes,
+  readJson,
+  readJsonl,
+  sweepStaleCache,
+  workDir,
+  writeJson,
+} from "./resumeCache";
+
 
 const PORT = Number(process.env.PORT || 5174);
 const MAX_CLIP_SECONDS = 600;
@@ -922,8 +936,29 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   const isAudio = format === "mp3";
   const ext = isAudio ? "mp3" : "mp4";
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ytclip-"));
+  // Keyed work folder: the same video at the same format/quality/range reuses
+  // the same folder, so yt-dlp's `.part` files survive a failure and the retry
+  // continues from where it stopped. Any other combination gets its own folder.
+  const tempDir = workDir(CLIP_PREFIX, [
+    url,
+    format,
+    quality,
+    start.toFixed(2),
+    end.toFixed(2),
+  ]);
   const outputPath = path.join(tempDir, `clip.${ext}`);
+  // A finished clip left from a previous run is never reused — only partials.
+  try {
+    fs.rmSync(outputPath, { force: true });
+  } catch {
+    /* ignore */
+  }
+  const resumeBytes = partialBytes(tempDir);
+  if (resumeBytes > 0) {
+    console.log(
+      `[server] /api/download resuming with ${resumeBytes} cached byte(s) in ${tempDir}`,
+    );
+  }
   const cleanup = () => {
     try {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -931,6 +966,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       /* ignore */
     }
   };
+
 
   // YouTube's SABR rollout means the web-type clients no longer expose separate
   // DASH video+audio URLs; only ANDROID_VR still does, and those URLs are bound
@@ -979,9 +1015,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
     noWarnings: true,
     newline: true,
     progress: true,
+    // Pick up any `.part` file left in this work folder by a failed run.
+    continue: true,
     ffmpegLocation: resolvedFfmpeg,
     ...cookieOptions,
   };
+
 
   const formatOptions: Record<string, unknown> = isAudio
     ? { extractAudio: true, audioFormat: "mp3", audioQuality: quality }
@@ -1125,7 +1164,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
   };
 
   try {
-    publishProgress(jobId, { phase: "downloading", percent: 0 });
+    publishProgress(jobId, {
+      phase: "downloading",
+      percent: 0,
+      ...(resumeBytes > 0
+        ? {
+            message: `Resuming — ${(resumeBytes / (1024 * 1024)).toFixed(1)} MB already downloaded`,
+          }
+        : {}),
+    });
+
     console.log(
       `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
     );
@@ -1205,7 +1253,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
     }
 
     if (!fs.existsSync(outputPath)) {
-      cleanup();
+      // Work folder deliberately kept so the next attempt can resume.
+
       publishProgress(jobId, {
         phase: "error",
         percent: 0,
@@ -1278,7 +1327,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
     const settle = (why: string, err?: unknown) => {
       if (settled) return;
       settled = true;
-      if (sent === stat.size && res.writableEnded) {
+      const ok = sent === stat.size && res.writableEnded;
+      if (ok) {
         console.log(
           `[server] /api/download sent job=${jobId} bytes=${sent}`,
         );
@@ -1295,8 +1345,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
         });
       }
       stream.destroy();
-      cleanup();
+      // Only a completed transfer clears the work folder; a broken one keeps
+      // the finished clip so the retry is instant.
+      if (ok) cleanup();
     };
+
 
     stream.on("data", (chunk) => {
       sent += chunk.length;
@@ -1306,14 +1359,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
     res.on("close", () => settle("connection closed early"));
     stream.pipe(res);
   } catch (e) {
+    // Work folders are intentionally left in place on failure: the partial
+    // download inside them is what makes the retry resumable. The staleness
+    // sweep and the "clear unfinished downloads" action reclaim the space.
     if (cookiesFromBrowser && isCookieError(e)) {
-      cleanup();
       const msg = cookieErrorMessage(cookiesFromBrowser);
       publishProgress(jobId, { phase: "error", percent: 0, message: msg });
       return res.status(400).json({ error: msg });
     }
     logYtError("/api/download", url, options, e);
-    cleanup();
+
     const raw = fullErrMessage(e);
     // Keep the friendly sentence but append the real yt-dlp stderr tail so the
     // next YouTube-side change is diagnosable straight from the UI.
