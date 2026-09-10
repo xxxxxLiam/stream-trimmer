@@ -922,8 +922,29 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   const isAudio = format === "mp3";
   const ext = isAudio ? "mp3" : "mp4";
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ytclip-"));
+  // Keyed work folder: the same video at the same format/quality/range reuses
+  // the same folder, so yt-dlp's `.part` files survive a failure and the retry
+  // continues from where it stopped. Any other combination gets its own folder.
+  const tempDir = workDir(CLIP_PREFIX, [
+    url,
+    format,
+    quality,
+    start.toFixed(2),
+    end.toFixed(2),
+  ]);
   const outputPath = path.join(tempDir, `clip.${ext}`);
+  // A finished clip left from a previous run is never reused — only partials.
+  try {
+    fs.rmSync(outputPath, { force: true });
+  } catch {
+    /* ignore */
+  }
+  const resumeBytes = partialBytes(tempDir);
+  if (resumeBytes > 0) {
+    console.log(
+      `[server] /api/download resuming with ${resumeBytes} cached byte(s) in ${tempDir}`,
+    );
+  }
   const cleanup = () => {
     try {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -931,6 +952,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       /* ignore */
     }
   };
+
 
   // YouTube's SABR rollout means the web-type clients no longer expose separate
   // DASH video+audio URLs; only ANDROID_VR still does, and those URLs are bound
