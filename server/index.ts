@@ -1015,9 +1015,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
     noWarnings: true,
     newline: true,
     progress: true,
+    // Pick up any `.part` file left in this work folder by a failed run.
+    continue: true,
     ffmpegLocation: resolvedFfmpeg,
     ...cookieOptions,
   };
+
 
   const formatOptions: Record<string, unknown> = isAudio
     ? { extractAudio: true, audioFormat: "mp3", audioQuality: quality }
