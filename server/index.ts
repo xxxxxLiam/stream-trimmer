@@ -1164,7 +1164,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
   };
 
   try {
-    publishProgress(jobId, { phase: "downloading", percent: 0 });
+    publishProgress(jobId, {
+      phase: "downloading",
+      percent: 0,
+      ...(resumeBytes > 0
+        ? {
+            message: `Resuming — ${(resumeBytes / (1024 * 1024)).toFixed(1)} MB already downloaded`,
+          }
+        : {}),
+    });
+
     console.log(
       `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
     );
