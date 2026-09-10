@@ -72,6 +72,9 @@ export function useClipper() {
   const [downloadPhase, setDownloadPhase] = useState<
     "idle" | "downloading" | "processing" | "done" | "error"
   >("idle");
+  // Set when the engine reports it is continuing a previously interrupted
+  // download, so the status bar can say so instead of looking like a restart.
+  const [downloadNote, setDownloadNote] = useState("");
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
   // Confirmation notice for a completed save (clip or comments CSV).
   const [savedNotice, setSavedNotice] = useState<{
@@ -505,6 +508,7 @@ export function useClipper() {
     setDownloading(true);
     setDownloadProgress(0);
     setDownloadPhase("downloading");
+    setDownloadNote("");
     setSavedNotice(null);
     const controller = new AbortController();
     downloadAbortRef.current = controller;
@@ -525,8 +529,11 @@ export function useClipper() {
           const data = JSON.parse(ev.data) as {
             phase: "downloading" | "processing" | "done" | "error";
             percent: number;
+            message?: string;
           };
           setDownloadPhase(data.phase);
+          if (data.phase === "downloading" && data.message)
+            setDownloadNote(data.message);
           if (typeof data.percent === "number") {
             setDownloadProgress((prev) =>
               data.phase === "downloading"
@@ -721,6 +728,7 @@ export function useClipper() {
     downloading,
     downloadProgress,
     downloadPhase,
+    downloadNote,
     error,
     videoId,
     duration,
