@@ -1350,14 +1350,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
     res.on("close", () => settle("connection closed early"));
     stream.pipe(res);
   } catch (e) {
+    // Work folders are intentionally left in place on failure: the partial
+    // download inside them is what makes the retry resumable. The staleness
+    // sweep and the "clear unfinished downloads" action reclaim the space.
     if (cookiesFromBrowser && isCookieError(e)) {
-      cleanup();
       const msg = cookieErrorMessage(cookiesFromBrowser);
       publishProgress(jobId, { phase: "error", percent: 0, message: msg });
       return res.status(400).json({ error: msg });
     }
     logYtError("/api/download", url, options, e);
-    cleanup();
+
     const raw = fullErrMessage(e);
     // Keep the friendly sentence but append the real yt-dlp stderr tail so the
     // next YouTube-side change is diagnosable straight from the UI.
