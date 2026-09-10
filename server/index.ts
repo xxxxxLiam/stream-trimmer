@@ -26,6 +26,20 @@ import {
   classifyYouTubeAuthOutput,
   type YouTubeAuthProbeStatus,
 } from "./youtubeAuth";
+import {
+  CLIP_PREFIX,
+  EXPORT_PREFIX,
+  appendJsonl,
+  cacheUsage,
+  clearCache,
+  partialBytes,
+  readJson,
+  readJsonl,
+  sweepStaleCache,
+  workDir,
+  writeJson,
+} from "./resumeCache";
+
 
 const PORT = Number(process.env.PORT || 5174);
 const MAX_CLIP_SECONDS = 600;
