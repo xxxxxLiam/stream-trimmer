@@ -1244,7 +1244,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
     }
 
     if (!fs.existsSync(outputPath)) {
-      cleanup();
+      // Work folder deliberately kept so the next attempt can resume.
+
       publishProgress(jobId, {
         phase: "error",
         percent: 0,
