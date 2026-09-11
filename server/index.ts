@@ -2315,6 +2315,18 @@ app.get("/api/channel/export/progress", (req: Request, res: Response) => {
 });
 
 
+// --- Resume cache -------------------------------------------------------
+
+app.get("/api/cache/usage", (_req: Request, res: Response) => {
+  return res.json(cacheUsage());
+});
+
+app.post("/api/cache/clear", (_req: Request, res: Response) => {
+  const { removed } = clearCache();
+  console.log(`[server] cleared ${removed} unfinished work folder(s)`);
+  return res.json({ ok: true, removed, ...cacheUsage() });
+});
+
 // SPA fallback for the packaged UI — must be registered after all API routes.
 if (uiDir && fs.existsSync(uiDir)) {
   app.get(/^\/(?!api\/).*/, (_req: Request, res: Response) => {
@@ -2324,4 +2336,6 @@ if (uiDir && fs.existsSync(uiDir)) {
 
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+  const swept = sweepStaleCache();
+  if (swept) console.log(`[server] swept ${swept} stale work folder(s)`);
 });
