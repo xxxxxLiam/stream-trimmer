@@ -2095,6 +2095,12 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       console.log(
         `[server] channel export resuming with ${alreadyDone.size} video(s) already collected`,
       );
+      publishChannel(jobId, {
+        phase: "details",
+        current: alreadyDone.size,
+        total: selected.length,
+        label: `Resuming — ${alreadyDone.size} of ${selected.length} already collected`,
+      });
     }
 
 
