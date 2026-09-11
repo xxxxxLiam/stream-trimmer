@@ -2104,8 +2104,13 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       for (let i = 0; i < selected.length; i++) {
         if (job.cancelled) break;
         const v = selected[i];
+        // Already collected on an earlier attempt — its rows were loaded from
+        // the checkpoint, so skip the expensive scrape entirely.
+        if (alreadyDone.has(v.id)) continue;
         const videoUrl = `https://www.youtube.com/watch?v=${v.id}`;
         const notes: string[] = [];
+        const videoComments: Record<string, unknown>[] = [];
+        const videoTranscripts: Record<string, unknown>[] = [];
         publishChannel(jobId, {
           phase: "details",
           current: i,
@@ -2136,7 +2141,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
             if (raw.length === 0) notes.push("no comments");
             for (const c of raw) {
               const isReply = Boolean(c.parent && c.parent !== "root");
-              comments.push({
+              videoComments.push({
                 video_id: v.id,
                 comment_id: c.id ?? "",
                 parent_id: isReply ? c.parent ?? "" : "",
@@ -2164,7 +2169,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
           const lines = await fetchTranscript(job, videoUrl, cookieOptions);
           if (lines.length === 0) notes.push("no captions");
           for (const l of lines) {
-            transcripts.push({
+            videoTranscripts.push({
               video_id: v.id,
               start: l.start,
               end: l.end,
@@ -2173,15 +2178,26 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
           }
         }
 
-        statuses.push({
+        if (job.cancelled) break;
+        const statusRow = {
           video_id: v.id,
           title: v.title,
           status: notes.length === 0 ? "ok" : notes.join("; "),
-        });
+        };
+        comments.push(...videoComments);
+        transcripts.push(...videoTranscripts);
+        statuses.push(statusRow);
+        // Flush this video to the checkpoint before moving on, so an
+        // interruption never costs more than the video in flight.
+        appendJsonl(ckComments, videoComments);
+        appendJsonl(ckTranscripts, videoTranscripts);
+        appendJsonl(ckStatuses, [statusRow]);
       }
     }
 
     const cancelled = job.cancelled;
+    // A finished export has nothing left to resume.
+    if (!cancelled) clearCheckpoint();
     publishChannel(jobId, {
       phase: cancelled ? "cancelled" : "done",
       current: selected.length,
