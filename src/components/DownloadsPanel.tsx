@@ -3,7 +3,7 @@
  * Path: src/components/DownloadsPanel.tsx
  * Description: Persisted download history with reveal-in-folder and per-row removal.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Clock,
@@ -14,6 +14,7 @@ import {
   X,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
+import { apiUrl } from "../lib/clip";
 import DragOutHandle from "./DragOutHandle";
 import type { DownloadEntry } from "../lib/downloads";
 
@@ -25,6 +26,12 @@ function formatWhen(ts: number): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 function KindIcon({ kind }: { kind: DownloadEntry["kind"] }) {
@@ -41,6 +48,39 @@ export default function DownloadsPanel() {
     labelForDir,
     isElectron,
   } = useClipperContext();
+
+  // Unfinished downloads and exports are kept so a failed run can pick up
+  // where it stopped; this shows how much room they take and offers to clear.
+  const [cache, setCache] = useState<{ folders: number; bytes: number } | null>(
+    null,
+  );
+  const [clearing, setClearing] = useState(false);
+
+  const refreshCache = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl("/api/cache/usage"));
+      if (!res.ok) return;
+      setCache((await res.json()) as { folders: number; bytes: number });
+    } catch {
+      setCache(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCache();
+  }, [refreshCache, downloads]);
+
+  const clearCache = useCallback(async () => {
+    setClearing(true);
+    try {
+      await fetch(apiUrl("/api/cache/clear"), { method: "POST" });
+    } catch {
+      /* nothing to report — the usage line refreshes either way */
+    } finally {
+      setClearing(false);
+      void refreshCache();
+    }
+  }, [refreshCache]);
 
   // Files can be moved or deleted outside the app, so probe once per mount
   // (and whenever the list changes) rather than on every render.
@@ -92,6 +132,24 @@ export default function DownloadsPanel() {
           </button>
         )}
       </div>
+
+      {cache && cache.bytes > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2">
+          <span className="min-w-0 text-[11px] text-fg-faint">
+            {formatBytes(cache.bytes)} of unfinished downloads kept so a failed
+            clip or export can carry on instead of starting over.
+          </span>
+          <button
+            type="button"
+            onClick={clearCache}
+            disabled={clearing}
+            className="btn shrink-0 text-[12px]"
+          >
+            <Trash size={12} />
+            <span>{clearing ? "Clearing…" : "Clear unfinished"}</span>
+          </button>
+        </div>
+      )}
 
       {downloads.length === 0 ? (
         <div className="rounded-row border border-dashed border-hairline px-3 py-6 text-center text-[12px] text-fg-faint">
