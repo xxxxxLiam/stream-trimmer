@@ -1890,12 +1890,43 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
     if (!res.writableEnded) cancelChannelJob(jobId);
   });
 
+  // Checkpoint folder keyed on everything that changes what gets exported.
+  // Rows are flushed to disk per video, so a failure, a cancel or a quit only
+  // costs the video in flight — the rerun continues from the next one.
+  const ckDir = workDir(EXPORT_PREFIX, [
+    base,
+    input.contentType,
+    input.limit,
+    input.includeComments,
+    input.includeTranscripts,
+  ]);
+  const ckSelection = path.join(ckDir, "selection.json");
+  const ckComments = path.join(ckDir, "comments.jsonl");
+  const ckTranscripts = path.join(ckDir, "transcripts.jsonl");
+  const ckStatuses = path.join(ckDir, "statuses.jsonl");
+  const clearCheckpoint = () => {
+    try {
+      fs.rmSync(ckDir, { recursive: true, force: true });
+    } catch {
+      /* swept later */
+    }
+  };
+
+  interface Checkpoint {
+    channelName: string;
+    subs: number | "";
+    videos: Record<string, unknown>[];
+    selected: { id: string; title: string }[];
+  }
+  const saved = readJson<Checkpoint>(ckSelection);
+
   const videos: Record<string, unknown>[] = [];
   const comments: Record<string, unknown>[] = [];
   const transcripts: Record<string, unknown>[] = [];
   const statuses: Record<string, unknown>[] = [];
   let channelName = "";
   let subs: number | "" = "";
+
 
   try {
     publishChannel(jobId, {
