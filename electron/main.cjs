@@ -364,11 +364,12 @@ function startCookieRefresh() {
 }
 
 // A clip handed to the renderer but never saved (a crash, a quit mid-save)
-// leaves its temp directory behind. Clear anything older than a day.
+// leaves its temp directory behind. These folders also hold the partial
+// downloads that make a failed clip resumable, so they are kept for a week.
 function sweepStaleClips() {
   try {
     const root = os.tmpdir();
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     let removed = 0;
     for (const name of fs.readdirSync(root)) {
       if (!name.startsWith("ytclip-")) continue;

@@ -1890,6 +1890,36 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
     if (!res.writableEnded) cancelChannelJob(jobId);
   });
 
+  // Checkpoint folder keyed on everything that changes what gets exported.
+  // Rows are flushed to disk per video, so a failure, a cancel or a quit only
+  // costs the video in flight — the rerun continues from the next one.
+  const ckDir = workDir(EXPORT_PREFIX, [
+    base,
+    input.contentType,
+    input.limit,
+    input.includeComments,
+    input.includeTranscripts,
+  ]);
+  const ckSelection = path.join(ckDir, "selection.json");
+  const ckComments = path.join(ckDir, "comments.jsonl");
+  const ckTranscripts = path.join(ckDir, "transcripts.jsonl");
+  const ckStatuses = path.join(ckDir, "statuses.jsonl");
+  const clearCheckpoint = () => {
+    try {
+      fs.rmSync(ckDir, { recursive: true, force: true });
+    } catch {
+      /* swept later */
+    }
+  };
+
+  interface Checkpoint {
+    channelName: string;
+    subs: number | "";
+    videos: Record<string, unknown>[];
+    selected: { id: string; title: string }[];
+  }
+  const saved = readJson<Checkpoint>(ckSelection);
+
   const videos: Record<string, unknown>[] = [];
   const comments: Record<string, unknown>[] = [];
   const transcripts: Record<string, unknown>[] = [];
@@ -1897,151 +1927,181 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
   let channelName = "";
   let subs: number | "" = "";
 
+
   try {
-    publishChannel(jobId, {
-      phase: "listing",
-      current: 0,
-      total: 0,
-      label: "Reading the channel listing",
-    });
+    let selected: { id: string; title: string }[] = [];
+    if (saved && Array.isArray(saved.selected) && saved.selected.length > 0) {
+      // Resuming: the ranking pass already ran, so the same top-N set is
+      // reused rather than re-fetching metadata for the whole candidate pool.
+      channelName = saved.channelName || "";
+      subs = saved.subs ?? "";
+      selected = saved.selected;
+      videos.push(...(saved.videos ?? []));
+      comments.push(...readJsonl<Record<string, unknown>>(ckComments));
+      transcripts.push(...readJsonl<Record<string, unknown>>(ckTranscripts));
+      statuses.push(...readJsonl<Record<string, unknown>>(ckStatuses));
+    } else {
+      publishChannel(jobId, {
+        phase: "listing",
+        current: 0,
+        total: 0,
+        label: "Reading the channel listing",
+      });
 
-    // Flat channel listings are inconsistent: the Videos tab carries duration
-    // but no view counts, the Shorts tab carries view counts but no duration.
-    // So each tab is pre-ranked with whatever signal it has (the Videos tab is
-    // requested in YouTube's own "most popular" order), a candidate pool is
-    // taken from the top of each, and the final ranking uses the real view
-    // counts from full metadata.
-    const tabs =
-      input.contentType === "shorts"
-        ? [`${base}/shorts`]
-        : input.contentType === "longform"
-          ? [`${base}/videos?view=0&sort=p`]
-          : [`${base}/videos?view=0&sort=p`, `${base}/shorts`];
+      // Flat channel listings are inconsistent: the Videos tab carries duration
+      // but no view counts, the Shorts tab carries view counts but no duration.
+      // So each tab is pre-ranked with whatever signal it has (the Videos tab is
+      // requested in YouTube's own "most popular" order), a candidate pool is
+      // taken from the top of each, and the final ranking uses the real view
+      // counts from full metadata.
+      const tabs =
+        input.contentType === "shorts"
+          ? [`${base}/shorts`]
+          : input.contentType === "longform"
+            ? [`${base}/videos?view=0&sort=p`]
+            : [`${base}/videos?view=0&sort=p`, `${base}/shorts`];
 
-    const seen = new Map<string, RankedVideo>();
-    let listedAny = false;
-    let lastListError = "";
-    for (const tab of tabs) {
-      try {
-        const { entries, channelName: name, subs: s } = await listChannelTab(
-          job,
-          tab,
-          cookieOptions,
-        );
-        listedAny = true;
-        if (!channelName && name) channelName = name;
-        if (subs === "" && s !== "") subs = s;
-        const tabVideos: RankedVideo[] = [];
-        for (const e of entries) {
-          if (!e.id || seen.has(e.id)) continue;
-          tabVideos.push({
-            id: e.id,
-            title: e.title ?? "",
-            duration: Number(e.duration) || 0,
-            view_count: Number(e.view_count) || 0,
+      const seen = new Map<string, RankedVideo>();
+      let listedAny = false;
+      let lastListError = "";
+      for (const tab of tabs) {
+        try {
+          const { entries, channelName: name, subs: s } = await listChannelTab(
+            job,
+            tab,
+            cookieOptions,
+          );
+          listedAny = true;
+          if (!channelName && name) channelName = name;
+          if (subs === "" && s !== "") subs = s;
+          const tabVideos: RankedVideo[] = [];
+          for (const e of entries) {
+            if (!e.id || seen.has(e.id)) continue;
+            tabVideos.push({
+              id: e.id,
+              title: e.title ?? "",
+              duration: Number(e.duration) || 0,
+              view_count: Number(e.view_count) || 0,
+            });
+          }
+          // Only re-sort when the tab actually reported view counts; otherwise
+          // the listing order (popularity) is the better signal.
+          if (tabVideos.some((v) => v.view_count > 0)) {
+            tabVideos.sort((a, b) => b.view_count - a.view_count);
+          }
+          for (const v of tabVideos.slice(0, input.limit * 2)) seen.set(v.id, v);
+        } catch (e) {
+          lastListError = fullErrMessage(e);
+          if (job.cancelled) break;
+        }
+      }
+      if (job.cancelled) throw new Error("cancelled");
+      if (!listedAny)
+        throw new Error(lastListError || "Couldn't read this channel's videos.");
+
+      const pool = [...seen.values()];
+      if (pool.length === 0)
+        throw new Error("No videos matched that filter on this channel.");
+
+      // Full metadata for the candidate pool (duration, views, likes, comments).
+      let metaDone = 0;
+      publishChannel(jobId, {
+        phase: "metadata",
+        current: 0,
+        total: pool.length,
+        label: "Collecting video details",
+      });
+      const metas = await mapLimit(pool, META_CONCURRENCY, async (v) => {
+        if (job.cancelled) return null;
+        try {
+          const info = await runForJob(
+            job,
+            `https://www.youtube.com/watch?v=${v.id}`,
+            {
+              dumpSingleJson: true,
+              noPlaylist: true,
+              noWarnings: true,
+              skipDownload: true,
+              ...cookieOptions,
+            },
+            90_000,
+          );
+          return info;
+        } catch {
+          return null;
+        } finally {
+          metaDone += 1;
+          publishChannel(jobId, {
+            phase: "metadata",
+            current: metaDone,
+            total: pool.length,
+            label: v.title || v.id,
           });
         }
-        // Only re-sort when the tab actually reported view counts; otherwise
-        // the listing order (popularity) is the better signal.
-        if (tabVideos.some((v) => v.view_count > 0)) {
-          tabVideos.sort((a, b) => b.view_count - a.view_count);
-        }
-        for (const v of tabVideos.slice(0, input.limit * 2)) seen.set(v.id, v);
-      } catch (e) {
-        lastListError = fullErrMessage(e);
-        if (job.cancelled) break;
-      }
-    }
-    if (job.cancelled) throw new Error("cancelled");
-    if (!listedAny)
-      throw new Error(lastListError || "Couldn't read this channel's videos.");
+      });
+      if (job.cancelled) throw new Error("cancelled");
 
-    const pool = [...seen.values()];
-    if (pool.length === 0)
-      throw new Error("No videos matched that filter on this channel.");
+      const rows = pool.map((v, i) => {
+        const m = (metas[i] ?? {}) as Record<string, any>;
+        const duration = Number(m.duration) || v.duration;
+        const views =
+          typeof m.view_count === "number" ? m.view_count : v.view_count;
+        return {
+          video_id: v.id,
+          url: `https://www.youtube.com/watch?v=${v.id}`,
+          title: m.title ?? v.title,
+          description: m.description ?? "",
+          upload_date: m.upload_date ?? "",
+          duration_seconds: duration,
+          is_short: duration > 0 && duration <= SHORT_MAX_SECONDS,
+          view_count: views,
+          like_count: typeof m.like_count === "number" ? m.like_count : "",
+          comment_count:
+            typeof m.comment_count === "number" ? m.comment_count : "",
+          channel: m.channel ?? channelName,
+          thumbnail: m.thumbnail ?? "",
+          tags: Array.isArray(m.tags) ? m.tags.join("; ") : "",
+          tag_count: Array.isArray(m.tags) ? m.tags.length : 0,
+          ...extractHashtags(m),
 
-    // Full metadata for the candidate pool (duration, views, likes, comments).
-    let metaDone = 0;
-    publishChannel(jobId, {
-      phase: "metadata",
-      current: 0,
-      total: pool.length,
-      label: "Collecting video details",
-    });
-    const metas = await mapLimit(pool, META_CONCURRENCY, async (v) => {
-      if (job.cancelled) return null;
-      try {
-        const info = await runForJob(
-          job,
-          `https://www.youtube.com/watch?v=${v.id}`,
-          {
-            dumpSingleJson: true,
-            noPlaylist: true,
-            noWarnings: true,
-            skipDownload: true,
-            ...cookieOptions,
-          },
-          90_000,
+        };
+      });
+
+      let ranked = rows;
+      if (input.contentType === "shorts") {
+        ranked = ranked.filter(
+          (r) => r.duration_seconds === 0 || r.is_short === true,
         );
-        return info;
-      } catch {
-        return null;
-      } finally {
-        metaDone += 1;
-        publishChannel(jobId, {
-          phase: "metadata",
-          current: metaDone,
-          total: pool.length,
-          label: v.title || v.id,
-        });
+      } else if (input.contentType === "longform") {
+        ranked = ranked.filter(
+          (r) => r.duration_seconds === 0 || r.is_short === false,
+        );
       }
-    });
-    if (job.cancelled) throw new Error("cancelled");
-
-    const rows = pool.map((v, i) => {
-      const m = (metas[i] ?? {}) as Record<string, any>;
-      const duration = Number(m.duration) || v.duration;
-      const views =
-        typeof m.view_count === "number" ? m.view_count : v.view_count;
-      return {
-        video_id: v.id,
-        url: `https://www.youtube.com/watch?v=${v.id}`,
-        title: m.title ?? v.title,
-        description: m.description ?? "",
-        upload_date: m.upload_date ?? "",
-        duration_seconds: duration,
-        is_short: duration > 0 && duration <= SHORT_MAX_SECONDS,
-        view_count: views,
-        like_count: typeof m.like_count === "number" ? m.like_count : "",
-        comment_count:
-          typeof m.comment_count === "number" ? m.comment_count : "",
-        channel: m.channel ?? channelName,
-        thumbnail: m.thumbnail ?? "",
-        tags: Array.isArray(m.tags) ? m.tags.join("; ") : "",
-        tag_count: Array.isArray(m.tags) ? m.tags.length : 0,
-        ...extractHashtags(m),
-
-      };
-    });
-
-    let ranked = rows;
-    if (input.contentType === "shorts") {
-      ranked = ranked.filter(
-        (r) => r.duration_seconds === 0 || r.is_short === true,
-      );
-    } else if (input.contentType === "longform") {
-      ranked = ranked.filter(
-        (r) => r.duration_seconds === 0 || r.is_short === false,
-      );
+      ranked.sort((a, b) => Number(b.view_count) - Number(a.view_count));
+      selected = ranked.slice(0, input.limit).map((r) => ({
+        id: String(r.video_id),
+        title: String(r.title),
+      }));
+      if (selected.length === 0)
+        throw new Error("No videos matched that filter on this channel.");
+      videos.push(...ranked.slice(0, input.limit));
+      writeJson(ckSelection, { channelName, subs, videos, selected });
     }
-    ranked.sort((a, b) => Number(b.view_count) - Number(a.view_count));
-    const selected = ranked.slice(0, input.limit).map((r) => ({
-      id: String(r.video_id),
-      title: String(r.title),
-    }));
-    if (selected.length === 0)
-      throw new Error("No videos matched that filter on this channel.");
-    videos.push(...ranked.slice(0, input.limit));
+
+    const alreadyDone = new Set(
+      statuses.map((s) => String((s as { video_id?: unknown }).video_id ?? "")),
+    );
+    if (alreadyDone.size > 0) {
+      console.log(
+        `[server] channel export resuming with ${alreadyDone.size} video(s) already collected`,
+      );
+      publishChannel(jobId, {
+        phase: "details",
+        current: alreadyDone.size,
+        total: selected.length,
+        label: `Resuming — ${alreadyDone.size} of ${selected.length} already collected`,
+      });
+    }
 
 
     // Per-video comments + transcripts. Sequential: these are the heavy calls
@@ -2050,8 +2110,13 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       for (let i = 0; i < selected.length; i++) {
         if (job.cancelled) break;
         const v = selected[i];
+        // Already collected on an earlier attempt — its rows were loaded from
+        // the checkpoint, so skip the expensive scrape entirely.
+        if (alreadyDone.has(v.id)) continue;
         const videoUrl = `https://www.youtube.com/watch?v=${v.id}`;
         const notes: string[] = [];
+        const videoComments: Record<string, unknown>[] = [];
+        const videoTranscripts: Record<string, unknown>[] = [];
         publishChannel(jobId, {
           phase: "details",
           current: i,
@@ -2082,7 +2147,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
             if (raw.length === 0) notes.push("no comments");
             for (const c of raw) {
               const isReply = Boolean(c.parent && c.parent !== "root");
-              comments.push({
+              videoComments.push({
                 video_id: v.id,
                 comment_id: c.id ?? "",
                 parent_id: isReply ? c.parent ?? "" : "",
@@ -2110,7 +2175,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
           const lines = await fetchTranscript(job, videoUrl, cookieOptions);
           if (lines.length === 0) notes.push("no captions");
           for (const l of lines) {
-            transcripts.push({
+            videoTranscripts.push({
               video_id: v.id,
               start: l.start,
               end: l.end,
@@ -2119,15 +2184,26 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
           }
         }
 
-        statuses.push({
+        if (job.cancelled) break;
+        const statusRow = {
           video_id: v.id,
           title: v.title,
           status: notes.length === 0 ? "ok" : notes.join("; "),
-        });
+        };
+        comments.push(...videoComments);
+        transcripts.push(...videoTranscripts);
+        statuses.push(statusRow);
+        // Flush this video to the checkpoint before moving on, so an
+        // interruption never costs more than the video in flight.
+        appendJsonl(ckComments, videoComments);
+        appendJsonl(ckTranscripts, videoTranscripts);
+        appendJsonl(ckStatuses, [statusRow]);
       }
     }
 
     const cancelled = job.cancelled;
+    // A finished export has nothing left to resume.
+    if (!cancelled) clearCheckpoint();
     publishChannel(jobId, {
       phase: cancelled ? "cancelled" : "done",
       current: selected.length,
@@ -2239,6 +2315,18 @@ app.get("/api/channel/export/progress", (req: Request, res: Response) => {
 });
 
 
+// --- Resume cache -------------------------------------------------------
+
+app.get("/api/cache/usage", (_req: Request, res: Response) => {
+  return res.json(cacheUsage());
+});
+
+app.post("/api/cache/clear", (_req: Request, res: Response) => {
+  const { removed } = clearCache();
+  console.log(`[server] cleared ${removed} unfinished work folder(s)`);
+  return res.json({ ok: true, removed, ...cacheUsage() });
+});
+
 // SPA fallback for the packaged UI — must be registered after all API routes.
 if (uiDir && fs.existsSync(uiDir)) {
   app.get(/^\/(?!api\/).*/, (_req: Request, res: Response) => {
@@ -2248,4 +2336,6 @@ if (uiDir && fs.existsSync(uiDir)) {
 
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+  const swept = sweepStaleCache();
+  if (swept) console.log(`[server] swept ${swept} stale work folder(s)`);
 });
