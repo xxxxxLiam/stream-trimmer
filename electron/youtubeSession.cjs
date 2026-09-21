@@ -13,6 +13,7 @@ const {
   isBenignLoadFailure,
   isSupersededNavigation,
 } = require("./navigation.cjs");
+const { isSignInRejected, validateCookieText } = require("./cookieFile.cjs");
 
 const PARTITION = "persist:youtube";
 const SIGNIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube";
@@ -21,6 +22,9 @@ const AUTH_COOKIES = ["SID", "__Secure-3PSID", "__Secure-1PSID"];
 // Ceiling for one verification attempt (the backend's own yt-dlp probe caps
 // out well below this).
 const VERIFY_TIMEOUT_MS = 75000;
+// Surfaced verbatim when Google blocks the in-app window.
+const EMBEDDED_REJECTED =
+  "Google won't accept a sign-in from inside an app. Import a cookies.txt exported from the browser you're signed in with — that's the route that works everywhere.";
 
 function ytSession() {
   return session.fromPartition(PARTITION);
@@ -354,6 +358,14 @@ function openLoginWindow(parent, validate, onEvent, onPhase) {
 
     win.webContents.on("did-navigate", (_e, url) => {
       trace(`did-navigate host=${safeHost(url)}`);
+      if (isSignInRejected(url)) {
+        // Google refuses sign-in from embedded browser frameworks. Record it
+        // so closing the window reports the real reason rather than a plain
+        // "cancelled", which says nothing about what to do next.
+        trace("google refused the embedded browser");
+        lastError = EMBEDDED_REJECTED;
+        phase("rejected");
+      }
       void check();
     });
     win.webContents.on("did-navigate-in-page", () => void check());
@@ -402,6 +414,41 @@ function openLoginWindow(parent, validate, onEvent, onPhase) {
 }
 
 
+/**
+ * Adopts a Netscape cookies.txt the user exported from their own browser.
+ *
+ * On Windows this is the only path that reliably works: a running Chrome
+ * holds an exclusive lock on its cookie database, and since Chrome 127
+ * App-Bound Encryption means even a readable copy cannot be decrypted from
+ * another process. Exporting from inside the browser sidesteps both.
+ */
+async function importCookieFile(sourcePath) {
+  try {
+    if (typeof sourcePath !== "string" || !sourcePath) {
+      return { ok: false, error: "No file chosen." };
+    }
+    const text = await fsp.readFile(sourcePath, "utf8");
+    const check = validateCookieText(text);
+    if (!check.ok) return { ok: false, error: check.reason };
+
+    const target = cookieFilePath();
+    const tmp = `${target}.tmp`;
+    await fsp.writeFile(tmp, text, { mode: 0o600 });
+    await fsp.rename(tmp, target);
+    try {
+      await fsp.chmod(target, 0o600);
+    } catch {
+      /* best effort on Windows */
+    }
+    return { ok: true, count: check.count };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err && err.message ? err.message : "Could not read that file.",
+    };
+  }
+}
+
 async function clear() {
   try {
     await ytSession().clearStorageData();
@@ -422,6 +469,7 @@ function isSigningIn() {
 }
 
 module.exports = {
+  importCookieFile,
   openLoginWindow,
   probe,
   clear,
