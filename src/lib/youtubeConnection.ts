@@ -438,7 +438,66 @@ export function checkConnection(source?: AuthSource): Promise<boolean> {
   return activeCheck;
 }
 
-/** Fallback path: check the selected desktop browser's cookie store. */
+/**
+ * Tries every installed browser, best first, and stops at the first one with
+ * a usable YouTube session.
+ *
+ * Without this the user has to guess: pick a browser from a dropdown, press
+ * check, read a failure, pick another. A Windows diagnostic report showed
+ * someone doing exactly that fifteen times across four browsers before
+ * giving up. The app knows the list — it should do the looking.
+ */
+export async function sweepBrowsers(): Promise<boolean> {
+  const api = electron();
+  let order: CookieBrowser[] = [...COOKIE_BROWSERS];
+  try {
+    const result = await api?.getBrowserOrder?.(
+      readSetting<string>(BROWSER_KEY, "") || null,
+    );
+    if (result?.browsers?.length) order = result.browsers;
+  } catch {
+    /* fall back to the full list in its default order */
+  }
+
+  const failures: string[] = [];
+  for (const browser of order) {
+    set({
+      busy: true,
+      browser,
+      browserStatus: "checking",
+      step: `Checking ${browser}…`,
+      message: undefined,
+      reason: undefined,
+    });
+    const result = await checkSource(browser);
+    if (result.status === "signed_in") {
+      writeSetting(BROWSER_KEY, browser);
+      markConnected(browser);
+      return true;
+    }
+    // "not installed" is not a failure worth reporting back to the user.
+    if (result.status !== "profile_missing") {
+      failures.push(`${browser}: ${result.message ?? result.status}`);
+    }
+  }
+
+  set({
+    connected: false,
+    busy: false,
+    step: undefined,
+    browserStatus: "signed_out",
+    probed: true,
+    restoring: false,
+    message:
+      failures.length === 0
+        ? "No supported browser is installed with a YouTube session."
+        : "None of your browsers would hand over a YouTube session.",
+    reason: failures.join("\n") || undefined,
+  });
+  return false;
+}
+
+/** Fallback path: check one specific browser, when the user picks it. */
 export function checkBrowserConnection(): Promise<boolean> {
   return checkConnection(state.browser);
 }

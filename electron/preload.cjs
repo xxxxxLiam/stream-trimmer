@@ -53,6 +53,7 @@ try {
     copyDiagnostics: () => ipcRenderer.invoke("diagnostics:copy"),
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
     getDefaultBrowser: () => ipcRenderer.invoke("system:defaultBrowser"),
+    getBrowserOrder: (saved) => ipcRenderer.invoke("system:browserOrder", saved),
 
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
