@@ -706,7 +706,16 @@ type CookieBrowserName = z.infer<typeof cookieBrowserSchema>;
 // Timing out there reports a perfectly good session as unverified, so the
 // ceiling sits well above the slow case; callers cap themselves above this.
 const AUTH_PROBE_TIMEOUT_MS = 40_000;
-const AUTH_PROBE_URL = "https://www.youtube.com/watch?v=BaW_jenozKc";
+// More than one, because the probe proves a sign-in by fetching a video and
+// any single video can be pulled, made private or blocked in a country. When
+// that happens the fetch fails for a reason that has nothing to do with the
+// user's cookies, so the probe moves to the next one rather than calling a
+// perfectly good session signed-out.
+const AUTH_PROBE_URLS = [
+  "https://www.youtube.com/watch?v=BaW_jenozKc", // yt-dlp's own test video
+  "https://www.youtube.com/watch?v=jNQXAC9IVRw", // "Me at the zoo"
+  "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+];
 
 type AuthSourceName = CookieBrowserName | "app";
 
@@ -716,12 +725,16 @@ function authProbeMessage(
 ): string | undefined {
   if (source === "app") {
     if (status === "signed_in") return undefined;
+    if (status === "probe_unavailable")
+      return "YouTube wouldn't play any of the videos used to check the connection. Your sign-in is probably fine — try again in a moment.";
     if (status === "signed_out")
       return "Your saved YouTube sign-in has expired. Sign in again, or import a fresh cookies.txt.";
     if (status === "timeout")
       return "YouTube took too long to answer. Try again.";
     return "YouTube rejected the saved sign-in. Sign in again.";
   }
+  if (status === "probe_unavailable")
+    return "YouTube wouldn't play any of the videos used to check the connection, so this says nothing about your sign-in. Try again in a moment.";
   const label = source[0].toUpperCase() + source.slice(1);
   if (status === "signed_out")
     return `No YouTube account cookies were found in ${label}.`;
@@ -759,13 +772,14 @@ interface AuthProbeResult {
   reason?: string;
 }
 
-function probeYouTubeAuth(
+function probeOnce(
+  url: string,
   cookieOptions: Record<string, unknown>,
   onChild: (child: ChildProcess | null) => void,
 ): Promise<AuthProbeResult> {
   return new Promise((resolve) => {
     const child = yt!.exec(
-      AUTH_PROBE_URL,
+      url,
       { ...cookieOptions, simulate: true, verbose: true },
       { env: childEnv() },
     );
@@ -803,6 +817,24 @@ function probeYouTubeAuth(
       finish("timeout", Buffer.concat(chunks).toString());
     }, AUTH_PROBE_TIMEOUT_MS);
   });
+}
+
+/** Tries each probe video until one gives a verdict about the session. */
+async function probeYouTubeAuth(
+  cookieOptions: Record<string, unknown>,
+  onChild: (child: ChildProcess | null) => void,
+): Promise<AuthProbeResult> {
+  let last: AuthProbeResult = {
+    status: "probe_unavailable",
+    reason: "No probe video could be reached.",
+  };
+  for (const url of AUTH_PROBE_URLS) {
+    last = await probeOnce(url, cookieOptions, onChild);
+    // Anything but a dead probe target is an answer about the session.
+    if (last.status !== "probe_unavailable") return last;
+    console.log(`[server] auth probe target unusable, trying the next one`);
+  }
+  return last;
 }
 
 app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {

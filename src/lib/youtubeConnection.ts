@@ -475,6 +475,12 @@ export async function sweepBrowsers(): Promise<boolean> {
       markConnected(browser);
       return true;
     }
+    // YouTube itself is the problem, not this browser — every remaining one
+    // would fail identically, so stop rather than grinding through them.
+    if (result.status === "probe_unavailable") {
+      markFailed(result, browser);
+      return false;
+    }
     // "not installed" is not a failure worth reporting back to the user.
     if (result.status !== "profile_missing") {
       failures.push(`${browser}: ${result.message ?? result.status}`);
