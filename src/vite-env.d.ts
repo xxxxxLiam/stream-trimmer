@@ -86,6 +86,10 @@ interface ElectronAPI {
   getDefaultBrowser?: () => Promise<{
     browser: import("./lib/clip").CookieBrowser | null;
   }>;
+  /** Browsers to try, best first, so the app can sweep them itself. */
+  getBrowserOrder?: (saved: string | null) => Promise<{
+    browsers: import("./lib/clip").CookieBrowser[];
+  }>;
 
   checkForUpdates: () => Promise<{
     ok: boolean;

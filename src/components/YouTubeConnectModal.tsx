@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ExclamationTriangleFill,
   FileEarmarkArrowUp,
+  Search,
   ShieldLock,
 } from "react-bootstrap-icons";
 import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
@@ -24,6 +25,7 @@ import {
   importCookies,
   openYouTubeSignIn,
   selectBrowser,
+  sweepBrowsers,
   useYouTubeConnection,
 } from "../lib/youtubeConnection";
 
@@ -130,9 +132,22 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
 
         <div className="mt-5 border-t border-hairline pt-3">
           <p className="text-[11px] leading-relaxed text-fg-faint">
-            Google blocks sign-in from inside an app on some systems, and
-            Windows browsers lock and encrypt their cookies so they can't be
-            read. If the button above doesn't work, this always does:
+            Google refuses in-app sign-in on some systems. If that happens,
+            try this — it checks every browser you have, so you don't have to.
+          </p>
+          <button
+            type="button"
+            className="btn mt-2 flex w-full items-center justify-center gap-2"
+            disabled={state.busy}
+            onClick={() => void sweepBrowsers()}
+          >
+            <Search size={12} />
+            Find my YouTube session
+          </button>
+
+          <p className="mt-4 text-[11px] leading-relaxed text-fg-faint">
+            Still stuck? Windows browsers lock and encrypt their cookies, so
+            neither route above can read them. This one always works:
           </p>
           <button
             type="button"
@@ -146,8 +161,8 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
           <p className="mt-2 text-[11px] leading-relaxed text-fg-faint">
             In the browser you're signed into YouTube with, install a
             "Get cookies.txt" extension, export while on youtube.com, then
-            pick that file here. The browser does its own decryption, so this
-            works while it is running and whatever encryption it uses.
+            pick that file here. The browser decrypts it on export, so this
+            works whatever the browser is doing.
           </p>
 
           <button
@@ -157,7 +172,7 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
             onClick={() => setShowFallback((v) => !v)}
           >
             {showFallback ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-            Use my browser session instead
+            Check one browser myself
           </button>
 
           {showFallback ? (

@@ -7,11 +7,36 @@
 export type YouTubeAuthProbeStatus =
   | "signed_in"
   | "signed_out"
+  // The probe video itself could not be played — says nothing about cookies.
+  | "probe_unavailable"
   | "profile_missing"
   | "locked"
   | "decrypt_failed"
   | "timeout"
   | "extractor_error";
+
+/**
+ * True when the failure is about the video the probe happened to ask for,
+ * not about the session.
+ *
+ * The probe proves a sign-in by fetching one video. If that video is pulled,
+ * made private or blocked in the user's country, the fetch fails for a reason
+ * that has nothing to do with their cookies — and reporting that as
+ * "signed out" sends them to fix something that was never broken. A Windows
+ * report showed exactly this: every browser came back signed_out behind
+ * "This video is unavailable".
+ */
+export function isProbeTargetUnusable(output: string): boolean {
+  const text = output.toLowerCase();
+  return (
+    text.includes("video is unavailable") ||
+    text.includes("video unavailable") ||
+    text.includes("private video") ||
+    text.includes("has been removed") ||
+    text.includes("is not available in your country") ||
+    text.includes("playability status: error")
+  );
+}
 
 export function classifyYouTubeAuthOutput(
   output: string,
@@ -47,6 +72,10 @@ export function classifyYouTubeAuthOutput(
     text.includes("unsupported platform")
   ) {
     return "profile_missing";
+  }
+  // Checked before signed_out: a dead probe target is not a missing session.
+  if (isProbeTargetUnusable(output)) {
+    return "probe_unavailable";
   }
   if (
     text.includes("extracted") && text.includes("cookies") ||

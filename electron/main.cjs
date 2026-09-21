@@ -24,7 +24,10 @@ const os = require("node:os");
 // app is signed, mac users must download new versions manually; we handle
 // the resulting error gracefully instead of crashing.
 const { autoUpdater } = require("electron-updater");
-const { detectDefaultBrowser } = require("./defaultBrowser.cjs");
+const {
+  browserCheckOrder,
+  detectDefaultBrowser,
+} = require("./defaultBrowser.cjs");
 const youtubeSession = require("./youtubeSession.cjs");
 const { createSettingsStore } = require("./settingsStore.cjs");
 const logger = require("./logger.cjs");
@@ -763,6 +766,17 @@ function registerIpc() {
   // the browser and are read directly by the local yt-dlp process.
   ipcMain.handle("system:defaultBrowser", () => ({
     browser: detectDefaultBrowser(app),
+  }));
+
+  // The order to try browsers in when sweeping them all: the system default
+  // first, then whichever one last worked, then the rest. Returning the order
+  // rather than a single name is what lets the app check them itself instead
+  // of making the user pick one at a time from a dropdown.
+  ipcMain.handle("system:browserOrder", (_e, saved) => ({
+    browsers: browserCheckOrder(
+      detectDefaultBrowser(app),
+      typeof saved === "string" ? saved : null,
+    ),
   }));
 
 

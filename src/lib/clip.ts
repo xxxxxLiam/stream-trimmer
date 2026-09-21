@@ -59,6 +59,7 @@ export type YouTubeAuthState =
   | "checking"
   | "signed_in"
   | "signed_out"
+  | "probe_unavailable"
   | "profile_missing"
   | "locked"
   | "decrypt_failed"
