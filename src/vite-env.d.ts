@@ -63,6 +63,13 @@ interface ElectronAPI {
   probeYouTube?: () => Promise<{ connected: boolean; error?: string }>;
   /** Clears the stored in-app YouTube session. */
   disconnectYouTube?: () => Promise<{ ok: boolean }>;
+  /** Picks a cookies.txt exported from the user's own browser and adopts it. */
+  importYouTubeCookies?: () => Promise<{
+    ok: boolean;
+    cancelled?: boolean;
+    count?: number;
+    error?: string;
+  }>;
   /** Subscribes to sign-in progress. Returns an unsubscribe function. */
   onYouTubeProgress?: (
     cb: (payload: { phase: YouTubeConnectPhase }) => void,

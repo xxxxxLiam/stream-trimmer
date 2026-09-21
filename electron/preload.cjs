@@ -36,6 +36,8 @@ try {
     connectYouTube: () => ipcRenderer.invoke("youtube:connect"),
     probeYouTube: () => ipcRenderer.invoke("youtube:probe"),
     disconnectYouTube: () => ipcRenderer.invoke("youtube:disconnect"),
+    // Adopts a cookies.txt the user exported from their own browser.
+    importYouTubeCookies: () => ipcRenderer.invoke("youtube:importCookies"),
     // Coarse sign-in progress, so the main window can show which stage the
     // flow is in instead of one indefinite spinner.
     onYouTubeProgress: (cb) => {

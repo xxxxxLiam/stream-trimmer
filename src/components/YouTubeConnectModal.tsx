@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   ExclamationTriangleFill,
+  FileEarmarkArrowUp,
   ShieldLock,
 } from "react-bootstrap-icons";
 import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
@@ -20,6 +21,7 @@ import DiagnosticsDisclosure from "./DiagnosticsDisclosure";
 import {
   checkBrowserConnection,
   connectInApp,
+  importCookies,
   openYouTubeSignIn,
   selectBrowser,
   useYouTubeConnection,
@@ -127,9 +129,30 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
         <ConnectProgress />
 
         <div className="mt-5 border-t border-hairline pt-3">
+          <p className="text-[11px] leading-relaxed text-fg-faint">
+            Google blocks sign-in from inside an app on some systems, and
+            Windows browsers lock and encrypt their cookies so they can't be
+            read. If the button above doesn't work, this always does:
+          </p>
           <button
             type="button"
-            className="flex items-center gap-1 text-[11px] text-fg-faint hover:text-fg-muted"
+            className="btn mt-2 flex w-full items-center justify-center gap-2"
+            disabled={state.busy}
+            onClick={() => void importCookies()}
+          >
+            <FileEarmarkArrowUp size={12} />
+            Import cookies.txt
+          </button>
+          <p className="mt-2 text-[11px] leading-relaxed text-fg-faint">
+            In the browser you're signed into YouTube with, install a
+            "Get cookies.txt" extension, export while on youtube.com, then
+            pick that file here. The browser does its own decryption, so this
+            works while it is running and whatever encryption it uses.
+          </p>
+
+          <button
+            type="button"
+            className="mt-4 flex items-center gap-1 text-[11px] text-fg-faint hover:text-fg-muted"
             aria-expanded={showFallback}
             onClick={() => setShowFallback((v) => !v)}
           >

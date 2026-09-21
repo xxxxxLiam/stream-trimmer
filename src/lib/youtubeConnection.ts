@@ -318,6 +318,54 @@ export async function connectInApp(): Promise<boolean> {
   }
 }
 
+/**
+ * Adopts a cookies.txt the user exported from their own browser, then
+ * verifies it. This is the path that works when the others cannot: Google
+ * refuses sign-in from inside an app, and on Windows a running Chrome locks
+ * its cookie database while App-Bound Encryption stops anything else
+ * decrypting a copy.
+ */
+export async function importCookies(): Promise<boolean> {
+  const api = electron();
+  if (!api?.importYouTubeCookies) {
+    set({ message: "Importing cookies needs the desktop app." });
+    return false;
+  }
+  set({ busy: true, step: "Reading the cookies file…", message: undefined, reason: undefined });
+  try {
+    const result = await api.importYouTubeCookies();
+    if (result.cancelled) {
+      set({ busy: false, step: undefined });
+      return false;
+    }
+    if (!result.ok) {
+      set({
+        busy: false,
+        step: undefined,
+        probed: true,
+        message: result.error || "That file couldn't be used.",
+      });
+      return false;
+    }
+    set({ phase: "verifying", step: PHASE_LABEL.verifying, verifyStartedAt: Date.now() });
+    const verified = await checkSource("app");
+    if (verified.status === "signed_in") {
+      markConnected("app");
+      return true;
+    }
+    markFailed(verified, "app");
+    return false;
+  } catch (error) {
+    set({
+      busy: false,
+      step: undefined,
+      probed: true,
+      message: error instanceof Error ? error.message : "Import failed.",
+    });
+    return false;
+  }
+}
+
 /** Clears the stored in-app session so the next launch asks again. */
 export async function signOut(): Promise<void> {
   const api = electron();

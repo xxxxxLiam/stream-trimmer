@@ -717,7 +717,7 @@ function authProbeMessage(
   if (source === "app") {
     if (status === "signed_in") return undefined;
     if (status === "signed_out")
-      return "Your in-app YouTube sign-in has expired. Sign in again.";
+      return "Your saved YouTube sign-in has expired. Sign in again, or import a fresh cookies.txt.";
     if (status === "timeout")
       return "YouTube took too long to answer. Try again.";
     return "YouTube rejected the saved sign-in. Sign in again.";
@@ -728,9 +728,14 @@ function authProbeMessage(
   if (status === "profile_missing")
     return `No ${label} profile was found on this computer.`;
   if (status === "locked")
-    return `Fully quit ${label}, including background windows, then check again.`;
+    return `${label} is running and holding its cookie database open. Fully quit it — including background tasks in the system tray — then check again. If that doesn't work, import a cookies.txt instead.`;
   if (status === "decrypt_failed")
-    return `${label}'s cookie security blocked access. Signing in inside the app is the reliable alternative.`;
+    // Chrome 127+ ties the cookie key to the browser itself (App-Bound
+    // Encryption on Windows, the keychain on macOS), so no other process can
+    // decrypt them. This one cannot be worked around — it has to be routed
+    // around, and the in-app window is NOT the alternative on Windows because
+    // Google refuses sign-in from inside an app.
+    return `${label} encrypts its cookies so other apps can't read them, and that can't be bypassed. Import a cookies.txt exported from ${label} instead.`;
   if (status === "timeout")
     return `${label} took too long to respond. Quit it fully, then try again.`;
   if (status === "extractor_error")

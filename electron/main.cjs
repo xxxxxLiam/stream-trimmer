@@ -677,6 +677,33 @@ function registerIpc() {
     }
   });
 
+  // Import a cookies.txt the user exported from their own browser. On Windows
+  // this is the only route that reliably works — see cookieFile.cjs.
+  ipcMain.handle("youtube:importCookies", async () => {
+    try {
+      const res = await dialog.showOpenDialog(mainWindow, {
+        title: "Choose the cookies.txt you exported",
+        properties: ["openFile"],
+        filters: [
+          { name: "Cookies", extensions: ["txt"] },
+          { name: "All files", extensions: ["*"] },
+        ],
+      });
+      if (res.canceled || res.filePaths.length === 0) {
+        return { ok: false, cancelled: true };
+      }
+      const result = await youtubeSession.importCookieFile(res.filePaths[0]);
+      logger.log(
+        "youtube",
+        `cookie import ok=${result.ok}${result.ok ? ` cookies=${result.count}` : `: ${result.error}`}`,
+      );
+      return result;
+    } catch (err) {
+      logger.log("youtube", `cookie import threw: ${logger.describe(err)}`);
+      return { ok: false, error: logger.describe(err) };
+    }
+  });
+
   ipcMain.handle("youtube:disconnect", async () => {
     try {
       await youtubeSession.clear();

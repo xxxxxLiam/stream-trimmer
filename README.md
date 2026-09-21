@@ -110,6 +110,31 @@ A React single-page app (Vite + TypeScript) talks to a local Express worker. The
 - **"Preview unavailable"** — the video owner disabled embedding. Downloading still works; ignore it.
 - **"No transcript available"** — that video has no captions (or none in a supported language). A YouTube limitation, not a bug.
 - **"yt-dlp failed" with details** — if YouTube changed something and the bundled yt-dlp is behind, grab the newest release build, which bundles an updated yt-dlp.
+- **"Couldn't sign you in — this browser or app may not be secure"** — Google
+  refuses sign-in from inside an app. It cannot be argued with, and is more
+  likely on Windows than macOS. Use **Import cookies.txt** on the Connect
+  screen instead.
+- **"Chrome is running and holding its cookie database open"** — Windows gives
+  the running browser an exclusive lock. Quit it fully, including tray
+  processes, or use **Import cookies.txt**.
+- **"Chrome encrypts its cookies so other apps can't read them"** — Chrome 127+
+  App-Bound Encryption. There is no way around it from outside the browser;
+  **Import cookies.txt** is the answer, because the browser decrypts on export.
+
+### Import cookies.txt (works everywhere)
+
+The universal route when sign-in won't go through:
+
+1. In the browser you're signed into YouTube with, add a "Get cookies.txt"
+   extension.
+2. Open **youtube.com** while signed in, and export.
+3. In the app: **Connect YouTube → Import cookies.txt**, and pick that file.
+
+The browser does its own decryption on export, so this is unaffected by
+whether the browser is running, how it encrypts its cookie store, or whether
+Google will accept an in-app sign-in. The file is validated (it must contain a
+real YouTube sign-in cookie), stored in the app's own data folder, and used
+only by the local yt-dlp process.
 
 **Building from source:**
 
