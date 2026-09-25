@@ -24,6 +24,9 @@ try {
     // crosses the bridge — never the media itself.
     saveClip: (payload) => ipcRenderer.invoke("clip:save", payload),
     saveFiles: (payload) => ipcRenderer.invoke("file:saveFiles", payload),
+    // Moves the channel exporter's CSVs out of the engine's temp dir. Like
+    // saveClip, only paths cross the bridge — never the file contents.
+    saveExport: (payload) => ipcRenderer.invoke("export:save", payload),
     showInFolder: (targetPath) =>
       ipcRenderer.invoke("file:showInFolder", targetPath),
     fileExists: (targetPath) => ipcRenderer.invoke("file:exists", targetPath),
