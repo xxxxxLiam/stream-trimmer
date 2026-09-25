@@ -91,7 +91,8 @@ export interface ChannelSummary {
 
 export type CsvRow = Record<string, unknown>;
 
-export interface ChannelExportResponse {
+/** Every row in the response body. What a browser gets. */
+export interface ChannelExportRows {
   jobId: string;
   cancelled: boolean;
   channel: ChannelSummary;
@@ -100,6 +101,29 @@ export interface ChannelExportResponse {
   transcripts: CsvRow[];
   statuses: CsvRow[];
   error?: string;
+}
+
+/**
+ * CSVs already written to disk by the local engine. What the desktop app gets:
+ * a whole-channel export is millions of caption lines, so the rows are streamed
+ * to files and only their paths are handed back.
+ */
+export interface ChannelExportPaths {
+  jobId: string;
+  cancelled: boolean;
+  channel: ChannelSummary;
+  dir: string;
+  files: { name: string; path: string; bytes: number }[];
+  counts: { videos: number; comments: number; transcripts: number };
+  error?: string;
+}
+
+export type ChannelExportResponse = ChannelExportRows | ChannelExportPaths;
+
+export function isPathDelivery(
+  data: ChannelExportResponse,
+): data is ChannelExportPaths {
+  return Array.isArray((data as ChannelExportPaths).files);
 }
 
 // RFC 4180-ish CSV with a UTF-8 BOM so Excel handles emoji and non-Latin text.
@@ -159,7 +183,18 @@ export interface ExportFile {
   contents: string;
 }
 
-export function buildExportFiles(data: ChannelExportResponse): ExportFile[] {
+export const SUMMARY_COLUMNS = [
+  "channel",
+  "channel_url",
+  "subscriber_count",
+  "exported_at",
+  "filter",
+  "requested",
+  "exported",
+  "cancelled",
+];
+
+export function buildExportFiles(data: ChannelExportRows): ExportFile[] {
   const summaryRows: CsvRow[] = [
     {
       channel: data.channel.name,
@@ -182,22 +217,7 @@ export function buildExportFiles(data: ChannelExportResponse): ExportFile[] {
       name: "transcripts.csv",
       contents: rowsToCsv(TRANSCRIPT_COLUMNS, data.transcripts),
     },
-    {
-      name: "summary.csv",
-      contents: rowsToCsv(
-        [
-          "channel",
-          "channel_url",
-          "subscriber_count",
-          "exported_at",
-          "filter",
-          "requested",
-          "exported",
-          "cancelled",
-        ],
-        summaryRows,
-      ),
-    },
+    { name: "summary.csv", contents: rowsToCsv(SUMMARY_COLUMNS, summaryRows) },
     {
       name: "video-status.csv",
       contents: rowsToCsv(STATUS_COLUMNS, data.statuses),

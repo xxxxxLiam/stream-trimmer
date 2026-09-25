@@ -48,6 +48,16 @@ interface ElectronAPI {
     folder: string;
     files: { name: string; contents: string }[];
   }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  /**
+   * Moves the channel exporter's CSVs out of the engine's temp directory into
+   * a new subfolder of `dirPath`. Only paths cross the bridge — a whole-channel
+   * export is far too large to pass through the renderer.
+   */
+  saveExport?: (payload: {
+    dirPath: string;
+    folder: string;
+    files: { name: string; path: string }[];
+  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
   showInFolder: (
     targetPath: string,
   ) => Promise<{ ok: boolean; error?: string }>;

@@ -30,6 +30,7 @@ const {
 } = require("./defaultBrowser.cjs");
 const youtubeSession = require("./youtubeSession.cjs");
 const { createSettingsStore } = require("./settingsStore.cjs");
+const { saveExportFiles } = require("./exportSave.cjs");
 const logger = require("./logger.cjs");
 
 
@@ -565,6 +566,32 @@ function registerIpc() {
     }
   });
 
+
+  // Moves a finished channel export out of the engine's temp dir, the same
+  // way clip:save moves a finished clip. The CSVs themselves never enter the
+  // renderer: a whole-channel export is millions of caption lines, and
+  // routing that through a JSON response and back across IPC is what used to
+  // run the app out of memory.
+  ipcMain.handle("export:save", async (_e, payload) => {
+    try {
+      const result = await saveExportFiles({
+        dirPath: payload?.dirPath,
+        folder: payload?.folder,
+        files: payload?.files,
+        tmpRoot: os.tmpdir(),
+      });
+      logger.log(
+        "export",
+        result.ok
+          ? `saved ${payload.files.length} file(s) to ${result.path}`
+          : `refused: ${result.error}`,
+      );
+      return result;
+    } catch (err) {
+      logger.log("export", `save failed: ${logger.describe(err)}`);
+      return { ok: false, error: logger.describe(err) };
+    }
+  });
 
   // Cheap existence probe so the Downloads list can dim rows whose file was
   // moved or deleted outside the app.

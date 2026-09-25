@@ -218,11 +218,20 @@ export default function ChannelExportPanel() {
 
       {heavy && (
         <div className="rounded-row border border-hairline bg-panel-raised px-3 py-2 text-[11px] leading-relaxed text-fg-faint">
-          Big runs are held in memory until the CSVs are written. Past a few
-          thousand videos with transcripts on, that can run the app out of
-          memory — turn transcripts off for a whole-channel export, or do it in
-          batches. Progress is saved per video either way, so stopping and
-          restarting continues where it left off.
+          {isElectron ? (
+            <>
+              A run this size takes hours. Rows are written to disk as they're
+              collected rather than held in memory, and progress is saved per
+              video — stop whenever you like and the next run carries on from
+              where it left off.
+            </>
+          ) : (
+            <>
+              In the browser the whole export is assembled in memory before it
+              downloads, so a few thousand videos with transcripts on can
+              exhaust it. Use the desktop app for a whole-channel export.
+            </>
+          )}
         </div>
       )}
 

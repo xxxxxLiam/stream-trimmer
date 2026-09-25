@@ -27,6 +27,15 @@ import {
   type YouTubeAuthProbeStatus,
 } from "./youtubeAuth";
 import {
+  COMMENT_COLUMNS,
+  STATUS_COLUMNS,
+  SUMMARY_COLUMNS,
+  TRANSCRIPT_COLUMNS,
+  VIDEO_COLUMNS,
+  writeCsv,
+  writeCsvFromJsonl,
+} from "./csv";
+import {
   CLIP_PREFIX,
   EXPORT_PREFIX,
   appendJsonl,
@@ -1669,6 +1678,11 @@ const channelExportSchema = z.object({
   includeTranscripts: z.boolean().default(true),
   // Throw away any saved progress for this exact request and start over.
   fresh: z.boolean().default(false),
+  // "rows" returns every row in the JSON response, which is what a browser
+  // needs. "path" writes the CSVs on this machine and returns their paths, so
+  // a whole-channel export never has to fit in a JSON body — see
+  // finishExportToDisk below.
+  deliver: z.enum(["rows", "path"]).default("rows"),
   cookiesFromBrowser: authSourceSchema.optional(),
 
 });
@@ -2030,6 +2044,12 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
   }
   const saved = readJson<Checkpoint>(ckSelection);
 
+  // In "path" mode comments and transcripts are never accumulated: they go to
+  // the JSONL checkpoint as they are collected and are streamed from there
+  // into CSVs at the end. They are the two that grow without bound — a few
+  // thousand videos is millions of caption lines — so holding them is what
+  // used to put a whole-channel export out of memory.
+  const toDisk = input.deliver === "path";
   const videos: Record<string, unknown>[] = [];
   const comments: Record<string, unknown>[] = [];
   const transcripts: Record<string, unknown>[] = [];
@@ -2037,6 +2057,85 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
   let channelName = "";
   let subs: number | "" = "";
 
+  // The five CSVs, in the order the UI lists them.
+  const EXPORT_FILES = [
+    "videos.csv",
+    "comments.csv",
+    "transcripts.csv",
+    "summary.csv",
+    "video-status.csv",
+  ] as const;
+
+  /**
+   * The response body, in whichever delivery mode was asked for.
+   *
+   * "rows" hands back every row as JSON — fine for a browser and for small
+   * runs. "path" writes the CSVs into a temp folder on this machine and
+   * returns their paths: comments and transcripts are streamed straight out of
+   * the JSONL checkpoints, so neither the server nor the UI ever holds a
+   * whole channel's captions at once.
+   */
+  function buildResponse(cancelled: boolean) {
+    const channel = {
+      name: channelName || base,
+      url: base,
+      subscriber_count: subs,
+      exported_at: new Date().toISOString(),
+      filter: input.contentType,
+      requested: input.limit,
+      exported: videos.length,
+    };
+    if (!toDisk) {
+      return {
+        jobId,
+        cancelled,
+        channel,
+        videos,
+        comments,
+        transcripts,
+        statuses,
+      };
+    }
+
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), EXPORT_PREFIX));
+    const at = (name: string) => path.join(outDir, name);
+    const counts = {
+      videos: writeCsv(at("videos.csv"), VIDEO_COLUMNS, videos),
+      comments: writeCsvFromJsonl(
+        ckComments,
+        at("comments.csv"),
+        COMMENT_COLUMNS,
+      ),
+      transcripts: writeCsvFromJsonl(
+        ckTranscripts,
+        at("transcripts.csv"),
+        TRANSCRIPT_COLUMNS,
+      ),
+    };
+    writeCsv(at("video-status.csv"), STATUS_COLUMNS, statuses);
+    writeCsv(at("summary.csv"), SUMMARY_COLUMNS, [
+      {
+        channel: channel.name,
+        channel_url: channel.url,
+        subscriber_count: channel.subscriber_count,
+        exported_at: channel.exported_at,
+        filter: channel.filter,
+        requested: channel.requested,
+        exported: channel.exported,
+        cancelled,
+      },
+    ]);
+    const files = EXPORT_FILES.map((name) => {
+      let bytes = 0;
+      try {
+        bytes = fs.statSync(at(name)).size;
+      } catch {
+        /* reported as 0 */
+      }
+      return { name, path: at(name), bytes };
+    });
+    return { jobId, cancelled, channel, dir: outDir, files, counts };
+  }
 
   try {
     let selected: { id: string; title: string }[] = [];
@@ -2047,9 +2146,13 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       subs = saved.subs ?? "";
       selected = saved.selected;
       videos.push(...(saved.videos ?? []));
-      comments.push(...readJsonl<Record<string, unknown>>(ckComments));
-      transcripts.push(...readJsonl<Record<string, unknown>>(ckTranscripts));
+      // Statuses are loaded either way: they are one short row per video, and
+      // they are what says which videos have already been collected.
       statuses.push(...readJsonl<Record<string, unknown>>(ckStatuses));
+      if (!toDisk) {
+        comments.push(...readJsonl<Record<string, unknown>>(ckComments));
+        transcripts.push(...readJsonl<Record<string, unknown>>(ckTranscripts));
+      }
     } else {
       publishChannel(jobId, {
         phase: "listing",
@@ -2297,8 +2400,10 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
           title: v.title,
           status: notes.length === 0 ? "ok" : notes.join("; "),
         };
-        comments.push(...videoComments);
-        transcripts.push(...videoTranscripts);
+        if (!toDisk) {
+          comments.push(...videoComments);
+          transcripts.push(...videoTranscripts);
+        }
         statuses.push(statusRow);
         // Flush this video to the checkpoint before moving on, so an
         // interruption never costs more than the video in flight.
@@ -2309,30 +2414,17 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
     }
 
     const cancelled = job.cancelled;
-    // A finished export has nothing left to resume.
-    if (!cancelled) clearCheckpoint();
     publishChannel(jobId, {
       phase: cancelled ? "cancelled" : "done",
       current: selected.length,
       total: selected.length,
     });
-    return res.json({
-      jobId,
-      cancelled,
-      channel: {
-        name: channelName || base,
-        url: base,
-        subscriber_count: subs,
-        exported_at: new Date().toISOString(),
-        filter: input.contentType,
-        requested: input.limit,
-        exported: videos.length,
-      },
-      videos,
-      comments,
-      transcripts,
-      statuses,
-    });
+    // Built before the checkpoint is dropped: in "path" mode the CSVs are
+    // streamed out of those very files.
+    const body = buildResponse(cancelled);
+    // A finished export has nothing left to resume.
+    if (!cancelled) clearCheckpoint();
+    return res.json(body);
   } catch (e) {
     const cancelled = job.cancelled || (e as Error)?.message === "cancelled";
     if (cancelled) {
@@ -2342,23 +2434,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         total: videos.length,
       });
       if (res.writableEnded || res.destroyed) return;
-      return res.json({
-        jobId,
-        cancelled: true,
-        channel: {
-          name: channelName || base,
-          url: base,
-          subscriber_count: subs,
-          exported_at: new Date().toISOString(),
-          filter: input.contentType,
-          requested: input.limit,
-          exported: videos.length,
-        },
-        videos,
-        comments,
-        transcripts,
-        statuses,
-      });
+      return res.json(buildResponse(true));
     }
     logYtError("/api/channel/export", input.url, { base }, e);
     const msg = fullErrMessage(e);

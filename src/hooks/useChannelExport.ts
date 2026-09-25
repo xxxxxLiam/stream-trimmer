@@ -9,6 +9,7 @@ import {
   buildExportFiles,
   buildExportFolderName,
   isLikelyChannelUrl,
+  isPathDelivery,
   parseChannelLimit,
   type ChannelContentType,
   type ChannelExportProgress,
@@ -110,6 +111,13 @@ export function useChannelExport(options: {
       /* progress is best-effort */
     }
 
+    // The desktop app has the engine write the CSVs and just moves the files.
+    // Routing them through a JSON body and back across IPC is what made a
+    // whole-channel export run out of memory.
+    const deliverPath = Boolean(
+      isElectron && window.electronAPI?.saveExport && saveDir,
+    );
+
     try {
       const res = await fetch(
         apiUrl(`/api/channel/export?jobId=${encodeURIComponent(jobId)}`),
@@ -128,6 +136,7 @@ export function useChannelExport(options: {
             includeComments,
             includeTranscripts,
             fresh,
+            deliver: deliverPath ? "path" : "rows",
             ...cookiePayload(),
           }),
         },
@@ -135,31 +144,48 @@ export function useChannelExport(options: {
       const data = await parseJson<ChannelExportResponse>(res);
       if (!res.ok) throw new Error(data.error || "Export failed");
 
-      const files = buildExportFiles(data);
       const folder = buildExportFolderName(data.channel.name);
-
       let savedPath = "";
-      if (isElectron && window.electronAPI?.saveFiles && saveDir) {
-        const saved = await window.electronAPI.saveFiles({
-          dirPath: saveDir,
+      let counts = { videos: 0, comments: 0, transcripts: 0 };
+
+      if (isPathDelivery(data)) {
+        counts = data.counts;
+        const saved = await window.electronAPI!.saveExport!({
+          dirPath: saveDir!,
           folder,
-          files,
+          files: data.files.map((f) => ({ name: f.name, path: f.path })),
         });
         if (!saved.ok) throw new Error(saved.error);
         savedPath = saved.path ?? "";
       } else {
-        for (const file of files) {
-          const blob = new Blob([file.contents], {
-            type: "text/csv;charset=utf-8",
+        counts = {
+          videos: data.videos.length,
+          comments: data.comments.length,
+          transcripts: data.transcripts.length,
+        };
+        const files = buildExportFiles(data);
+        if (isElectron && window.electronAPI?.saveFiles && saveDir) {
+          const saved = await window.electronAPI.saveFiles({
+            dirPath: saveDir,
+            folder,
+            files,
           });
-          const objectUrl = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = objectUrl;
-          a.download = `${folder}-${file.name}`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(objectUrl);
+          if (!saved.ok) throw new Error(saved.error);
+          savedPath = saved.path ?? "";
+        } else {
+          for (const file of files) {
+            const blob = new Blob([file.contents], {
+              type: "text/csv;charset=utf-8",
+            });
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = objectUrl;
+            a.download = `${folder}-${file.name}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(objectUrl);
+          }
         }
       }
 
@@ -168,16 +194,16 @@ export function useChannelExport(options: {
         label: folder,
         path: savedPath,
         dir: savedPath ? saveDir : null,
-        detail: `${data.videos.length} videos · ${data.comments.length} comments · ${data.transcripts.length} transcripts`,
+        detail: `${counts.videos} videos · ${counts.comments} comments · ${counts.transcripts} transcripts`,
       });
 
 
       setResult({
         folder,
         path: savedPath,
-        videos: data.videos.length,
-        comments: data.comments.length,
-        transcripts: data.transcripts.length,
+        videos: counts.videos,
+        comments: counts.comments,
+        transcripts: counts.transcripts,
         cancelled: data.cancelled,
       });
     } catch (e) {
