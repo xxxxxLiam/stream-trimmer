@@ -32,6 +32,7 @@ import {
   SUMMARY_COLUMNS,
   TRANSCRIPT_COLUMNS,
   VIDEO_COLUMNS,
+  describeParts,
   writeCsv,
   writeCsvFromJsonl,
 } from "./csv";
@@ -1674,6 +1675,9 @@ const channelExportSchema = z.object({
   limit: z
     .union([z.literal("all"), z.number().int().min(1).max(CHANNEL_LIMIT_MAX)])
     .default(100),
+  // What to collect. Each is its own CSV, and turning one off skips the work
+  // rather than just the file.
+  includeVideoDetails: z.boolean().default(true),
   includeComments: z.boolean().default(true),
   includeTranscripts: z.boolean().default(true),
   // Throw away any saved progress for this exact request and start over.
@@ -1992,6 +1996,17 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
     typeof req.query.jobId === "string" && req.query.jobId
       ? req.query.jobId
       : `chan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  if (
+    !input.includeVideoDetails &&
+    !input.includeComments &&
+    !input.includeTranscripts
+  ) {
+    return res.status(400).json({
+      error:
+        "Pick at least one thing to export — video details, comments or transcripts.",
+    });
+  }
+
   const job = getOrCreateChannelJob(jobId);
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(
     input.cookiesFromBrowser,
@@ -2009,6 +2024,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
     base,
     input.contentType,
     input.limit,
+    input.includeVideoDetails,
     input.includeComments,
     input.includeTranscripts,
   ]);
@@ -2057,14 +2073,13 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
   let channelName = "";
   let subs: number | "" = "";
 
-  // The five CSVs, in the order the UI lists them.
-  const EXPORT_FILES = [
-    "videos.csv",
-    "comments.csv",
-    "transcripts.csv",
-    "summary.csv",
-    "video-status.csv",
-  ] as const;
+  // Which parts this run collected, echoed back so the UI reports on exactly
+  // what it asked for.
+  const parts = {
+    videoDetails: input.includeVideoDetails,
+    comments: input.includeComments,
+    transcripts: input.includeTranscripts,
+  };
 
   /**
    * The response body, in whichever delivery mode was asked for.
@@ -2090,6 +2105,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         jobId,
         cancelled,
         channel,
+        parts,
         videos,
         comments,
         transcripts,
@@ -2099,20 +2115,32 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
 
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), EXPORT_PREFIX));
     const at = (name: string) => path.join(outDir, name);
-    const counts = {
-      videos: writeCsv(at("videos.csv"), VIDEO_COLUMNS, videos),
-      comments: writeCsvFromJsonl(
+    // Only the requested CSVs are written. An unasked-for part yields no file
+    // at all rather than an empty one, so the folder says what the run was.
+    const names: string[] = [];
+    const counts = { videos: 0, comments: 0, transcripts: 0 };
+    if (parts.videoDetails) {
+      counts.videos = writeCsv(at("videos.csv"), VIDEO_COLUMNS, videos);
+      names.push("videos.csv");
+    }
+    if (parts.comments) {
+      counts.comments = writeCsvFromJsonl(
         ckComments,
         at("comments.csv"),
         COMMENT_COLUMNS,
-      ),
-      transcripts: writeCsvFromJsonl(
+      );
+      names.push("comments.csv");
+    }
+    if (parts.transcripts) {
+      counts.transcripts = writeCsvFromJsonl(
         ckTranscripts,
         at("transcripts.csv"),
         TRANSCRIPT_COLUMNS,
-      ),
-    };
-    writeCsv(at("video-status.csv"), STATUS_COLUMNS, statuses);
+      );
+      names.push("transcripts.csv");
+    }
+    // Always written: one row saying what the run did, and a line per video
+    // saying which ones gave trouble. A few kilobytes between them.
     writeCsv(at("summary.csv"), SUMMARY_COLUMNS, [
       {
         channel: channel.name,
@@ -2123,9 +2151,13 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         requested: channel.requested,
         exported: channel.exported,
         cancelled,
+        included: describeParts(parts),
       },
     ]);
-    const files = EXPORT_FILES.map((name) => {
+    writeCsv(at("video-status.csv"), STATUS_COLUMNS, statuses);
+    names.push("summary.csv", "video-status.csv");
+
+    const files = names.map((name) => {
       let bytes = 0;
       try {
         bytes = fs.statSync(at(name)).size;
@@ -2134,7 +2166,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       }
       return { name, path: at(name), bytes };
     });
-    return { jobId, cancelled, channel, dir: outDir, files, counts };
+    return { jobId, cancelled, channel, parts, dir: outDir, files, counts };
   }
 
   try {
@@ -2219,9 +2251,16 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       if (pool.length === 0)
         throw new Error("No videos matched that filter on this channel.");
 
+      // The metadata pass is one yt-dlp call per video and dominates a large
+      // export. It earns its cost for exactly two things: the videos.csv rows,
+      // and the view counts that rank a "Top N by views" run. When neither
+      // applies — video details not wanted, and everything being exported
+      // anyway — it is skipped outright. That is what makes a
+      // transcripts-only run of a few thousand videos practical.
+      const needsMetadata = input.includeVideoDetails || input.limit !== "all";
+
       // Full metadata for the candidate pool (duration, views, likes, comments).
-      // Checkpointed per video: on a whole-channel run this pass alone is one
-      // yt-dlp call per video and can take hours, so losing all of it to a
+      // Checkpointed per video: on a whole-channel run losing all of it to a
       // single interruption made resuming pointless.
       const cachedRows = new Map<string, Record<string, unknown>>();
       for (const row of readJsonl<Record<string, unknown>>(ckMetadata)) {
@@ -2232,46 +2271,53 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       publishChannel(jobId, {
         phase: "metadata",
         current: 0,
-        total: pool.length,
-        label: "Collecting video details",
+        total: needsMetadata ? pool.length : 0,
+        label: needsMetadata
+          ? "Collecting video details"
+          : "Skipping video details",
       });
-      const fetched = await mapLimit(pool, META_CONCURRENCY, async (v) => {
-        const cached = cachedRows.get(v.id);
-        if (cached) {
-          metaDone += 1;
-          return cached;
-        }
-        if (job.cancelled) return null;
-        let meta: Record<string, any> = {};
-        try {
-          meta =
-            ((await runForJob(
-              job,
-              `https://www.youtube.com/watch?v=${v.id}`,
-              {
-                dumpSingleJson: true,
-                noPlaylist: true,
-                noWarnings: true,
-                skipDownload: true,
-                ...cookieOptions,
-              },
-              90_000,
-            )) as Record<string, any>) ?? {};
-        } catch {
-          meta = {};
-        } finally {
-          metaDone += 1;
-          publishChannel(jobId, {
-            phase: "metadata",
-            current: metaDone,
-            total: pool.length,
-            label: v.title || v.id,
+      const fetched = !needsMetadata
+        ? // Everything the listing already knows, and nothing fetched. The
+          // rows are still built so the content-type filter and the selection
+          // below work unchanged; they simply never reach a CSV.
+          pool.map((v) => buildVideoRow(v, {}, channelName))
+        : await mapLimit(pool, META_CONCURRENCY, async (v) => {
+            const cached = cachedRows.get(v.id);
+            if (cached) {
+              metaDone += 1;
+              return cached;
+            }
+            if (job.cancelled) return null;
+            let meta: Record<string, any> = {};
+            try {
+              meta =
+                ((await runForJob(
+                  job,
+                  `https://www.youtube.com/watch?v=${v.id}`,
+                  {
+                    dumpSingleJson: true,
+                    noPlaylist: true,
+                    noWarnings: true,
+                    skipDownload: true,
+                    ...cookieOptions,
+                  },
+                  90_000,
+                )) as Record<string, any>) ?? {};
+            } catch {
+              meta = {};
+            } finally {
+              metaDone += 1;
+              publishChannel(jobId, {
+                phase: "metadata",
+                current: metaDone,
+                total: pool.length,
+                label: v.title || v.id,
+              });
+            }
+            const row = buildVideoRow(v, meta, channelName);
+            appendJsonl(ckMetadata, [row]);
+            return row;
           });
-        }
-        const row = buildVideoRow(v, meta, channelName);
-        appendJsonl(ckMetadata, [row]);
-        return row;
-      });
       if (job.cancelled) throw new Error("cancelled");
 
       let ranked = fetched.filter(

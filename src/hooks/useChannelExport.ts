@@ -6,6 +6,8 @@
 import { useCallback, useRef, useState } from "react";
 import { apiUrl, parseJson } from "../lib/clip";
 import {
+  ALL_PARTS,
+  anyPartSelected,
   buildExportFiles,
   buildExportFolderName,
   isLikelyChannelUrl,
@@ -15,6 +17,8 @@ import {
   type ChannelExportProgress,
   type ChannelExportResponse,
   type ChannelLimit,
+  type ChannelPart,
+  type ChannelParts,
 } from "../lib/channel";
 import { CHANNEL_PASSCODE_HASH } from "../lib/channelLock";
 import { addDownload } from "../lib/downloads";
@@ -26,6 +30,8 @@ export interface ChannelExportResult {
   videos: number;
   comments: number;
   transcripts: number;
+  /** Which parts the run covered, so the summary only reports on those. */
+  parts: ChannelParts;
   cancelled: boolean;
 }
 
@@ -41,9 +47,13 @@ export function useChannelExport(options: {
   // back as an error rather than silently becoming some other number.
   const [limitText, setLimitText] = useState("100");
   const [exportAll, setExportAll] = useState(false);
-  const [includeComments, setIncludeComments] = useState(true);
-  const [includeTranscripts, setIncludeTranscripts] = useState(true);
+  // What to collect. Everything, until you say otherwise.
+  const [parts, setParts] = useState<ChannelParts>(ALL_PARTS);
   const [fresh, setFresh] = useState(false);
+
+  const togglePart = useCallback((key: ChannelPart, on: boolean) => {
+    setParts((current) => ({ ...current, [key]: on }));
+  }, []);
 
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<ChannelExportProgress | null>(null);
@@ -84,6 +94,12 @@ export function useChannelExport(options: {
     const budget = parseChannelLimit(exportAll ? "all" : limitText);
     if (!budget.ok) {
       setError(budget.reason);
+      return;
+    }
+    if (!anyPartSelected(parts)) {
+      setError(
+        "Pick at least one thing to export — video details, comments or transcripts.",
+      );
       return;
     }
     setError("");
@@ -133,8 +149,9 @@ export function useChannelExport(options: {
             url: trimmed,
             contentType,
             limit: budget.limit,
-            includeComments,
-            includeTranscripts,
+            includeVideoDetails: parts.videoDetails,
+            includeComments: parts.comments,
+            includeTranscripts: parts.transcripts,
             fresh,
             deliver: deliverPath ? "path" : "rows",
             ...cookiePayload(),
@@ -150,6 +167,9 @@ export function useChannelExport(options: {
 
       if (isPathDelivery(data)) {
         counts = data.counts;
+        // videos.csv is absent when details weren't asked for, but the run
+        // still covered that many videos.
+        counts.videos = data.channel.exported;
         const saved = await window.electronAPI!.saveExport!({
           dirPath: saveDir!,
           folder,
@@ -159,7 +179,7 @@ export function useChannelExport(options: {
         savedPath = saved.path ?? "";
       } else {
         counts = {
-          videos: data.videos.length,
+          videos: data.channel.exported,
           comments: data.comments.length,
           transcripts: data.transcripts.length,
         };
@@ -194,7 +214,13 @@ export function useChannelExport(options: {
         label: folder,
         path: savedPath,
         dir: savedPath ? saveDir : null,
-        detail: `${counts.videos} videos · ${counts.comments} comments · ${counts.transcripts} transcripts`,
+        detail: [
+          `${counts.videos} videos`,
+          parts.comments && `${counts.comments} comments`,
+          parts.transcripts && `${counts.transcripts} transcripts`,
+        ]
+          .filter(Boolean)
+          .join(" · "),
       });
 
 
@@ -204,6 +230,7 @@ export function useChannelExport(options: {
         videos: counts.videos,
         comments: counts.comments,
         transcripts: counts.transcripts,
+        parts: data.parts ?? parts,
         cancelled: data.cancelled,
       });
     } catch (e) {
@@ -219,8 +246,7 @@ export function useChannelExport(options: {
     contentType,
     limitText,
     exportAll,
-    includeComments,
-    includeTranscripts,
+    parts,
     fresh,
     isElectron,
     saveDir,
@@ -242,10 +268,8 @@ export function useChannelExport(options: {
     setLimitText,
     exportAll,
     setExportAll,
-    includeComments,
-    setIncludeComments,
-    includeTranscripts,
-    setIncludeTranscripts,
+    parts,
+    togglePart,
     fresh,
     setFresh,
     exporting,
