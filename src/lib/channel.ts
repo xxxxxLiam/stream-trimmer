@@ -18,11 +18,81 @@ export interface ChannelExportRequest {
   url: string;
   contentType: ChannelContentType;
   limit: ChannelLimit;
+  includeVideoDetails: boolean;
   includeComments: boolean;
   includeTranscripts: boolean;
   /** Ignore any saved progress for this request and start the export over. */
   fresh?: boolean;
   cookiesFromBrowser?: AuthSource;
+}
+
+// --- what to export -------------------------------------------------------
+
+/**
+ * The three collectable parts of an export, each its own CSV. Everything is
+ * on by default; turning one off skips the work, not just the file, so a
+ * transcripts-only run of a big channel is a fraction of the time.
+ *
+ * summary.csv and video-status.csv are not listed: they are a few kilobytes
+ * between them and they are how you tell what a run actually did, so they are
+ * always written.
+ */
+export type ChannelPart = "videoDetails" | "comments" | "transcripts";
+
+export type ChannelParts = Record<ChannelPart, boolean>;
+
+export const ALL_PARTS: ChannelParts = {
+  videoDetails: true,
+  comments: true,
+  transcripts: true,
+};
+
+export const PART_INFO: {
+  key: ChannelPart;
+  label: string;
+  file: string;
+  hint: string;
+}[] = [
+  {
+    key: "videoDetails",
+    label: "Video details",
+    file: "videos.csv",
+    hint: "Title, description, views, likes, upload date, tags and hashtags.",
+  },
+  {
+    key: "comments",
+    label: "Comments",
+    file: "comments.csv",
+    hint: "Top 50 per video, with author, likes and replies.",
+  },
+  {
+    key: "transcripts",
+    label: "Transcripts",
+    file: "transcripts.csv",
+    hint: "Caption lines with their timestamps.",
+  },
+];
+
+export function anyPartSelected(parts: ChannelParts): boolean {
+  return PART_INFO.some((p) => parts[p.key]);
+}
+
+/** What summary.csv records under `included`, so a partial run says so. */
+export function describeParts(parts: ChannelParts): string {
+  return PART_INFO.filter((p) => parts[p.key])
+    .map((p) => p.label.toLowerCase())
+    .join("; ");
+}
+
+/** The CSVs a run with these parts produces, in the order the UI lists them. */
+export function partFileNames(parts: ChannelParts): string[] {
+  const names: string[] = [];
+  if (parts.videoDetails) names.push("videos.csv");
+  if (parts.comments) names.push("comments.csv");
+  if (parts.transcripts) names.push("transcripts.csv");
+  // Always written: the run's receipt, and which videos gave trouble.
+  names.push("summary.csv", "video-status.csv");
+  return names;
 }
 
 /**
@@ -100,6 +170,8 @@ export interface ChannelExportRows {
   comments: CsvRow[];
   transcripts: CsvRow[];
   statuses: CsvRow[];
+  /** Which parts the run collected. Absent on a response from an older build. */
+  parts?: ChannelParts;
   error?: string;
 }
 
@@ -115,6 +187,7 @@ export interface ChannelExportPaths {
   dir: string;
   files: { name: string; path: string; bytes: number }[];
   counts: { videos: number; comments: number; transcripts: number };
+  parts?: ChannelParts;
   error?: string;
 }
 
@@ -192,9 +265,13 @@ export const SUMMARY_COLUMNS = [
   "requested",
   "exported",
   "cancelled",
+  "included",
 ];
 
 export function buildExportFiles(data: ChannelExportRows): ExportFile[] {
+  // Only the parts that were asked for. The server does the same for path
+  // delivery, so both routes produce the same set of files.
+  const parts = data.parts ?? ALL_PARTS;
   const summaryRows: CsvRow[] = [
     {
       channel: data.channel.name,
@@ -205,24 +282,36 @@ export function buildExportFiles(data: ChannelExportRows): ExportFile[] {
       requested: data.channel.requested,
       exported: data.channel.exported,
       cancelled: data.cancelled,
+      included: describeParts(parts),
     },
   ];
-  return [
-    { name: "videos.csv", contents: rowsToCsv(VIDEO_COLUMNS, data.videos) },
-    {
+  const files: ExportFile[] = [];
+  if (parts.videoDetails) {
+    files.push({
+      name: "videos.csv",
+      contents: rowsToCsv(VIDEO_COLUMNS, data.videos),
+    });
+  }
+  if (parts.comments) {
+    files.push({
       name: "comments.csv",
       contents: rowsToCsv(COMMENT_COLUMNS, data.comments),
-    },
-    {
+    });
+  }
+  if (parts.transcripts) {
+    files.push({
       name: "transcripts.csv",
       contents: rowsToCsv(TRANSCRIPT_COLUMNS, data.transcripts),
-    },
+    });
+  }
+  files.push(
     { name: "summary.csv", contents: rowsToCsv(SUMMARY_COLUMNS, summaryRows) },
     {
       name: "video-status.csv",
       contents: rowsToCsv(STATUS_COLUMNS, data.statuses),
     },
-  ];
+  );
+  return files;
 }
 
 // `<channel>-export-YYYY-MM-DD`

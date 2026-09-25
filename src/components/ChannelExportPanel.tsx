@@ -17,6 +17,8 @@ import DestinationSelector from "./DestinationSelector";
 import {
   CHANNEL_LIMIT_MAX,
   CHANNEL_LIMIT_MIN,
+  PART_INFO,
+  anyPartSelected,
   describeChannelLimit,
   type ChannelContentType,
 } from "../lib/channel";
@@ -93,10 +95,8 @@ export default function ChannelExportPanel() {
     setLimitText,
     exportAll,
     setExportAll,
-    includeComments,
-    setIncludeComments,
-    includeTranscripts,
-    setIncludeTranscripts,
+    parts,
+    togglePart,
     fresh,
     setFresh,
     exporting,
@@ -107,10 +107,15 @@ export default function ChannelExportPanel() {
     dismissResult,
   } = useChannelExportContext();
   const { isElectron, saveDir } = useClipperContext();
-  const blocked = exporting || (isElectron && !saveDir);
+  const blocked =
+    exporting || (isElectron && !saveDir) || !anyPartSelected(parts);
 
+  // Rough per-video cost of each pass, in seconds. The details pass still
+  // runs for a numeric limit even when its CSV is not wanted, because that is
+  // where the view counts a "Top N by views" run ranks on come from.
+  const detailsPass = parts.videoDetails || limit !== "all";
   const perVideoSeconds =
-    (includeComments ? 14 : 4) + (includeTranscripts ? 3 : 0);
+    (detailsPass ? 4 : 0) + (parts.comments ? 10 : 0) + (parts.transcripts ? 3 : 0);
   const minutes =
     typeof limit === "number"
       ? Math.max(1, Math.round((limit * perVideoSeconds) / 60))
@@ -183,38 +188,68 @@ export default function ChannelExportPanel() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-4 text-[12px] text-fg-muted">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={includeComments}
-            onChange={(e) => setIncludeComments(e.target.checked)}
-            className="accent-accent"
-          />
-          <span>Comments (top 50 per video)</span>
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={includeTranscripts}
-            onChange={(e) => setIncludeTranscripts(e.target.checked)}
-            className="accent-accent"
-          />
-          <span>Transcripts</span>
-        </label>
-        <label
-          className="flex items-center gap-2"
-          title="An interrupted export normally picks up where it stopped. Tick this to collect every video again from scratch."
-        >
-          <input
-            type="checkbox"
-            checked={fresh}
-            onChange={(e) => setFresh(e.target.checked)}
-            className="accent-accent"
-          />
-          <span>Start fresh (ignore saved progress)</span>
-        </label>
+      <div className="flex flex-col gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-2.5">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[12px] text-fg">What to export</span>
+          <span className="text-[11px] text-fg-faint">
+            one CSV each — untick what you don't need
+          </span>
+        </div>
+        {PART_INFO.map((part) => (
+          <label
+            key={part.key}
+            className="flex items-start gap-2 text-[12px] text-fg-muted"
+          >
+            <input
+              type="checkbox"
+              checked={parts[part.key]}
+              onChange={(e) => togglePart(part.key, e.target.checked)}
+              className="mt-0.5 accent-accent"
+            />
+            <span className="min-w-0">
+              <span className={parts[part.key] ? "text-fg" : undefined}>
+                {part.label}
+              </span>
+              <span className="text-fg-faint"> — {part.hint}</span>
+            </span>
+          </label>
+        ))}
+        {!anyPartSelected(parts) && (
+          <p className="text-[11px] text-accent">
+            Nothing selected — pick at least one.
+          </p>
+        )}
+        {!parts.videoDetails && limit === "all" && (
+          <p className="text-[11px] leading-relaxed text-fg-faint">
+            Skipping video details also skips a yt-dlp call per video, so this
+            run is much faster than a full one.
+          </p>
+        )}
+        {!parts.videoDetails && limit !== "all" && (
+          <p className="text-[11px] leading-relaxed text-fg-faint">
+            A "Top {limit === null ? "N" : limit} by views" run still reads view
+            counts to rank on — they just won't be written to a CSV. Choose
+            Everything to skip that work too.
+          </p>
+        )}
+        <p className="text-[11px] leading-relaxed text-fg-faint">
+          summary.csv and video-status.csv are always written — they're a few
+          kilobytes, and they're how you tell what the run actually did.
+        </p>
       </div>
+
+      <label
+        className="flex items-center gap-2 text-[12px] text-fg-muted"
+        title="An interrupted export normally picks up where it stopped. Tick this to collect every video again from scratch."
+      >
+        <input
+          type="checkbox"
+          checked={fresh}
+          onChange={(e) => setFresh(e.target.checked)}
+          className="accent-accent"
+        />
+        <span>Start fresh (ignore saved progress)</span>
+      </label>
 
       {heavy && (
         <div className="rounded-row border border-hairline bg-panel-raised px-3 py-2 text-[11px] leading-relaxed text-fg-faint">
@@ -271,8 +306,14 @@ export default function ChannelExportPanel() {
               {result.folder}
             </span>
             <span className="text-[11px] text-fg-faint">
-              {result.videos} videos · {result.comments} comments ·{" "}
-              {result.transcripts} transcript lines
+              {[
+                `${result.videos} videos`,
+                result.parts.comments && `${result.comments} comments`,
+                result.parts.transcripts &&
+                  `${result.transcripts} transcript lines`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">

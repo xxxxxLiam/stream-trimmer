@@ -408,3 +408,279 @@ test("a large export streams instead of accumulating", SLOW, async () => {
     );
   });
 });
+
+// --- what to export -------------------------------------------------------
+// Each part is its own CSV and its own work. Turning one off has to drop the
+// file AND skip the collecting, or the toggle is cosmetic.
+
+test("every part is exported by default", SLOW, () =>
+  withHarness(
+    { longform: 3, shorts: 0, commentsPerVideo: 2, transcriptLines: 2 },
+    async (harness) => {
+      // No include* flags at all — the server's own defaults decide.
+      const data = await runExport(harness, {
+        limit: "all",
+        contentType: "longform",
+        includeComments: undefined,
+        includeTranscripts: undefined,
+        deliver: "path",
+      });
+
+      assert.deepEqual(data.parts, {
+        videoDetails: true,
+        comments: true,
+        transcripts: true,
+      });
+      assert.deepEqual(
+        data.files.map((f: { name: string }) => f.name).sort(),
+        [
+          "comments.csv",
+          "summary.csv",
+          "transcripts.csv",
+          "video-status.csv",
+          "videos.csv",
+        ],
+      );
+      assert.equal(data.counts.comments, 6);
+      assert.equal(data.counts.transcripts, 6);
+    },
+  ));
+
+test("transcripts only: no other CSV, and no metadata pass at all", SLOW, () =>
+  withHarness(
+    { longform: 5, shorts: 0, commentsPerVideo: 9, transcriptLines: 2 },
+    async (harness) => {
+      const data = await runExport(harness, {
+        limit: "all",
+        contentType: "longform",
+        includeVideoDetails: false,
+        includeComments: false,
+        includeTranscripts: true,
+        deliver: "path",
+      });
+
+      assert.deepEqual(
+        data.files.map((f: { name: string }) => f.name).sort(),
+        ["summary.csv", "transcripts.csv", "video-status.csv"],
+      );
+      assert.equal(data.counts.transcripts, 10);
+      assert.equal(data.counts.comments, 0);
+
+      // The run still covered every video, it just collected less per video.
+      assert.equal(data.channel.exported, 5);
+      const statuses = readCsvFile(filesByName(data)["video-status.csv"]);
+      assert.equal(statuses.length, 5);
+
+      // The expensive pass is skipped outright, not merely unwritten: with
+      // details off and everything selected there is nothing to rank on. One
+      // yt-dlp call per video is the whole cost of that pass.
+      const calls = harness.calls();
+      assert.equal(
+        calls.metadata ?? 0,
+        0,
+        `no per-video metadata call should have been made, saw ${JSON.stringify(calls)}`,
+      );
+      assert.equal(calls.subtitles, 5);
+      assert.equal(calls.comments ?? 0, 0);
+
+      const transcripts = readCsvFile(filesByName(data)["transcripts.csv"]);
+      assert.equal(transcripts.length, 10);
+      assert.match(transcripts[0].text, /Caption 0 of lf00000/);
+    },
+  ));
+
+test("comments only", SLOW, () =>
+  withHarness(
+    { longform: 4, shorts: 0, commentsPerVideo: 3, transcriptLines: 5 },
+    async (harness) => {
+      const data = await runExport(harness, {
+        limit: "all",
+        contentType: "longform",
+        includeVideoDetails: false,
+        includeComments: true,
+        includeTranscripts: false,
+        deliver: "path",
+      });
+
+      assert.deepEqual(
+        data.files.map((f: { name: string }) => f.name).sort(),
+        ["comments.csv", "summary.csv", "video-status.csv"],
+      );
+      assert.equal(data.counts.comments, 12);
+      assert.equal(data.counts.transcripts, 0);
+
+      const calls = harness.calls();
+      assert.equal(calls.metadata ?? 0, 0, "details were not asked for");
+      assert.equal(calls.subtitles ?? 0, 0, "transcripts were not asked for");
+      assert.equal(calls.comments, 4);
+    },
+  ));
+
+test("video details only", SLOW, () =>
+  withHarness(
+    { longform: 4, shorts: 0, commentsPerVideo: 3, transcriptLines: 5 },
+    async (harness) => {
+      const data = await runExport(harness, {
+        limit: "all",
+        contentType: "longform",
+        includeVideoDetails: true,
+        includeComments: false,
+        includeTranscripts: false,
+        deliver: "path",
+      });
+
+      assert.deepEqual(
+        data.files.map((f: { name: string }) => f.name).sort(),
+        ["summary.csv", "video-status.csv", "videos.csv"],
+      );
+      assert.equal(data.counts.videos, 4);
+      const videos = readCsvFile(filesByName(data)["videos.csv"]);
+      // The details really were fetched, not left blank.
+      assert.equal(videos.length, 4);
+      assert.ok(videos.every((v) => v.view_count !== ""));
+      assert.ok(videos.every((v) => v.description !== ""));
+
+      const calls = harness.calls();
+      assert.equal(calls.metadata, 4);
+      assert.equal(calls.comments ?? 0, 0);
+      assert.equal(calls.subtitles ?? 0, 0);
+    },
+  ));
+
+test("a Top-N run still ranks on views with details switched off", SLOW, () =>
+  // The details pass is what view counts come from, so it has to keep running
+  // for a numeric limit even though videos.csv is not wanted.
+  withHarness(
+    { longform: 20, shorts: 0, commentsPerVideo: 1 },
+    async (harness) => {
+      const data = await runExport(harness, {
+        limit: 5,
+        contentType: "longform",
+        includeVideoDetails: false,
+        includeComments: true,
+        includeTranscripts: false,
+        deliver: "path",
+      });
+
+      assert.equal(data.channel.exported, 5);
+      assert.ok(!data.files.some((f: { name: string }) => f.name === "videos.csv"));
+
+      // The five most-viewed, in order — which is only possible if the view
+      // counts were read.
+      const statuses = readCsvFile(filesByName(data)["video-status.csv"]);
+      assert.deepEqual(
+        statuses.map((s) => s.video_id),
+        ["lf000001", "lf000002", "lf000003", "lf000004", "lf000005"],
+      );
+      // The pass ran over the candidate pool precisely because ranking needs it.
+      assert.ok(
+        (harness.calls().metadata ?? 0) > 0,
+        "a Top-N run must still read view counts",
+      );
+    },
+  ));
+
+test("summary.csv records which parts the run held", SLOW, () =>
+  withHarness({ longform: 2, shorts: 0, transcriptLines: 1 }, async (harness) => {
+    const partial = await runExport(harness, {
+      limit: "all",
+      contentType: "longform",
+      includeVideoDetails: false,
+      includeComments: false,
+      includeTranscripts: true,
+      deliver: "path",
+    });
+    assert.equal(
+      readCsvFile(filesByName(partial)["summary.csv"])[0].included,
+      "transcripts",
+    );
+
+    const full = await runExport(harness, {
+      limit: "all",
+      contentType: "longform",
+      includeComments: true,
+      includeTranscripts: true,
+      deliver: "path",
+    });
+    assert.equal(
+      readCsvFile(filesByName(full)["summary.csv"])[0].included,
+      "video details; comments; transcripts",
+    );
+  }));
+
+test("selecting nothing is refused", SLOW, () =>
+  withHarness({ longform: 2, shorts: 0 }, async (harness) => {
+    await assert.rejects(
+      () =>
+        runExport(harness, {
+          limit: "all",
+          includeVideoDetails: false,
+          includeComments: false,
+          includeTranscripts: false,
+        }),
+      /at least one thing to export/i,
+    );
+  }));
+
+test("a partial run keeps its own saved progress, separate from a full one", SLOW, () =>
+  // The checkpoint is keyed on what is being collected, so switching the
+  // toggles must not resume from a run that collected something else.
+  withHarness(
+    { longform: 3, shorts: 0, commentsPerVideo: 2, transcriptLines: 2 },
+    async (harness) => {
+      const transcriptsOnly = await runExport(harness, {
+        limit: "all",
+        contentType: "longform",
+        includeVideoDetails: false,
+        includeComments: false,
+        includeTranscripts: true,
+        deliver: "path",
+      });
+      assert.equal(transcriptsOnly.counts.transcripts, 6);
+      assert.equal(transcriptsOnly.counts.comments, 0);
+
+      const commentsOnly = await runExport(harness, {
+        limit: "all",
+        contentType: "longform",
+        includeVideoDetails: false,
+        includeComments: true,
+        includeTranscripts: false,
+        deliver: "path",
+      });
+      assert.equal(commentsOnly.counts.comments, 6);
+      assert.equal(commentsOnly.counts.transcripts, 0);
+    },
+  ));
+
+test("path and rows deliveries agree on a partial export too", SLOW, () =>
+  withHarness(
+    { longform: 3, shorts: 0, commentsPerVideo: 2, transcriptLines: 2 },
+    async (harness) => {
+      const opts = {
+        limit: "all" as const,
+        contentType: "longform" as const,
+        includeVideoDetails: false,
+        includeComments: false,
+        includeTranscripts: true,
+      };
+      const viaPath = await runExport(harness, { ...opts, deliver: "path" });
+      const viaRows = await runExport(harness, { ...opts, deliver: "rows" });
+
+      const { buildExportFiles } = await import("../src/lib/channel");
+      const built = buildExportFiles(viaRows as any);
+      assert.deepEqual(
+        built.map((f) => f.name).sort(),
+        ["summary.csv", "transcripts.csv", "video-status.csv"],
+      );
+
+      const onDisk = filesByName(viaPath);
+      for (const file of built) {
+        if (file.name === "summary.csv") continue; // carries a timestamp
+        assert.equal(
+          fs.readFileSync(onDisk[file.name], "utf8"),
+          file.contents,
+          `${file.name} differs between path and rows delivery`,
+        );
+      }
+    },
+  ));

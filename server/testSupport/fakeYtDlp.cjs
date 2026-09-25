@@ -19,6 +19,19 @@ const argv = process.argv.slice(2);
 // has not been flushed. A channel listing is hundreds of kilobytes, far more
 // than the pipe buffer, so exiting explicitly would truncate it. Setting
 // exitCode and returning lets node drain the stream first.
+// Every invocation is recorded so a test can assert on what the exporter
+// actually spawned — the only way to show that turning a part off skips the
+// work rather than just dropping the file.
+function record(kind) {
+  const file = process.env.FAKE_CALL_LOG;
+  if (!file) return;
+  try {
+    fs.appendFileSync(file, `${kind}\n`);
+  } catch {
+    /* the log is best-effort */
+  }
+}
+
 function emit(text, code = 0) {
   process.exitCode = code;
   if (text) process.stdout.write(text);
@@ -178,23 +191,29 @@ function writeSubtitles(id) {
 
 // --- dispatch -------------------------------------------------------------
 function main() {
-  if (has("--flat-playlist")) return emit(JSON.stringify(listing()));
+  if (has("--flat-playlist")) {
+    record("listing");
+    return emit(JSON.stringify(listing()));
+  }
 
   const id = videoId();
   if (!id) return fail(`fake yt-dlp: unsupported url ${url}\n`);
 
   if (has("--write-auto-subs") || has("--write-subs")) {
+    record("subtitles");
     writeSubtitles(id);
     return emit("");
   }
 
   if (has("--write-comments")) {
+    record("comments");
     if (NO_COMMENTS.has(id)) {
       return fail("ERROR: Comments are disabled for this video\n");
     }
     return emit(JSON.stringify({ ...metadata(id), comments: comments(id) }));
   }
 
+  record("metadata");
   return emit(JSON.stringify(metadata(id)));
 }
 

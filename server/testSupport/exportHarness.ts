@@ -60,6 +60,14 @@ export interface Harness {
   stop(): Promise<void>;
   /** Everything the server logged, for diagnosing a failed assertion. */
   log(): string;
+  /**
+   * How many yt-dlp calls of each kind the exporter has made so far
+   * ("listing", "metadata", "comments", "subtitles"). This is what shows that
+   * an unselected part costs nothing rather than merely being dropped.
+   */
+  calls(): Record<string, number>;
+  /** Forget the counts, so the next export can be measured on its own. */
+  resetCalls(): void;
 }
 
 function freePort(): Promise<number> {
@@ -123,6 +131,8 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
   const bundle = path.join(bundleDir, `${path.basename(tmpDir)}.cjs`);
   buildServer(bundle);
 
+  const callLog = path.join(tmpDir, "yt-dlp-calls.log");
+
   const port = await freePort();
   const nodeArgs = channel.maxOldSpaceMb
     ? [`--max-old-space-size=${channel.maxOldSpaceMb}`, bundle]
@@ -143,6 +153,7 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
       FAKE_TRANSCRIPT_LINES: String(channel.transcriptLines ?? 2),
       FAKE_CHANNEL_NAME: channel.channelName ?? "Test Channel",
       FAKE_NO_COMMENTS: (channel.noComments ?? []).join(","),
+      FAKE_CALL_LOG: callLog,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -174,6 +185,21 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
     baseUrl,
     tmpDir,
     log: () => output,
+    calls: () => {
+      const counts: Record<string, number> = {};
+      let raw = "";
+      try {
+        raw = fs.readFileSync(callLog, "utf8");
+      } catch {
+        return counts; // nothing spawned yet
+      }
+      for (const line of raw.split("\n")) {
+        const kind = line.trim();
+        if (kind) counts[kind] = (counts[kind] ?? 0) + 1;
+      }
+      return counts;
+    },
+    resetCalls: () => fs.rmSync(callLog, { force: true }),
     stop: async () => {
       // The server may already be gone — a test can deliberately push it out
       // of memory — and "exit" never fires twice, so waiting unconditionally
@@ -192,6 +218,7 @@ export interface ExportRequest {
   url?: string;
   contentType?: "all" | "shorts" | "longform";
   limit?: number | "all";
+  includeVideoDetails?: boolean;
   includeComments?: boolean;
   includeTranscripts?: boolean;
   fresh?: boolean;

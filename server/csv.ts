@@ -79,7 +79,25 @@ export const SUMMARY_COLUMNS = [
   "requested",
   "exported",
   "cancelled",
+  "included",
 ];
+
+/**
+ * What summary.csv records under `included`, so a partial export says which
+ * parts it holds. Mirrors describeParts in src/lib/channel.ts — channelCsv
+ * drift tests keep the two in step.
+ */
+export function describeParts(parts: {
+  videoDetails: boolean;
+  comments: boolean;
+  transcripts: boolean;
+}): string {
+  const out: string[] = [];
+  if (parts.videoDetails) out.push("video details");
+  if (parts.comments) out.push("comments");
+  if (parts.transcripts) out.push("transcripts");
+  return out.join("; ");
+}
 
 /** Writes a complete CSV from rows already in memory. For the small files. */
 export function writeCsv(
