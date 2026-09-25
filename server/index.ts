@@ -1595,8 +1595,34 @@ app.get("/api/download/progress", (req: Request, res: Response) => {
 // metadata / comments / transcripts for the top N videos.
 // ---------------------------------------------------------------------------
 
-const CANDIDATE_CAP = 3000; // flat-listing depth used before ranking
+// Hard ceiling on how deep a channel listing is read. A channel with more
+// videos than this exports its most-viewed CANDIDATE_CAP, not all of them.
+const CANDIDATE_CAP = 20000;
+const CHANNEL_LIMIT_MAX = 10000; // largest budget that can be asked for by number
 const SHORT_MAX_SECONDS = 60;
+
+/** How many videos to export: a count, or every video the channel lists. */
+type ChannelLimit = number | "all";
+
+const DEFAULT_LISTING_DEPTH = 3000;
+
+/**
+ * How deep to read a channel tab.
+ *
+ * This was a flat 3000, which quietly capped an "export the whole channel" run
+ * at 3000 candidates. It stays at least 3000 for numeric budgets: the Shorts
+ * tab comes back newest-first, so a shallow listing would rank the newest
+ * videos rather than the most-viewed ones.
+ */
+function listingDepth(limit: ChannelLimit): number {
+  if (limit === "all") return CANDIDATE_CAP;
+  return Math.min(CANDIDATE_CAP, Math.max(DEFAULT_LISTING_DEPTH, limit * 2));
+}
+
+/** How many of a tab's ranked entries go into the candidate pool. */
+function poolCap(limit: ChannelLimit): number {
+  return limit === "all" ? CANDIDATE_CAP : Math.min(CANDIDATE_CAP, limit * 2);
+}
 
 // Collects #hashtags from a string, keeping first-seen casing.
 function collectHashtags(text: string, into: Map<string, string>): void {
@@ -1636,9 +1662,13 @@ const META_CONCURRENCY = 3;
 const channelExportSchema = z.object({
   url: urlSchema,
   contentType: z.enum(["shorts", "longform", "all"]).default("all"),
-  limit: z.number().int().min(1).max(500).default(100),
+  limit: z
+    .union([z.literal("all"), z.number().int().min(1).max(CHANNEL_LIMIT_MAX)])
+    .default(100),
   includeComments: z.boolean().default(true),
   includeTranscripts: z.boolean().default(true),
+  // Throw away any saved progress for this exact request and start over.
+  fresh: z.boolean().default(false),
   cookiesFromBrowser: authSourceSchema.optional(),
 
 });
@@ -1788,16 +1818,47 @@ interface RankedVideo {
   view_count: number;
 }
 
+// One videos.csv row, built from the flat listing entry plus whatever full
+// metadata came back (an empty object when the metadata fetch failed).
+function buildVideoRow(
+  v: RankedVideo,
+  meta: Record<string, any>,
+  channelName: string,
+): Record<string, unknown> {
+  const duration = Number(meta.duration) || v.duration;
+  const views =
+    typeof meta.view_count === "number" ? meta.view_count : v.view_count;
+  return {
+    video_id: v.id,
+    url: `https://www.youtube.com/watch?v=${v.id}`,
+    title: meta.title ?? v.title,
+    description: meta.description ?? "",
+    upload_date: meta.upload_date ?? "",
+    duration_seconds: duration,
+    is_short: duration > 0 && duration <= SHORT_MAX_SECONDS,
+    view_count: views,
+    like_count: typeof meta.like_count === "number" ? meta.like_count : "",
+    comment_count:
+      typeof meta.comment_count === "number" ? meta.comment_count : "",
+    channel: meta.channel ?? channelName,
+    thumbnail: meta.thumbnail ?? "",
+    tags: Array.isArray(meta.tags) ? meta.tags.join("; ") : "",
+    tag_count: Array.isArray(meta.tags) ? meta.tags.length : 0,
+    ...extractHashtags(meta),
+  };
+}
+
 async function listChannelTab(
   job: ChannelJob,
   tabUrl: string,
   cookieOptions: Record<string, unknown>,
+  listEnd: number,
 ): Promise<{ entries: FlatEntry[]; channelName: string; subs: number | "" }> {
   const info = await runForJob(job, tabUrl, {
     dumpSingleJson: true,
     flatPlaylist: true,
     noWarnings: true,
-    playlistEnd: CANDIDATE_CAP,
+    playlistEnd: listEnd,
     ...cookieOptions,
   });
   const entries: FlatEntry[] = Array.isArray(info?.entries) ? info.entries : [];
@@ -1938,6 +1999,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
     input.includeTranscripts,
   ]);
   const ckSelection = path.join(ckDir, "selection.json");
+  const ckMetadata = path.join(ckDir, "metadata.jsonl");
   const ckComments = path.join(ckDir, "comments.jsonl");
   const ckTranscripts = path.join(ckDir, "transcripts.jsonl");
   const ckStatuses = path.join(ckDir, "statuses.jsonl");
@@ -1948,6 +2010,17 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
       /* swept later */
     }
   };
+
+  // "Start fresh" — the saved progress from an earlier run of this exact
+  // request is discarded so nothing is carried over or skipped.
+  if (input.fresh) {
+    clearCheckpoint();
+    try {
+      fs.mkdirSync(ckDir, { recursive: true });
+    } catch {
+      /* the checkpoint is best-effort; the export still runs */
+    }
+  }
 
   interface Checkpoint {
     channelName: string;
@@ -1999,6 +2072,8 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
             : [`${base}/videos?view=0&sort=p`, `${base}/shorts`];
 
       const seen = new Map<string, RankedVideo>();
+      const listEnd = listingDepth(input.limit);
+      const candidates = poolCap(input.limit);
       let listedAny = false;
       let lastListError = "";
       for (const tab of tabs) {
@@ -2007,6 +2082,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
             job,
             tab,
             cookieOptions,
+            listEnd,
           );
           listedAny = true;
           if (!channelName && name) channelName = name;
@@ -2026,7 +2102,7 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
           if (tabVideos.some((v) => v.view_count > 0)) {
             tabVideos.sort((a, b) => b.view_count - a.view_count);
           }
-          for (const v of tabVideos.slice(0, input.limit * 2)) seen.set(v.id, v);
+          for (const v of tabVideos.slice(0, candidates)) seen.set(v.id, v);
         } catch (e) {
           lastListError = fullErrMessage(e);
           if (job.cancelled) break;
@@ -2041,6 +2117,14 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         throw new Error("No videos matched that filter on this channel.");
 
       // Full metadata for the candidate pool (duration, views, likes, comments).
+      // Checkpointed per video: on a whole-channel run this pass alone is one
+      // yt-dlp call per video and can take hours, so losing all of it to a
+      // single interruption made resuming pointless.
+      const cachedRows = new Map<string, Record<string, unknown>>();
+      for (const row of readJsonl<Record<string, unknown>>(ckMetadata)) {
+        const id = String((row as { video_id?: unknown })?.video_id ?? "");
+        if (id) cachedRows.set(id, row);
+      }
       let metaDone = 0;
       publishChannel(jobId, {
         phase: "metadata",
@@ -2048,24 +2132,30 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
         total: pool.length,
         label: "Collecting video details",
       });
-      const metas = await mapLimit(pool, META_CONCURRENCY, async (v) => {
+      const fetched = await mapLimit(pool, META_CONCURRENCY, async (v) => {
+        const cached = cachedRows.get(v.id);
+        if (cached) {
+          metaDone += 1;
+          return cached;
+        }
         if (job.cancelled) return null;
+        let meta: Record<string, any> = {};
         try {
-          const info = await runForJob(
-            job,
-            `https://www.youtube.com/watch?v=${v.id}`,
-            {
-              dumpSingleJson: true,
-              noPlaylist: true,
-              noWarnings: true,
-              skipDownload: true,
-              ...cookieOptions,
-            },
-            90_000,
-          );
-          return info;
+          meta =
+            ((await runForJob(
+              job,
+              `https://www.youtube.com/watch?v=${v.id}`,
+              {
+                dumpSingleJson: true,
+                noPlaylist: true,
+                noWarnings: true,
+                skipDownload: true,
+                ...cookieOptions,
+              },
+              90_000,
+            )) as Record<string, any>) ?? {};
         } catch {
-          return null;
+          meta = {};
         } finally {
           metaDone += 1;
           publishChannel(jobId, {
@@ -2075,53 +2165,33 @@ app.post("/api/channel/export", async (req: Request, res: Response) => {
             label: v.title || v.id,
           });
         }
+        const row = buildVideoRow(v, meta, channelName);
+        appendJsonl(ckMetadata, [row]);
+        return row;
       });
       if (job.cancelled) throw new Error("cancelled");
 
-      const rows = pool.map((v, i) => {
-        const m = (metas[i] ?? {}) as Record<string, any>;
-        const duration = Number(m.duration) || v.duration;
-        const views =
-          typeof m.view_count === "number" ? m.view_count : v.view_count;
-        return {
-          video_id: v.id,
-          url: `https://www.youtube.com/watch?v=${v.id}`,
-          title: m.title ?? v.title,
-          description: m.description ?? "",
-          upload_date: m.upload_date ?? "",
-          duration_seconds: duration,
-          is_short: duration > 0 && duration <= SHORT_MAX_SECONDS,
-          view_count: views,
-          like_count: typeof m.like_count === "number" ? m.like_count : "",
-          comment_count:
-            typeof m.comment_count === "number" ? m.comment_count : "",
-          channel: m.channel ?? channelName,
-          thumbnail: m.thumbnail ?? "",
-          tags: Array.isArray(m.tags) ? m.tags.join("; ") : "",
-          tag_count: Array.isArray(m.tags) ? m.tags.length : 0,
-          ...extractHashtags(m),
-
-        };
-      });
-
-      let ranked = rows;
+      let ranked = fetched.filter(
+        (r): r is Record<string, unknown> => r !== null,
+      );
       if (input.contentType === "shorts") {
         ranked = ranked.filter(
-          (r) => r.duration_seconds === 0 || r.is_short === true,
+          (r) => Number(r.duration_seconds) === 0 || r.is_short === true,
         );
       } else if (input.contentType === "longform") {
         ranked = ranked.filter(
-          (r) => r.duration_seconds === 0 || r.is_short === false,
+          (r) => Number(r.duration_seconds) === 0 || r.is_short === false,
         );
       }
       ranked.sort((a, b) => Number(b.view_count) - Number(a.view_count));
-      selected = ranked.slice(0, input.limit).map((r) => ({
+      const keep = input.limit === "all" ? ranked.length : input.limit;
+      selected = ranked.slice(0, keep).map((r) => ({
         id: String(r.video_id),
         title: String(r.title),
       }));
       if (selected.length === 0)
         throw new Error("No videos matched that filter on this channel.");
-      videos.push(...ranked.slice(0, input.limit));
+      videos.push(...ranked.slice(0, keep));
       writeJson(ckSelection, { channelName, subs, videos, selected });
     }
 

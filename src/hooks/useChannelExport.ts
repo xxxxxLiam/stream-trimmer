@@ -9,11 +9,11 @@ import {
   buildExportFiles,
   buildExportFolderName,
   isLikelyChannelUrl,
-  CHANNEL_LIMIT_MAX,
-  CHANNEL_LIMIT_MIN,
+  parseChannelLimit,
   type ChannelContentType,
   type ChannelExportProgress,
   type ChannelExportResponse,
+  type ChannelLimit,
 } from "../lib/channel";
 import { CHANNEL_PASSCODE_HASH } from "../lib/channelLock";
 import { addDownload } from "../lib/downloads";
@@ -36,9 +36,13 @@ export function useChannelExport(options: {
 
   const [channelUrl, setChannelUrl] = useState("");
   const [contentType, setContentType] = useState<ChannelContentType>("all");
-  const [limit, setLimit] = useState(100);
+  // Kept as the raw field text, so a half-typed or cleared count can be shown
+  // back as an error rather than silently becoming some other number.
+  const [limitText, setLimitText] = useState("100");
+  const [exportAll, setExportAll] = useState(false);
   const [includeComments, setIncludeComments] = useState(true);
   const [includeTranscripts, setIncludeTranscripts] = useState(true);
+  const [fresh, setFresh] = useState(false);
 
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<ChannelExportProgress | null>(null);
@@ -46,6 +50,11 @@ export function useChannelExport(options: {
   const [result, setResult] = useState<ChannelExportResult | null>(null);
 
   const jobIdRef = useRef<string | null>(null);
+
+  const parsedLimit = parseChannelLimit(exportAll ? "all" : limitText);
+  // null while the field holds something unusable — the panel shows the run
+  // estimate off this, and startExport reports the reason.
+  const limit: ChannelLimit | null = parsedLimit.ok ? parsedLimit.limit : null;
 
   const cancelExport = useCallback(async () => {
     const jobId = jobIdRef.current;
@@ -71,10 +80,11 @@ export function useChannelExport(options: {
       setError("Choose a save folder first");
       return;
     }
-    const safeLimit = Math.min(
-      CHANNEL_LIMIT_MAX,
-      Math.max(CHANNEL_LIMIT_MIN, Math.round(limit) || CHANNEL_LIMIT_MIN),
-    );
+    const budget = parseChannelLimit(exportAll ? "all" : limitText);
+    if (!budget.ok) {
+      setError(budget.reason);
+      return;
+    }
     setError("");
     setResult(null);
     setExporting(true);
@@ -114,9 +124,10 @@ export function useChannelExport(options: {
           body: JSON.stringify({
             url: trimmed,
             contentType,
-            limit: safeLimit,
+            limit: budget.limit,
             includeComments,
             includeTranscripts,
+            fresh,
             ...cookiePayload(),
           }),
         },
@@ -180,9 +191,11 @@ export function useChannelExport(options: {
   }, [
     channelUrl,
     contentType,
-    limit,
+    limitText,
+    exportAll,
     includeComments,
     includeTranscripts,
+    fresh,
     isElectron,
     saveDir,
   ]);
@@ -199,11 +212,16 @@ export function useChannelExport(options: {
     contentType,
     setContentType,
     limit,
-    setLimit,
+    limitText,
+    setLimitText,
+    exportAll,
+    setExportAll,
     includeComments,
     setIncludeComments,
     includeTranscripts,
     setIncludeTranscripts,
+    fresh,
+    setFresh,
     exporting,
     progress,
     error,

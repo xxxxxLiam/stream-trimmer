@@ -17,6 +17,7 @@ import DestinationSelector from "./DestinationSelector";
 import {
   CHANNEL_LIMIT_MAX,
   CHANNEL_LIMIT_MIN,
+  describeChannelLimit,
   type ChannelContentType,
 } from "../lib/channel";
 
@@ -88,11 +89,16 @@ export default function ChannelExportPanel() {
     contentType,
     setContentType,
     limit,
-    setLimit,
+    limitText,
+    setLimitText,
+    exportAll,
+    setExportAll,
     includeComments,
     setIncludeComments,
     includeTranscripts,
     setIncludeTranscripts,
+    fresh,
+    setFresh,
     exporting,
     error,
     result,
@@ -103,10 +109,15 @@ export default function ChannelExportPanel() {
   const { isElectron, saveDir } = useClipperContext();
   const blocked = exporting || (isElectron && !saveDir);
 
-  const minutes = Math.round(
-    (limit * (includeComments ? 14 : 4) + (includeTranscripts ? limit * 3 : 0)) /
-      60,
-  );
+  const perVideoSeconds =
+    (includeComments ? 14 : 4) + (includeTranscripts ? 3 : 0);
+  const minutes =
+    typeof limit === "number"
+      ? Math.max(1, Math.round((limit * perVideoSeconds) / 60))
+      : null;
+  // A whole-channel run, or a few hundred videos, is a very different thing
+  // from the old 500-video ceiling — say so before it starts.
+  const heavy = limit === "all" || (typeof limit === "number" && limit > 500);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -140,18 +151,36 @@ export default function ChannelExportPanel() {
             </button>
           ))}
         </div>
-        <label className="flex items-center gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-1.5 text-[12px] text-fg-muted">
+        <label
+          className={`flex items-center gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-1.5 text-[12px] ${
+            exportAll ? "text-fg-faint" : "text-fg-muted"
+          }`}
+        >
           <span>Top</span>
           <input
             type="number"
             min={CHANNEL_LIMIT_MIN}
             max={CHANNEL_LIMIT_MAX}
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
-            className="w-16 bg-transparent text-right tabular-nums text-fg outline-none"
+            value={limitText}
+            disabled={exportAll}
+            onChange={(e) => setLimitText(e.target.value)}
+            className="w-20 bg-transparent text-right tabular-nums text-fg outline-none disabled:text-fg-faint"
           />
           <span>by views</span>
         </label>
+        <button
+          type="button"
+          onClick={() => setExportAll(!exportAll)}
+          aria-pressed={exportAll}
+          title="Export every video the channel lists, not just the top N"
+          className={`rounded-row border px-2.5 py-1.5 text-[12px] transition-colors ${
+            exportAll
+              ? "border-accent bg-accent text-white"
+              : "border-hairline bg-panel-raised text-fg-muted hover:text-fg"
+          }`}
+        >
+          Everything
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-4 text-[12px] text-fg-muted">
@@ -173,7 +202,29 @@ export default function ChannelExportPanel() {
           />
           <span>Transcripts</span>
         </label>
+        <label
+          className="flex items-center gap-2"
+          title="An interrupted export normally picks up where it stopped. Tick this to collect every video again from scratch."
+        >
+          <input
+            type="checkbox"
+            checked={fresh}
+            onChange={(e) => setFresh(e.target.checked)}
+            className="accent-accent"
+          />
+          <span>Start fresh (ignore saved progress)</span>
+        </label>
       </div>
+
+      {heavy && (
+        <div className="rounded-row border border-hairline bg-panel-raised px-3 py-2 text-[11px] leading-relaxed text-fg-faint">
+          Big runs are held in memory until the CSVs are written. Past a few
+          thousand videos with transcripts on, that can run the app out of
+          memory — turn transcripts off for a whole-channel export, or do it in
+          batches. Progress is saved per video either way, so stopping and
+          restarting continues where it left off.
+        </div>
+      )}
 
       <DestinationSelector />
 
@@ -241,9 +292,14 @@ export default function ChannelExportPanel() {
       <p className="text-[11px] leading-relaxed text-fg-faint">
         Everything here is public data read locally with yt-dlp — views, likes,
         comment counts, comment text, and captions. Dislikes are not published
-        by YouTube and can't be exported. A {limit}-video run takes roughly{" "}
-        {Math.max(1, minutes)} minutes and can be stopped at any point; videos
-        with comments disabled or no captions are noted in video-status.csv.
+        by YouTube and can't be exported.{" "}
+        {limit === null
+          ? "Set how many videos to export above."
+          : limit === "all"
+            ? `Exporting ${describeChannelLimit(limit)} takes roughly ${perVideoSeconds} seconds per video, so a few thousand videos is a run of several hours.`
+            : `A run of ${describeChannelLimit(limit)} takes roughly ${minutes} minutes.`}{" "}
+        It can be stopped at any point; videos with comments disabled or no
+        captions are noted in video-status.csv.
       </p>
     </div>
   );
