@@ -31,10 +31,18 @@ const {
 const youtubeSession = require("./youtubeSession.cjs");
 const { createSettingsStore } = require("./settingsStore.cjs");
 const { saveExportFiles } = require("./exportSave.cjs");
+const {
+  canInstallInPlace,
+  downloadUrl,
+  releasesUrl,
+} = require("./updater.cjs");
 const logger = require("./logger.cjs");
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
+// Whether an update can be downloaded and restarted into, or only offered as
+// a download. See electron/updater.cjs.
+const canInstall = canInstallInPlace(process.platform);
 
 // Drag icon for native file drag-out, resolved once and reused. startDrag
 // needs a non-empty icon synchronously or Windows cancels the drag outright.
@@ -135,20 +143,37 @@ function sendUpdateStatus(payload) {
 
 function setupAutoUpdater() {
   if (isDev) return; // never hit GitHub during dev
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  // On macOS the download is pointless — see canInstallInPlace — so the check
+  // runs but nothing is fetched, and the UI offers the installer instead.
+  autoUpdater.autoDownload = canInstall;
+  autoUpdater.autoInstallOnAppQuit = canInstall;
   autoUpdater.logger = console;
+  logger.log(
+    "updater",
+    `install in place: ${canInstall ? "yes" : "no (macOS is unsigned)"}`,
+  );
 
   autoUpdater.on("checking-for-update", () => {
     console.log("[updater] checking for update");
     sendUpdateStatus({ state: "checking" });
   });
   autoUpdater.on("update-available", (info) => {
-    console.log("[updater] update available", info && info.version);
-    sendUpdateStatus({ state: "available", version: info && info.version });
+    const version = info && info.version;
+    logger.log("updater", `update available: ${version}`);
+    if (!canInstall) {
+      // Nothing is downloading, so say what is actually on offer and where to
+      // get it rather than showing a progress bar that will never move.
+      sendUpdateStatus({
+        state: "manual",
+        version,
+        url: downloadUrl(process.platform, version),
+      });
+      return;
+    }
+    sendUpdateStatus({ state: "available", version });
   });
   autoUpdater.on("update-not-available", () => {
-    console.log("[updater] no update available");
+    logger.log("updater", "no update available");
     sendUpdateStatus({ state: "none" });
   });
   autoUpdater.on("download-progress", (p) => {
@@ -175,10 +200,10 @@ function setupAutoUpdater() {
   });
   autoUpdater.on("error", (err) => {
     const message = (err && err.message) || String(err);
-    console.error("[updater] error:", message);
-    // On unsigned macOS builds this fires with a code-signature error.
-    // Surface a "download manually" hint instead of crashing.
-    sendUpdateStatus({ state: "error", message });
+    // Logged to the diagnostics file, not just the console: "the update
+    // button didn't work" is unanswerable without the actual error.
+    logger.log("updater", `error: ${message}`);
+    sendUpdateStatus({ state: "error", message, url: releasesUrl() });
   });
 
   // Fire the initial check shortly after window is ready.
@@ -645,16 +670,20 @@ function registerIpc() {
   ipcMain.handle("updater:check", async () => {
     if (isDev) return { ok: false, error: "Updates disabled in dev" };
     try {
+      logger.log("updater", "manual check requested");
       const result = await autoUpdater.checkForUpdates();
-      return {
-        ok: true,
-        version: result && result.updateInfo && result.updateInfo.version,
-      };
+      const version = result && result.updateInfo && result.updateInfo.version;
+      // checkForUpdates resolves without emitting update-not-available when
+      // there is nothing new, so the caller gets told either way.
+      if (!version || version === app.getVersion()) {
+        sendUpdateStatus({ state: "none" });
+      }
+      return { ok: true, version };
     } catch (err) {
-      return {
-        ok: false,
-        error: err && err.message ? err.message : "Check failed",
-      };
+      const error = err && err.message ? err.message : "Check failed";
+      logger.log("updater", `manual check failed: ${error}`);
+      sendUpdateStatus({ state: "error", message: error, url: releasesUrl() });
+      return { ok: false, error };
     }
   });
 

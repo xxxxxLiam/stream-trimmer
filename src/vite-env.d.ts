@@ -19,10 +19,15 @@ type YouTubeConnectPhase =
 type UpdateStatusPayload =
   | { state: "checking" }
   | { state: "available"; version?: string }
+  /**
+   * A new version exists but this build cannot restart into it — macOS, where
+   * the app is unsigned. `url` is the installer to download.
+   */
+  | { state: "manual"; version?: string; url: string }
   | { state: "none" }
   | { state: "downloading"; percent: number }
   | { state: "ready"; version?: string }
-  | { state: "error"; message: string };
+  | { state: "error"; message: string; url?: string };
 
 interface ElectronAPI {
   isElectron: true;
