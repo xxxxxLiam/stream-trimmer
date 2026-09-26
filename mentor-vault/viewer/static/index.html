@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mentor Vault</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <h1>Mentor Vault</h1>
+      <div id="stats" class="stats"></div>
+
+      <div class="filter-group">
+        <label for="search">Search</label>
+        <input id="search" type="search" placeholder="e.g. no-show, discounting, objection…" />
+      </div>
+
+      <div class="filter-group">
+        <label for="speaker">Speaker</label>
+        <select id="speaker"><option value="">All speakers</option></select>
+      </div>
+
+      <div class="filter-group">
+        <label for="industry">Industry</label>
+        <select id="industry"><option value="">Any industry</option></select>
+      </div>
+
+      <div class="filter-group">
+        <label for="format">Video format</label>
+        <select id="format">
+          <option value="">Any format</option>
+          <option value="solo">Solo teaching</option>
+          <option value="consult_qa">Consult / Q&amp;A</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Topics</label>
+        <div id="topic-tree"></div>
+      </div>
+
+      <button id="needs-watching-btn" class="ghost-btn"></button>
+    </aside>
+
+    <main id="content">
+      <div id="lesson-count"></div>
+      <div id="lessons"></div>
+    </main>
+  </div>
+
+  <div id="needs-watching-modal" class="modal hidden">
+    <div class="modal-box">
+      <h2>Needs watching</h2>
+      <p>These videos didn't get a usable transcript from the automatic export, so extraction was skipped for them. Watch them manually if they're worth including.</p>
+      <ul id="needs-watching-list"></ul>
+      <button id="close-modal">Close</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

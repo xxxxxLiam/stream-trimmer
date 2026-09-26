@@ -42,3 +42,6 @@ resources/bin
 # Local environment (passcode hashes)
 .env
 .env.local
+
+# Mentor Vault local database (real data — never committed)
+mentor-vault/data/

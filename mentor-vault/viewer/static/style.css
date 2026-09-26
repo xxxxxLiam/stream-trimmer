@@ -1,0 +1,222 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #262b36;
+  --text: #e8e9ec;
+  --muted: #8b90a0;
+  --accent: #6ea8ff;
+  --tag-bg: #1e2430;
+  --industry-bg: #2a2116;
+  --industry-text: #e0b563;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  display: flex;
+  min-height: 100vh;
+}
+
+#sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+#sidebar h1 {
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+
+.stats {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.filter-group {
+  margin-bottom: 18px;
+}
+
+.filter-group label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+input, select {
+  width: 100%;
+  padding: 7px 9px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+#topic-tree { font-size: 13px; }
+
+.topic-node { margin-bottom: 4px; }
+
+.topic-label {
+  cursor: pointer;
+  padding: 3px 4px;
+  border-radius: 4px;
+  display: block;
+}
+.topic-label:hover { background: var(--tag-bg); }
+.topic-label.active { color: var(--accent); font-weight: 600; }
+
+.subtopic-list { padding-left: 14px; }
+.subtopic-label {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.subtopic-label:hover { background: var(--tag-bg); }
+.subtopic-label.active { color: var(--accent); font-weight: 600; }
+
+.ghost-btn {
+  width: 100%;
+  padding: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+#content {
+  flex: 1;
+  padding: 24px 32px;
+  max-width: 820px;
+}
+
+#lesson-count {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.lesson-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.lesson-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--tag-bg);
+  color: var(--text);
+}
+.tag.industry { background: var(--industry-bg); color: var(--industry-text); }
+.tag.speaker { color: var(--accent); border: 1px solid var(--accent); background: none; }
+
+.lesson-text {
+  font-size: 14.5px;
+  line-height: 1.55;
+  white-space: pre-line;
+  margin-bottom: 10px;
+}
+
+.questioner-context {
+  font-size: 13px;
+  color: var(--muted);
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin-bottom: 10px;
+}
+
+.transferability {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.transferability strong { color: var(--text); }
+
+.sources {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.source-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 9px;
+}
+.source-link:hover { border-color: var(--accent); }
+.source-link.short-badge::after { content: " · Short"; color: var(--muted); }
+
+.empty-state {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal.hidden { display: none; }
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+}
+.modal-box h2 { margin-top: 0; }
+.modal-box ul { padding-left: 18px; font-size: 13px; color: var(--muted); }
+.modal-box button {
+  background: var(--accent);
+  color: #10131a;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
