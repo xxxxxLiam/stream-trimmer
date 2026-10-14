@@ -34,7 +34,11 @@ function copy(src, dstName) {
 // -------- HTTP download helper (follows redirects) --------
 function download(url, destPath) {
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(destPath);
+    // The write stream is opened only once a 200 is in hand. Opening it up
+    // front truncates whatever is already at destPath, so a failed fetch used
+    // to replace a good binary with a zero-byte file before anyone saw the
+    // status code — the build then exits non-zero but leaves the husk behind
+    // for a later packaging step to pick up.
     const req = (u) =>
       https
         .get(u, { headers: { "User-Agent": "yt-clipper-bundler" } }, (res) => {
@@ -48,9 +52,13 @@ function download(url, destPath) {
             return req(new URL(res.headers.location, u).toString());
           }
           if (res.statusCode !== 200) {
+            res.resume();
             reject(new Error(`GET ${u} → ${res.statusCode}`));
             return;
           }
+          const file = fs.createWriteStream(destPath);
+          file.on("error", reject);
+          res.on("error", reject);
           res.pipe(file);
           file.on("finish", () => file.close(() => resolve()));
         })
@@ -146,7 +154,41 @@ function cached(name, urlFactory, install) {
 }
 
 // -------- yt-dlp: fetch latest release binary --------
+// We track the NIGHTLY channel, not stable. YouTube breaks extraction roughly
+// monthly and yt-dlp's stable tags trail the fix by weeks: as of 2026-10-14
+// stable is 2026.08.19 while nightly is 2026.10.10.233141, an eight-week gap
+// that predates tv_samsung becoming a default player client (the 1080p
+// regression) and the UNPLAYABLE fixes for #17389 / #17788. Upstream's own
+// standing answer on those issues is `yt-dlp --update-to nightly`, so a build
+// pinned to stable ships a binary its maintainers already consider broken —
+// and since we have no runtime self-update, whatever we bundle is what users
+// are stuck with until the next release.
+//
+// Nightly lives in a separate repo but publishes identical asset names, so
+// only the repo changes. Set YTDLP_CHANNEL=stable to pin a release back to
+// stable if a nightly is ever broken; that is a deliberate opt-in, never an
+// automatic fallback — silently reverting to an eight-week-old build is the
+// exact failure this tracks away from.
+const YTDLP_CHANNELS = {
+  nightly: "yt-dlp/yt-dlp-nightly-builds",
+  stable: "yt-dlp/yt-dlp",
+};
+
+// Smallest real asset is the ~3 MB Linux zipapp. download() resolves on stream
+// 'finish', which also fires for a connection dropped mid-transfer, so without
+// a floor a truncated fetch would pass as success and ship a corrupt binary.
+const YTDLP_MIN_BYTES = 1_000_000;
+
 async function bundleYtDlp() {
+  const channel = process.env.YTDLP_CHANNEL || "nightly";
+  const repo = YTDLP_CHANNELS[channel];
+  if (!repo) {
+    throw new Error(
+      `YTDLP_CHANNEL="${channel}" is not a known channel ` +
+        `(${Object.keys(YTDLP_CHANNELS).join(" | ")}). Refusing to guess.`,
+    );
+  }
+
   const assetName =
     platform === "win32"
       ? "yt-dlp.exe"
@@ -154,16 +196,67 @@ async function bundleYtDlp() {
         ? "yt-dlp_macos"
         : "yt-dlp";
   const outName = platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
-  const url = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${assetName}`;
+  const url = `https://github.com/${repo}/releases/latest/download/${assetName}`;
   const dst = path.join(outDir, outName);
-  console.log(`[bundle-binaries] downloading yt-dlp: ${url}`);
-  await download(url, dst);
+  // Fetch beside the target and move it into place only once the download
+  // succeeded. download() opens its write stream before it has seen the status
+  // code, so fetching straight to dst would truncate a previously-good binary
+  // to zero bytes on a 404 and leave that husk behind for electron-builder.
+  const tmp = `${dst}.download`;
+
+  console.log(`[bundle-binaries] downloading yt-dlp (${channel}): ${url}`);
+  try {
+    await download(url, tmp);
+    const bytes = fs.statSync(tmp).size;
+    if (bytes < YTDLP_MIN_BYTES) {
+      throw new Error(
+        `yt-dlp (${channel}) downloaded only ${bytes} bytes from ${url} — ` +
+          `truncated or an error page. Refusing to bundle.`,
+      );
+    }
+    try {
+      fs.rmSync(dst, { force: true }); // win32 rename won't clobber
+    } catch {
+      /* fall through to rename, which fails loudly if dst is really stuck */
+    }
+    fs.renameSync(tmp, dst);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
+
   try {
     fs.chmodSync(dst, 0o755);
   } catch {
     /* windows */
   }
   console.log(`[bundle-binaries] yt-dlp -> ${dst}`);
+  reportYtDlpVersion(dst, channel);
+}
+
+// Record which yt-dlp actually shipped. The binary's own --version is ground
+// truth where a release tag is only what we asked for, and it pins every
+// release to an exact build — so a later "it stopped working" report can be
+// matched against a known yt-dlp instead of guessed at.
+function reportYtDlpVersion(binPath, channel) {
+  // The Linux asset is a Python zipapp behind a `#!` shebang, so it only
+  // answers on a host with python3; the macOS/Windows assets are standalone.
+  let res = spawnSync(binPath, ["--version"], { encoding: "utf8" });
+  if (res.error || res.status !== 0) {
+    res = spawnSync("python3", [binPath, "--version"], { encoding: "utf8" });
+  }
+  const version = res.status === 0 ? (res.stdout || "").trim() : "";
+  if (version) {
+    console.log(`[bundle-binaries] yt-dlp version ${version} (${channel})`);
+  } else {
+    // Not fatal: the binary is downloaded and verified, we just can't name it
+    // (a build host with no python3 can't run the zipapp). Losing the audit
+    // trail shouldn't break a release, but it must not pass unnoticed either.
+    console.warn(
+      `[bundle-binaries] WARNING: bundled yt-dlp (${channel}) would not report ` +
+        `--version on this host; shipping it without a recorded version.`,
+    );
+  }
 }
 
 // -------- ffmpeg: fetch static build for the current platform+arch --------
