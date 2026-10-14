@@ -52,6 +52,20 @@ export interface FakeChannel {
    * than accumulates: a run that holds every row would exhaust this.
    */
   maxOldSpaceMb?: number;
+  /**
+   * Heights the single-video probe lists in `formats` — what /api/download
+   * compares the finished clip against. Left out, the probe reports none and
+   * the quality safety net has nothing to judge, which is how the exporter
+   * tests see it.
+   */
+  availableHeights?: number[];
+  /**
+   * The height a clip download actually comes back at, per player-client
+   * list: `primary` for the server's first attempt, `fallback` for the retry
+   * it makes when the first one is degraded. This is the knob that reproduces
+   * "1080p was listed, 360p arrived".
+   */
+  deliveredHeights?: { primary: number; fallback: number };
 }
 
 export interface Harness {
@@ -119,9 +133,14 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
     `#!/bin/sh\nexec "${process.execPath}" "${fake}" "$@"\n`,
   );
   fs.chmodSync(ytDlp, 0o755);
-  // preflight() only checks that ffmpeg exists; the exporter never runs it.
+  // The exporter never runs ffmpeg, but /api/download probes every finished
+  // clip with it to find out what resolution actually arrived.
+  const fakeFfmpeg = path.join(here, "fakeFfmpeg.cjs");
   const ffmpeg = path.join(binDir, "ffmpeg");
-  fs.writeFileSync(ffmpeg, "#!/bin/sh\nexit 0\n");
+  fs.writeFileSync(
+    ffmpeg,
+    `#!/bin/sh\nexec "${process.execPath}" "${fakeFfmpeg}" "$@"\n`,
+  );
   fs.chmodSync(ffmpeg, 0o755);
 
   // The bundle keeps ffmpeg-static external, exactly as the packaged build
@@ -153,6 +172,9 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
       FAKE_TRANSCRIPT_LINES: String(channel.transcriptLines ?? 2),
       FAKE_CHANNEL_NAME: channel.channelName ?? "Test Channel",
       FAKE_NO_COMMENTS: (channel.noComments ?? []).join(","),
+      FAKE_AVAILABLE_HEIGHTS: (channel.availableHeights ?? []).join(","),
+      FAKE_HEIGHT_PRIMARY: String(channel.deliveredHeights?.primary ?? 0),
+      FAKE_HEIGHT_FALLBACK: String(channel.deliveredHeights?.fallback ?? 0),
       FAKE_CALL_LOG: callLog,
     },
     stdio: ["ignore", "pipe", "pipe"],

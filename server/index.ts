@@ -38,6 +38,7 @@ import {
   writeCsv,
   writeCsvFromJsonl,
 } from "./csv";
+import { isDegradedDelivery } from "./quality";
 import {
   CLIP_PREFIX,
   EXPORT_PREFIX,
@@ -1044,47 +1045,75 @@ app.post("/api/download", async (req: Request, res: Response) => {
   };
 
 
-  // YouTube's SABR rollout means the web-type clients no longer expose separate
-  // DASH video+audio URLs; only ANDROID_VR still does, and those URLs are bound
-  // to that client's session so ffmpeg's range requests get 403'd. HLS (m3u8)
-  // and progressive formats are still served to web clients and work fine with
-  // --download-sections. But preferring HLS unconditionally silently caps
-  // quality: a 720p HLS rendition would beat a 1080p DASH one. So resolution
-  // is the primary key — the exact requested height is tried on HLS *and*
-  // DASH before anything lower, and only then does protocol preference apply.
+  // Every tier here used to lead with `protocol*=m3u8`. That was written when
+  // SABR had stopped web clients handing out usable DASH URLs and web_safari's
+  // pre-merged HLS was the only thing left that survived ffmpeg's range
+  // requests. It has since inverted: YouTube only returns HLS to logged-in or
+  // otherwise "trusted" sessions, so on an ordinary session every m3u8 tier
+  // matched nothing, the whole ladder fell through to the bare `best`, and a
+  // video the probe had just listed at 1080p was delivered as itag 18 — muxed
+  // 360p. Protocol is therefore no longer part of the selection at all:
+  // resolution is the key, HLS competes with DASH on equal terms at each
+  // height, and the mp4/avc1 pairing is preferred only because it copies into
+  // the output container without re-encoding. A DASH URL that does 403 under
+  // ffmpeg is still caught by isForbidden() below, which moves the whole job
+  // to the fallback path where yt-dlp fetches the media itself — that path,
+  // not an HLS-first selector, is what covers the 403.
   const videoFormat =
     quality === "best"
       ? [
-          "bestvideo[protocol*=m3u8]+bestaudio[protocol*=m3u8]",
           "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]",
           "bestvideo+bestaudio",
-          "best[protocol*=m3u8]",
+          // Pre-merged renditions, itag 18 among them, only once no separate
+          // video+audio pair exists at all.
           "best[ext=mp4]",
           "best",
         ].join("/")
       : [
-          // Exact requested height first, either protocol.
-          `bestvideo[height=${quality}][protocol*=m3u8]+bestaudio[protocol*=m3u8]`,
+          // Exact requested height first, whatever protocol serves it.
           `bestvideo[height=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]`,
           `bestvideo[height=${quality}]+bestaudio`,
+          `best[height=${quality}][ext=mp4]`,
           `best[height=${quality}]`,
           // Then step down.
-          `bestvideo[height<=${quality}][protocol*=m3u8]+bestaudio[protocol*=m3u8]`,
           `bestvideo[height<=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]`,
           `bestvideo[height<=${quality}]+bestaudio`,
-          `best[protocol*=m3u8][height<=${quality}]`,
-          `best[ext=mp4][height<=${quality}]`,
+          `best[height<=${quality}][ext=mp4]`,
           `best[height<=${quality}]`,
         ].join("/");
 
 
-  // Attempt 1 pins web-based clients only. ANDROID_VR is kept out here because
-  // its URLs are exactly the ones that 403 under ffmpeg; it is reintroduced in
-  // the whole-file fallback where yt-dlp fetches the media itself.
-  const PLAYER_CLIENTS_PRIMARY =
-    "youtube:player_client=web_safari,web,mweb,tv";
+  // Naming player clients here is what capped users at 360p: the pinned set
+  // (web_safari, web, mweb, tv) turned out to be exactly the clients YouTube
+  // now gates behind a GVS PO token this app has no way to mint, while every
+  // token-free client was excluded. Per yt-dlp's own extractor tables:
+  //   web, web_safari — WEB_PO_TOKEN_POLICIES marks HTTPS and DASH
+  //     required=True, so their only ungated formats are HLS, and web_safari
+  //     is annotated "Since 2026.07, HLS formats are only returned with some
+  //     logged-in or 'trusted' sessions". On a session that is not trusted
+  //     these clients contribute nothing usable above 360p.
+  //   mweb, tv_simply, android, ios — each carries its own GVS_PO_TOKEN_POLICY
+  //     with required=True for HTTPS/DASH. Same dead end.
+  //   tv — yt-dlp's workaround for the DRM'd-formats bug (yt-dlp#12563) is
+  //     annotated "not effective when logged-in", and this app always sends
+  //     cookies, so `tv` is the one state where the workaround does not apply.
+  //   android_vr — removed from the fallback: it is annotated "Since
+  //     2026.08.17, ALL formats (including live HLS and itag 18) are 403'd",
+  //     so it could only make the whole-file retry fail, never succeed.
+  // So stop pinning. `default` is yt-dlp's own current choice and it swaps to
+  // the authenticated set on its own when cookies are present, which means the
+  // next time YouTube rotates which client works this app follows without a
+  // release. web_embedded is named explicitly for two reasons: it has no
+  // GVS_PO_TOKEN_POLICY at all, and `default` collapses to visionos alone when
+  // no JS runtime is installed, which is a thin single point of failure.
+  const PLAYER_CLIENTS_PRIMARY = "youtube:player_client=default,web_embedded";
+  // Used only when a finished clip comes back far below the resolution the
+  // probe listed, so it has to be a genuinely different configuration rather
+  // than a superset of the primary: the token-free clients spelled out, in a
+  // different order, independent of whatever `default` resolved to. (The
+  // 403 retry is a different downloader on the same clients, not this.)
   const PLAYER_CLIENTS_FALLBACK =
-    "youtube:player_client=web_safari,web,mweb,tv,android_vr";
+    "youtube:player_client=tv_samsung,web_embedded,visionos";
 
   const commonOptions: Record<string, unknown> = {
     noPlaylist: true,
@@ -1102,11 +1131,15 @@ app.post("/api/download", async (req: Request, res: Response) => {
     ? { extractAudio: true, audioFormat: "mp3", audioQuality: quality }
     : { format: videoFormat, mergeOutputFormat: "mp4", remuxVideo: "mp4" };
 
+  // Both attempts are built per client list rather than once, because a clip
+  // that comes back far below the resolution YouTube listed is re-run on a
+  // different set of clients (see the degraded-delivery check below).
+
   // Attempt 1: let yt-dlp cut the section (fast, ffmpeg fetches the range).
-  const sectionOptions: Record<string, unknown> = {
+  const sectionOptionsFor = (clients: string): Record<string, unknown> => ({
     ...commonOptions,
     ...formatOptions,
-    extractorArgs: PLAYER_CLIENTS_PRIMARY,
+    extractorArgs: clients,
     downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
     forceKeyframesAtCuts: true,
     output: outputPath,
@@ -1115,29 +1148,32 @@ app.post("/api/download", async (req: Request, res: Response) => {
       "Referer:https://www.youtube.com/",
       "Origin:https://www.youtube.com",
     ],
-  };
+  });
 
   // Attempt 2 (fallback): yt-dlp downloads the whole media itself (native
   // downloader, no ffmpeg-fetched URLs), then we trim locally.
   const fullPath = path.join(tempDir, `source.${isAudio ? "m4a" : "mp4"}`);
-  const fullOptions: Record<string, unknown> = {
+  const fullOptionsFor = (clients: string): Record<string, unknown> => ({
     ...commonOptions,
-    extractorArgs: PLAYER_CLIENTS_FALLBACK,
+    extractorArgs: clients,
     // Fetch HLS with yt-dlp's own segment downloader so ffmpeg only ever sees
     // a local file. Older bundled ffmpeg builds crash fetching m3u8 themselves.
     hlsPreferNative: true,
     ...(isAudio
       ? {
-          // Same HLS-first ordering as video: SABR withholds the DASH audio
-          // URL from web clients, so m4a-only selection lands on a 403 URL.
-          format:
-            "bestaudio[protocol*=m3u8]/best[protocol*=m3u8]/bestaudio[ext=m4a]/bestaudio/best",
+          // Protocol is left out of the audio ladder for the same reason as
+          // the video one: HLS is no longer reliably offered, so asking for it
+          // first meant falling through to `best` and transcoding the muxed
+          // 360p stream's audio track.
+          format: "bestaudio[ext=m4a]/bestaudio/best",
         }
       : { format: videoFormat, mergeOutputFormat: "mp4" }),
     output: fullPath,
-  };
+  });
 
-  let options: Record<string, unknown> = sectionOptions;
+  let options: Record<string, unknown> = sectionOptionsFor(
+    PLAYER_CLIENTS_PRIMARY,
+  );
 
   // Progress is driven by ffmpeg's `... time=HH:MM:SS.ss ...` output, which
   // streams continuously as the clip is processed (yt-dlp routes section
@@ -1239,20 +1275,14 @@ app.post("/api/download", async (req: Request, res: Response) => {
     return match ?? null;
   };
 
-  try {
-    publishProgress(jobId, {
-      phase: "downloading",
-      percent: 0,
-      ...(resumeBytes > 0
-        ? {
-            message: `Resuming — ${(resumeBytes / (1024 * 1024)).toFixed(1)} MB already downloaded`,
-          }
-        : {}),
-    });
-
-    console.log(
-      `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
-    );
+  // One complete build of the clip on one set of player clients: sectioned
+  // first, whole-file-then-trim if the sectioned URLs 403.
+  const buildClip = async (clients: string): Promise<void> => {
+    const sectionOptions = sectionOptionsFor(clients);
+    options = sectionOptions;
+    lastReported = 0;
+    scaleFrom = 0;
+    scaleTo = 99;
     console.log(
       `[server] /api/download exec url=${url} options=${JSON.stringify(sectionOptions)}`,
     );
@@ -1266,6 +1296,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       console.warn(
         "[server] sectioned download failed (403) — retrying with full download + local trim",
       );
+      const fullOptions = fullOptionsFor(clients);
       options = fullOptions;
       lastReported = 0;
       scaleFrom = 0;
@@ -1327,6 +1358,23 @@ app.post("/api/download", async (req: Request, res: Response) => {
         /* ignore */
       }
     }
+  };
+
+  try {
+    publishProgress(jobId, {
+      phase: "downloading",
+      percent: 0,
+      ...(resumeBytes > 0
+        ? {
+            message: `Resuming — ${(resumeBytes / (1024 * 1024)).toFixed(1)} MB already downloaded`,
+          }
+        : {}),
+    });
+
+    console.log(
+      `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
+    );
+    await buildClip(PLAYER_CLIENTS_PRIMARY);
 
     if (!fs.existsSync(outputPath)) {
       // Work folder deliberately kept so the next attempt can resume.
@@ -1346,7 +1394,76 @@ app.post("/api/download", async (req: Request, res: Response) => {
     // the clip legitimately completes at a lower resolution. Probed with the
     // resolved ffmpeg (ffprobe is not bundled) and passed back as headers since
     // the response body is the media stream itself.
-    const delivered = probeDelivered(outputPath, resolvedFfmpeg as string);
+    let delivered = probeDelivered(outputPath, resolvedFfmpeg as string);
+
+    // The 360p-from-a-1080p-video bug was invisible for months because the
+    // two numbers that prove it — what the probe listed and what came out —
+    // only ever met in a log line. A clip that lands below half of what both
+    // the request and the probe said was reachable is not a compromise, it is
+    // a player client that handed back nothing usable, so it is worth paying
+    // for one more download on a different client set before giving up.
+    const requestedHeight: number | "best" =
+      quality === "best" ? "best" : Number(quality);
+    let degraded = isDegradedDelivery(
+      delivered.height,
+      requestedHeight,
+      availableHeights,
+    );
+    if (degraded) {
+      console.warn(
+        `[server] /api/download degraded job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} available=${availableHeights.join(",") || "unknown"} — rebuilding on ${PLAYER_CLIENTS_FALLBACK}`,
+      );
+      publishProgress(jobId, {
+        phase: "downloading",
+        percent: 0,
+        message:
+          "YouTube served a much lower resolution than it listed — retrying with a different player client.",
+      });
+      // The degraded clip is moved aside rather than deleted: if the retry
+      // fails outright the user still gets a watchable clip instead of an
+      // error, which is what they had before this check existed.
+      const keptPath = path.join(tempDir, `degraded.${ext}`);
+      const keptFormat = chosenFormat;
+      try {
+        fs.rmSync(keptPath, { force: true });
+      } catch {
+        /* ignore */
+      }
+      fs.renameSync(outputPath, keptPath);
+      try {
+        chosenFormat = "";
+        await buildClip(PLAYER_CLIENTS_FALLBACK);
+        if (!fs.existsSync(outputPath)) {
+          throw new Error("yt-dlp produced no output");
+        }
+      } catch (retryErr) {
+        const why =
+          retryErr instanceof Error ? retryErr.message : String(retryErr);
+        console.warn(
+          `[server] /api/download degraded retry failed job=${jobId}: ${why} — keeping the ${delivered.height ?? "?"}p clip`,
+        );
+        chosenFormat = keptFormat;
+        try {
+          fs.rmSync(outputPath, { force: true });
+        } catch {
+          /* ignore */
+        }
+        fs.renameSync(keptPath, outputPath);
+      }
+      try {
+        fs.rmSync(keptPath, { force: true });
+      } catch {
+        /* ignore */
+      }
+      publishProgress(jobId, { phase: "processing", percent: 99 });
+      delivered = probeDelivered(outputPath, resolvedFfmpeg as string);
+      degraded = isDegradedDelivery(
+        delivered.height,
+        requestedHeight,
+        availableHeights,
+      );
+    }
+
     if (delivered.height) {
       res.setHeader("X-Delivered-Height", String(delivered.height));
     }
@@ -1357,12 +1474,20 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (availableHeights.length)
       res.setHeader("X-Available-Heights", availableHeights.join(","));
     res.setHeader("X-Auth-Mode", cookieMode);
+    // Both client sets came back degraded. Nothing left to retry, so say so
+    // out loud rather than letting a 360p file pass for a 1080p download.
+    if (degraded) {
+      res.setHeader("X-Quality-Degraded", "1");
+      console.error(
+        `[server] /api/download still degraded job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} available=${availableHeights.join(",") || "unknown"} format=${chosenFormat || "?"} auth=${cookieMode}`,
+      );
+    }
     console.log(
       `[server] /api/download built job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode}`,
     );
     res.setHeader(
       "Access-Control-Expose-Headers",
-      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode, X-Quality-Degraded",
     );
 
 
