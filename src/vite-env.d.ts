@@ -9,13 +9,6 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-/** Stages the in-app YouTube sign-in reports back to the main window. */
-type YouTubeConnectPhase =
-  | "waiting"
-  | "verifying"
-  | "rejected"
-  | "verified";
-
 type UpdateStatusPayload =
   | { state: "checking" }
   | { state: "available"; version?: string }
@@ -68,15 +61,9 @@ interface ElectronAPI {
   ) => Promise<{ ok: boolean; error?: string }>;
   fileExists?: (targetPath: string) => Promise<boolean>;
   startDrag?: (targetPath: string) => void;
-  /** Opens the in-app YouTube login window. Cookie values never cross this bridge. */
-  connectYouTube?: () => Promise<{
-    connected: boolean;
-    cancelled: boolean;
-    error?: string;
-  }>;
-  /** Refreshes the stored cookie file and reports whether a session exists. */
+  /** Reads the stored cookies.txt and reports whether a session is on disk. */
   probeYouTube?: () => Promise<{ connected: boolean; error?: string }>;
-  /** Clears the stored in-app YouTube session. */
+  /** Deletes the stored cookies.txt. */
   disconnectYouTube?: () => Promise<{ ok: boolean }>;
   /** Picks a cookies.txt exported from the user's own browser and adopts it. */
   importYouTubeCookies?: () => Promise<{
@@ -85,10 +72,6 @@ interface ElectronAPI {
     count?: number;
     error?: string;
   }>;
-  /** Subscribes to sign-in progress. Returns an unsubscribe function. */
-  onYouTubeProgress?: (
-    cb: (payload: { phase: YouTubeConnectPhase }) => void,
-  ) => () => void;
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
   revealDiagnostics?: () => Promise<{

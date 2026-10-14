@@ -413,8 +413,8 @@ function Shell() {
   const { tabs, activeId } = useWorkspace();
   const connection = useYouTubeConnection();
 
-  // No background polling. On launch we restore the stored in-app sign-in
-  // once and verify it silently; after that the user checks when they choose.
+  // No background polling. On launch we read the imported cookies.txt once
+  // and verify it silently; after that the user checks when they choose.
   useEffect(() => {
     void restoreConnection();
   }, []);

@@ -110,10 +110,10 @@ A React single-page app (Vite + TypeScript) talks to a local Express worker. The
 - **"Preview unavailable"** — the video owner disabled embedding. Downloading still works; ignore it.
 - **"No transcript available"** — that video has no captions (or none in a supported language). A YouTube limitation, not a bug.
 - **"yt-dlp failed" with details** — if YouTube changed something and the bundled yt-dlp is behind, grab the newest release build, which bundles an updated yt-dlp.
-- **"Couldn't sign you in — this browser or app may not be secure"** — Google
-  refuses sign-in from inside an app. It cannot be argued with, and is more
-  likely on Windows than macOS. Use **Import cookies.txt** on the Connect
-  screen instead.
+- **"Sign in to confirm you're not a bot"** — YouTube is challenging an
+  unauthenticated request. Import a cookies.txt (below). If you already have,
+  the session may have been rotated out — re-export it from a private window,
+  which is the step that makes it last.
 - **"Chrome is running and holding its cookie database open"** — Windows gives
   the running browser an exclusive lock. Quit it fully, including tray
   processes, or use **Import cookies.txt**.
@@ -121,20 +121,42 @@ A React single-page app (Vite + TypeScript) talks to a local Express worker. The
   App-Bound Encryption. There is no way around it from outside the browser;
   **Import cookies.txt** is the answer, because the browser decrypts on export.
 
-### Import cookies.txt (works everywhere)
+### Import cookies.txt
 
-The universal route when sign-in won't go through:
+This is how the app signs in. There is no in-app Google sign-in: Google
+blocks Google Account sign-in from inside other applications as policy, and
+has since January 2021, so no amount of work in this app can make it succeed.
 
-1. In the browser you're signed into YouTube with, add a "Get cookies.txt"
-   extension.
-2. Open **youtube.com** while signed in, and export.
-3. In the app: **Connect YouTube → Import cookies.txt**, and pick that file.
+**Export from a private window.** YouTube rotates account cookies on open
+YouTube tabs as a security measure, so a file exported from your normal
+browsing is invalidated within hours — that is why a plain export seems to
+"stop working" and need redoing. A private session you close and never reopen
+is never rotated.
 
-The browser does its own decryption on export, so this is unaffected by
-whether the browser is running, how it encrypts its cookie store, or whether
-Google will accept an in-app sign-in. The file is validated (it must contain a
-real YouTube sign-in cookie), stored in the app's own data folder, and used
-only by the local yt-dlp process.
+1. Open a new private browsing/incognito window and log into YouTube.
+2. In the same window and same tab, go to `https://www.youtube.com/robots.txt`.
+   This should be the only private/incognito tab open.
+3. Export youtube.com cookies with a "Get cookies.txt LOCALLY" style extension.
+4. Close the private window, so that session is never opened in the browser
+   again.
+5. In the app: **Connect YouTube → Import cookies.txt**, and pick that file.
+
+The procedure is yt-dlp's own; see its
+[Exporting YouTube cookies](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies)
+wiki page. The browser decrypts on export, so this works regardless of whether
+the browser is running or how it encrypts its cookie store. The file is
+validated (it must contain a real YouTube sign-in cookie), stored in the app's
+own data folder, and read only by the local yt-dlp process — which also
+refreshes it after each run, so one good import lasts.
+
+Reading a browser's cookies directly (**Find my YouTube session**) is offered
+as a secondary route. Firefox works reliably; Chrome and Chromium on Windows
+cannot be read at all, because Chrome 127+ encrypts the cookie database
+against other programs. Cookies obtained that way are the rotating kind, so
+expect to redo them.
+
+Note that 1080p does not itself require a sign-in. Cookies are needed for
+age-restricted, members-only and private content, and to clear bot checks.
 
 **Building from source:**
 

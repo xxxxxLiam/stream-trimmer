@@ -1,8 +1,8 @@
 /**
  * File: cookieFile.test.ts
  * Path: server/cookieFile.test.ts
- * Description: Verifies the imported-cookies check and the detection of
- * Google's embedded-browser sign-in rejection.
+ * Description: Verifies the check that decides whether an imported
+ * cookies.txt is worth adopting.
  */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -10,10 +10,8 @@ import test from "node:test";
 
 const require = createRequire(import.meta.url);
 const {
-  isSignInRejected,
   validateCookieText,
 }: {
-  isSignInRejected: (url: unknown) => boolean;
   validateCookieText: (
     text: unknown,
   ) => { ok: boolean; reason?: string; count?: number };
@@ -61,33 +59,4 @@ test("a domain that merely ends in the right letters is not accepted", () => {
   // notyoutube.com must not pass as youtube.com.
   assert.equal(validateCookieText(row("notyoutube.com", "SID", "x")).ok, false);
   assert.equal(validateCookieText(row("evilgoogle.com", "SID", "x")).ok, false);
-});
-
-test("Google's embedded-browser rejection is recognised", () => {
-  assert.equal(
-    isSignInRejected("https://accounts.google.com/v3/signin/rejected?rrk=48"),
-    true,
-  );
-  assert.equal(
-    isSignInRejected("https://accounts.google.com/signin/rejected"),
-    true,
-  );
-  assert.equal(
-    isSignInRejected("https://accounts.google.com/x?reason=deniedsigninrejected"),
-    true,
-  );
-});
-
-test("ordinary sign-in pages are not treated as a rejection", () => {
-  assert.equal(
-    isSignInRejected("https://accounts.google.com/v3/signin/identifier"),
-    false,
-  );
-  assert.equal(
-    isSignInRejected("https://accounts.google.com/v3/signin/challenge/pwd"),
-    false,
-  );
-  assert.equal(isSignInRejected("https://www.youtube.com/"), false);
-  assert.equal(isSignInRejected(""), false);
-  assert.equal(isSignInRejected(undefined), false);
 });

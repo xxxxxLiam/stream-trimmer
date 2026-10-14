@@ -61,6 +61,14 @@ const SUBS = num("FAKE_SUBS", 4242);
 const NO_COMMENTS = new Set(
   (process.env.FAKE_NO_COMMENTS || "").split(",").filter(Boolean),
 );
+// Clip-download knobs. All zero/empty unless a test sets them, which is how
+// the exporter tests keep the probe's format list empty.
+const AVAILABLE_HEIGHTS = (process.env.FAKE_AVAILABLE_HEIGHTS || "")
+  .split(",")
+  .filter(Boolean)
+  .map(Number);
+const HEIGHT_PRIMARY = num("FAKE_HEIGHT_PRIMARY", 0);
+const HEIGHT_FALLBACK = num("FAKE_HEIGHT_FALLBACK", 0);
 
 // Text that only survives a correct UTF-8 path: an emoji outside the BMP, a
 // non-Latin script, and the CSV quote character.
@@ -133,8 +141,21 @@ function videoId() {
   return m ? m[1] : null;
 }
 
+// What the pre-download probe reads to decide which heights YouTube is
+// offering. Only the height matters to the server; the rest is shape.
+function formats() {
+  return AVAILABLE_HEIGHTS.map((h) => ({
+    format_id: `v${h}`,
+    height: h,
+    vcodec: "avc1.640028",
+    acodec: "none",
+    tbr: h * 2,
+  }));
+}
+
 function metadata(id) {
   return {
+    ...(AVAILABLE_HEIGHTS.length ? { formats: formats() } : {}),
     id,
     title: titleFor(id),
     description: `Description for ${id} ${TRICKY}`,
@@ -189,6 +210,24 @@ function writeSubtitles(id) {
   fs.writeFileSync(`${out}.en.vtt`, blocks.join("\n"), "utf8");
 }
 
+// A clip download. The "media" is one line of text naming the height that
+// arrived, which is what fakeFfmpeg.cjs reads back when the server probes the
+// finished clip. Which height that is depends on the player clients asked
+// for, so a test can make the server's first choice come back degraded and
+// its retry come back correct.
+function download() {
+  const out = valueOf("--output");
+  if (!out) return fail("fake yt-dlp: a download needs --output\n");
+  // The server's first attempt defers to yt-dlp's own client choice; the
+  // degraded-quality retry names the token-free clients instead.
+  const primary = (valueOf("--extractor-args") || "").includes("default");
+  const height = primary ? HEIGHT_PRIMARY : HEIGHT_FALLBACK;
+  if (!height) return fail("fake yt-dlp: Requested format is not available\n");
+  fs.writeFileSync(out, `fake clip height=${height}\n`);
+  // The line the server scrapes to report which format yt-dlp settled on.
+  return emit(`[info] Downloading 1 format(s): v${height}\n`);
+}
+
 // --- dispatch -------------------------------------------------------------
 function main() {
   if (has("--flat-playlist")) {
@@ -198,6 +237,13 @@ function main() {
 
   const id = videoId();
   if (!id) return fail(`fake yt-dlp: unsupported url ${url}\n`);
+
+  // Only /api/download cuts a section, so this can never collide with one of
+  // the exporter's four call shapes.
+  if (has("--download-sections")) {
+    record("download");
+    return download();
+  }
 
   if (has("--write-auto-subs") || has("--write-subs")) {
     record("subtitles");

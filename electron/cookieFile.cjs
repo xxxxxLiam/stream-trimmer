@@ -1,9 +1,8 @@
 /**
  * File: cookieFile.cjs
  * Path: electron/cookieFile.cjs
- * Description: Validation for an imported Netscape cookies.txt, and detection
- * of Google's embedded-browser sign-in rejection. Pure (no electron import)
- * so both can be tested.
+ * Description: Validation for an imported Netscape cookies.txt. Pure (no
+ * electron import) so it can be tested.
  */
 
 // The Netscape parsing itself lives in cookieState.cjs, which also reads the
@@ -14,25 +13,6 @@ const {
   isRelevantDomain,
   parseCookieRows,
 } = require("./cookieState.cjs");
-
-/**
- * True when a navigation landed on Google's "Couldn't sign you in — this
- * browser or app may not be secure" page.
- *
- * Google deliberately refuses sign-in from embedded browser frameworks, and
- * an Electron window is one however it identifies itself. Without this the
- * app reports a plain "cancelled" when the user closes the blocked window,
- * which tells them nothing about what went wrong or what to do instead.
- *
- * The URL path is used rather than the page title, because the title is
- * localised and the path is not.
- */
-function isSignInRejected(url) {
-  const text = String(url || "");
-  return (
-    /\/signin\/rejected/i.test(text) || /deniedsigninrejected/i.test(text)
-  );
-}
 
 /**
  * Checks a Netscape cookies.txt the user exported from their own browser.
@@ -89,4 +69,4 @@ function validateCookieText(text) {
   return { ok: true, count: relevant.length };
 }
 
-module.exports = { AUTH_COOKIES, isSignInRejected, validateCookieText };
+module.exports = { AUTH_COOKIES, validateCookieText };

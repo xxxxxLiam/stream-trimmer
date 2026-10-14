@@ -2,10 +2,8 @@
  * File: cookieState.cjs
  * Path: electron/cookieState.cjs
  * Description: Netscape cookies.txt parsing, and what a cookie file says about
- * the YouTube sign-in it carries — including when that sign-in runs out, and
- * which of the two possible sources (the app's own session partition, or an
- * imported file) the app should believe. Pure (no electron import) so it can
- * be tested, like cookieFile.cjs beside it.
+ * the YouTube sign-in it carries — including when that sign-in runs out. Pure
+ * (no electron import) so it can be tested, like cookieFile.cjs beside it.
  */
 
 // Any one of these, with a value, means a usable signed-in YouTube session.
@@ -106,32 +104,18 @@ function readCookieFileState(text, now = Date.now()) {
 }
 
 /**
- * Decides whether the app is signed in to YouTube, given both places the
- * cookies can live.
+ * Decides whether the app is signed in to YouTube.
  *
- * The order of truth matters. The app's own session partition is checked
- * first because it is the one that can be refreshed, and exporting it keeps
- * the cookie file rolling forward. But a user who imported a cookies.txt has
- * an EMPTY partition — the cookies only ever existed in that file. Judging
- * connectedness from the partition alone is what told those users "not signed
- * in" on every launch, every window focus and every hourly refresh while
- * yt-dlp was downloading 1080p from that very file; they re-imported for
- * hours because the app kept insisting it had nothing.
+ * The imported cookies.txt is the whole answer. This used to also consult the
+ * app's own login partition and prefer it — which told every user who had
+ * imported a file "not signed in" on each launch, window focus and hourly
+ * refresh, because their partition was empty and always would be; yt-dlp was
+ * downloading 1080p from that very file while they re-imported it for hours.
  *
  * `fileText` is the contents of the cookie file on disk, or null when there
  * is no file. Returns { connected, source, expiresAt, expired, reason }.
  */
-function resolveAuthState({ partitionSignedIn, fileText, now = Date.now() } = {}) {
-  if (partitionSignedIn) {
-    const state = readCookieFileState(fileText, now);
-    return {
-      connected: true,
-      source: "signed-in",
-      expiresAt: state.expiresAt,
-      expired: false,
-    };
-  }
-
+function resolveAuthState({ fileText, now = Date.now() } = {}) {
   if (fileText == null) {
     return {
       connected: false,
