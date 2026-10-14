@@ -1,9 +1,9 @@
 /**
  * File: youtubeConnection.ts
  * Path: src/lib/youtubeConnection.ts
- * Description: App-wide YouTube connection. Primary path is the session the
- * user signs into inside the app (persisted by the main process); reading a
- * desktop browser's cookie store is kept only as a fallback.
+ * Description: App-wide YouTube connection. Primary path is a cookies.txt the
+ * user exported from their own browser and imported here; letting yt-dlp read
+ * a browser's own cookie store is kept as a secondary route.
  */
 import { useSyncExternalStore } from "react";
 import {
@@ -23,7 +23,7 @@ export interface YouTubeConnectionState {
   connected: boolean;
   /** Which session the app is currently using. */
   source: AuthSource;
-  /** Browser selected for the fallback path (independent of `source`). */
+  /** Browser selected for the secondary path (independent of `source`). */
   browser: CookieBrowser;
   browserStatus: YouTubeAuthState;
   busy: boolean;
@@ -35,21 +35,9 @@ export interface YouTubeConnectionState {
   probed: boolean;
   /** True while the launch-time silent restore is still running. */
   restoring: boolean;
-  /** Whether the in-app sign-in window is available (desktop build only). */
-  canSignInApp: boolean;
-  /** Current stage of an in-app sign-in, while one is running. */
-  phase?: YouTubeConnectPhase;
-  /** Epoch ms the current verification started, for an elapsed-time readout. */
-  verifyStartedAt?: number;
+  /** Whether a cookies.txt can be imported at all (desktop build only). */
+  canImport: boolean;
 }
-
-/** Human-readable label for each sign-in stage. */
-export const PHASE_LABEL: Record<YouTubeConnectPhase, string> = {
-  waiting: "Waiting for you to sign in…",
-  verifying: "Checking your sign-in with YouTube…",
-  rejected: "YouTube didn't accept that sign-in. Try again in the window.",
-  verified: "Signed in — finishing up…",
-};
 
 export interface CookiePayload {
   cookiesFromBrowser?: AuthSource;
@@ -63,9 +51,10 @@ function electron() {
   return typeof window === "undefined" ? undefined : window.electronAPI;
 }
 
-function hasInAppSignIn(): boolean {
+/** The cookie file lives in the main process, so it only exists on desktop. */
+function hasCookieFile(): boolean {
   const api = electron();
-  return Boolean(api?.connectYouTube && api?.probeYouTube);
+  return Boolean(api?.importYouTubeCookies && api?.probeYouTube);
 }
 
 function initialBrowser(): CookieBrowser {
@@ -77,9 +66,9 @@ function initialSource(): AuthSource {
   const saved = readSetting<string>(SOURCE_KEY, "");
   // A saved "app" source is meaningless without the desktop bridge (browser
   // preview, or an older build), so fall back to the browser path there.
-  if (saved === "app") return hasInAppSignIn() ? "app" : initialBrowser();
+  if (saved === "app") return hasCookieFile() ? "app" : initialBrowser();
   if (isCookieBrowser(saved)) return saved;
-  return hasInAppSignIn() ? "app" : initialBrowser();
+  return hasCookieFile() ? "app" : initialBrowser();
 }
 
 let state: YouTubeConnectionState = {
@@ -89,23 +78,12 @@ let state: YouTubeConnectionState = {
   browserStatus: "idle",
   busy: false,
   probed: false,
-  restoring: hasInAppSignIn(),
-  canSignInApp: hasInAppSignIn(),
+  restoring: hasCookieFile(),
+  canImport: hasCookieFile(),
 };
 
 const listeners = new Set<() => void>();
 let activeCheck: Promise<boolean> | null = null;
-
-// Sign-in progress arrives from the main process; without it the UI has no
-// way to tell "waiting for the user" apart from "verifying with YouTube",
-// which is the slow stage.
-electron()?.onYouTubeProgress?.(({ phase }) => {
-  set({
-    phase,
-    step: PHASE_LABEL[phase] ?? undefined,
-    verifyStartedAt: phase === "verifying" ? Date.now() : undefined,
-  });
-});
 
 function set(patch: Partial<YouTubeConnectionState>) {
   state = { ...state, ...patch };
@@ -184,15 +162,15 @@ async function checkSource(source: AuthSource): Promise<ProbeResult> {
 
 function failureMessage(result: ProbeResult, source: AuthSource): string {
   if (result.message) return result.message;
-  if (source === "app") return "Your saved YouTube sign-in is no longer valid.";
+  if (source === "app") {
+    return "That cookies.txt is no longer valid. Export a fresh one and import it again.";
+  }
   return "No signed-in YouTube session was found in that browser. Sign in there, leave the tab open, then check again.";
 }
 
 function markConnected(source: AuthSource) {
   writeSetting(SOURCE_KEY, source);
   set({
-    phase: undefined,
-    verifyStartedAt: undefined,
     connected: true,
     source,
     browserStatus: "signed_in",
@@ -207,8 +185,6 @@ function markConnected(source: AuthSource) {
 
 function markFailed(result: ProbeResult, source: AuthSource) {
   set({
-    phase: undefined,
-    verifyStartedAt: undefined,
     connected: false,
     source,
     browserStatus: result.status,
@@ -222,9 +198,10 @@ function markFailed(result: ProbeResult, source: AuthSource) {
 }
 
 /**
- * Launch-time restore. Refreshes the cookie file from the app's own session,
- * then verifies it once. On success the app opens straight into the main UI
- * with no prompt. Never runs on a timer.
+ * Launch-time restore. Reads the imported cookies.txt, then verifies it once.
+ * On success the app opens straight into the main UI with no prompt — the
+ * whole point of importing a file that is never rotated. Never runs on a
+ * timer.
  */
 export async function restoreConnection(): Promise<boolean> {
   const api = electron();
@@ -234,7 +211,7 @@ export async function restoreConnection(): Promise<boolean> {
     await initBrowserSelection();
     return false;
   }
-  set({ restoring: true, busy: true, step: "Restoring your YouTube sign-in…" });
+  set({ restoring: true, busy: true, step: "Checking your YouTube cookies…" });
   try {
     const stored = await api.probeYouTube();
     if (!stored.connected) {
@@ -264,66 +241,11 @@ export async function restoreConnection(): Promise<boolean> {
 }
 
 /**
- * The guaranteed path: opens a real YouTube login window inside the app, in
- * its own persistent session, and verifies the result for real before
- * reporting success.
- */
-export async function connectInApp(): Promise<boolean> {
-  const api = electron();
-  if (!api?.connectYouTube) {
-    set({ message: "In-app sign-in needs the desktop app." });
-    return false;
-  }
-  set({
-    busy: true,
-    phase: "waiting",
-    step: PHASE_LABEL.waiting,
-    verifyStartedAt: undefined,
-    message: undefined,
-    reason: undefined,
-  });
-  try {
-    const result = await api.connectYouTube();
-    if (!result.connected) {
-      set({
-        busy: false,
-        phase: undefined,
-        step: undefined,
-        verifyStartedAt: undefined,
-        probed: true,
-        restoring: false,
-        message: result.cancelled
-          ? undefined
-          : result.error || "Sign-in didn't complete. Try again.",
-      });
-      return false;
-    }
-    // No second check here. `connected` already means the main process ran
-    // the engine's real verification against YouTube through the very same
-    // endpoint — re-running it doubled the slowest part of the flow for no
-    // extra confidence.
-    markConnected("app");
-    return true;
-  } catch (error) {
-    set({
-      busy: false,
-      phase: undefined,
-      step: undefined,
-      verifyStartedAt: undefined,
-      probed: true,
-      restoring: false,
-      message: error instanceof Error ? error.message : "Sign-in failed.",
-    });
-    return false;
-  }
-}
-
-/**
  * Adopts a cookies.txt the user exported from their own browser, then
  * verifies it. This is the path that works when the others cannot: Google
- * refuses sign-in from inside an app, and on Windows a running Chrome locks
- * its cookie database while App-Bound Encryption stops anything else
- * decrypting a copy.
+ * refuses Google Account sign-in from inside an app, and on Windows a running
+ * Chrome locks its cookie database while App-Bound Encryption stops anything
+ * else decrypting a copy.
  */
 export async function importCookies(): Promise<boolean> {
   const api = electron();
@@ -347,7 +269,9 @@ export async function importCookies(): Promise<boolean> {
       });
       return false;
     }
-    set({ phase: "verifying", step: PHASE_LABEL.verifying, verifyStartedAt: Date.now() });
+    // The check runs yt-dlp against YouTube for real, so it is slow enough
+    // that the button must stop saying "Reading the cookies file…".
+    set({ step: "Checking those cookies with YouTube…" });
     const verified = await checkSource("app");
     if (verified.status === "signed_in") {
       markConnected("app");
@@ -366,7 +290,7 @@ export async function importCookies(): Promise<boolean> {
   }
 }
 
-/** Clears the stored in-app session so the next launch asks again. */
+/** Deletes the stored cookies.txt so the next launch asks again. */
 export async function signOut(): Promise<void> {
   const api = electron();
   try {
@@ -377,9 +301,7 @@ export async function signOut(): Promise<void> {
   writeSetting(SOURCE_KEY, null);
   set({
     connected: false,
-    phase: undefined,
-    verifyStartedAt: undefined,
-    source: hasInAppSignIn() ? "app" : state.browser,
+    source: hasCookieFile() ? "app" : state.browser,
     browserStatus: "idle",
     busy: false,
     step: undefined,
@@ -390,7 +312,7 @@ export async function signOut(): Promise<void> {
   });
 }
 
-/** Selects the browser used by the fallback path, without starting a check. */
+/** Selects the browser used by the secondary path, without starting a check. */
 export function selectBrowser(browser: CookieBrowser): void {
   writeSetting(BROWSER_KEY, browser);
   set({ browser, message: undefined, reason: undefined });
@@ -406,20 +328,16 @@ export async function initBrowserSelection(): Promise<void> {
 async function runConnectionCheck(source: AuthSource): Promise<boolean> {
   set({
     busy: true,
-    step: source === "app" ? "Checking your saved sign-in…" : `Checking ${source}…`,
+    step:
+      source === "app"
+        ? "Checking your imported cookies…"
+        : `Checking ${source}…`,
     browserStatus: "checking",
     message: undefined,
     reason: undefined,
   });
-  // Roll the cookie file forward from the app's own session before checking,
-  // so a session that is still alive never reads as expired.
-  if (source === "app") {
-    try {
-      await electron()?.probeYouTube?.();
-    } catch {
-      /* the check below reports the real outcome */
-    }
-  }
+  // No probe first. The engine reads the same cookie file this would have
+  // read, so asking the main process about it only delayed the answer.
   const result = await checkSource(source);
   if (result.status === "signed_in") {
     markConnected(source);
@@ -508,7 +426,7 @@ export async function sweepBrowsers(): Promise<boolean> {
   return false;
 }
 
-/** Fallback path: check one specific browser, when the user picks it. */
+/** Secondary path: check one specific browser, when the user picks it. */
 export function checkBrowserConnection(): Promise<boolean> {
   return checkConnection(state.browser);
 }

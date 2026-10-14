@@ -2,7 +2,7 @@
  * File: DiagnosticsDisclosure.tsx
  * Path: src/components/DiagnosticsDisclosure.tsx
  * Description: Surfaces the desktop app's local diagnostic log so a crash or a
- * failed sign-in can be reported without hunting for a hidden folder.
+ * rejected cookies.txt can be reported without hunting for a hidden folder.
  */
 import { useCallback, useState } from "react";
 import {

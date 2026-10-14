@@ -2,10 +2,9 @@
  * File: cookieState.test.ts
  * Path: server/cookieState.test.ts
  * Description: Verifies what a cookies.txt is read to mean — signed in or
- * not, and until when — and that an imported file counts as connected even
- * though the app's own session partition is empty, which is the case that had
- * the app reporting "not signed in" while yt-dlp downloaded 1080p from that
- * very file.
+ * not, and until when — and that an imported file counts as connected, which
+ * is the case that had the app reporting "not signed in" while yt-dlp
+ * downloaded 1080p from that very file.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -40,7 +39,6 @@ const {
   parseCookieRows: (text: unknown) => Array<Record<string, unknown>>;
   readCookieFileState: (text: unknown, now?: number) => CookieFileState;
   resolveAuthState: (input?: {
-    partitionSignedIn?: boolean;
     fileText?: string | null;
     now?: number;
   }) => AuthState;
@@ -131,13 +129,12 @@ test("junk input is reported, never thrown", () => {
   assert.equal(readCookieFileState(file(row("SID", "x", NaN as unknown as number)), NOW).signedIn, true);
 });
 
-test("an imported file counts as connected with an empty partition", () => {
-  // The bug: the partition is empty for everyone who imported a cookies.txt,
-  // and judging connectedness from the partition alone reported "not signed
-  // in" on every launch, focus and hourly refresh while that same file was
-  // downloading 1080p.
+test("an imported file is what connectedness is judged from", () => {
+  // The bug: this used to be answered from the app's own login partition,
+  // which is empty for everyone who imported a cookies.txt — so it reported
+  // "not signed in" on every launch, focus and hourly refresh while that
+  // same file was downloading 1080p.
   const state = resolveAuthState({
-    partitionSignedIn: false,
     fileText: file(row("__Secure-3PSID", "abc123", SOON)),
     now: NOW,
   });
@@ -147,9 +144,8 @@ test("an imported file counts as connected with an empty partition", () => {
   assert.equal(state.expired, false);
 });
 
-test("an empty partition with no usable file is not connected", () => {
+test("no usable file is not connected", () => {
   const expired = resolveAuthState({
-    partitionSignedIn: false,
     fileText: file(row("SID", "abc123", PAST)),
     now: NOW,
   });
@@ -157,7 +153,7 @@ test("an empty partition with no usable file is not connected", () => {
   assert.equal(expired.expired, true);
   assert.match(expired.reason!, /expired/i);
 
-  const missing = resolveAuthState({ partitionSignedIn: false, fileText: null, now: NOW });
+  const missing = resolveAuthState({ fileText: null, now: NOW });
   assert.equal(missing.connected, false);
   assert.equal(missing.expired, false);
   assert.equal(missing.source, "none");
@@ -167,9 +163,8 @@ test("an empty partition with no usable file is not connected", () => {
 
 test("probe() sees an imported file, and leaves it alone", async () => {
   // The end of the same wire: youtubeSession.probe() is what the launch,
-  // focus and hourly refreshes call, and it is what kept logging
-  // connected=false. Electron is stubbed with an EMPTY partition, exactly
-  // the state an importing user is in.
+  // focus and hourly checks call, and it is what kept logging
+  // connected=false.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "yt-probe-"));
   const expiry = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30;
   const text = file(row("__Secure-3PSID", "abc123", expiry));
@@ -181,8 +176,7 @@ test("probe() sees an imported file, and leaves it alone", async () => {
     if (request === "electron") {
       return {
         app: { getPath: () => dir },
-        BrowserWindow: class {},
-        session: { fromPartition: () => ({ cookies: { get: async () => [] } }) },
+        session: { fromPartition: () => ({ clearStorageData: async () => {} }) },
       };
     }
     return load.call(this, request, ...rest);
@@ -196,23 +190,10 @@ test("probe() sees an imported file, and leaves it alone", async () => {
     assert.equal(result.source, "imported");
     assert.equal(result.path, cookieFile);
     assert.equal(result.expiresAt, expiry * 1000);
-    // The refresh must not write over the only sign-in the user has.
+    // The check must not write over the only session the user has.
     assert.equal(fs.readFileSync(cookieFile, "utf8"), text);
   } finally {
     (Module as unknown as { _load: Function })._load = load;
     fs.rmSync(dir, { recursive: true, force: true });
   }
-});
-
-test("the app's own session wins over whatever is on disk", () => {
-  // The partition is the one that can be refreshed, so a signed-in partition
-  // is connected even when the file it is about to be exported to is stale.
-  const state = resolveAuthState({
-    partitionSignedIn: true,
-    fileText: file(row("SID", "abc123", PAST)),
-    now: NOW,
-  });
-  assert.equal(state.connected, true);
-  assert.equal(state.source, "signed-in");
-  assert.equal(state.expired, false);
 });

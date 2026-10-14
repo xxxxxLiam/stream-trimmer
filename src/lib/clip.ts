@@ -46,9 +46,9 @@ export const COOKIE_BROWSERS = [
 
 export type CookieBrowser = (typeof COOKIE_BROWSERS)[number];
 
-// Where a verified YouTube session comes from. "app" is the session the user
-// signed into inside the app (a cookie file only yt-dlp reads); a browser name
-// is the fallback that reads that browser's own cookie store.
+// Where a verified YouTube session comes from. "app" is the cookies.txt the
+// user imported (a file only yt-dlp reads); a browser name is the secondary
+// route that reads that browser's own cookie store.
 export type AuthSource = "app" | CookieBrowser;
 
 // Server → client shape from POST /api/auth/youtube/status. "idle" and

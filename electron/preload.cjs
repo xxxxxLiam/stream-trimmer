@@ -33,27 +33,18 @@ try {
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.
     startDrag: (targetPath) => ipcRenderer.send("file:startDrag", targetPath),
-    // In-app YouTube sign-in. Cookie values never cross this bridge — the
-    // main process keeps them in its own session and writes them to a file
-    // only yt-dlp reads.
-    connectYouTube: () => ipcRenderer.invoke("youtube:connect"),
+    // The YouTube session, which is one imported cookies.txt. Cookie values
+    // never cross this bridge — the main process writes the file and only
+    // yt-dlp reads it, so the renderer sees booleans and a count.
     probeYouTube: () => ipcRenderer.invoke("youtube:probe"),
     disconnectYouTube: () => ipcRenderer.invoke("youtube:disconnect"),
-    // Adopts a cookies.txt the user exported from their own browser.
     importYouTubeCookies: () => ipcRenderer.invoke("youtube:importCookies"),
-    // Coarse sign-in progress, so the main window can show which stage the
-    // flow is in instead of one indefinite spinner.
-    onYouTubeProgress: (cb) => {
-      const listener = (_e, payload) => cb(payload);
-      ipcRenderer.on("youtube:progress", listener);
-      return () => ipcRenderer.removeListener("youtube:progress", listener);
-    },
-    // Fallback path: opens YouTube in the user's own browser so yt-dlp can
-    // read that browser's cookie store instead.
     // Diagnostics: reads the app's own local log so a crash can be reported.
     readDiagnostics: () => ipcRenderer.invoke("diagnostics:read"),
     revealDiagnostics: () => ipcRenderer.invoke("diagnostics:reveal"),
     copyDiagnostics: () => ipcRenderer.invoke("diagnostics:copy"),
+    // Secondary route: opens YouTube in the user's own browser, so yt-dlp can
+    // be pointed at that browser's cookie store instead of an imported file.
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
     getDefaultBrowser: () => ipcRenderer.invoke("system:defaultBrowser"),
     getBrowserOrder: (saved) => ipcRenderer.invoke("system:browserOrder", saved),

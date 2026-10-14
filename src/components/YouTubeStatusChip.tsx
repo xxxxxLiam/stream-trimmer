@@ -2,7 +2,7 @@
  * File: YouTubeStatusChip.tsx
  * Path: src/components/YouTubeStatusChip.tsx
  * Description: Compact top-bar chip showing the shared YouTube connection
- * state, with a menu to re-check or sign out of the stored session.
+ * state, with a menu to re-check or drop the stored cookies.txt.
  */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -47,7 +47,7 @@ export default function YouTubeStatusChip() {
         title={
           connected
             ? source === "app"
-              ? "Signed in inside the app — stays signed in across restarts"
+              ? "Using your imported cookies.txt — stays connected across restarts"
               : `Using your ${source} browser session`
             : "Connect YouTube to unlock 1080p+ downloads"
         }
@@ -105,7 +105,7 @@ export default function YouTubeStatusChip() {
               void signOut();
             }}
           >
-            Sign out of YouTube
+            Disconnect YouTube
           </button>
         </div>
       ) : null}

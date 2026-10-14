@@ -9,7 +9,6 @@ const {
   dialog,
   ipcMain,
   nativeImage,
-  net: electronNet,
   shell,
 } = require("electron");
 const path = require("node:path");
@@ -85,55 +84,6 @@ function loadSettings() {
 }
 
 let serverHandle = null; // { close(cb) } returned by the bundled server
-// Loopback port the bundled backend listens on. Needed by verifyCookieFile,
-// which asks the backend (and therefore yt-dlp) whether a saved sign-in is
-// actually accepted by YouTube.
-let backendPort = null;
-
-// Verifies a freshly exported cookie file for real: the backend runs yt-dlp
-// against YouTube with `--cookies <file>` and reports what it found. Returns
-// { ok, message } so the sign-in window can stay open with the true reason.
-async function verifyCookieFile(file) {
-  if (!file || !fs.existsSync(file)) {
-    return { ok: false, message: "No cookie file was written." };
-  }
-  if (!backendPort) {
-    return { ok: false, message: "The local engine is not running yet." };
-  }
-  try {
-    logger.log("youtube", "verify: asking the local engine");
-    // Electron's net.fetch, not Node's global fetch: it is the supported
-    // main-process HTTP client and goes through Chromium's stack.
-    const res = await electronNet.fetch(
-      `http://127.0.0.1:${backendPort}/api/auth/youtube/status`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ browser: "app" }),
-        signal: AbortSignal.timeout(60000),
-      },
-    );
-    const text = await res.text();
-    let data = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      logger.log("youtube", `verify: non-JSON reply status=${res.status}`);
-      return { ok: false, message: "The local engine returned an unexpected reply." };
-    }
-    logger.log("youtube", `verify: status=${data && data.status}`);
-    return {
-      ok: Boolean(data && data.status === "signed_in"),
-      message: (data && (data.message || data.reason)) || undefined,
-    };
-  } catch (err) {
-    logger.log("youtube", `verify failed: ${logger.describe(err)}`);
-    return {
-      ok: false,
-      message: err && err.message ? err.message : "Verification failed.",
-    };
-  }
-}
 
 function sendUpdateStatus(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -234,8 +184,8 @@ async function startBackend() {
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
   process.env.ELECTRON_USER_DATA = app.getPath("userData");
-  // Where the in-app sign-in stores its cookies. The backend resolves the
-  // path from here and never accepts it from the renderer.
+  // Where the imported cookies.txt lives. The backend resolves the path from
+  // here and never accepts it from the renderer.
   process.env.YT_CLIPPER_COOKIE_FILE = youtubeSession.cookieFilePath();
 
   // Serve the built UI from the same local server so the window loads over
@@ -274,7 +224,6 @@ async function startBackend() {
   // The bundled server exports a { server } object (see scripts/build-server.cjs).
   const mod = require(bundledServer);
   serverHandle = mod && mod.server ? mod.server : null;
-  backendPort = port;
   return port;
 }
 
@@ -359,37 +308,46 @@ async function createWindow(port) {
 }
 
 
-// Keeps the exported cookie file in step with the app's own YouTube session,
-// so a session that is still alive never reads as expired. Local only — this
-// reads Electron's own cookie jar and writes a file; it makes no network call.
-let cookieRefreshTimer = null;
-const COOKIE_REFRESH_MS = 60 * 60 * 1000;
+// Notices when the imported cookies.txt has run out, while the app is open.
+//
+// There is nothing left to refresh: the file is the session, and the app has
+// no way to renew it — the user re-exports one when it expires. What this
+// still buys is the log line. An expired file otherwise shows up as a
+// download that quietly comes back at 360p, hours after the expiry, with
+// nothing in the diagnostics saying why. Read-only, and no network call.
+let cookieCheckTimer = null;
+const COOKIE_CHECK_MS = 60 * 60 * 1000;
 
-let lastCookieRefresh = 0;
-const COOKIE_REFRESH_MIN_GAP_MS = 60 * 1000;
+let lastCookieCheck = 0;
+const COOKIE_CHECK_MIN_GAP_MS = 60 * 1000;
 
-function refreshCookieFile(why) {
-  // The sign-in window runs its own export loop; a second one racing it only
-  // risks writing the cookie file from two places at once.
-  if (youtubeSession.isSigningIn()) return;
+function checkCookieFile(why) {
+  // Focus fires in bursts — alt-tab, a dialog closing, the updater toast —
+  // so without a floor one window switch re-reads the file several times.
   const now = Date.now();
-  if (now - lastCookieRefresh < COOKIE_REFRESH_MIN_GAP_MS) return;
-  lastCookieRefresh = now;
-  logger.log("youtube", `cookie refresh (${why}) starting`);
+  if (now - lastCookieCheck < COOKIE_CHECK_MIN_GAP_MS) return;
+  lastCookieCheck = now;
   youtubeSession
     .probe()
-    .then((r) => logger.log("youtube", `cookie refresh (${why}) connected=${!!r.connected}`))
+    .then((r) =>
+      logger.log(
+        "youtube",
+        `cookie check (${why}) connected=${!!r.connected} source=${r.source}${
+          r.expired ? " expired" : ""
+        }`,
+      ),
+    )
     .catch((err) =>
-      logger.log("youtube", `cookie refresh (${why}) failed: ${logger.describe(err)}`),
+      logger.log("youtube", `cookie check (${why}) failed: ${logger.describe(err)}`),
     );
 }
 
-function startCookieRefresh() {
-  refreshCookieFile("launch");
-  if (cookieRefreshTimer) clearInterval(cookieRefreshTimer);
-  cookieRefreshTimer = setInterval(() => refreshCookieFile("timer"), COOKIE_REFRESH_MS);
-  cookieRefreshTimer.unref?.();
-  app.on("browser-window-focus", () => refreshCookieFile("focus"));
+function startCookieChecks() {
+  checkCookieFile("launch");
+  if (cookieCheckTimer) clearInterval(cookieCheckTimer);
+  cookieCheckTimer = setInterval(() => checkCookieFile("timer"), COOKIE_CHECK_MS);
+  cookieCheckTimer.unref?.();
+  app.on("browser-window-focus", () => checkCookieFile("focus"));
 }
 
 // A clip handed to the renderer but never saved (a crash, a quit mid-save)
@@ -439,7 +397,7 @@ app.whenReady().then(async () => {
     await createWindow(port);
     logger.watchWindow("main", mainWindow);
     sweepStaleClips();
-    startCookieRefresh();
+    startCookieChecks();
     setupAutoUpdater();
   } catch (err) {
     logger.log("app", `failed to start: ${logger.describe(err)}`);
@@ -449,9 +407,10 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  // Defensive: the sign-in window closing has previously coincided with the
-  // whole app disappearing. If the main window is still alive, this event is
-  // spurious and must not be read as "the user quit".
+  // Defensive: a secondary window closing — the splash, on a slow launch —
+  // has previously coincided with the whole app disappearing. If the main
+  // window is still alive, this event is spurious and must not be read as
+  // "the user quit".
   if (mainWindow && !mainWindow.isDestroyed()) {
     logger.log("app", "window-all-closed ignored — main window still alive");
     return;
@@ -687,45 +646,9 @@ function registerIpc() {
     }
   });
 
-  // In-app sign-in: opens a real YouTube login window in the app's own
-  // persistent session and exports those cookies to a file yt-dlp can use.
-  // Cookie values never reach the renderer — only a boolean.
-  ipcMain.handle("youtube:connect", async () => {
-    logger.log("youtube", "connect: requested");
-    try {
-      const result = await youtubeSession.openLoginWindow(
-        mainWindow,
-        (file) => verifyCookieFile(file),
-        (msg) => logger.log("youtube", msg),
-        (phase) => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send("youtube:progress", { phase });
-          }
-        },
-      );
-      logger.log(
-        "youtube",
-        `connect: finished connected=${!!result.connected} cancelled=${!!result.cancelled}`,
-      );
-      return {
-        connected: !!result.connected,
-        cancelled: !!result.cancelled,
-        error: result.error,
-      };
-    } catch (err) {
-      // A sign-in problem returns a normal failure to the UI; it never
-      // escapes and takes the app with it.
-      logger.log("youtube", `connect: threw ${logger.describe(err)}`);
-      return {
-        connected: false,
-        cancelled: false,
-        error: err && err.message ? err.message : "Sign-in failed",
-      };
-    }
-  });
-
-  // Cheap, offline check plus a cookie-file refresh so the session rolls
-  // forward from the app's own storage on every launch.
+  // Cheap, offline read of the imported cookies.txt. Says whether a session
+  // is on disk at all; whether YouTube still accepts it is the engine's
+  // /api/auth/youtube/status check, which costs a real request.
   ipcMain.handle("youtube:probe", async () => {
     try {
       const result = await youtubeSession.probe();
