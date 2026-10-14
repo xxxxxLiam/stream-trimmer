@@ -14,6 +14,7 @@ const {
   isSupersededNavigation,
 } = require("./navigation.cjs");
 const { isSignInRejected, validateCookieText } = require("./cookieFile.cjs");
+const { resolveAuthState } = require("./cookieState.cjs");
 
 const PARTITION = "persist:youtube";
 const SIGNIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube";
@@ -115,6 +116,11 @@ let exportQueue = Promise.resolve(false);
 
 async function writeCookieFile() {
   const cookies = await readAuthCookies();
+  // Bailing out on an empty partition is what protects an imported
+  // cookies.txt: the partition is empty for everyone who imported one, and a
+  // write here would replace their working file with a cookie-less stub —
+  // the refresh that runs on every launch and window focus would silently
+  // destroy the only sign-in they have.
   if (!hasAuth(cookies)) return false;
   const target = cookieFilePath();
   const tmp = `${target}.tmp`;
@@ -136,21 +142,51 @@ function exportCookieFile() {
   return exportQueue;
 }
 
-/** Cheap check used on launch — no network call. */
+/** Reads the cookie file as text, or null when there is no file to read. */
+async function readCookieFileText() {
+  try {
+    return await fsp.readFile(cookieFilePath(), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cheap check used on launch — no network call.
+ *
+ * Reports on both places a session can live: the app's own partition, and a
+ * cookies.txt the user imported. Only the partition is ever exported to disk;
+ * an imported file is read and left exactly as it is.
+ *
+ * Returns { connected, path } plus source / expiresAt / expired for callers
+ * that want to say more than yes-or-no.
+ */
 async function probe() {
   try {
     const cookies = await readAuthCookies();
-    const connected = hasAuth(cookies);
-    if (connected) await exportCookieFile();
+    const partitionSignedIn = hasAuth(cookies);
+    // Export first, so the file this then reads is the fresh one.
+    if (partitionSignedIn) await exportCookieFile();
     const filePath = cookieFilePath();
+    const state = resolveAuthState({
+      partitionSignedIn,
+      fileText: await readCookieFileText(),
+    });
     return {
-      connected: connected && fs.existsSync(filePath),
-      path: connected ? filePath : null,
+      connected: state.connected && fs.existsSync(filePath),
+      path: state.connected ? filePath : null,
+      source: state.source,
+      expiresAt: state.expiresAt,
+      expired: state.expired,
+      reason: state.reason,
     };
   } catch (err) {
     return {
       connected: false,
       path: null,
+      source: "none",
+      expiresAt: null,
+      expired: false,
       error: err && err.message ? err.message : "Probe failed",
     };
   }

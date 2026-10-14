@@ -64,7 +64,12 @@ export type YouTubeAuthState =
   | "locked"
   | "decrypt_failed"
   | "timeout"
-  | "extractor_error";
+  | "extractor_error"
+  // YouTube is throttling this network. Says nothing about the session, and
+  // re-authenticating cannot clear it.
+  | "rate_limited"
+  // The check ran but found no marker either way. Not a failure.
+  | "inconclusive";
 
 export interface YouTubeAuthStatus {
   status: Exclude<YouTubeAuthState, "idle" | "ready" | "checking">;

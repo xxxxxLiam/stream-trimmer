@@ -477,7 +477,12 @@ export async function sweepBrowsers(): Promise<boolean> {
     }
     // YouTube itself is the problem, not this browser — every remaining one
     // would fail identically, so stop rather than grinding through them.
-    if (result.status === "probe_unavailable") {
+    // Throttling is the same situation and worse to grind on: each extra
+    // browser spends more of the quota that already ran out.
+    if (
+      result.status === "probe_unavailable" ||
+      result.status === "rate_limited"
+    ) {
       markFailed(result, browser);
       return false;
     }
