@@ -217,7 +217,13 @@ export function useClipper() {
       const res = await fetch(apiUrl("/api/comments"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: normalizeYouTubeUrl(url) }),
+        // Metadata, captions and comments need the session as much as the
+        // download does — without it YouTube answers "Sign in to confirm
+        // you're not a bot" and the app looks signed out when it isn't.
+        body: JSON.stringify({
+          url: normalizeYouTubeUrl(url),
+          ...cookiePayload(),
+        }),
       });
       const data = await parseJson<CommentsResponse & { error?: string }>(res);
       if (!res.ok) throw new Error(data.error || "Failed to fetch comments");
@@ -355,7 +361,13 @@ export function useClipper() {
       const res = await fetch(apiUrl("/api/info"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: normalizeYouTubeUrl(url) }),
+        // Metadata, captions and comments need the session as much as the
+        // download does — without it YouTube answers "Sign in to confirm
+        // you're not a bot" and the app looks signed out when it isn't.
+        body: JSON.stringify({
+          url: normalizeYouTubeUrl(url),
+          ...cookiePayload(),
+        }),
       });
       const data = await parseJson<VideoInfo & { error?: string }>(res);
       if (!res.ok) throw new Error(data.error || "Failed to load video info");
@@ -415,7 +427,13 @@ export function useClipper() {
       const res = await fetch(apiUrl("/api/transcript"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: normalizeYouTubeUrl(url) }),
+        // Metadata, captions and comments need the session as much as the
+        // download does — without it YouTube answers "Sign in to confirm
+        // you're not a bot" and the app looks signed out when it isn't.
+        body: JSON.stringify({
+          url: normalizeYouTubeUrl(url),
+          ...cookiePayload(),
+        }),
       });
       const data = await parseJson<TranscriptResponse>(res);
       setTranscript(data.available ? data.lines : []);

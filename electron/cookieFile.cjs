@@ -6,8 +6,14 @@
  * so both can be tested.
  */
 
-// Any one of these, with a value, means a usable signed-in YouTube session.
-const AUTH_COOKIES = ["SID", "__Secure-3PSID", "__Secure-1PSID"];
+// The Netscape parsing itself lives in cookieState.cjs, which also reads the
+// sign-in's expiry out of a file. Both must agree on what counts as a
+// sign-in, so there is exactly one copy of the rules.
+const {
+  AUTH_COOKIES,
+  isRelevantDomain,
+  parseCookieRows,
+} = require("./cookieState.cjs");
 
 /**
  * True when a navigation landed on Google's "Couldn't sign you in — this
@@ -37,6 +43,11 @@ function isSignInRejected(url) {
  * another process. Exporting from inside the browser sidesteps both, because
  * the browser does its own decryption.
  *
+ * Expiry is deliberately NOT checked here: this gate decides whether a file
+ * is worth adopting at all, and refusing an import outright over a date is a
+ * worse outcome than adopting it and reporting it as expired afterwards —
+ * readCookieFileState in cookieState.cjs is what answers that question.
+ *
  * Returns { ok, reason } — never throws.
  */
 function validateCookieText(text) {
@@ -45,13 +56,7 @@ function validateCookieText(text) {
     return { ok: false, reason: "That file is empty." };
   }
 
-  const rows = raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
-    // Netscape format: domain, includeSubdomains, path, secure, expiry, name, value
-    .map((line) => line.split("\t"))
-    .filter((cols) => cols.length >= 7);
+  const rows = parseCookieRows(raw);
 
   if (rows.length === 0) {
     return {
@@ -61,9 +66,7 @@ function validateCookieText(text) {
     };
   }
 
-  const relevant = rows.filter((cols) =>
-    /(^|\.)(youtube\.com|google\.com)$/i.test(cols[0].replace(/^\./, ".")),
-  );
+  const relevant = rows.filter((row) => isRelevantDomain(row.domain));
   if (relevant.length === 0) {
     return {
       ok: false,
@@ -73,7 +76,7 @@ function validateCookieText(text) {
   }
 
   const signedIn = relevant.some(
-    (cols) => AUTH_COOKIES.includes(cols[5]) && cols[6] && cols[6].length > 0,
+    (row) => AUTH_COOKIES.includes(row.name) && row.value && row.value.length > 0,
   );
   if (!signedIn) {
     return {

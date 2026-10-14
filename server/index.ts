@@ -23,6 +23,8 @@ import { z } from "zod";
 import dargs from "dargs";
 import ffmpegPath from "ffmpeg-static";
 import {
+  AUTH_PROBE_URLS,
+  authProbeVerdict,
   classifyYouTubeAuthOutput,
   type YouTubeAuthProbeStatus,
 } from "./youtubeAuth";
@@ -334,8 +336,6 @@ const urlSchema = z
   .url()
   .refine((v) => /youtube\.com|youtu\.be/.test(v), "URL must be a YouTube link");
 
-const infoSchema = z.object({ url: urlSchema });
-
 // Browsers yt-dlp can read a logged-in YouTube session from. Only the browser
 // name ever crosses the API; cookie contents never touch this process.
 const cookieBrowserSchema = z.enum([
@@ -351,6 +351,15 @@ const cookieBrowserSchema = z.enum([
 // path is never accepted from the client; it is resolved here from the path
 // Electron hands the server at startup.
 const authSourceSchema = z.union([z.literal("app"), cookieBrowserSchema]);
+
+// Metadata, transcripts and comments all need the signed-in session just as
+// much as the download does. Without it YouTube answers "Sign in to confirm
+// you're not a bot" for a signed-out IP, which read in the UI as the app
+// having lost a sign-in it was actually still holding.
+const infoSchema = z.object({
+  url: urlSchema,
+  cookiesFromBrowser: authSourceSchema.optional(),
+});
 
 export function appCookieFile(): string | null {
   const target = process.env.YT_CLIPPER_COOKIE_FILE;
@@ -629,6 +638,7 @@ app.post("/api/info", async (req: Request, res: Response) => {
     dumpSingleJson: true,
     noWarnings: true,
     noPlaylist: true,
+    ...resolveCookieOptions(parsed.data.cookiesFromBrowser),
   };
   try {
     console.log(
@@ -675,6 +685,7 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
     noWarnings: true,
     output: path.join(tempDir, "sub"),
     ffmpegLocation: resolvedFfmpeg,
+    ...resolveCookieOptions(parsed.data.cookiesFromBrowser),
   };
   try {
     console.log(
@@ -716,17 +727,6 @@ type CookieBrowserName = z.infer<typeof cookieBrowserSchema>;
 // Timing out there reports a perfectly good session as unverified, so the
 // ceiling sits well above the slow case; callers cap themselves above this.
 const AUTH_PROBE_TIMEOUT_MS = 40_000;
-// More than one, because the probe proves a sign-in by fetching a video and
-// any single video can be pulled, made private or blocked in a country. When
-// that happens the fetch fails for a reason that has nothing to do with the
-// user's cookies, so the probe moves to the next one rather than calling a
-// perfectly good session signed-out.
-const AUTH_PROBE_URLS = [
-  "https://www.youtube.com/watch?v=BaW_jenozKc", // yt-dlp's own test video
-  "https://www.youtube.com/watch?v=jNQXAC9IVRw", // "Me at the zoo"
-  "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-];
-
 type AuthSourceName = CookieBrowserName | "app";
 
 function authProbeMessage(
@@ -737,6 +737,10 @@ function authProbeMessage(
     if (status === "signed_in") return undefined;
     if (status === "probe_unavailable")
       return "YouTube wouldn't play any of the videos used to check the connection. Your sign-in is probably fine — try again in a moment.";
+    if (status === "rate_limited")
+      return "YouTube is rate-limiting this network, not rejecting your sign-in. Wait a few minutes and try again — re-importing cookies won't help.";
+    if (status === "inconclusive")
+      return undefined;
     if (status === "signed_out")
       return "Your saved YouTube sign-in has expired. Sign in again, or import a fresh cookies.txt.";
     if (status === "timeout")
@@ -745,6 +749,9 @@ function authProbeMessage(
   }
   if (status === "probe_unavailable")
     return "YouTube wouldn't play any of the videos used to check the connection, so this says nothing about your sign-in. Try again in a moment.";
+  if (status === "rate_limited")
+    return "YouTube is rate-limiting this network, not rejecting your sign-in. Wait a few minutes and try again.";
+  if (status === "inconclusive") return undefined;
   const label = source[0].toUpperCase() + source.slice(1);
   if (status === "signed_out")
     return `No YouTube account cookies were found in ${label}.`;
@@ -840,9 +847,15 @@ async function probeYouTubeAuth(
   };
   for (const url of AUTH_PROBE_URLS) {
     last = await probeOnce(url, cookieOptions, onChild);
-    // Anything but a dead probe target is an answer about the session.
-    if (last.status !== "probe_unavailable") return last;
-    console.log(`[server] auth probe target unusable, trying the next one`);
+    // A dead probe target says nothing about the session, and neither does a
+    // run whose output carried no recognisable marker — try the next video
+    // before letting either stand as the verdict.
+    if (last.status !== "probe_unavailable" && last.status !== "inconclusive") {
+      return last;
+    }
+    console.log(
+      `[server] auth probe ${last.status} on this target, trying the next one`,
+    );
   }
   return last;
 }
@@ -920,12 +933,28 @@ app.post("/api/download", async (req: Request, res: Response) => {
       });
     }
     const auth = await probeYouTubeAuth(cookieOptions, () => undefined);
-    if (auth.status !== "signed_in") {
+    const verdict = authProbeVerdict(auth.status);
+    if (verdict === "rate_limited") {
+      return res.status(429).json({
+        code: "YOUTUBE_RATE_LIMITED",
+        error:
+          "YouTube is rate-limiting this network. Wait a few minutes and try again — your sign-in is fine, re-importing cookies won't help.",
+        reason: auth.reason,
+      });
+    }
+    if (verdict === "blocked") {
       return res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
         error: "Your YouTube connection is no longer valid. Connect again.",
         reason: auth.reason,
       });
+    }
+    if (auth.status !== "signed_in") {
+      // Couldn't confirm, but nothing says the session is bad. Proceed and
+      // let yt-dlp produce a real error if it genuinely cannot authenticate.
+      console.log(
+        `[server] /api/download proceeding on an unconfirmed session (${auth.status})`,
+      );
     }
   }
 
@@ -1460,6 +1489,7 @@ app.post("/api/comments", async (req: Request, res: Response) => {
     // Fetch every top-level comment and every reply. `all` avoids yt-dlp's
     // default cap so nothing is truncated on large videos.
     extractorArgs: "youtube:comment_sort=top;max_comments=all,all,all,all",
+    ...resolveCookieOptions(parsed.data.cookiesFromBrowser),
   };
   try {
     console.log(
