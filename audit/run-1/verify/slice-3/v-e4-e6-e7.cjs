@@ -163,16 +163,22 @@ async function runShape(shape, out) {
   const prog = await L.req({ port: a.port, path: "/api/channel/export/progress?jobId=verify-attacker-1", timeout: 4000 });
   s.E4_progressCall = { status: prog.status, contentType: prog.headers && prog.headers["content-type"], body: (prog.body || "").slice(0, 160) };
 
+  // Audit the bytes the SERVER wrote, straight out of its own output folder.
+  if (body && body.dir && fs.existsSync(body.dir)) {
+    s.E7_csv_serverFolder = auditCsvFolder(body.dir);
+  }
+
   // Can a page script then write the CSVs anywhere it likes, via the bridge?
-  if (body && body.paths) {
+  const outFiles = body && (body.files || body.paths);
+  if (outFiles) {
     const target = `/tmp/v3-e4-steal-${shape}`;
     fs.rmSync(target, { recursive: true, force: true });
     s.E4_saveExport = await a.win.evaluate(async (args) => {
       try {
-        return await window.electronAPI.saveExport({ dirPath: args.dir, folderName: "stolen-channel-data", files: args.files });
+        return await window.electronAPI.saveExport({ dirPath: args.dir, folder: "verify-exfil-copy", files: args.files });
       } catch (e) { return { ok: false, error: String(e && e.message) }; }
-    }, { dir: target, files: body.paths });
-    const landed = path.join(target, "stolen-channel-data");
+    }, { dir: target, files: outFiles });
+    const landed = path.join(target, "verify-exfil-copy");
     s.E4_filesOnDisk = fs.existsSync(landed) ? fs.readdirSync(landed) : [];
     if (s.E4_filesOnDisk.length) s.E7_csv = auditCsvFolder(landed);
   }
@@ -203,8 +209,9 @@ async function runShape(shape, out) {
     progressStatus: s.E4_progressCall.status,
     savedFiles: s.E4_filesOnDisk,
     ownerCheck: s.E6,
-    formulaCells: s.E7_csv ? s.E7_csv.formulaCells.length : null,
-    formulaColumns: s.E7_csv ? s.E7_csv.formulaColumns : null,
+    formulaCells: s.E7_csv_serverFolder ? s.E7_csv_serverFolder.formulaCells.length : null,
+    formulaColumns: s.E7_csv_serverFolder ? s.E7_csv_serverFolder.formulaColumns : null,
+    savedCopyFormulaCells: s.E7_csv ? s.E7_csv.formulaCells.length : null,
   }));
   console.log(JSON.stringify(out.summary, null, 2));
   console.log(L.save(`v-e467-${which}-${runLabel}.json`, out));
