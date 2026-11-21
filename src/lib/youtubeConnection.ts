@@ -37,6 +37,81 @@ export interface YouTubeConnectionState {
   restoring: boolean;
   /** Whether a cookies.txt can be imported at all (desktop build only). */
   canImport: boolean;
+  /** Epoch ms the imported sign-in runs out, or null (session cookies, or unknown). */
+  expiresAt: number | null;
+  /** The saved sign-in is on disk but past its date, or YouTube rejected it. */
+  expired: boolean;
+  /**
+   * Something went wrong that is NOT the sign-in (rate limit, YouTube not
+   * answering). Re-importing cookies does not fix it, so it is kept apart from
+   * `message`, which the connect screen treats as "your sign-in failed".
+   */
+  notice?: string;
+}
+
+/** The four states the user is ever shown. `checking` is transient. */
+export type SessionStatus =
+  | "signed_in"
+  | "expiring_soon"
+  | "expired"
+  | "not_signed_in"
+  | "checking";
+
+export const EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const SESSION_LABEL: Record<Exclude<SessionStatus, "checking">, string> = {
+  signed_in: "Signed in",
+  expiring_soon: "Signed in, expires soon",
+  expired: "Sign-in expired",
+  not_signed_in: "Not signed in",
+};
+
+/** Pure: what to tell the user, from the connection state and the clock. */
+export function deriveSessionStatus(
+  s: Pick<YouTubeConnectionState, "connected" | "expired" | "expiresAt" | "restoring" | "busy" | "probed">,
+  now: number = Date.now(),
+): SessionStatus {
+  if (s.restoring || (s.busy && !s.probed)) return "checking";
+  if (s.connected) {
+    if (s.expiresAt !== null && s.expiresAt <= now) return "expired";
+    if (s.expiresAt !== null && s.expiresAt - now <= EXPIRY_WARNING_MS) return "expiring_soon";
+    return "signed_in";
+  }
+  return s.expired ? "expired" : "not_signed_in";
+}
+
+/** "Fri 12 Mar 2027": the day it stops working, in the user's own locale. */
+export function formatExpiryDay(expiresAt: number): string {
+  try {
+    return new Date(expiresAt).toLocaleDateString(undefined, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return new Date(expiresAt).toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Why a download came back at 360p, and the one fix. Null when the session is
+ * healthy, so a 360p result is then not explained by sign-in at all. Callers
+ * show this INSTEAD of silently handing over a 360p file.
+ */
+export function lowQualityExplanation(
+  status: SessionStatus,
+): { message: string; action: string } | null {
+  if (status === "signed_in" || status === "expiring_soon" || status === "checking") {
+    return null;
+  }
+  return {
+    message:
+      status === "expired"
+        ? "Only 360p was offered because your saved YouTube sign-in has expired. YouTube serves higher formats to signed-in requests."
+        : "Only 360p was offered because you are not signed in to YouTube. YouTube serves higher formats to signed-in requests.",
+    action: "Re-import cookies.txt",
+  };
 }
 
 export interface CookiePayload {
@@ -47,8 +122,32 @@ function isCookieBrowser(value: unknown): value is CookieBrowser {
   return typeof value === "string" && COOKIE_BROWSERS.includes(value as CookieBrowser);
 }
 
+/**
+ * Desktop bridge members this module needs beyond what vite-env.d.ts declares.
+ * `probeYouTube` carries the saved file's expiry only once the main-process
+ * handler forwards it; `importYouTubeCookiesText` needs its own IPC. Both are
+ * optional here so an older build degrades instead of throwing.
+ */
+interface StoredProbe {
+  connected: boolean;
+  error?: string;
+  expiresAt?: number | null;
+  expired?: boolean;
+}
+interface CookieBridge {
+  importYouTubeCookiesText?: (
+    text: string,
+  ) => Promise<{ ok: boolean; count?: number; error?: string; kind?: string }>;
+}
+
 function electron() {
-  return typeof window === "undefined" ? undefined : window.electronAPI;
+  return typeof window === "undefined"
+    ? undefined
+    : (window.electronAPI as (NonNullable<Window["electronAPI"]> & CookieBridge) | undefined);
+}
+
+async function probeStored(): Promise<StoredProbe | undefined> {
+  return (await electron()?.probeYouTube?.()) as StoredProbe | undefined;
 }
 
 /** The cookie file lives in the main process, so it only exists on desktop. */
@@ -80,6 +179,8 @@ let state: YouTubeConnectionState = {
   probed: false,
   restoring: hasCookieFile(),
   canImport: hasCookieFile(),
+  expiresAt: null,
+  expired: false,
 };
 
 const listeners = new Set<() => void>();
@@ -160,6 +261,11 @@ async function checkSource(source: AuthSource): Promise<ProbeResult> {
   }
 }
 
+const EXPIRED_MESSAGE = (expiresAt: number | null) =>
+  expiresAt
+    ? `Your YouTube sign-in expired on ${formatExpiryDay(expiresAt)}. Import a fresh cookies.txt to get 1080p again.`
+    : "Your saved YouTube sign-in has expired. Import a fresh cookies.txt to get 1080p again.";
+
 function failureMessage(result: ProbeResult, source: AuthSource): string {
   if (result.message) return result.message;
   if (source === "app") {
@@ -180,10 +286,47 @@ function markConnected(source: AuthSource) {
     reason: undefined,
     probed: true,
     restoring: false,
+    expired: false,
+    notice: undefined,
   });
 }
 
-function markFailed(result: ProbeResult, source: AuthSource) {
+/** YouTube answered, but not about the sign-in. These never mean "expired". */
+const NOT_ABOUT_SIGN_IN: ReadonlySet<YouTubeAuthState> = new Set([
+  "rate_limited",
+  "probe_unavailable",
+  "timeout",
+  "inconclusive",
+]);
+
+/**
+ * `hadFile`: a cookies.txt was on disk when the check ran, so a rejection means
+ * that sign-in EXPIRED rather than that there never was one.
+ */
+function markFailed(result: ProbeResult, source: AuthSource, hadFile = false) {
+  // Rate limiting (and YouTube simply not answering) says nothing about the
+  // session. Dropping the sign-in here would send the user to re-import a
+  // perfectly good file, which cannot help. Stay signed in and say what it is.
+  if (source === "app" && hadFile && NOT_ABOUT_SIGN_IN.has(result.status)) {
+    set({
+      connected: true,
+      source,
+      browserStatus: result.status,
+      busy: false,
+      step: undefined,
+      message: undefined,
+      notice:
+        result.message ??
+        (result.status === "rate_limited"
+          ? "YouTube is rate-limiting this network, not rejecting your sign-in. Wait a few minutes and try again. Re-importing cookies will not help."
+          : "YouTube did not answer the check. Your sign-in is probably fine; try again in a moment."),
+      reason: result.reason,
+      probed: true,
+      restoring: false,
+    });
+    return;
+  }
+  const rejected = source === "app" && hadFile && !NOT_ABOUT_SIGN_IN.has(result.status);
   set({
     connected: false,
     source,
@@ -191,10 +334,34 @@ function markFailed(result: ProbeResult, source: AuthSource) {
     busy: false,
     step: undefined,
     message: failureMessage(result, source),
+    notice: undefined,
     reason: result.reason,
     probed: true,
     restoring: false,
+    expired: rejected ? true : state.expired,
   });
+}
+
+/** Cheap, offline: reads the saved file's expiry from the main process. */
+async function readStoredExpiry(): Promise<void> {
+  try {
+    const stored = await probeStored();
+    if (!stored) return;
+    set({
+      expiresAt: typeof stored.expiresAt === "number" ? stored.expiresAt : null,
+      expired: Boolean(stored.expired) || (state.expired && !stored.connected),
+    });
+  } catch {
+    /* the chip then simply has no date to show */
+  }
+}
+
+/**
+ * Re-reads the saved file's date. The chip calls this on focus and hourly so
+ * that an approaching expiry is announced without any network request.
+ */
+export function refreshSessionStatus(): Promise<void> {
+  return hasCookieFile() ? readStoredExpiry() : Promise.resolve();
 }
 
 /**
@@ -213,7 +380,8 @@ export async function restoreConnection(): Promise<boolean> {
   }
   set({ restoring: true, busy: true, step: "Checking your YouTube cookies…" });
   try {
-    const stored = await api.probeYouTube();
+    const stored = (await probeStored()) ?? { connected: false };
+    const expiresAt = typeof stored.expiresAt === "number" ? stored.expiresAt : null;
     if (!stored.connected) {
       set({
         connected: false,
@@ -221,19 +389,22 @@ export async function restoreConnection(): Promise<boolean> {
         step: undefined,
         restoring: false,
         probed: true,
-        browserStatus: "idle",
-        message: undefined,
+        browserStatus: stored.expired ? "signed_out" : "idle",
+        message: stored.expired ? EXPIRED_MESSAGE(expiresAt) : undefined,
+        expiresAt,
+        expired: Boolean(stored.expired),
       });
       await initBrowserSelection();
       return false;
     }
+    set({ expiresAt, expired: false });
     const result = await checkSource("app");
     if (result.status === "signed_in") {
       markConnected("app");
       return true;
     }
-    markFailed(result, "app");
-    return false;
+    markFailed(result, "app", true);
+    return state.connected;
   } catch {
     set({ busy: false, step: undefined, restoring: false, probed: true });
     return false;
@@ -271,14 +442,59 @@ export async function importCookies(): Promise<boolean> {
     }
     // The check runs yt-dlp against YouTube for real, so it is slow enough
     // that the button must stop saying "Reading the cookies file…".
-    set({ step: "Checking those cookies with YouTube…" });
-    const verified = await checkSource("app");
-    if (verified.status === "signed_in") {
-      markConnected("app");
-      return true;
-    }
-    markFailed(verified, "app");
+    return await verifyImported();
+  } catch (error) {
+    set({
+      busy: false,
+      step: undefined,
+      probed: true,
+      message: error instanceof Error ? error.message : "Import failed.",
+    });
     return false;
+  }
+}
+
+/** Verifies a just-imported file with a real request, then records its expiry. */
+async function verifyImported(): Promise<boolean> {
+  // The check runs yt-dlp against YouTube for real, so it is slow enough
+  // that the button must stop saying "Reading the cookies file…".
+  set({ step: "Checking those cookies with YouTube…", expired: false });
+  await readStoredExpiry();
+  const verified = await checkSource("app");
+  if (verified.status === "signed_in") {
+    markConnected("app");
+    return true;
+  }
+  markFailed(verified, "app", true);
+  return state.connected;
+}
+
+/**
+ * Adopts a cookies.txt dropped on the window. The renderer reads the text and
+ * hands it to the main process, which validates with cookieFile.cjs and
+ * commits atomically. Needs `importYouTubeCookiesText` in the preload.
+ */
+export async function importDroppedCookies(file: File): Promise<boolean> {
+  const api = electron();
+  if (!api?.importYouTubeCookiesText) {
+    set({
+      message:
+        "Dropping a file needs a newer version of the app. Use Choose cookies.txt instead.",
+    });
+    return false;
+  }
+  set({ busy: true, step: "Reading the cookies file…", message: undefined, notice: undefined, reason: undefined });
+  try {
+    if (file.size > 5 * 1024 * 1024) {
+      set({ busy: false, step: undefined, probed: true, message: "That file is too large to be a cookies.txt (over 5 MB)." });
+      return false;
+    }
+    const result = await api.importYouTubeCookiesText(await file.text());
+    if (!result.ok) {
+      set({ busy: false, step: undefined, probed: true, message: result.error || "That file couldn't be used." });
+      return false;
+    }
+    return await verifyImported();
   } catch (error) {
     set({
       busy: false,
@@ -300,6 +516,9 @@ export async function signOut(): Promise<void> {
   }
   writeSetting(SOURCE_KEY, null);
   set({
+    expiresAt: null,
+    expired: false,
+    notice: undefined,
     connected: false,
     source: hasCookieFile() ? "app" : state.browser,
     browserStatus: "idle",
@@ -343,8 +562,8 @@ async function runConnectionCheck(source: AuthSource): Promise<boolean> {
     markConnected(source);
     return true;
   }
-  markFailed(result, source);
-  return false;
+  markFailed(result, source, source === "app" && (state.expiresAt !== null || state.connected));
+  return state.connected;
 }
 
 /** Runs at most one check at a time. */

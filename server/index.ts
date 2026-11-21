@@ -40,6 +40,36 @@ import {
 } from "./csv";
 import { isDegradedDelivery } from "./quality";
 import {
+  CookieJarMissingError,
+  acquireCookiePath,
+  type CookieLease,
+} from "./cookieJar";
+import {
+  STAGE_FOUND,
+  STAGE_WRITING,
+  classifyFailure,
+  estimateNeededMb,
+  joinFailure,
+  joinSegments,
+  lowQualityWithoutSession,
+  outPointFailure,
+  probeDurationSec,
+  refusedFailure,
+  pruneWorkDir,
+  resolveSegments,
+  runProcess,
+  sectionArg,
+  segmentFileName,
+  segmentWindow,
+  segmentsTotal,
+  staleSessionFailure,
+  stageDownloaded,
+  stageDownloading,
+  stageJoining,
+  type ClipFailure,
+  type Segment,
+} from "./segments";
+import {
   CLIP_PREFIX,
   EXPORT_PREFIX,
   appendJsonl,
@@ -383,27 +413,70 @@ export function resolveCookieOptions(
   return {};
 }
 
-const downloadSchema = z
-  .object({
-    url: urlSchema,
-    start: z.number().nonnegative(),
-    end: z.number().positive(),
-    format: z.enum(["mp4", "mp3"]).default("mp4"),
-    quality: z.string().default("best"),
-    // How the finished clip is handed back. "stream" sends the media as the
-    // response body. "path" returns only its location on disk, for the
-    // desktop app, whose main process can move the file itself — the media
-    // then never travels through the UI at all.
-    deliver: z.enum(["stream", "path"]).default("stream"),
-    // Optional sign-in path. "app" uses the session the user signed into
-    // inside the app; a browser name lets yt-dlp read that browser's session.
-    // Cookie contents never cross the API — only the source label.
-    cookiesFromBrowser: authSourceSchema.optional(),
-  })
-  .refine((v) => v.end > v.start, { message: "End must be greater than start" })
-  .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
-    message: `Clip length capped at ${MAX_CLIP_SECONDS} seconds (10 minutes)`,
-  });
+/**
+ * Runs `fn` with the cookie options for ONE yt-dlp run.
+ *
+ * yt-dlp writes its cookie jar back on every run, so a run is never given the
+ * canonical file: it gets a private copy from the cookie jar module, and only
+ * the single run flagged `refresher` may promote its result. A multi-segment
+ * cut runs one yt-dlp per segment, so segment one is the refresher and the
+ * rest are throwaway copies. The lease is released whether the run succeeds or
+ * not, and a failed run is released as `false` so it can never overwrite a good
+ * jar. A browser-sourced or absent session has no cookie file to protect.
+ */
+async function withRunCookies<T>(
+  mode: "app" | "browser" | "none",
+  base: Record<string, unknown>,
+  refresher: boolean,
+  fn: (cookieOptions: Record<string, unknown>) => Promise<T>,
+): Promise<T> {
+  if (mode !== "app" || !appCookieFile()) return fn(base);
+  let lease: CookieLease;
+  try {
+    lease = await acquireCookiePath({ refresher });
+  } catch (e) {
+    if (e instanceof CookieJarMissingError) {
+      // The file vanished between the check and the copy. Run unsigned and let
+      // the 360p-without-a-session notice say so, rather than failing the cut.
+      console.warn(`[server] cookie jar unavailable: ${e.message}`);
+      return fn({});
+    }
+    throw e;
+  }
+  let ok = false;
+  try {
+    const result = await fn({ ...base, cookies: lease.path });
+    ok = true;
+    return result;
+  } finally {
+    await lease.release(ok);
+  }
+}
+
+const downloadSchema = z.object({
+  url: urlSchema,
+  // A clip is a list of ranges, joined in order into one file. The older
+  // single `start`/`end` pair is still accepted and means one segment.
+  segments: z
+    .array(
+      z.object({ start: z.number().nonnegative(), end: z.number().positive() }),
+    )
+    .min(1)
+    .optional(),
+  start: z.number().nonnegative().optional(),
+  end: z.number().positive().optional(),
+  format: z.enum(["mp4", "mp3"]).default("mp4"),
+  quality: z.string().default("best"),
+  // How the finished clip is handed back. "stream" sends the media as the
+  // response body. "path" returns only its location on disk, for the
+  // desktop app, whose main process can move the file itself — the media
+  // then never travels through the UI at all.
+  deliver: z.enum(["stream", "path"]).default("stream"),
+  // Optional sign-in path. "app" uses the session the user signed into
+  // inside the app; a browser name lets yt-dlp read that browser's session.
+  // Cookie contents never cross the API — only the source label.
+  cookiesFromBrowser: authSourceSchema.optional(),
+});
 
 type DownloadInput = z.infer<typeof downloadSchema>;
 
@@ -901,39 +974,76 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   });
 });
 
+/** Sends a failure in the table shape: cause, the one fix, the work kept. */
+function sendFailure(
+  res: Response,
+  f: ClipFailure,
+  extra: Record<string, unknown> = {},
+) {
+  return res.status(f.status).json({
+    error: f.error,
+    code: f.code,
+    cause: f.cause,
+    action: f.action,
+    preserved: f.preserved,
+    ...(f.detail ? { detail: f.detail } : {}),
+    ...extra,
+  });
+}
+
 app.post("/api/download", async (req: Request, res: Response) => {
   const parsed = downloadSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const {
-    url,
-    start,
-    end,
-    format,
-    quality,
-    deliver,
-    cookiesFromBrowser,
-  }: DownloadInput = parsed.data;
+  const { url, format, quality, deliver, cookiesFromBrowser }: DownloadInput =
+    parsed.data;
+  // A clip is a list of ranges. The old single start/end is one segment.
+  const resolvedSegments = resolveSegments(parsed.data, MAX_CLIP_SECONDS);
+  if (!resolvedSegments.ok) {
+    return res.status(400).json({ error: resolvedSegments.error });
+  }
+  const segs: Segment[] = resolvedSegments.segments;
+  const segCount = segs.length;
+  const multi = segCount > 1;
+  const totalSec = segmentsTotal(segs);
+  const lastEnd = Math.max(...segs.map((s) => s.end));
+
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
   const cookieMode: "app" | "browser" | "none" = !cookiesFromBrowser
     ? "none"
     : cookiesFromBrowser === "app"
       ? "app"
       : "browser";
-  console.log(`[server] /api/download auth mode=${cookieMode}`);
+  console.log(
+    `[server] /api/download auth mode=${cookieMode} segments=${segCount}`,
+  );
+
+  // True only when the probe confirmed a signed-in session. A clip that lands
+  // at 360p without one is reported as an expired or missing sign-in.
+  let sessionConfirmed = false;
 
   const requiresVerifiedSession =
     format === "mp4" && (quality === "best" || Number(quality) > 360);
   if (requiresVerifiedSession) {
     if (cookieMode === "none") {
+      const cause =
+        "No YouTube session is connected, and YouTube serves higher formats only to signed-in requests";
+      const preserved = "Your marked range is kept.";
       return res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
-        error: "Connect YouTube before downloading this quality.",
+        error: `${cause}. Connect YouTube. ${preserved}`,
+        cause,
+        action: { id: "import_cookies", label: "Connect YouTube" },
+        preserved,
       });
     }
-    const auth = await probeYouTubeAuth(cookieOptions, () => undefined);
+    // A private copy: this is one of possibly many runs in flight, and yt-dlp
+    // writes its jar back on every run.
+    const auth = await withRunCookies(cookieMode, cookieOptions, false, (c) =>
+      probeYouTubeAuth(c, () => undefined),
+    );
     const verdict = authProbeVerdict(auth.status);
     if (verdict === "rate_limited") {
       return res.status(429).json({
@@ -944,9 +1054,13 @@ app.post("/api/download", async (req: Request, res: Response) => {
       });
     }
     if (verdict === "blocked") {
+      const f = staleSessionFailure(401, "Your marked range is kept.");
       return res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
-        error: "Your YouTube connection is no longer valid. Connect again.",
+        error: f.error,
+        cause: f.cause,
+        action: f.action,
+        preserved: f.preserved,
         reason: auth.reason,
       });
     }
@@ -956,6 +1070,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
       console.log(
         `[server] /api/download proceeding on an unconfirmed session (${auth.status})`,
       );
+    } else {
+      sessionConfirmed = true;
     }
   }
 
@@ -974,21 +1090,24 @@ app.post("/api/download", async (req: Request, res: Response) => {
     ...opts,
   });
   let probeOptions: Record<string, unknown> = probeWith(cookieOptions);
-  const runProbe = async (opts: Record<string, unknown>) => {
-    console.log(
-      `[server] /api/download probe url=${url} options=${JSON.stringify(opts)}`,
-    );
-    return yt!.run(url, opts, { env: childEnv() } as any);
-  };
+  const runProbe = (opts: Record<string, unknown>) =>
+    withRunCookies(cookieMode, opts, false, (c) => {
+      const withCookies = probeWith(c);
+      probeOptions = withCookies;
+      console.log(
+        `[server] /api/download probe url=${url} options=${JSON.stringify(withCookies)}`,
+      );
+      return yt!.run(url, withCookies, { env: childEnv() } as any);
+    });
   try {
     let info: any;
     try {
-      info = await runProbe(probeOptions);
+      info = await runProbe(cookieOptions);
     } catch (first) {
       throw first;
     }
-    if (typeof info.duration === "number" && end > info.duration + 1) {
-      return res.status(400).json({ error: "End exceeds video duration" });
+    if (typeof info.duration === "number" && lastEnd > info.duration + 1) {
+      return sendFailure(res, outPointFailure(lastEnd, info.duration));
     }
     availableHeights = Array.from(
       new Set(
@@ -1007,28 +1126,46 @@ app.post("/api/download", async (req: Request, res: Response) => {
         .json({ error: cookieErrorMessage(cookiesFromBrowser) });
     }
     logYtError("/api/download probe", url, probeOptions, e);
-    return res.status(400).json({ error: fullErrMessage(e) });
+    return sendFailure(res, classifyFailure(fullErrMessage(e)));
   }
-
+  publishProgress(jobId, {
+    phase: "downloading",
+    percent: 0,
+    message: STAGE_FOUND,
+  });
 
   const isAudio = format === "mp3";
   const ext = isAudio ? "mp3" : "mp4";
-  // Keyed work folder: the same video at the same format/quality/range reuses
+  // Keyed work folder: the same video at the same format/quality/ranges reuses
   // the same folder, so yt-dlp's `.part` files survive a failure and the retry
   // continues from where it stopped. Any other combination gets its own folder.
-  const tempDir = workDir(CLIP_PREFIX, [
-    url,
-    format,
-    quality,
-    start.toFixed(2),
-    end.toFixed(2),
-  ]);
+  // One segment keeps exactly the key it always had.
+  const tempDir = workDir(
+    CLIP_PREFIX,
+    multi
+      ? [
+          url,
+          format,
+          quality,
+          "segments",
+          ...segs.map((s) => `${s.start.toFixed(2)}-${s.end.toFixed(2)}`),
+        ]
+      : [url, format, quality, segs[0].start.toFixed(2), segs[0].end.toFixed(2)],
+  );
   const outputPath = path.join(tempDir, `clip.${ext}`);
+  // Per-segment files and the join's inputs. A single segment writes straight
+  // to outputPath and none of these exist.
+  const segFiles = segs.map((_, i) =>
+    multi ? path.join(tempDir, segmentFileName(i, ext)) : outputPath,
+  );
+  const listPath = path.join(tempDir, "list.txt");
   // A finished clip left from a previous run is never reused — only partials.
-  try {
-    fs.rmSync(outputPath, { force: true });
-  } catch {
-    /* ignore */
+  for (const f of [outputPath, listPath, ...segFiles]) {
+    try {
+      fs.rmSync(f, { force: true });
+    } catch {
+      /* ignore */
+    }
   }
   const resumeBytes = partialBytes(tempDir);
   if (resumeBytes > 0) {
@@ -1115,6 +1252,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
   const PLAYER_CLIENTS_FALLBACK =
     "youtube:player_client=tv_samsung,web_embedded,visionos";
 
+  // Cookie options are deliberately NOT part of this: each yt-dlp run is given
+  // its own cookie file by withRunCookies, never the canonical one.
   const commonOptions: Record<string, unknown> = {
     noPlaylist: true,
     noWarnings: true,
@@ -1123,7 +1262,6 @@ app.post("/api/download", async (req: Request, res: Response) => {
     // Pick up any `.part` file left in this work folder by a failed run.
     continue: true,
     ffmpegLocation: resolvedFfmpeg,
-    ...cookieOptions,
   };
 
 
@@ -1136,13 +1274,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // different set of clients (see the degraded-delivery check below).
 
   // Attempt 1: let yt-dlp cut the section (fast, ffmpeg fetches the range).
-  const sectionOptionsFor = (clients: string): Record<string, unknown> => ({
+  // --force-keyframes-at-cuts is what makes the cut frame-accurate: without it
+  // the cut snaps to the nearest keyframe and starts early.
+  const sectionOptionsFor = (
+    clients: string,
+    seg: Segment,
+    out: string,
+    cookies: Record<string, unknown>,
+  ): Record<string, unknown> => ({
     ...commonOptions,
+    ...cookies,
     ...formatOptions,
     extractorArgs: clients,
-    downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
+    downloadSections: sectionArg(seg),
     forceKeyframesAtCuts: true,
-    output: outputPath,
+    output: out,
     // Make ffmpeg's range request look like the one that minted the URL.
     addHeader: [
       "Referer:https://www.youtube.com/",
@@ -1153,8 +1299,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // Attempt 2 (fallback): yt-dlp downloads the whole media itself (native
   // downloader, no ffmpeg-fetched URLs), then we trim locally.
   const fullPath = path.join(tempDir, `source.${isAudio ? "m4a" : "mp4"}`);
-  const fullOptionsFor = (clients: string): Record<string, unknown> => ({
+  const fullOptionsFor = (
+    clients: string,
+    cookies: Record<string, unknown>,
+  ): Record<string, unknown> => ({
     ...commonOptions,
+    ...cookies,
     extractorArgs: clients,
     // Fetch HLS with yt-dlp's own segment downloader so ffmpeg only ever sees
     // a local file. Older bundled ffmpeg builds crash fetching m3u8 themselves.
@@ -1173,15 +1323,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   let options: Record<string, unknown> = sectionOptionsFor(
     PLAYER_CLIENTS_PRIMARY,
+    segs[0],
+    segFiles[0],
+    cookieOptions,
   );
 
   // Progress is driven by ffmpeg's `... time=HH:MM:SS.ss ...` output, which
   // streams continuously as the clip is processed (yt-dlp routes section
   // downloads through ffmpeg with --download-sections). Progress =
-  // processed time / clip length. yt-dlp's own `[download] NN%` only appears
-  // once at the very end, so it's used only as a fallback.
-  const clipDuration = Math.max(0.1, end - start);
+  // processed time / segment length. yt-dlp's own `[download] NN%` only
+  // appears once at the very end, so it's used only as a fallback.
+  let segDuration = Math.max(0.1, segs[0].end - segs[0].start);
   let lastReported = 0;
+  // The named stage the bar is currently in; carried on every tick so the UI
+  // always says what the percentage is a percentage of.
+  let currentStage = STAGE_FOUND;
   // Progress window the current phase maps onto (fallback splits the bar).
   let scaleFrom = 0;
   let scaleTo = 99;
@@ -1192,7 +1348,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
     );
     if (pct > lastReported) {
       lastReported = pct;
-      publishProgress(jobId, { phase: "downloading", percent: pct });
+      publishProgress(jobId, {
+        phase: "downloading",
+        percent: pct,
+        message: currentStage,
+        stage: currentStage,
+      });
     }
   };
   const hmsToSeconds = (h: string, m: string, s: string) =>
@@ -1210,7 +1371,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (tm) {
       const secs = hmsToSeconds(tm[1], tm[2], tm[3]);
       // Ignore ffmpeg's initial bogus negative timestamp.
-      if (secs >= 0) report(secs / clipDuration);
+      if (secs >= 0) report(secs / segDuration);
       return;
     }
     // Fallback: honor a real yt-dlp download percentage if one is emitted.
@@ -1266,60 +1427,119 @@ app.post("/api/download", async (req: Request, res: Response) => {
     );
   };
 
+  // A finished whole-file download. A `.part` is not one: yt-dlp renames it
+  // only once the file is complete.
   const findDownloaded = (): string | null => {
     if (fs.existsSync(fullPath)) return fullPath;
     const match = fs
       .readdirSync(tempDir)
-      .filter((f) => f.startsWith("source."))
+      .filter((f) => f.startsWith("source.") && !/\.(part|ytdl)$/.test(f))
       .map((f) => path.join(tempDir, f))[0];
     return match ?? null;
   };
 
-  // One complete build of the clip on one set of player clients: sectioned
-  // first, whole-file-then-trim if the sectioned URLs 403.
-  const buildClip = async (clients: string): Promise<void> => {
-    const sectionOptions = sectionOptionsFor(clients);
-    options = sectionOptions;
-    lastReported = 0;
-    scaleFrom = 0;
-    scaleTo = 99;
-    console.log(
-      `[server] /api/download exec url=${url} options=${JSON.stringify(sectionOptions)}`,
-    );
-    try {
-      await runStreaming(
-        () => yt!.exec(url, sectionOptions, { env: childEnv() } as any),
-        "yt-dlp",
-      );
-    } catch (sectionErr) {
-      if (!isForbidden(sectionErr)) throw sectionErr;
-      console.warn(
-        "[server] sectioned download failed (403) — retrying with full download + local trim",
-      );
-      const fullOptions = fullOptionsFor(clients);
-      options = fullOptions;
-      lastReported = 0;
-      scaleFrom = 0;
-      scaleTo = 70;
-      publishProgress(jobId, { phase: "downloading", percent: 0 });
-      await runStreaming(
-        () => yt!.exec(url, fullOptions, { env: childEnv() } as any),
-        "yt-dlp (full)",
-      );
+  // Everything a build leaves beside the finished clip: segment files, the
+  // concat list and the whole-file source. Partials (`.part`) are never
+  // touched, they are what a retry resumes from.
+  const dropIntermediates = (keepSource: boolean) => {
+    const doomed = [...segFiles.filter((f) => f !== outputPath), listPath];
+    if (!keepSource) {
+      try {
+        for (const f of fs.readdirSync(tempDir)) {
+          if (f.startsWith("source.") && !/\.(part|ytdl)$/.test(f)) {
+            doomed.push(path.join(tempDir, f));
+          }
+        }
+      } catch {
+        /* folder gone */
+      }
+    }
+    for (const f of doomed) {
+      try {
+        fs.rmSync(f, { force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  };
 
-      const source = findDownloaded();
+  // One segment on one set of player clients: sectioned first, whole-file-then-
+  // trim if the sectioned URLs 403. `state.sectionsForbidden` carries the 403
+  // verdict from one segment to the next, so the rest go straight to the local
+  // trim instead of failing the same way again.
+  const buildSegment = async (
+    clients: string,
+    index: number,
+    state: { sectionsForbidden: boolean },
+  ): Promise<void> => {
+    const seg = segs[index];
+    const out = segFiles[index];
+    const win = segmentWindow(index, segCount);
+    segDuration = Math.max(0.1, seg.end - seg.start);
+    // Segment one is the one run allowed to refresh the user's saved session;
+    // every other is a throwaway copy.
+    await withRunCookies(cookieMode, cookieOptions, index === 0, async (cookies) => {
+      const sectionOptions = sectionOptionsFor(clients, seg, out, cookies);
+      options = sectionOptions;
+      lastReported = win.from;
+      scaleFrom = win.from;
+      scaleTo = win.to;
+      if (!state.sectionsForbidden) {
+        console.log(
+          `[server] /api/download exec url=${url} segment=${index + 1}/${segCount} options=${JSON.stringify(sectionOptions)}`,
+        );
+        try {
+          await runStreaming(
+            () => yt!.exec(url, sectionOptions, { env: childEnv() } as any),
+            "yt-dlp",
+          );
+          return;
+        } catch (sectionErr) {
+          if (!isForbidden(sectionErr)) throw sectionErr;
+          state.sectionsForbidden = true;
+          console.warn(
+            "[server] sectioned download failed (403) — retrying with full download + local trim",
+          );
+        }
+      }
+
+      const fullOptions = fullOptionsFor(clients, cookies);
+      options = fullOptions;
+      // One segment splits the bar 70/29 exactly as it always has.
+      const mid =
+        segCount <= 1
+          ? 70
+          : Math.round(win.from + (win.to - win.from) * 0.7);
+      lastReported = win.from;
+      scaleFrom = win.from;
+      scaleTo = mid;
+      publishProgress(jobId, {
+        phase: "downloading",
+        percent: win.from,
+        message: currentStage,
+        stage: currentStage,
+      });
+      // The whole file is the same for every segment, so fetch it once.
+      let source = findDownloaded();
+      if (!source) {
+        await runStreaming(
+          () => yt!.exec(url, fullOptions, { env: childEnv() } as any),
+          "yt-dlp (full)",
+        );
+        source = findDownloaded();
+      }
       if (!source) throw new Error("yt-dlp produced no output");
 
-      scaleFrom = 70;
-      scaleTo = 99;
-      lastReported = 70;
+      scaleFrom = mid;
+      scaleTo = win.to;
+      lastReported = mid;
       const trimArgs = isAudio
         ? [
             "-y",
             "-ss",
-            String(start),
+            String(seg.start),
             "-to",
-            String(end),
+            String(seg.end),
             "-i",
             source,
             "-vn",
@@ -1327,21 +1547,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
             "libmp3lame",
             "-b:a",
             `${quality}k`,
-            outputPath,
+            out,
           ]
         : [
             "-y",
             "-ss",
-            String(start),
+            String(seg.start),
             "-to",
-            String(end),
+            String(seg.end),
             "-i",
             source,
             "-c",
             "copy",
             "-movflags",
             "+faststart",
-            outputPath,
+            out,
           ];
       await runStreaming(
         () =>
@@ -1352,11 +1572,86 @@ app.post("/api/download", async (req: Request, res: Response) => {
           }),
         "ffmpeg (trim)",
       );
-      try {
-        fs.rmSync(source, { force: true });
-      } catch {
-        /* ignore */
+      // A lone segment is done with the source. Several share it, so it goes
+      // when the whole clip is built.
+      if (!multi) {
+        try {
+          fs.rmSync(source, { force: true });
+        } catch {
+          /* ignore */
+        }
       }
+    });
+  };
+
+  // How the last join was made, for the response and the log.
+  let joinMethod: "copy" | "reencode" | null = null;
+
+  // One complete build of the clip on one set of player clients: each segment
+  // in order, then (for several) the join into one file.
+  const buildClip = async (clients: string): Promise<void> => {
+    lastReported = 0;
+    let built = false;
+    const state = { sectionsForbidden: false };
+    try {
+      for (let i = 0; i < segCount; i++) {
+        currentStage = stageDownloading(i + 1, segCount);
+        publishProgress(jobId, {
+          phase: "downloading",
+          percent: Math.max(lastReported, segmentWindow(i, segCount).from),
+          message: currentStage,
+          stage: currentStage,
+          segment: i + 1,
+          segments: segCount,
+        });
+        await buildSegment(clients, i, state);
+        const win = segmentWindow(i, segCount);
+        currentStage = stageDownloaded(i + 1, segCount);
+        lastReported = Math.max(lastReported, win.to);
+        publishProgress(jobId, {
+          phase: "downloading",
+          percent: win.to,
+          message: currentStage,
+          stage: currentStage,
+          segment: i + 1,
+          segments: segCount,
+        });
+      }
+
+      if (multi) {
+        currentStage = stageJoining(segCount);
+        publishProgress(jobId, {
+          phase: "processing",
+          percent: 92,
+          message: currentStage,
+          stage: currentStage,
+        });
+        const join = await joinSegments(
+          segFiles,
+          outputPath,
+          listPath,
+          totalSec,
+          { isAudio, audioKbps: quality },
+          {
+            run: (args) =>
+              runProcess(resolvedFfmpeg as string, args, childEnv()),
+            probeDuration: (file) =>
+              probeDurationSec(resolvedFfmpeg as string, file),
+            log: (m) => console.log(`[server] /api/download job=${jobId} ${m}`),
+          },
+        );
+        joinMethod = join.method;
+        if (!join.durationOk) {
+          console.warn(
+            `[server] /api/download job=${jobId} joined clip is ${join.duration?.toFixed(2) ?? "?"}s, expected ${totalSec.toFixed(2)}s even after ${join.method}`,
+          );
+        }
+      }
+      built = true;
+    } finally {
+      // Success or failure, the pieces are not the deliverable. On success the
+      // whole-file source goes too; on failure it stays, a resumable download.
+      dropIntermediates(!built);
     }
   };
 
@@ -1378,13 +1673,14 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
     if (!fs.existsSync(outputPath)) {
       // Work folder deliberately kept so the next attempt can resume.
-
+      pruneWorkDir(tempDir);
+      const f = classifyFailure("yt-dlp produced no output");
       publishProgress(jobId, {
         phase: "error",
         percent: 0,
         message: "no output",
       });
-      return res.status(500).json({ error: "yt-dlp produced no output" });
+      return sendFailure(res, f);
     }
 
     publishProgress(jobId, { phase: "processing", percent: 99 });
@@ -1464,6 +1760,24 @@ app.post("/api/download", async (req: Request, res: Response) => {
       );
     }
 
+    // A 360p file with no confirmed session behind it is the expired-sign-in
+    // failure, not a quality choice. The clip is still delivered (it is real
+    // work), but it never passes silently: the cause and the one fix travel
+    // with it.
+    const lowQuality = lowQualityWithoutSession({
+      deliveredHeight: delivered.height,
+      requested: requestedHeight,
+      sessionValid: sessionConfirmed,
+      isAudio,
+    })
+      ? staleSessionFailure(200, "The 360p clip is kept.")
+      : null;
+    if (lowQuality) {
+      console.warn(
+        `[server] /api/download low quality without a session job=${jobId} delivered=${delivered.height} auth=${cookieMode} confirmed=${sessionConfirmed}`,
+      );
+    }
+
     if (delivered.height) {
       res.setHeader("X-Delivered-Height", String(delivered.height));
     }
@@ -1474,6 +1788,13 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (availableHeights.length)
       res.setHeader("X-Available-Heights", availableHeights.join(","));
     res.setHeader("X-Auth-Mode", cookieMode);
+    res.setHeader("X-Segments", String(segCount));
+    if (joinMethod) res.setHeader("X-Join-Method", joinMethod);
+    if (lowQuality) {
+      res.setHeader("X-Quality-Cause", lowQuality.code);
+      res.setHeader("X-Quality-Message", lowQuality.cause);
+      res.setHeader("X-Quality-Action", lowQuality.action.id);
+    }
     // Both client sets came back degraded. Nothing left to retry, so say so
     // out loud rather than letting a 360p file pass for a 1080p download.
     if (degraded) {
@@ -1483,15 +1804,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
       );
     }
     console.log(
-      `[server] /api/download built job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode}`,
+      `[server] /api/download built job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode} segments=${segCount}${joinMethod ? ` join=${joinMethod}` : ""}`,
     );
     res.setHeader(
       "Access-Control-Expose-Headers",
-      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode, X-Quality-Degraded",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode, X-Quality-Degraded, X-Segments, X-Join-Method, X-Quality-Cause, X-Quality-Message, X-Quality-Action",
     );
 
 
     const stat = fs.statSync(outputPath);
+    publishProgress(jobId, {
+      phase: "processing",
+      percent: 99,
+      message: STAGE_WRITING,
+      stage: STAGE_WRITING,
+    });
 
     // Desktop app: hand back the location, not the media. Sending a clip as
     // an HTTP body means the UI buffers the whole file, converts it to an
@@ -1504,8 +1831,28 @@ app.post("/api/download", async (req: Request, res: Response) => {
       console.log(
         `[server] /api/download handing off job=${jobId} bytes=${stat.size}`,
       );
-      publishProgress(jobId, { phase: "done", percent: 100 });
-      return res.json({ path: outputPath, size: stat.size });
+      publishProgress(jobId, {
+        phase: "done",
+        percent: 100,
+        ...(lowQuality ? { message: lowQuality.error } : {}),
+      });
+      return res.json({
+        path: outputPath,
+        size: stat.size,
+        segments: segCount,
+        ...(joinMethod ? { joinMethod } : {}),
+        ...(lowQuality
+          ? {
+              warning: {
+                code: lowQuality.code,
+                cause: lowQuality.cause,
+                action: lowQuality.action,
+                preserved: lowQuality.preserved,
+                error: lowQuality.error,
+              },
+            }
+          : {}),
+      });
     }
 
     const name = `clip.${ext}`;
@@ -1560,9 +1907,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
     res.on("close", () => settle("connection closed early"));
     stream.pipe(res);
   } catch (e) {
-    // Work folders are intentionally left in place on failure: the partial
-    // download inside them is what makes the retry resumable. The staleness
-    // sweep and the "clear unfinished downloads" action reclaim the space.
+    // What is on disk now is what a retry resumes from. Measure it before the
+    // work folder is pruned down to exactly that: partial downloads stay,
+    // finished segment files, the concat list and half-written joins go.
+    const partial = partialBytes(tempDir);
+    pruneWorkDir(tempDir);
     if (cookiesFromBrowser && isCookieError(e)) {
       const msg = cookieErrorMessage(cookiesFromBrowser);
       publishProgress(jobId, { phase: "error", percent: 0, message: msg });
@@ -1574,11 +1923,35 @@ app.post("/api/download", async (req: Request, res: Response) => {
     // Keep the friendly sentence but append the real yt-dlp stderr tail so the
     // next YouTube-side change is diagnosable straight from the UI.
     const tail = ((e as { tail?: string } | null)?.tail || raw || "").trim();
-    const msg = isForbidden(e)
-      ? `YouTube refused the media request for this video. Try again in a moment, or pick a different quality.${tail ? `\n${tail}` : ""}`
-      : raw;
-    publishProgress(jobId, { phase: "error", percent: 0, message: msg });
-    res.status(500).json({ error: msg });
+    let failure: ClipFailure;
+    if ((e as { joinFailed?: boolean } | null)?.joinFailed) {
+      failure = joinFailure(tail);
+    } else {
+      const ctx = { percent: lastReported, partialBytes: partial };
+      failure = classifyFailure(raw, ctx);
+      if (failure.code === "disk_full") {
+        let freeMb: number | undefined;
+        try {
+          const st = fs.statfsSync(os.tmpdir());
+          freeMb = Math.floor((st.bavail * st.bsize) / (1024 * 1024));
+        } catch {
+          /* statfs unavailable: say it without the numbers */
+        }
+        failure = classifyFailure(raw, {
+          ...ctx,
+          freeMb,
+          neededMb: estimateNeededMb(totalSec, quality, isAudio, segCount),
+        });
+      } else if (failure.code === "unknown" && isForbidden(e)) {
+        failure = refusedFailure(tail);
+      }
+    }
+    publishProgress(jobId, {
+      phase: "error",
+      percent: 0,
+      message: failure.error,
+    });
+    sendFailure(res, failure);
   }
 });
 
@@ -1683,6 +2056,10 @@ interface ProgressEvent {
   phase: "downloading" | "processing" | "done" | "error";
   percent: number;
   message?: string;
+  /** Named stage: Found the stream, Downloaded segment n of m, Joining n segments, Writing to your folder. */
+  stage?: string;
+  segment?: number;
+  segments?: number;
 }
 
 interface JobChannel {
@@ -1925,7 +2302,37 @@ function channelBaseUrl(raw: string): string | null {
 }
 
 // Spawn yt-dlp for a job, registering the child so cancellation can kill it.
-function runForJob(
+// Every exporter run is one of thousands in flight over a job's life, and
+// yt-dlp writes its cookie jar back on every run, so none of them may be handed
+// the canonical file. Each gets a private copy that is thrown away (release
+// false) when the run ends; the saved session is refreshed by single runs
+// elsewhere, never by the exporter.
+async function runForJob(
+  job: ChannelJob,
+  url: string,
+  opts: Record<string, unknown>,
+  timeoutMs = 180_000,
+): Promise<any> {
+  const canonical = appCookieFile();
+  if (!canonical || opts.cookies !== canonical) {
+    return runForJobRaw(job, url, opts, timeoutMs);
+  }
+  let lease: CookieLease;
+  try {
+    lease = await acquireCookiePath({ refresher: false });
+  } catch (e) {
+    if (!(e instanceof CookieJarMissingError)) throw e;
+    const { cookies: _gone, ...rest } = opts;
+    return runForJobRaw(job, url, rest, timeoutMs);
+  }
+  try {
+    return await runForJobRaw(job, url, { ...opts, cookies: lease.path }, timeoutMs);
+  } finally {
+    await lease.release(false);
+  }
+}
+
+function runForJobRaw(
   job: ChannelJob,
   url: string,
   opts: Record<string, unknown>,

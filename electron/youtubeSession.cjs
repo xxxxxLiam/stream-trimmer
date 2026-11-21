@@ -16,7 +16,11 @@ const path = require("node:path");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const { validateCookieText } = require("./cookieFile.cjs");
-const { resolveAuthState } = require("./cookieState.cjs");
+const {
+  isRelevantDomain,
+  parseCookieRows,
+  resolveAuthState,
+} = require("./cookieState.cjs");
 
 // Only ever cleared, never read. See clear().
 const LEGACY_PARTITION = "persist:youtube";
@@ -83,14 +87,47 @@ async function importCookieFile(sourcePath) {
     if (typeof sourcePath !== "string" || !sourcePath) {
       return { ok: false, error: "No file chosen." };
     }
-    const text = await fsp.readFile(sourcePath, "utf8");
-    const check = validateCookieText(text);
-    if (!check.ok) return { ok: false, error: check.reason };
+    return await importCookieText(await fsp.readFile(sourcePath, "utf8"));
+  } catch (err) {
+    return {
+      ok: false,
+      error: err && err.message ? err.message : "Could not read that file.",
+    };
+  }
+}
+
+/**
+ * Adopts cookies.txt TEXT, validated, then commits it atomically (temp file
+ * beside the target, then rename). Used by the file picker and by a file
+ * dropped on the window, whose contents the renderer reads itself.
+ *
+ * The same canonical path as ever: userData/yt-cookies.txt. A crash mid-write
+ * can never leave a half file, because rename() is atomic.
+ */
+async function importCookieText(text) {
+  try {
+    const raw = String(text || "");
+    // A JSON export is the commonest wrong turn: several extensions offer it
+    // beside the Netscape format. Say so rather than "doesn't look right".
+    if (/^\s*[\[{]/.test(raw)) {
+      return {
+        ok: false,
+        kind: "wrong_format",
+        error:
+          "That file is JSON. Export it again and choose the Netscape (cookies.txt) format.",
+      };
+    }
+    const check = validateCookieText(raw);
+    if (!check.ok) return { ok: false, kind: classify(raw), error: check.reason };
 
     const target = cookieFilePath();
-    const tmp = `${target}.tmp`;
-    await fsp.writeFile(tmp, text, { mode: 0o600 });
-    await fsp.rename(tmp, target);
+    const tmp = `${target}.import-${process.pid}-${Date.now()}`;
+    try {
+      await fsp.writeFile(tmp, raw, { mode: 0o600 });
+      await fsp.rename(tmp, target);
+    } finally {
+      await fsp.rm(tmp, { force: true }).catch(() => {});
+    }
     try {
       await fsp.chmod(target, 0o600);
     } catch {
@@ -103,6 +140,14 @@ async function importCookieFile(sourcePath) {
       error: err && err.message ? err.message : "Could not read that file.",
     };
   }
+}
+
+/** Which of the three ways a cookies.txt can be wrong this one is. */
+function classify(text) {
+  const rows = parseCookieRows(text);
+  if (!String(text || "").trim() || rows.length === 0) return "wrong_format";
+  if (!rows.some((row) => isRelevantDomain(row.domain))) return "no_youtube_cookies";
+  return "signed_out";
 }
 
 async function clear() {
@@ -124,6 +169,7 @@ async function clear() {
 
 module.exports = {
   importCookieFile,
+  importCookieText,
   probe,
   clear,
   cookieFilePath,

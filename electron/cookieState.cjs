@@ -33,6 +33,10 @@ function parseCookieRows(text) {
   return String(text || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
+    // yt-dlp and cookies.txt extensions write HttpOnly cookies as
+    // "#HttpOnly_<domain>". That is a real cookie, not a comment, and the
+    // session cookies (SID, __Secure-1PSID) are exactly the HttpOnly ones.
+    .map((line) => line.replace(/^#HttpOnly_/, ""))
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => line.split("\t"))
     .filter((cols) => cols.length >= COLUMNS)

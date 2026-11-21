@@ -42,3 +42,7 @@ resources/bin
 # Local environment (passcode hashes)
 .env
 .env.local
+
+# agent test-build scratch dirs
+.tb-*/
+.testbuild/
