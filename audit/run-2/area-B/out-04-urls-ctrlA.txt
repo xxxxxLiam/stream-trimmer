@@ -1,11 +1,31 @@
 === B-5 / B-17 URL shapes ===
 ROOT=/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/ctrlA  TAG=ctrlA
 
-SCRIPT FAILED page.reload: Target page, context or browser has been closed
-Call log:
-[2m  - waiting for navigation until "load"[22m
+[channel @handle] {"source":"Loading","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":null,"status":"Loading the video","transcript":""}
+[channel /c/] {"source":"Loading","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":null,"status":"Loading the video","transcript":""}
+[channel /channel/] {"source":"Loading","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":null,"status":"Loading the video","transcript":""}
+[playlist] {"source":"Stub video 00:00:30 Change","urlBarStillOpen":false,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"loading…"}
+[watch + list] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"loading…"}
+[shorts] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"loading…"}
+[youtu.be] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"loading…"}
+[live/] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[embed/] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"loading…"}
+[results search] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"loading…"}
+[bare word] {"source":"Stub video 00:00:30 Change","urlBarStillOpen":false,"markDisabled":false,"inValue":"","alert":"Invalid url","status":"00:00:30 clip · MP4","transcript":"loading…"}
+[whitespace] {"source":"Stub video 00:00:30 Change","urlBarStillOpen":false,"markDisabled":false,"inValue":"","alert":"Invalid url","status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[non-youtube] {"source":"Stub video 00:00:30 Change","urlBarStillOpen":false,"markDisabled":false,"inValue":"","alert":"URL must be a YouTube link","status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[timestamped + tracking] {"source":"Loading","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"Loading the video","transcript":"loading…"}
+[10k chars] {"source":"Loading","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"Loading the video","transcript":"loading…"}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b04-ctrlA/01-url-last-case.png
 
-    at boot (/home/user/stream-trimmer/audit/run-2/area-B/lib.cjs:130:15)
-    at async /home/user/stream-trimmer/audit/run-2/area-B/b04-b5-urls-and-cut.cjs:46:13 {
-  log: [ '  - waiting for navigation until "load"' ]
-}
+--- channel URL -> mark -> Cut as one file ---
+pane: {"rows":[],"total":"00:00:30","source":"Loading","markIn":"","markOut":"00:00:30","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"Loading the video","alert":null,"transcriptHeader":"loading…","transcriptRows":0,"cutDisabled":false,"addDisabled":false,"cancelVisible":false}
+after clicking Cut: {"rows":["1 00:00:05 to 00:00:15 0:10 line 1 bravo says something"],"total":"00:00:10","source":"Reload","markIn":"","markOut":"00:00:30","timelineSegments":2,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":false,"cancelVisible":false}
+files written: []
+engine calls: 0
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b04-ctrlA/02-channel-cut-attempt.png
+
+--- playlist URL -> mark -> Cut ---
+pane: {"rows":["1 00:00:05 to 00:00:15 0:10 line 1 bravo says something"],"total":"00:00:10","source":"Loading","markIn":"","markOut":"00:00:30","timelineSegments":2,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":false,"cancelVisible":false}
+after clicking Cut: {"rows":["1 00:00:05 to 00:00:15 0:10 line 1 bravo says something","2 00:00:05 to 00:00:15 0:10 line 1 bravo says something"],"total":"00:00:20","source":"Loading","markIn":"","markOut":"","timelineSegments":4,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+files: []
