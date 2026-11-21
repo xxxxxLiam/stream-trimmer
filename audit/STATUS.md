@@ -1,6 +1,6 @@
 # Audit run 1 — live status
 
-Generated 2026-11-21 19:15:32 UTC by `node audit/status.cjs`. Re-run it to refresh.
+Generated 2026-11-21 20:02:11 UTC by `node audit/status.cjs`. Re-run it to refresh.
 
 **8 of 8 area reports written.** 165 test scripts, 516 screenshots, 364 captured output files.
 
@@ -8,14 +8,14 @@ A helper writes its report last, so an area with no report is still running.
 
 | Area | | Scripts | Shots | Captures | Last wrote | Report |
 |---|---|--:|--:|--:|---|---|
-| **A** | Onboarding and sign-in | 15 | 39 | 74 | 35m ago | done |
-| **B** | Core clipping loop | 23 | 80 | 20 | 10m ago | done |
-| **C** | Clip bank and campaigns | 21 | 61 | 43 | 11m ago | done |
-| **D** | Output and editor handoff | 23 | 52 | 41 | 18m ago | done |
-| **E** | Channel data and owner gate | 22 | 55 | 34 | 25m ago | done |
-| **F** | Help, diagnostics and updates | 26 | 155 | 60 | 16m ago | done |
-| **G** | Server and jobs | 19 | 0 | 65 | 7m ago | done |
-| **H** | Accessibility and layout | 16 | 74 | 27 | 26m ago | done |
+| **A** | Onboarding and sign-in | 15 | 39 | 74 | 82m ago | done |
+| **B** | Core clipping loop | 23 | 80 | 20 | 56m ago | done |
+| **C** | Clip bank and campaigns | 21 | 61 | 43 | 58m ago | done |
+| **D** | Output and editor handoff | 23 | 52 | 41 | 65m ago | done |
+| **E** | Channel data and owner gate | 22 | 55 | 34 | 72m ago | done |
+| **F** | Help, diagnostics and updates | 26 | 155 | 60 | 62m ago | done |
+| **G** | Server and jobs | 19 | 0 | 65 | 54m ago | done |
+| **H** | Accessibility and layout | 16 | 74 | 27 | 72m ago | done |
 
 ## Findings so far
 
