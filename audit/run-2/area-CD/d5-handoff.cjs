@@ -70,7 +70,7 @@ async function setField(a, labelRe, value) {
   await a.win.evaluate(
     ([re, v]) => {
       const rx = new RegExp(re, "i");
-      const lab = Array.from(document.querySelectorAll("label")).find((l) => rx.test(l.textContent || ""));
+      const lab = Array.from(document.querySelectorAll("label")).find((l) => rx.test(((l.querySelector("span") || l).textContent || "").trim()));
       const el = lab && lab.querySelector("input,select");
       if (!el) return "no field";
       const proto = el.tagName === "SELECT" ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
@@ -218,6 +218,7 @@ async function handoffStatus(a) {
 
     // now turn the automatic send on and cut a third clip
     await setField(b, "^After cutting$", "finalcut");
+    say("the After cutting select now reads:", await b.win.evaluate(() => { const s = Array.from(document.querySelectorAll("select")).find((x) => Array.from(x.options).some((o) => o.value === "finalcut")); return s ? s.value : "no select"; }));
     await b.win.waitForTimeout(600);
     say("afterCutting persisted:", JSON.stringify((b.state()["clipper.editorHandoff"] || {})["acme-q4"] || {}).slice(0, 220));
     say("cut 3:", await L.cutOne(b.win, "00:00:20", "00:00:26"));
