@@ -696,6 +696,54 @@ Findings: **3 blocker, 7 major, 13 minor, 2 polish** (25 in all).
 
 ---
 
+### D-22  Every folder picker is titled "Choose download folder"
+
+- **Severity**: polish
+- **Status**: likely
+- **Steps**:
+  1. Expand "Hand off to an editor" and click **Choose** next to **Library**.
+  2. Click **Choose** next to the CapCut drop folder.
+  3. Click the footer's **Data** chip.
+- **Expected**: titles that say what is being chosen — a Final Cut library, a
+  CapCut drop folder, the channel-data folder.
+- **Actual**: there is one handler, `dialog:pickDirectory`, with
+  `title: "Choose download folder"` hard-coded, and all five call sites use it
+  (`EditorHandoff.tsx:350, 423`, `CampaignContext.tsx:231, 236`). Choosing a
+  Final Cut **library** through a dialog labelled "download folder" is the
+  worst of them, and the library field also wants a `.fcpbundle` package
+  rather than a plain folder.
+- **Proof**: not proven by evidence — the native dialog cannot be opened or
+  photographed in this container (no window manager, no `xdotool`), so this is
+  read off the single handler and its call sites and labelled **likely**.
+  `audit/run-1/area-D/31-folders-real.cjs` replaces the dialog rather than
+  showing it.
+- **Suspected file**: `electron/main.cjs:449-456`
+
+---
+
+### D-23  Every generated document is mis-indented around `<note>`
+
+- **Severity**: polish
+- **Status**: confirmed
+- **Steps**:
+  1. `node audit/run-1/area-D/20-fcpxml-matrix.cjs`, or any send in
+     `40-handoff-e2e.cjs`.
+  2. Open the written `.fcpxml`.
+- **Expected**: consistent indentation; the file is something a user opens in
+  a text editor when an import misbehaves.
+- **Actual**: `<asset-clip>` sits at 2 spaces while its `<note>` child is at 8
+  and the closing `</asset-clip>` at 6; inside a project the whole
+  `<sequence>`/`<spine>` block is two spaces too deep. `buildFcpxml` builds
+  the event lines at one indent and then does `events.map((l) => l.slice(2))`
+  (`fcpxml.ts:758`), which only strips two characters from the **first** line
+  of each multi-line string. Harmless to Final Cut (every document is
+  DTD-valid) but it looks broken.
+- **Proof**: `audit/run-1/area-D/out/handoff/E-Raw clips تجربة.fcpxml`;
+  `audit/run-1/area-D/out/fcpxml/07-library-event-project-second-event.fcpxml`
+- **Suspected file**: `src/lib/fcpxml.ts:726-761`
+
+---
+
 ### D-24  A folder that is a file, or that does not exist, is accepted as the clips folder with no warning
 
 - **Severity**: minor
@@ -749,54 +797,6 @@ Findings: **3 blocker, 7 major, 13 minor, 2 polish** (25 in all).
   `state at the end` block
 - **Suspected file**: `src/context/CampaignContext.tsx` (`saveDefaults`);
   `src/lib/downloads.ts:64-71`
-
----
-
-### D-22  Every folder picker is titled "Choose download folder"
-
-- **Severity**: polish
-- **Status**: likely
-- **Steps**:
-  1. Expand "Hand off to an editor" and click **Choose** next to **Library**.
-  2. Click **Choose** next to the CapCut drop folder.
-  3. Click the footer's **Data** chip.
-- **Expected**: titles that say what is being chosen — a Final Cut library, a
-  CapCut drop folder, the channel-data folder.
-- **Actual**: there is one handler, `dialog:pickDirectory`, with
-  `title: "Choose download folder"` hard-coded, and all five call sites use it
-  (`EditorHandoff.tsx:350, 423`, `CampaignContext.tsx:231, 236`). Choosing a
-  Final Cut **library** through a dialog labelled "download folder" is the
-  worst of them, and the library field also wants a `.fcpbundle` package
-  rather than a plain folder.
-- **Proof**: not proven by evidence — the native dialog cannot be opened or
-  photographed in this container (no window manager, no `xdotool`), so this is
-  read off the single handler and its call sites and labelled **likely**.
-  `audit/run-1/area-D/31-folders-real.cjs` replaces the dialog rather than
-  showing it.
-- **Suspected file**: `electron/main.cjs:449-456`
-
----
-
-### D-23  Every generated document is mis-indented around `<note>`
-
-- **Severity**: polish
-- **Status**: confirmed
-- **Steps**:
-  1. `node audit/run-1/area-D/20-fcpxml-matrix.cjs`, or any send in
-     `40-handoff-e2e.cjs`.
-  2. Open the written `.fcpxml`.
-- **Expected**: consistent indentation; the file is something a user opens in
-  a text editor when an import misbehaves.
-- **Actual**: `<asset-clip>` sits at 2 spaces while its `<note>` child is at 8
-  and the closing `</asset-clip>` at 6; inside a project the whole
-  `<sequence>`/`<spine>` block is two spaces too deep. `buildFcpxml` builds
-  the event lines at one indent and then does `events.map((l) => l.slice(2))`
-  (`fcpxml.ts:758`), which only strips two characters from the **first** line
-  of each multi-line string. Harmless to Final Cut (every document is
-  DTD-valid) but it looks broken.
-- **Proof**: `audit/run-1/area-D/out/handoff/E-Raw clips تجربة.fcpxml`;
-  `audit/run-1/area-D/out/fcpxml/07-library-event-project-second-event.fcpxml`
-- **Suspected file**: `src/lib/fcpxml.ts:726-761`
 
 ---
 
