@@ -19,7 +19,7 @@ session and a browser sweep answer differently in one run
 for the authentication…`, `Sign in to confirm your age`, the
 `[debug] Found YouTube account cookies` line the classifier keys on).
 
-Findings: **1 blocker, 5 major, 8 minor, 1 polish**.
+Findings: **1 blocker, 5 major, 9 minor, 1 polish** (16 in all).
 
 ---
 
@@ -420,14 +420,21 @@ Findings: **1 blocker, 5 major, 8 minor, 1 polish**.
 - **Expected**: what the file's own doc comment promises — "The extension is
   named for the user's browser."
 - **Actual**: `sweepBrowsers` calls `set({ browser })` on every iteration, and
-  `extensionFor(state.browser)` follows it, so when the sweep ends the modal
-  names whichever browser happened to be last in the list. On this machine it
-  ends up telling the user to "Install Get cookies.txt LOCALLY in **Chromium**"
-  and leaves the dropdown on `chromium`, regardless of what they actually use.
+  `extensionFor(state.browser)` follows it, so step 1 churns through a
+  different set of instructions for each browser *while the user is reading
+  it* and then settles on whichever was last in the list. Measured on this
+  machine (`system:defaultBrowser` → `{"browser":null}`, so there is no
+  detected default to justify any of them):
+  - at open: "Install Get cookies.txt LOCALLY in **Chrome**"
+  - mid-sweep: "**Edge**: let the app read the browser directly"
+  - after the sweep: "Install Get cookies.txt LOCALLY in **Chromium**", with
+    the "Pick a browser" dropdown left on `chromium`.
+
+  A Firefox user is told to install a Chrome Web Store extension in Chromium.
   The browser is only persisted on success, so the next launch starts from
   `chrome` again and ends on `chromium` again.
-- **Proof**: `audit/out/area-A/captured/12-browser-label.txt` (before/after
-  step-1 text and dropdown value); visible in
+- **Proof**: `audit/out/area-A/captured/12-browser-label.txt` — the four
+  samples quoted above; visible in
   `audit/out/area-A/A-06-a/03-sweep-finished.png` — "Install Get cookies.txt
   LOCALLY in Chromium" — and `audit/out/area-A/A-12/01-browser-label-after-sweep.png`.
   Script: `audit/run-1/area-A/12-browser-label.cjs`
@@ -515,7 +522,7 @@ Findings: **1 blocker, 5 major, 8 minor, 1 polish**.
   `clipper.clipsDir`), so "Choose the clips folder" is unticked and "Choose
   what happens after cutting" is permanently blocked with "Waiting for: Choose
   the clips folder" — for an upgrading user whose clips are already going to
-  that folder. Progress reads 4 of 6 with no way to move it except re-picking
+  that folder. Progress reads 4 of 7 with no way to move it except re-picking
   the same folder.
 - **Proof**: `audit/out/area-A/captured/05-checklist.txt`, scenario
   `older-shape` — `clips-folder done=false`, `after-cutting blocked=true
@@ -550,6 +557,34 @@ Findings: **1 blocker, 5 major, 8 minor, 1 polish**.
   through `src/lib/setupTasks.ts` (`bandIsSet`)
 
 ---
+
+## User stories run
+
+Every one was executed against the running app; "→" names where the evidence
+is.
+
+| # | Story | Outcome |
+|---|---|---|
+| 1 | Fresh install, no YouTube account at all, just wants one 360p clip | **Fails** — locked out of the whole app (A-1) → `01-cold-boot.txt`, `11-unsigned-usable.txt` |
+| 2 | Exports cookies from the wrong (signed-out) browser profile, imports, re-exports signed in | **Works** — "That file has YouTube cookies but no sign-in. Sign in to YouTube in your browser, then export again.", then success → `08-stories.txt` S1 |
+| 3 | Picks the extension's JSON export instead of the Netscape one | **Works** — the clearest message in the flow → `08-stories.txt` S2 |
+| 4 | Impatient on first run: drops the file while it still says "Checking chrome…" | **Fails** — signed in, then thrown back out (A-2) → `06-races.txt` (a) |
+| 5 | Returning user whose sign-in expired overnight | **Partly fails** — right heading, wrong advice; the date is never shown (A-4) → `08-stories.txt` S3 |
+| 6 | Re-exports from the same non-incognito window a week later; the file has already expired | **Fails** — imports as a success, app says "Signed in" while the chip says expired (A-3) → `04-expired.txt` (b) |
+| 7 | YouTube rate-limits the network ("confirm you're not a bot") with a good file on disk | **Works** — stays signed in, says re-importing won't help → `08-stories.txt` S4 |
+| 8 | Signs out of YouTube everywhere, uses "Forget this sign-in", then imports a new file | **Works**, but disconnecting fires an unasked-for 18-probe sweep and a browser error (A-5) → `08-stories.txt` S5 |
+| 9 | Impatiently double-clicks "Choose cookies.txt" | **Works** — one dialog, one probe → `06-races.txt` (b) |
+| 10 | Uses an extension that writes CRLF, `#HttpOnly_` rows and a non-ASCII cookie value | **Works** → `03-malformed-matrix.txt`, `A-03/matrix.json` |
+| 11 | Nothing found, so presses "Check browsers again" three times | **Works but costly** — 54 yt-dlp processes (A-5) → `08-stories.txt` S6 |
+| 12 | Clears Downloads, then picks the cookies.txt that is no longer there | **Fails** — raw `ENOENT: … open '/abs/path'` in the modal (A-8) → `07-edges.txt` (3) |
+| 13 | Extension dumps every cookie in the profile: a 10.4 MB file | **Inconsistent** — picker installs it, drop refuses it (A-7) → `07-edges.txt` (1) |
+| 14 | Laptop dies while the freshly imported file is being verified | **Works** — file committed and intact, no temp litter, relaunch restores → `07-edges.txt` (6) |
+| 15 | Keyboard-only user completes the sign-in | **Works**, but 19 Tab stops and no focus containment (A-10) → `07-edges.txt` (5) |
+| 16 | Already signed in; exports a fresh file and drops it on the window before the old one rotates | **Fails silently** — nothing happens at all (A-13) → `09-drop-and-copy.txt` |
+| 17 | Upgrades from a pre-4.x install with `clipper.saveDir` set | **Fails** — checklist demands a clips folder the app is already using (A-15) → `05-checklist.txt` older-shape |
+| 18 | Picks a cookies.txt exported from the wrong site (vimeo.com, notyoutube.com) | **Works** — "No YouTube or Google cookies in that file." and the look-alike domain is not mistaken for YouTube → `A-03/matrix.json` |
+
+All paths above are under `audit/out/area-A/captured/`.
 
 ## Coverage
 
@@ -597,14 +632,29 @@ this one works exactly as documented. Defects: A-3, A-4, A-9.
 (`{ok:true}` both times). Disconnect → re-import restores the session. The
 unasked-for sweep it triggers is counted under A-5.
 
-**Setup checklist and gating** — fresh (1 of 6, items 3-9 blocked on "Create a
-campaign", after-cutting also on the clips folder, clip-bank also on "Load a
-video"); half-finished; older settings shape; complete. Blocked rows show
-"Waiting for: …" and hide their action button; done-ness is derived, not
-stored; the optional clip-bank row never counts against progress; the
-channel-data row is correctly absent from a non-owner build. Defects: A-15,
-A-16, plus the fact that in a fresh install the checklist is only reachable
-behind the connect modal (A-1/A-10).
+**Setup checklist and gating** — four cold starts: fresh (1 of 7, items 3-9
+blocked on "Create a campaign", after-cutting also on the clips folder,
+clip-bank also on "Load a video"); half-finished; an older settings shape;
+complete. Blocked rows show "Waiting for: …" and hide their action button,
+exactly as specified. The optional clip-bank row never counts against
+progress. The dependency chain holds under reversal: with the clips folder
+set the list reads 7 of 7; clearing that campaign's `clipsDir` through the
+app's own settings IPC and reloading drops it to 5 of 7, un-ticks "Choose the
+clips folder" and re-blocks "Choose what happens after cutting" with "Waiting
+for: Choose the clips folder" — done-ness really is derived, not stored
+(`audit/out/area-A/captured/13-untick.txt`,
+`audit/out/area-A/A-13/01-after-clearing-clips-folder.png`,
+`audit/run-1/area-A/13-untick.cjs`). Defects: A-15, A-16, plus the fact that
+in a fresh install the checklist is only reachable behind the connect modal
+(A-1/A-10).
+
+Two notes on the checklist that belong to other areas, recorded so the action
+plan is not surprised: `owner:check` returns true on this machine, so the
+owner-only "Choose the channel data folder" row is present and the required
+total is 7, not 6; and because `useOwnerAccess` resolves asynchronously, an
+earlier run of the same script read the list before the gate landed and saw
+"1 of 6", i.e. the total visibly changes under the user shortly after the
+drawer opens. Both point at `src/lib/ownerGate.ts` (area E).
 
 **Interruptions** — the app was SIGKILLed mid-verification, 2.5 s after a drop
 import, while the UI read "Checking those cookies with YouTube…". The cookie

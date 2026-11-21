@@ -84,10 +84,12 @@ await a.win.evaluate(async () => {
 });
 ```
 
-`/api/info`, `/api/transcript`, `/api/download`, `/api/channel/export*` and
-`/api/cache/clear` are **POST**. `/api/download/progress`,
-`/api/auth/youtube/status`, `/api/cache/usage` and
-`/api/channel/export/progress` are **GET**.
+`/api/info`, `/api/transcript`, `/api/download`, `/api/auth/youtube/status`,
+`/api/cache/clear` and `/api/channel/export` + `/api/channel/export/cancel`
+are **POST**. Only `/api/download/progress`, `/api/cache/usage` and
+`/api/channel/export/progress` are **GET**. Sending the wrong verb gets you
+Express's HTML 404, which looks like a missing route rather than a wrong
+method — check here before reporting an endpoint as absent.
 
 ## Seeding state
 

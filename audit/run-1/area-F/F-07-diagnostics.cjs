@@ -39,6 +39,7 @@ function stderrWith(extra) {
   ].join("\n");
 }
 
+const SIGNED_IN = "[debug] Extracted cookies from cookies file\n[debug] Found YouTube account cookies";
 const SHORT = { id: "stub0000001", title: "Stub video", duration: 60, uploader: "Stub channel" };
 
 const UI = () => {
@@ -82,7 +83,7 @@ async function cut(a) {
 
 (async () => {
   const rows = [];
-  L.stub({ exitCode: 0, writeMedia: false, authStderr: null, info: SHORT });
+  L.stub({ exitCode: 0, writeMedia: false, authStderr: SIGNED_IN, authExitCode: 1, info: SHORT });
   const a = await L.boot("F-07-diagnostics", { noStub: true });
   try {
     await a.win.setViewportSize({ width: 1440, height: 900 });
@@ -116,7 +117,7 @@ async function cut(a) {
     ];
 
     for (const [name, stderr, kind] of CASES) {
-      L.stub({ exitCode: 1, stderr, authStderr: null, writeMedia: false, info: SHORT });
+      L.stub({ exitCode: 1, stderr, authStderr: SIGNED_IN, authExitCode: 1, writeMedia: false, info: SHORT });
       await cut(a);
       const ui = await a.win.evaluate(UI);
       rows.push({ case: name, expected: kind, ...ui });
@@ -134,7 +135,7 @@ async function cut(a) {
     await a.shot("case-bad-url");
 
     // ---- a code-level /api/info failure: is Copy diagnostics offered? ----
-    L.stub({ exitCode: 1, stderr: stderrWith("ERROR: Traceback: KeyError: 'streamingData'"), authStderr: null, info: SHORT });
+    L.stub({ exitCode: 1, stderr: stderrWith("ERROR: Traceback: KeyError: 'streamingData'"), authStderr: SIGNED_IN, authExitCode: 1, info: SHORT });
     await setUrl(a, "https://www.youtube.com/watch?v=stub0000002");
     const infoFail = await a.win.evaluate(UI);
     const statusText = await a.win.evaluate(() =>
@@ -145,11 +146,11 @@ async function cut(a) {
     await a.shot("case-info-crash");
 
     // ---- now actually COPY a developer failure and read the clipboard ----
-    L.stub({ exitCode: 0, writeMedia: false, authStderr: null, info: SHORT });
+    L.stub({ exitCode: 0, writeMedia: false, authStderr: SIGNED_IN, authExitCode: 1, info: SHORT });
     await setUrl(a, "https://www.youtube.com/watch?v=stub0000001");
     L.stub({
       exitCode: 1,
-      authStderr: null,
+      authStderr: SIGNED_IN, authExitCode: 1,
       stderr: stderrWith("ERROR: Traceback (most recent call last): TypeError: NoneType object is not subscriptable"),
       info: SHORT,
     });
