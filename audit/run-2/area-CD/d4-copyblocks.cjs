@@ -68,8 +68,29 @@ async function openPanel(a) {
   await a.win.waitForTimeout(900);
 }
 async function closePanel(a) {
-  await a.win.click('button[aria-label="Close copy blocks"]').catch(() => {});
+  await a.win.keyboard.press("Escape").catch(() => {});
   await a.win.waitForTimeout(400);
+  const still = await a.win.evaluate(() => !!document.querySelector('[role="dialog"][aria-label="Copy blocks"]'));
+  if (still) {
+    await a.win.evaluate(() => {
+      const b = document.querySelector('button[aria-label="Close copy blocks"]');
+      if (b) b.click();
+    });
+    await a.win.waitForTimeout(400);
+  }
+  return a.win.evaluate(() => !!document.querySelector('[role="dialog"][aria-label="Copy blocks"]'));
+}
+
+/** Does the panel sit on top of the screen's primary action? */
+async function coversCut(a) {
+  return a.win.evaluate(() => {
+    const cut = document.querySelector("#ui-cut");
+    if (!cut) return "no cut button";
+    const r = cut.getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const inPanel = !!(el && el.closest('[role="dialog"][aria-label="Copy blocks"]'));
+    return { cutRect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], topElement: el ? el.tagName + (el.id ? "#" + el.id : "") : null, coveredByCopyBlocks: inPanel };
+  });
 }
 async function dumpBlocks(a) {
   return a.win.evaluate(() => {
@@ -181,6 +202,7 @@ async function copyBlock(a, id) {
   await openPanel(a);
   const s4 = await dumpBlocks(a);
   say("enabled blocks:", s4.enabled);
+  say("does the open panel cover the Cut button?", await coversCut(a));
   const seg2 = [[4, 12], [18, 22]];
   const want4 = {
     "segment-transcript": linesIn(seg2).map((c) => `[${tc(c[0])}] ${c[2]}`).join("\n"),
@@ -192,7 +214,7 @@ async function copyBlock(a, id) {
     check(`two-segment block ${id}`, await copyBlock(a, `ui-copy-block-${id}`), want);
   }
   await a.shot("04-two-segments");
-  await closePanel(a);
+  say("panel still open after closing it:", await closePanel(a));
 
   // ---------------------------------------------------- state 5: after a real cut
   say("");

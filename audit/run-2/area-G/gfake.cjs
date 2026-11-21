@@ -149,7 +149,7 @@ async function main() {
   if (cfg.delayMs) await sleep(cfg.delayMs);
   // An interrupted download: leave a `.part` beside the output and fail, which
   // is the shape a dropped connection leaves and what resume reads.
-  if (cfg.partialBytes) {
+  if (cfg.partialBytes && !(cfg.partialOnFull && has("--download-sections"))) {
     const out0 = valOf("--output") || valOf("-o");
     if (out0) {
       try {
