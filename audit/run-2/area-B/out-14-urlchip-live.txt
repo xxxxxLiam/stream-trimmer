@@ -1,1 +1,14 @@
-env: 'b14-url-chip-and-live.cjs': No such file or directory
+=== URL bar: /live/ and the stuck chip ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+A. a live-stream link
+  /live/mmmmmmmmmmm -> {"urlBarOpen":true,"chipText":"Reload","markOutDisabled":true,"alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video."}
+  watch?v=mmmmmmmmmmm (the same video) -> {"urlBarOpen":false,"chipText":"Stream M 00:00:30 Change","markOutDisabled":false,"alert":""}
+
+B. Change -> a link that resolves to the same video
+  youtu.be/mmmmmmmmmmm (same id) -> {"urlBarOpen":true,"chipText":"Reload","markOutDisabled":false,"alert":""}
+  pane says it is loaded: "Choose a clips folder in the footer"
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b14-LIVE/01-same-id-url-bar-stuck.png
+  the very same link again -> {"urlBarOpen":true,"chipText":"Reload","markOutDisabled":false,"alert":""}
+  a DIFFERENT video -> {"urlBarOpen":false,"chipText":"Other N 00:00:30 Change","markOutDisabled":false,"alert":""}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b14-LIVE/02-different-video-chip-back.png

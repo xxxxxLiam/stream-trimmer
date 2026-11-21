@@ -1,1 +1,108 @@
-env: 'b11-tab-regressions.cjs': No such file or directory
+=== tab regressions ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+--- 1. 25 seeded tabs ---
+tabs rendered: 25
+element ids: [["ui-mark-in",25],["ui-cut",25],["ui-cut-row",25],["ui-stitched-total",25],["ui-col-centre",25],["ui-source-chip",25]]
+active tab in view: {"activeInView":false,"scrollLeft":0,"scrollWidth":2592,"clientWidth":1421,"newTabButtonInView":false}
+crash: {"rootChildren":1,"bodyLen":909,"boundary":false,"boundaryMessage":null,"panes":25,"answering":true,"reactErrors":[],"reactErrorCount":0,"crashed":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b11-LIVE-25tabs/01-25-tabs.png
+
+--- 2. eight tabs, each with its own clip, then 24 fast switches ---
+eight panes before switching: [{"i":0,"source":"Video AAA00:00:30Change","rows":1,"total":"00:00:02"},{"i":1,"source":"Video BBB00:00:30Change","rows":1,"total":"00:00:09"},{"i":2,"source":"Video CCC00:00:30Change","rows":1,"total":"00:00:09"},{"i":3,"source":"Video AAA00:00:30Change","rows":1,"total":"00:00:09"},{"i":4,"source":"Video BBB00:00:30Change","rows":1,"total":"00:00:09"},{"i":5,"source":"Video CCC00:00:30Change","rows":1,"total":"00:00:09"},{"i":6,"source":"Video AAA00:00:30Change","rows":1,"total":"00:00:09"},{"i":7,"source":"Video BBB 00:00:30 Change","rows":1,"total":"00:00:09"}]
+eight panes after 24 fast switches: [{"i":0,"source":"Video AAA00:00:30Change","rows":1,"total":"00:00:02"},{"i":1,"source":"Video BBB00:00:30Change","rows":1,"total":"00:00:09"},{"i":2,"source":"Video CCC00:00:30Change","rows":1,"total":"00:00:09"},{"i":3,"source":"Video AAA00:00:30Change","rows":1,"total":"00:00:09"},{"i":4,"source":"Video BBB00:00:30Change","rows":1,"total":"00:00:09"},{"i":5,"source":"Video CCC00:00:30Change","rows":1,"total":"00:00:09"},{"i":6,"source":"Video AAA00:00:30Change","rows":1,"total":"00:00:09"},{"i":7,"source":"Video BBB 00:00:30 Change","rows":1,"total":"00:00:09"}]
+every tab kept exactly its own clip: true
+crash: {"rootChildren":1,"bodyLen":1245,"boundary":false,"boundaryMessage":null,"panes":8,"answering":true,"reactErrors":[],"reactErrorCount":0,"crashed":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b11-LIVE/01-eight-tabs-after-switching.png
+
+--- 3. cut in tab 1, then work in tab 2 while it runs ---
+tab 1 mid-cut: {"rows":["1 00:00:01 to 00:00:03 0:02 line 0 alpha says something"],"total":"00:00:02","source":"Video AAA 00:00:30 Change","markIn":"","markOut":"","timelineSegments":2,"bankedOnTimeline":2,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":true,"addDisabled":true,"cancelVisible":true}
+tab 2 while tab 1 downloads: {"rows":["1 00:00:02 to 00:00:11 0:09 line 0 alpha says something"],"addDisabled":true,"cutDisabled":false,"cancelVisible":false,"status":""}
+marking in tab 2 while tab 1 downloads: added rows now: 2
+cutting in tab 2 while tab 1 downloads: clicked
+files on disk: ["C-aaaaaaaaaaa-01.mp4","C-bbbbbbbbbbb-01.mp4"]
+panes after both cuts: [{"i":0,"source":"Video AAA00:00:30Change","rows":0},{"i":1,"source":"Video BBB 00:00:30 Change","rows":0},{"i":2,"source":"Video CCC00:00:30Change","rows":1},{"i":3,"source":"Video AAA00:00:30Change","rows":1},{"i":4,"source":"Video BBB00:00:30Change","rows":1},{"i":5,"source":"Video CCC00:00:30Change","rows":1},{"i":6,"source":"Video AAA00:00:30Change","rows":1},{"i":7,"source":"Video BBB00:00:30Change","rows":1}]
+crash: {"rootChildren":1,"bodyLen":1357,"boundary":false,"boundaryMessage":null,"panes":8,"answering":true,"reactErrors":[],"reactErrorCount":0,"crashed":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b11-LIVE/02-two-tabs-cutting.png
+
+--- 4. close the active tab while its cut runs ---
+engine children during the cut: 1
+dialog shown: ["This tab has a job running. Closing it will cancel that job. Continue?"]
+tabs now: 7
+engine children 4s after closing the tab: 0
+files added by that cut: []
+crash: {"rootChildren":1,"bodyLen":1306,"boundary":false,"boundaryMessage":null,"panes":7,"answering":true,"reactErrors":[],"reactErrorCount":0,"crashed":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b11-LIVE/03-after-closing-active-tab-midcut.png
+
+--- 5. the bank's planned ranges, per tab ---
+[
+ {
+  "i": 0,
+  "shown": false,
+  "source": "Video AAA00:00:30Change",
+  "bankedSpans": [
+   "Banked: hook 00:00:02 to 00:00:06",
+   "Banked: payoff 00:00:12 to 00:00:16"
+  ]
+ },
+ {
+  "i": 1,
+  "shown": false,
+  "source": "Video BBB00:00:30Change",
+  "bankedSpans": []
+ },
+ {
+  "i": 2,
+  "shown": true,
+  "source": "Video AAA 00:00:30 Change",
+  "bankedSpans": [
+   "Banked: hook 00:00:02 to 00:00:06",
+   "Banked: payoff 00:00:12 to 00:00:16"
+  ]
+ },
+ {
+  "i": 3,
+  "shown": false,
+  "source": "Video BBB00:00:30Change",
+  "bankedSpans": []
+ },
+ {
+  "i": 4,
+  "shown": false,
+  "source": "Video CCC00:00:30Change",
+  "bankedSpans": []
+ },
+ {
+  "i": 5,
+  "shown": false,
+  "source": "Video AAA00:00:30Change",
+  "bankedSpans": [
+   "Banked: hook 00:00:02 to 00:00:06",
+   "Banked: payoff 00:00:12 to 00:00:16"
+  ]
+ },
+ {
+  "i": 6,
+  "shown": false,
+  "source": "Video BBB00:00:30Change",
+  "bankedSpans": []
+ }
+]
+  (only the tabs showing Video AAA should carry the two banked spans)
+
+--- 6. saved-files record vs the disk ---
+clipper.downloads: [
+ {
+  "label": "C-aaaaaaaaaaa-01.mp4",
+  "path": "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/clips-b11-LIVE/C-aaaaaaaaaaa-01.mp4"
+ },
+ {
+  "label": "C-bbbbbbbbbbb-01.mp4",
+  "path": "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/clips-b11-LIVE/C-bbbbbbbbbbb-01.mp4"
+ }
+]
+on disk: ["C-aaaaaaaaaaa-01.mp4","C-bbbbbbbbbbb-01.mp4"]
+  C-aaaaaaaaaaa-01.mp4: path exists on disk = true (/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/clips-b11-LIVE/C-aaaaaaaaaaa-01.mp4)
+  C-bbbbbbbbbbb-01.mp4: path exists on disk = true (/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/clips-b11-LIVE/C-bbbbbbbbbbb-01.mp4)
+  C-aaaaaaaaaaa-01.mp4: 1.99s
+  C-bbbbbbbbbbb-01.mp4: 13.01s

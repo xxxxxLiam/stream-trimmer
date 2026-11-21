@@ -12,13 +12,13 @@ measurements `audit/run-2/area-H/out/data/*.json` (+ the captured run logs
 
 | Fix | Verdict | One line |
 |---|---|---|
-| **H-3 / H-4 / B-10** (container query at 960) | **HELD** | Three columns appear at exactly ≥960px of host width; the app's real default 1100x760 gets them with every critical control in view and hit-testable at 0, 2 and 5 segments. Two boundary cases fall outside the fix: the 900px **minimum** window is still below 960 (H2-3), and one zoom step at the default window drops the viewport under 960 (H2-2). |
+| **H-3 / H-4 / B-10** (container query at 960) | **HELD** | Three columns appear at exactly ≥960px of host width; the app's real default 1100x760 gets them with every critical control in view and hit-testable at 0, 2 and 5 segments. Two boundary cases fall outside the fix: the 900px **minimum** window is still below 960 (H2-4), and one zoom step at the default window drops the viewport under 960 (H2-2). |
 | **H-6** (scrollbars) | **HELD** | 36 live scrollers across 29 surface/state combinations: **0 painted gutters**, computed `scrollbar-width: none` on every one, wheel reaches the bottom on every one, and a **real Tab route** reaches every one — including the scrollers with no focusable children. Table below. |
 | **H-1** (disabled Reload at 2.01:1) | **NOT FIXED** — never assigned | Re-measured from computed styles: **2.016:1**, pixel cross-check 1.98:1. `UrlBar.tsx:54` is byte-identical to run 1. Filed as H2-7. |
 | **H-5** (invisible focus on tab close) | **NOT FIXED** — never assigned | Still Tab stop 2 from a cold start; focus ring computes, paint SHA identical before/after. Filed as H2-8. |
-| **H-2** (sign-in modal focus) | **HELD** | Initial focus inside the dialog, **40 of 40 Tab presses stay inside**, the background is inert and aria-hidden through an ancestor, the scrim eats the pointer, Escape closes it. One hole: the portalled Help button (H2-9). |
+| **H-2** (sign-in modal focus) | **HELD** | Initial focus inside the dialog, **40 of 40 Tab presses stay inside**, the background is inert and aria-hidden through an ancestor, the scrim eats the pointer, Escape closes it. One hole: the portalled Help button stays live on top of it (H2-6). |
 | **The sticky primary action** (T10 item 4) | **REGRESSED** | Cut is reachable as claimed, but the 91px sticky row **covers the whole mark bar at every width ≥960 whenever the window is 600–660px tall**, in the scroll position the app presents. Filed as H2-1. |
-| **The portalled help button** (T8) | **HELD** | Box identical to its placeholder (delta 0,0) on 7 screens × 4 sizes, exactly one `#ui-help-button`, placeholder `visibility:hidden` + `pointer-events:none` + `aria-hidden`, no gap, no double control. Its Tab position is wrong (H2-10) and it stays live over the gate (H2-9). |
+| **The portalled help button** (T8) | **HELD** | Box identical to its placeholder (delta 0,0) on 7 screens × 4 sizes, exactly one `#ui-help-button`, placeholder `visibility:hidden` + `pointer-events:none` + `aria-hidden`, no gap, no double control. Two faults remain: its Tab position no longer matches where it is drawn (H2-9), and it stays live and clickable over the sign-in gate (H2-6). |
 
 **Usability at 900x600, the app's own advertised minimum: usable, but the
 mark→cut loop costs a scroll per clip.** Nothing is unreachable. The mark bar is
@@ -115,7 +115,7 @@ across every state the only text colours are `#F5F5F7`, `#969697`, `#909092`,
 `#0B0B0C` (accent.on) and `#FF6363`; the only radii are 5/8/14px plus `9999px`
 for status dots; the only type sizes are 12/13/16/26px. The `#FFFFFF` tier run 1
 found is still absent from the public build and still present on the owner-only
-exporter screen (H2-11). One icon fails: the tab close glyph at **1.00:1**,
+exporter screen (H2-10). One icon fails: the tab close glyph at **1.00:1**,
 which is H2-8, not a colour choice.
 
 ---
@@ -165,11 +165,28 @@ which is H2-8, not a colour choice.
   layout area overlaps the footer by **0px** and the footer is fully visible at
   every size and zoom tested; those readings are the mark bar scrolled out of the
   wrapped scroller, with the footer behind the sampled point.
-- **Proof**: `audit/run-2/area-H/out/data/sticky.json` + `sticky.txt` (the
-  coverage matrix and the scrolled-to-bottom retest),
-  `out/data/breakpoint.txt` (the same coverage in the independent width sweep),
-  `probe-scrollband.cjs` output quoted above,
-  screenshots `out/sticky-1280/*-covered.png`, `out/seg-960x600/*.png`
+- **Proof**: `audit/run-2/area-H/out/data/h2-1-shots.txt` and the screenshots
+  beside it — these are the ones to look at, because `run-sticky.cjs` took its
+  own shots *after* the scrolled-to-bottom retest and so shows the cleared
+  state. `shots-h2-1.cjs` re-reads the hit test in the same frame as each
+  picture, at `scrollTop 0`:
+  ```
+  1280x600 5seg  scrollTop=0/429  cutRow sticky 471..562
+      In           y 481..517  reaches 0/9  covered by #ui-cut-row,#ui-stitched-total
+      Out          y 481..517  reaches 0/9  covered by #ui-cut-row,#ui-stitched-total
+      Whole video  y 481..517  reaches 0/9  covered by #ui-cut-row,#ui-stitched-total
+      Add segment  y 481..517  reaches 0/9  covered by #ui-cut-row
+      Cut          y 513..549  reaches 9/9
+  960x600  5seg   In/Out/Whole 9/9, Add segment 486..522 reaches 0/9
+  1100x620 5seg   In/Out/Whole and Add segment all 0/9
+  1440x900 at 150% zoom (CSS 960x600), 5 seg: Add segment 485..521 reaches 0/9
+  ```
+  `out/h2-1-shots/09-1280x600-5seg-scrolltop0.png` shows it plainly: of the mark
+  bar only a 10px sliver of the "In / Out" row survives above the pinned
+  "Stitched total · Cut as one file" panel.
+  Also: `out/data/sticky.json` + `sticky.txt` (the full coverage matrix and the
+  scrolled-to-bottom retest), `out/data/breakpoint.txt` (the same coverage found
+  independently in the width sweep), `probe-scrollband.cjs` output quoted above
 - **Suspected file**: `src/styles.css:420-423` (`.cut-row { position: sticky; bottom: 0 }` inside `@container (min-width: 960px)` — the guard is on width only), `src/components/MarkBar.tsx:404-405`
 
 ---

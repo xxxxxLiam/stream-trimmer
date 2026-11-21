@@ -1,1 +1,53 @@
-env: 'b10-headline-and-frames.cjs': No such file or directory
+=== headline assertion + frame identity ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+--- 1. the normal (sectioned) path ---
+  stitched total readout: 00:00:13 (expect 00:00:13)
+  saved toast: yes; alerts: []
+  files this cut added: ["Headline [00-00-02-00-00-28].mp4"]  (expect exactly 1)
+  Headline [00-00-02-00-00-28].mp4: decoded=13.01s container=13.02s  (expect ~13.0)
+  frames vs source: {
+    "sourceFrames": 750,
+    "sourceFps": 25,
+    "clipFrames": 326,
+    "clipFps": 25,
+    "markedFrames": 325,
+    "deliveredDistinctSourceFrames": 325,
+    "framesFromBeforeEveryInPoint": 0,
+    "framesOutsideEveryMark": 0,
+    "firstMatchedSourceTime": 2,
+    "lastMatchedSourceTime": 27.96,
+    "worstDistance": 0.05,
+    "smallestMargin": 0.27,
+    "outsideSamples": []
+  }
+  sections the engine was asked for: ["*2.00-7.00","*20.00-28.00","*2.00-7.00","*20.00-28.00"]
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b10-LIVE/01-sectioned-cut.png
+
+--- 2. the whole-file + LOCAL TRIM path (sectioned download 403s) ---
+    this is the path T1 changed for G-4; the sectioned path never reaches it
+  stitched total readout: 00:00:13 (expect 00:00:13)
+  saved toast: yes; alerts: []
+  files this cut added: ["Headline [00-00-02-00-00-28] 2.mp4"]  (expect exactly 1)
+  Headline [00-00-02-00-00-28] 2.mp4: decoded=13.01s container=13.02s  (expect ~13.0)
+  frames vs source: {
+    "sourceFrames": 750,
+    "sourceFps": 25,
+    "clipFrames": 326,
+    "clipFps": 25,
+    "markedFrames": 325,
+    "deliveredDistinctSourceFrames": 325,
+    "framesFromBeforeEveryInPoint": 0,
+    "framesOutsideEveryMark": 0,
+    "firstMatchedSourceTime": 2,
+    "lastMatchedSourceTime": 27.96,
+    "worstDistance": 0.12,
+    "smallestMargin": 0.25,
+    "outsideSamples": []
+  }
+  sections the engine was asked for: ["*2.00-7.00","*2.00-7.00"]
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b10-LIVE/02-local-trim-cut.png
+
+all files: ["Headline [00-00-02-00-00-28] 2.mp4","Headline [00-00-02-00-00-28].mp4"]
+downloads recorded: [{"label":"Headline [00-00-02-00-00-28].mp4","detail":"Downloaded at 360p."},{"label":"Headline [00-00-02-00-00-28].mp4","detail":"Downloaded at 360p."}]
+pane at the end: {"rows":[],"total":"00:00:00","source":"Headline 00:00:30 Change","markIn":"","markOut":"","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"00:00:30 clip · MP4","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}

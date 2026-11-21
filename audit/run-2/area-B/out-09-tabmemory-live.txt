@@ -16,3 +16,10 @@ tab 1 after all of that: {"rows":["1 00:00:10 to 00:00:20 0:10 line 2 charlie sa
 persisted before quitting: {"tabs":[{"id":"ws_mwqyd21e_ay8pw","name":"","url":"https://www.youtube.com/watch?v=hhhhhhhhhhh","segments":[{"start":10,"end":20},{"start":60,"end":90}]},{"id":"ws_mwqyd4op_oiamr","name":"","url":"https://www.youtube.com/watch?v=iiiiiiiiiii"}],"activeId":"ws_mwqyd21e_ay8pw"}
 
 === relaunch ===
+tabs after relaunch: ["Memory AAA","Memory BBB"]
+active pane: {"rows":[],"total":"00:10:00","source":"Memory AAA 00:10:00 Change","markIn":"","markOut":"00:10:00","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"Choose a clips folder in the footer","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":false,"cancelVisible":false}
+every pane after relaunch: [{"i":0,"shown":true,"source":"Memory AAA 00:10:00 Change","rows":[]},{"i":1,"shown":false,"source":"Memory BBB00:10:00Change","rows":[]}]
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b09-LIVE-relaunch/01-relaunched.png
+second tab after relaunch: {"rows":[],"total":"00:10:00","source":"Memory BBB 00:10:00 Change","markIn":"","markOut":"00:10:00","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"Choose a clips folder in the footer","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":false,"cancelVisible":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b09-LIVE-relaunch/02-relaunched-tab2.png
+persisted after relaunch: {"tabs":[{"id":"ws_mwqyd21e_ay8pw","name":"","url":"https://www.youtube.com/watch?v=hhhhhhhhhhh"},{"id":"ws_mwqyd4op_oiamr","name":"","url":"https://www.youtube.com/watch?v=iiiiiiiiiii"}],"activeId":"ws_mwqyd4op_oiamr"}
