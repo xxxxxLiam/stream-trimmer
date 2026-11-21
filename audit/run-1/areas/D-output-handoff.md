@@ -15,8 +15,10 @@ stub as `cwd` and real `ffmpeg`/`ffprobe`. Scripts live in
   the generator produced for the hostile-input matrix, was checked with
   `xmllint --noout` (well-formedness) and `xmllint --noout --dtdvalid
   FCPXMLv1_10.dtd` (Apple's real FCPXML 1.10 DTD, which also enforces element
-  **order** through its content models). 24 documents in
-  `audit/run-1/area-D/out/fcpxml/`, 5 more in `.../out/handoff/`.
+  **order** through its content models). **34 documents, all valid**: 24 under
+  `audit/run-1/area-D/out/fcpxml/` plus 10 the running app wrote, under
+  `out/handoff/`, `out/stories/`, `out/three/` and `out/batch/`. Re-check with:
+  `find audit/run-1/area-D/out -name '*.fcpxml' -print0 | while IFS= read -r -d '' f; do xmllint --noout --dtdvalid <dtd> "$f"; done`
 - **Real clipboard.** Symbol and copy-block assertions read the system
   clipboard back through `navigator.clipboard.readText()` and compare code
   point by code point against the product's own data. Nothing was eyeballed.
@@ -343,10 +345,12 @@ Findings: **3 blocker, 7 major, 13 minor, 2 polish** (25 in all).
     `buildSessionFcpxml`'s `try` only wraps the probe loop (`fcpxml.ts:834-844`).
   - C: the same clip is **accepted** and the document is DTD-valid, so the two
     code paths disagree about whether it is usable.
-  In the app this surfaces as the Send button producing a one-line error and no
-  file (see `audit/run-1/area-D/out/handoff/04-library-missing.png` for the
-  same shape of refusal).
-- **Proof**: captured output of `audit/run-1/area-D/25-batch-abort.cjs`;
+  The defect is in the generator, which is where it is confirmed; the UI path
+  into it was **not** reproduced, because the yt-dlp stub cannot produce a
+  sub-frame file through a real download. What the user would see is the Send
+  button's one-line error with no file written, the shape of refusal captured
+  in `audit/run-1/area-D/out/handoff/04-library-missing.png`.
+- **Proof**: `audit/run-1/area-D/out/logs/batch-abort.log` (cases A, B, C);
   `audit/run-1/area-D/out/batch/C-subframe-media-only.fcpxml` (the same clip,
   accepted, `DTD: OK`)
 - **Suspected file**: `src/lib/fcpxml.ts:671, 702, 832-848`
@@ -820,7 +824,7 @@ suspected and they hold up.
   LIBRARY PATHS section of `20-fcpxml-matrix.cjs`, and
   `70-state-order-drag.cjs` part 3 (`was a library created at the bad path?
   false`).
-- **D-PASS-3 — the FCPXML is valid, including element order.** 29 documents
+- **D-PASS-3 — the FCPXML is valid, including element order.** 34 documents
   validated against Apple's FCPXML 1.10 DTD with
   `xmllint --dtdvalid`: one segment, several segments, several clips at mixed
   frame rates (25 and 30000/1001 in one document), a sub-frame clip, a clip

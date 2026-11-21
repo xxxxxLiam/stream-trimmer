@@ -102,7 +102,7 @@ async function switchTo(a, name) {
     // ---- 6. sort by tier to cut the T1s first
     await a.win.click('#ui-col-clips button:has-text("Sort by tier")');
     await a.win.waitForTimeout(300);
-    const order = (await colText(a)).split("\n").filter((l) => /^[SM]\d\d /.test(l.trim()));
+    const order = (await colText(a)).split("\n").filter((l) => /^(T\d-)?[A-Z]\d\d /.test(l.trim()));
     log("6. order after Sort by tier:", JSON.stringify(order));
     log("6. shot:", await a.shot("story6-sorted"));
 
@@ -138,9 +138,10 @@ async function switchTo(a, name) {
     log("9. row now:", JSON.stringify((await colText(a)).split("\n").filter((l) => /repentance|apology/.test(l))));
 
     // ---- 10. delete a row today, re-import the same block tomorrow
-    await a.win.locator('#ui-col-clips button[aria-label^="Remove M02"]').click();
+    await a.win.locator('#ui-col-clips button[aria-label*="M02"]').first().click();
     await a.win.waitForTimeout(300);
     log("10. after deleting M02:", await line(a, /clips/));
+    log("10. rows now:", JSON.stringify(bankOf(a, "southbay-launch").map((c) => c.id)));
     log("10. re-importing the same block:", await importBlock(a, messy));
     log("10. M02 is back:", (await colText(a)).includes("the laugh"));
 
