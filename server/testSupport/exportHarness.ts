@@ -13,6 +13,7 @@ import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 
 // Resolved from the working directory rather than from this file's own
 // location, so the harness works whether it is run directly by tsx or from a
@@ -327,4 +328,103 @@ export function readCsvFile(file: string): Record<string, string>[] {
     header.forEach((name, i) => (out[name] = cells[i] ?? ""));
     return out;
   });
+}
+
+/**
+ * Counts the data rows of a CSV and returns the last one, holding only a
+ * single row in memory.
+ *
+ * The streaming test deliberately produces a transcripts.csv larger than the
+ * heap the exporter is allowed, to prove the exporter streams. Asserting that
+ * with readCsvFile then undoes the point: it pulls the whole file into one
+ * string and builds an object per row, so the *test* process needs gigabytes
+ * and aborts with SIGABRT on a smaller machine. That is what turned CI red
+ * while the exporter itself was behaving.
+ *
+ * Rows are counted by scanning for newlines outside quotes rather than by
+ * splitting lines, because a quoted field may legally contain one.
+ */
+export function scanCsvFile(file: string): {
+  rows: number;
+  last: Record<string, string>;
+} {
+  const fd = fs.openSync(file, "r");
+  const buf = Buffer.allocUnsafe(1 << 20);
+  const decoder = new StringDecoder("utf8");
+
+  let inQuotes = false;
+  let pendingQuote = false; // saw a quote inside quotes; "" is an escaped one
+  let sawCR = false; // outside quotes: only \r\n ends a row, as parseCsv does
+  let current = "";
+  let lastComplete = "";
+  let headerLine: string | null = null;
+  let rows = 0;
+
+  const endRow = () => {
+    const line = current;
+    current = "";
+    if (headerLine === null) {
+      headerLine = line;
+      return;
+    }
+    if (line === "") return; // trailing newline at EOF
+    rows += 1;
+    lastComplete = line;
+  };
+
+  try {
+    for (;;) {
+      const read = fs.readSync(fd, buf, 0, buf.length, null);
+      if (read === 0) break;
+      const chunk = decoder.write(buf.subarray(0, read));
+      for (const ch of chunk) {
+        if (pendingQuote) {
+          pendingQuote = false;
+          if (ch === '"') {
+            current += '""';
+            continue;
+          }
+          inQuotes = false;
+          current += '"';
+          // fall through and handle ch normally
+        }
+        if (inQuotes) {
+          if (ch === '"') pendingQuote = true;
+          else current += ch;
+          continue;
+        }
+        if (sawCR) {
+          sawCR = false;
+          if (ch === "\n") {
+            endRow();
+            continue;
+          }
+          current += "\r";
+          // fall through: this character is ordinary
+        }
+        if (ch === "\r") {
+          sawCR = true;
+          continue;
+        }
+        if (ch === '"') {
+          inQuotes = true;
+          current += ch;
+          continue;
+        }
+        current += ch;
+      }
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+  current += decoder.end();
+  if (pendingQuote) current += '"';
+  if (sawCR) current += "\r";
+  if (current !== "") endRow();
+
+  const header = headerLine === null ? [] : (parseCsv(headerLine)[0] ?? []);
+  const cells = lastComplete === "" ? [] : (parseCsv(lastComplete)[0] ?? []);
+  const last: Record<string, string> = {};
+  header.forEach((name, i) => (last[name] = cells[i] ?? ""));
+  return { rows, last };
 }
