@@ -67,6 +67,21 @@ function __saveCookies() {
   }
 }
 process.on("exit", __saveCookies);
+
+// The shared stub checks cfg.exitCode before it answers --version, so setting
+// it makes the version probe fail too and server/index.ts then prefers a
+// SYSTEM yt-dlp (which would reach the network). These flags fail only the
+// invocations a test means to fail, leaving --version answerable.
+{
+  const isVersion = argv.includes("--version");
+  const isJson = argv.includes("-J") || argv.includes("--dump-json") || argv.includes("--dump-single-json");
+  const isDownload = !isVersion && !isJson;
+  const code = (isJson && cfg.failJson) || (isDownload && cfg.failDownload) || 0;
+  if (code) {
+    if (cfg.failStderr) process.stderr.write(String(cfg.failStderr) + "\\n");
+    process.exit(Number(code));
+  }
+}
 `;
 
 // Insert right after the stub's own argv helpers are defined.

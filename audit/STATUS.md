@@ -1,21 +1,21 @@
 # Audit run 1 — live status
 
-Generated 2026-11-21 18:58:18 UTC by `node audit/status.cjs`. Re-run it to refresh.
+Generated 2026-11-21 19:05:17 UTC by `node audit/status.cjs`. Re-run it to refresh.
 
-**4 of 8 area reports written.** 150 test scripts, 482 screenshots, 306 captured output files.
+**6 of 8 area reports written.** 160 test scripts, 513 screenshots, 342 captured output files.
 
 A helper writes its report last, so an area with no report is still running.
 
 | Area | | Scripts | Shots | Captures | Last wrote | Report |
 |---|---|--:|--:|--:|---|---|
-| **A** | Onboarding and sign-in | 15 | 39 | 74 | 18m ago | done |
-| **B** | Core clipping loop | 19 | 60 | 13 | 8s ago | running |
-| **C** | Clip bank and campaigns | 19 | 58 | 38 | 23s ago | running |
-| **D** | Output and editor handoff | 23 | 52 | 41 | 51s ago | done |
-| **E** | Channel data and owner gate | 22 | 55 | 34 | 8m ago | done |
-| **F** | Help, diagnostics and updates | 25 | 144 | 54 | 5s ago | running |
-| **G** | Server and jobs | 11 | 0 | 25 | 10s ago | running |
-| **H** | Accessibility and layout | 16 | 74 | 27 | 8m ago | done |
+| **A** | Onboarding and sign-in | 15 | 39 | 74 | 25m ago | done |
+| **B** | Core clipping loop | 22 | 77 | 19 | 42s ago | running |
+| **C** | Clip bank and campaigns | 21 | 61 | 43 | 37s ago | done |
+| **D** | Output and editor handoff | 23 | 52 | 41 | 8m ago | done |
+| **E** | Channel data and owner gate | 22 | 55 | 34 | 15m ago | done |
+| **F** | Help, diagnostics and updates | 26 | 155 | 60 | 5m ago | done |
+| **G** | Server and jobs | 15 | 0 | 44 | 88s ago | running |
+| **H** | Accessibility and layout | 16 | 74 | 27 | 15m ago | done |
 
 ## Findings so far
 
@@ -26,10 +26,12 @@ scratch, and false alarms are dropped before the action plan.
 | Area | Blocker | Major | Minor | Polish |
 |---|--:|--:|--:|--:|
 | A — Onboarding and sign-in | 1 | 5 | 9 | 1 |
+| C — Clip bank and campaigns | 1 | 6 | 8 | 2 |
 | D — Output and editor handoff | 3 | 7 | 13 | 2 |
 | E — Channel data and owner gate | 3 | 5 | 6 | 1 |
+| F — Help, diagnostics and updates | 2 | 8 | 9 | 1 |
 | H — Accessibility and layout | 0 | 6 | 7 | 5 |
-| **Total** | **7** | **23** | **35** | **9** |
+| **Total** | **10** | **37** | **52** | **12** |
 
 ## Where the evidence is
 

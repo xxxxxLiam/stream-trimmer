@@ -55,8 +55,13 @@ async function addSegment(a, i, o) {
   await row.click();
   await a.win.waitForTimeout(400);
   console.log("  after clicking the line:", JSON.stringify(await live(a).then((l) => ({ in: l.markIn, out: l.markOut }))));
-  await search.fill("");
-  await a.win.waitForTimeout(600);
+  // NOTE: clearing the search box crashes the app (see t13b), so the only way
+  // on from here is a reload — which is itself the bug's cost.
+  await a.win.reload();
+  await a.win.waitForLoadState("domcontentloaded");
+  await a.win.waitForFunction(() => document.querySelectorAll("#ui-mark-in").length > 0, null, { timeout: 30000 });
+  await a.win.waitForFunction(() => !document.querySelector("div.fixed.inset-0.z-50"), null, { timeout: 45000 });
+  await loadLive(a, "https://www.youtube.com/watch?v=stub0000001", 3000);
 
   // ---- Story 2: shift-click two transcript lines to set a range ----------
   console.log("\n## Story 2 — shift-click two transcript lines to set the range");

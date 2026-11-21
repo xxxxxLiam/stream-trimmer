@@ -246,6 +246,55 @@ async function section(name, fn) {
     return r;
   });
 
+
+  // --------------------------------------------------------------- 10
+  await section("same-key race: job B deletes job A's work in flight", async () => {
+    S.setStub(stub, { info: { id: "stub0000001", title: "Stub", duration: 30 }, delayMs: 2500 });
+    const s = await S.start({ stub });
+    const segs = [{ start: 0, end: 4 }, { start: 10, end: 14 }, { start: 20, end: 24 }];
+    const a = s.open("POST", "/api/download?jobId=job_key_a", { body: JSON.stringify(DL(segs)), headers: { "content-type": "application/json" } });
+    // Long enough for A to have finished at least one segment file.
+    await new Promise((r) => setTimeout(r, 4000));
+    const b = s.open("POST", "/api/download?jobId=job_key_b", { body: JSON.stringify(DL(segs)), headers: { "content-type": "application/json" } });
+    const [ra, rb] = [await a.wait(180000), await b.wait(180000)];
+    const parse = (x) => { try { return JSON.parse(x.body || "{}"); } catch { return { unparsable: (x.body || "").slice(0, 200) }; } };
+    const pa = parse(ra), pb = parse(rb);
+    const r = {
+      statuses: [ra.status, rb.status],
+      bodies: [JSON.stringify(pa).slice(0, 300), JSON.stringify(pb).slice(0, 300)],
+      samePath: pa.path && pa.path === pb.path,
+      sizes: [pa.size, pb.size],
+      pathExistsNow: pa.path ? fs.existsSync(pa.path) : null,
+      logJoin: s.log().split("\n").filter((l) => /join|segment|job_key_/.test(l)).slice(-16),
+    };
+    log(`  ${JSON.stringify(r, null, 1)}`);
+    await s.stop();
+    return r;
+  });
+
+  // --------------------------------------------------------------- 11
+  await section("mp3 with an unvalidated quality string", async () => {
+    S.setStub(stub, { info: { id: "stub0000001", title: "Stub", duration: 30 } });
+    const s = await S.start({ stub });
+    const r = {};
+    for (const q of ["192", "../../etc/passwd", "320; touch /tmp/g-pwn2", "9999999"]) {
+      s.resetLogs();
+      const res = await s.json("POST", "/api/download", { url: S.YT, deliver: "path", format: "mp3", quality: q, segments: [{ start: 0, end: 2 }] });
+      const flat = s.argvLog().map((x) => x.argv).filter((x) => !x.includes("--version"));
+      r[q] = {
+        status: res.status,
+        isJson: /application\/json/.test(res.contentType || ""),
+        body: (res.body || "").slice(0, 300),
+        audioQualityArg: (() => { for (const a of flat) { const i = a.indexOf("--audio-quality"); if (i >= 0) return a[i + 1]; } return null; })(),
+      };
+      log(`  quality=${JSON.stringify(q)} -> ${JSON.stringify(r[q])}`);
+    }
+    r.pwnFileCreated = fs.existsSync("/tmp/g-pwn2");
+    log(`  canary /tmp/g-pwn2 created: ${r.pwnFileCreated}`);
+    await s.stop();
+    return r;
+  });
+
   fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify(out, null, 2));
   log(`\n\nresults: ${path.join(OUT, "results.json")}`);
   log("SUMMARY-DONE");
