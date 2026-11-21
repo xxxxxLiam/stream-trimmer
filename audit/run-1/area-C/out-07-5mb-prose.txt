@@ -1,0 +1,10 @@
+[C07] mode prose bytes 5100000 lines 85001
+[C07] value set + input dispatched, returned after 2204 ms
+[C07] preview painted: true after 19528 ms; alive
+[C07] headline: ["0 clips, 0 segments, 0:00 in total","","0 with a category, 0 without"]
+[C07] error <li> count in DOM: 85000
+[C07] shot: /home/user/stream-trimmer/audit/out/area-C/C07-5mb-prose/01-5mb.png
+[C07] Cancel worked after 2373 ms
+[C07] final: alive
+[C07] pageErrors: []
+[C07] console tail: ["[warning] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security\n  Policy set or a policy with \"unsafe-eval\" enabled. This exposes users of\n  this app to unnecessary security risks.\n\nFor more information and help, consult\nhttps://electronjs.org/docs/tutorial/security.\nThis warning will not show up\nonce the app is packaged.","[error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED","[error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"]

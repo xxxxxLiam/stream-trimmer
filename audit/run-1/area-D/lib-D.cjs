@@ -8,7 +8,7 @@ const path = require("node:path");
 const { launchApp } = require("/home/user/stream-trimmer/audit/harness/app.cjs");
 
 const SCRATCH = "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad";
-const STUB = `${SCRATCH}/stubD`;
+const STUB = `${SCRATCH}/stubD2`;
 
 /** A synthetic Netscape cookies.txt, which is what the product actually parses. */
 function cookiesTxt() {
@@ -57,17 +57,34 @@ function folders(label) {
 async function boot(opts) {
   const a = await launchApp({ cwd: STUB, ...opts });
   await a.win.waitForSelector("header", { timeout: 25000 });
-  await a.win.evaluate(
-    async (text) => await window.electronAPI.importYouTubeCookiesText(text),
-    cookiesTxt(),
-  );
-  // The gate watches the session; give the probe a moment, then confirm.
-  for (let i = 0; i < 40; i++) {
-    const gated = await a.win.evaluate(
-      () => !!document.querySelector('[aria-labelledby="youtube-connect-title"], [role="status"][aria-live="polite"]'),
+  // Get past the YouTube gate the way a user does: drop a cookies.txt on the
+  // window. This runs the product's own drop handler and import path.
+  const drop = async () => {
+    await a.win.evaluate(async (text) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([text], "cookies.txt", { type: "text/plain" }));
+      window.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true }));
+      window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    }, cookiesTxt());
+  };
+  const gated = async () =>
+    await a.win.evaluate(() => !!document.querySelector('[aria-labelledby="youtube-connect-title"]'));
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await a.win.waitForTimeout(1500);
+    if (!(await gated())) break;
+    await drop();
+    for (let i = 0; i < 24; i++) {
+      if (!(await gated())) break;
+      await a.win.waitForTimeout(500);
+    }
+    if (!(await gated())) break;
+  }
+  if (await gated()) {
+    const why = await a.win.evaluate(
+      () => document.querySelector('[aria-labelledby="youtube-connect-title"]').innerText.slice(0, 500),
     );
-    if (!gated) break;
-    await a.win.waitForTimeout(500);
+    throw new Error("could not get past the YouTube sign-in gate:\n" + why);
   }
   return a;
 }

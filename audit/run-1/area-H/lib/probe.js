@@ -250,6 +250,43 @@
     return out;
   };
 
+  /**
+   * Dominant colour on a horizontal scanline segment of the loaded screenshot.
+   * Used to read a focus ring off the real pixels: the ring band sits a few px
+   * outside the control, the comparison band a few px further out again.
+   */
+  H.stripColor = (x1, x2, y) => {
+    if (!CTX) return null;
+    const X = Math.max(0, Math.round(x1 * SCALE));
+    const W = Math.max(1, Math.round((x2 - x1) * SCALE));
+    const Y = Math.round(y * SCALE);
+    if (Y < 0 || Y >= CANVAS.height || X >= CANVAS.width) return null;
+    const d = CTX.getImageData(X, Y, Math.min(W, CANVAS.width - X), 1).data;
+    const counts = new Map();
+    for (let i = 0; i < d.length; i += 4) {
+      const k = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    let best = null, n = -1;
+    for (const [k, c] of counts) if (c > n) { n = c; best = k; }
+    return { hex: hex({ r: (best >> 16) & 255, g: (best >> 8) & 255, b: best & 255 }), share: n / (d.length / 4) };
+  };
+
+  /** Reads a focused control's indicator band and the background beside it. */
+  H.ringBands = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const mid = { x1: r.left + r.width * 0.25, x2: r.left + r.width * 0.75 };
+    const out = {};
+    for (const off of [1, 2, 3, 4, 5, 8, 12]) {
+      out["above" + off] = H.stripColor(mid.x1, mid.x2, Math.round(r.top - off));
+    }
+    out.inside = H.stripColor(mid.x1, mid.x2, Math.round(r.top + 2));
+    out.rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+    return out;
+  };
+
   // ---- 2/3. focusables, names, semantics -------------------------------
   const FOCUSABLE =
     'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable="true"]';

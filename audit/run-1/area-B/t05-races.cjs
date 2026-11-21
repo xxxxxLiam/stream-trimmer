@@ -12,6 +12,17 @@ const { live, allPanes, S, loadLive, markLive } = require("./live.cjs");
 const STUB = process.env.STUB || "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/stubB";
 const CLIPS = "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/clips-t05";
 
+/** Wait until no download is in flight in the visible tab. */
+async function waitIdle(a, ms = 90000) {
+  const t0 = Date.now();
+  for (;;) {
+    const l = await live(a);
+    if (!l || !l.cancelVisible) return true;
+    if (Date.now() - t0 > ms) return false;
+    await a.win.waitForTimeout(500);
+  }
+}
+
 const tmpJobs = () =>
   fs.readdirSync("/tmp").filter((d) => d.startsWith("ytclip-"));
 const listClips = () => fs.readdirSync(CLIPS).sort();
@@ -53,7 +64,7 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   await cut.dblclick();
   await a.win.waitForTimeout(400);
   console.log("cut disabled during run:", await cut.isDisabled(), "cancel visible:", (await live(a)).cancelVisible);
-  await a.win.waitForTimeout(16000);
+  await waitIdle(a);
   console.log("clips after double-click:", JSON.stringify(listClips()));
   console.log("download rows in state:", (a.readState()["clipper.downloads"] || []).length);
   console.log("shot:", await a.shot("double-click"));
@@ -64,7 +75,7 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   await markLive(a, "00:00:01", "00:00:04");
   await a.win.click(S.add);
   await a.win.click(S.cut);
-  await a.win.waitForTimeout(14000);
+  await waitIdle(a);
   const twice = listClips();
   console.log("clips now:", JSON.stringify(twice));
   console.log("  (same filename twice => overwritten, or suffixed?)");
@@ -90,7 +101,7 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   const cutDisabledNow = await a.win.locator(S.cut).isDisabled();
   console.log("cut disabled immediately after cancel:", cutDisabledNow);
   await a.win.click(S.cut);
-  await a.win.waitForTimeout(14000);
+  await waitIdle(a);
   console.log("clips after re-cut:", JSON.stringify(listClips()));
   console.log("segments left:", JSON.stringify((await live(a)).rows));
   console.log("shot:", await a.shot("after-recut"));
@@ -109,7 +120,7 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   await a.win.keyboard.press("Enter");
   await a.win.waitForTimeout(2500);
   console.log("mid-cut after URL change:", JSON.stringify(await live(a)));
-  await a.win.waitForTimeout(16000);
+  await waitIdle(a);
   console.log("after it settles:", JSON.stringify(await live(a)));
   console.log("clips:", JSON.stringify(listClips()));
   console.log("downloads in state:", JSON.stringify((a.readState()["clipper.downloads"] || []).map((d) => d.label)));
@@ -118,6 +129,7 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   // --- 5. delete / reorder a segment mid-cut ------------------------------
   console.log("\n=== 5. delete and reorder a segment mid-cut ===");
   stub.write({ delayMs: 0, info: { id: "stub0000001", title: "Race video", duration: 30, uploader: "Ch" } });
+  await waitIdle(a);
   await a.win.locator("#ui-source-chip button:has-text('Change')").locator("visible=true").first().click();
   await a.win.locator(S.urlInput).first().fill("https://www.youtube.com/watch?v=stub0000001");
   await a.win.keyboard.press("Enter");
@@ -138,7 +150,7 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   await a.win.locator('button[aria-label="Remove segment 2"]').locator("visible=true").first().click();
   await a.win.waitForTimeout(200);
   console.log("segments after deleting #2 mid-cut:", JSON.stringify((await live(a)).rows));
-  await a.win.waitForTimeout(30000);
+  await waitIdle(a);
   const after5 = listClips().filter((f) => !before5.includes(f));
   console.log("new clip(s):", JSON.stringify(after5));
   for (const f of after5) {
@@ -165,7 +177,8 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   await a.win.click(S.add);
   console.log("tab2 before its cut — ALL PANES:", JSON.stringify(await allPanes(a)));
   await a.win.click(S.cut);
-  await a.win.waitForTimeout(25000);
+  await waitIdle(a);
+  await a.win.waitForTimeout(3000);
   console.log("both tabs settled. clips:", JSON.stringify(listClips()));
   console.log("downloads in state:", JSON.stringify((a.readState()["clipper.downloads"] || []).map((d) => d.label)));
   console.log("shot:", await a.shot("two-tabs-cutting"));
@@ -189,7 +202,7 @@ const listClips = () => fs.readdirSync(CLIPS).sort();
   console.log("confirm dialog text:", JSON.stringify(dialogText));
   console.log("tabs after close:", (await a.win.locator(S.wsTabs).allInnerTexts()).map((t) => t.trim()));
   const beforeClose = listClips();
-  await a.win.waitForTimeout(20000);
+  await a.win.waitForTimeout(25000);
   console.log("clips added after closing mid-cut:", JSON.stringify(listClips().filter((f) => !beforeClose.includes(f))));
   console.log("jobs left in /tmp:", JSON.stringify(tmpJobs()));
   console.log("shot:", await a.shot("closed-midcut"));

@@ -1,0 +1,16 @@
+[C06:200] keystroke "S" -> 144 ms
+[C06:200] keystroke "4" -> 60 ms
+[C06:200] keystroke "9" -> 32 ms
+[C06:200] keystroke "9" -> 34 ms
+[C06:200] keystroke "9" -> 49 ms
+[C06:200] total for 5 keystrokes: 319 ms; per key: [144,60,32,34,49]
+[C06:200] count line now: 0 of 200 clips
+[C06:200] shot: /home/user/stream-trimmer/audit/out/area-C/C06-latency-200/01-after-typing.png
+[C06:5000] keystroke "S" -> 1950 ms
+[C06:5000] keystroke "4" -> 1014 ms
+[C06:5000] keystroke "9" -> 198 ms
+[C06:5000] keystroke "9" -> 68 ms
+[C06:5000] keystroke "9" -> 50 ms
+[C06:5000] total for 5 keystrokes: 3280 ms; per key: [1950,1014,198,68,50]
+[C06:5000] count line now: 1 of 5000 clips
+[C06:5000] shot: /home/user/stream-trimmer/audit/out/area-C/C06-latency-5000/01-after-typing.png
