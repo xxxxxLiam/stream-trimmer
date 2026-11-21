@@ -12,7 +12,7 @@
 const { boot, live, loadLive, markLive, stubRoot, S } = require("./lib.cjs");
 
 const SCRATCH = "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2";
-const STUB = process.env.STUB || `${SCRATCH}/stub`;
+const STUB = process.env.STUB || `${SCRATCH}/stub2`; // per-URL info: each tab must get its own video
 const ROOT = process.env.ROOT || "/home/user/stream-trimmer";
 const TAG = process.env.TAG || ROOT.split("/").pop();
 
@@ -21,7 +21,14 @@ const tabNames = (a) => a.win.locator(S.wsTabs).allInnerTexts().then((t) => t.ma
 (async () => {
   console.log(`=== B-8 tab memory ===\nROOT=${ROOT}  TAG=${TAG}`);
   const stub = stubRoot(STUB);
-  stub.write({ info: { id: "hhhhhhhhhhh", title: "Memory AAA", duration: 600, uploader: "Ch" }, transcriptLines: 8 });
+  stub.write({
+    info: { id: "hhhhhhhhhhh", title: "Memory AAA", duration: 600, uploader: "Ch" },
+    transcriptLines: 8,
+    // Answer each probe about the video it was actually asked about, so a restored
+    // workspace cannot look right (or wrong) by accident.
+    infoFromUrl: true,
+    titles: { hhhhhhhhhhh: "Memory AAA", iiiiiiiiiii: "Memory BBB" },
+  });
 
   const a = await boot({ label: `b09-${TAG}`, root: ROOT, stub: STUB, viewport: { width: 1440, height: 900 } });
   const dialogs = [];
@@ -39,7 +46,6 @@ const tabNames = (a) => a.win.locator(S.wsTabs).allInnerTexts().then((t) => t.ma
   await a.win.waitForTimeout(500);
 
   // tab 2 = BBB with one segment
-  stub.write({ info: { id: "iiiiiiiiiii", title: "Memory BBB", duration: 600, uploader: "Ch" } });
   await a.win.click(S.newTab);
   await a.win.waitForTimeout(1200);
   await loadLive(a, "https://www.youtube.com/watch?v=iiiiiiiiiii");
@@ -76,9 +82,10 @@ const tabNames = (a) => a.win.locator(S.wsTabs).allInnerTexts().then((t) => t.ma
 
   // reopen
   await a.win.keyboard.press("Control+Shift+T");
-  await a.win.waitForTimeout(2500);
+  await a.win.waitForTimeout(5000);
   console.log("tabs after Ctrl+Shift+T:", JSON.stringify(await tabNames(a)));
   console.log("the reopened tab's pane:", JSON.stringify(await live(a)));
+  console.log("persisted after reopen:", JSON.stringify(a.readState()["clipper.workspaces"]));
   console.log("shot:", await a.shot("after-reopen"));
 
   // back to tab 1 — is its work intact?
