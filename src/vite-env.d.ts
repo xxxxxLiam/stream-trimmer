@@ -125,6 +125,14 @@ interface ElectronAPI {
       dirPath: string;
       files: unknown[];
     }) => Promise<{ ok: boolean; error?: string; [k: string]: unknown }>;
+    /**
+     * Checked before an import names a Final Cut library. Final Cut creates a
+     * library when nothing exists at the URL it is handed, so without this a
+     * mistyped path would quietly produce a stray library instead of failing.
+     */
+    pathExists: (
+      target: string,
+    ) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;
   };
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;

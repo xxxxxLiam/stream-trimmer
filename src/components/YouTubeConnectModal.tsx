@@ -31,6 +31,7 @@ import {
 } from "react-bootstrap-icons";
 import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
 import DiagnosticsDisclosure from "./DiagnosticsDisclosure";
+import BrandMark from "./shell/BrandMark";
 import {
   checkBrowserConnection,
   importCookies,
@@ -69,14 +70,17 @@ function Working({ label }: { label: string }) {
 
 /**
  * The exporter to install for a browser. Named exactly so the user is never
- * told to find "a cookies.txt extension". Safari has no maintained exporter,
- * so the honest answer there is to borrow another browser for the export.
- * The store pages are searched by name rather than deep-linked.
+ * told to find "a cookies.txt extension". These are the two yt-dlp's own FAQ
+ * names. Edge and Safari have no extension we have verified, so `extension` is
+ * null there and the flow points at the automatic browser sweep instead; do not
+ * invent a recommendation for them.
  */
 export function extensionFor(browser: CookieBrowser | string): {
   browserLabel: string;
-  extension: string;
+  extension: string | null;
   where: string;
+  /** Extra line for this browser (the Safari permission, say). */
+  note?: string;
 } {
   const label = browser ? browser[0].toUpperCase() + browser.slice(1) : "your browser";
   switch (browser) {
@@ -85,15 +89,24 @@ export function extensionFor(browser: CookieBrowser | string): {
     case "safari":
       return {
         browserLabel: label,
-        extension: "Get cookies.txt LOCALLY, in Chrome or Firefox",
-        where: "Safari has no cookies.txt exporter, so use Chrome or Firefox just for this export",
+        extension: null,
+        where: "",
+        note: "Safari needs Full Disk Access for this app (System Settings, Privacy & Security) before its cookies can be read.",
       };
     case "edge":
-      return { browserLabel: label, extension: "Get cookies.txt LOCALLY", where: "Microsoft Edge Add-ons, or the Chrome Web Store" };
+      return { browserLabel: label, extension: null, where: "" };
     default:
       return { browserLabel: label, extension: "Get cookies.txt LOCALLY", where: "the Chrome Web Store" };
   }
 }
+
+/**
+ * The older "Get cookies.txt" (without LOCALLY) was reported as malware and
+ * removed from the Chrome Web Store; yt-dlp advises uninstalling it. Store
+ * search shows similarly named clones, so the exact name matters.
+ */
+export const COOKIE_EXTENSION_WARNING =
+  'Install exactly this name. The older "Get cookies.txt" without LOCALLY was reported as malware and removed from the Chrome Web Store; yt-dlp advises uninstalling it. Search results also show look-alike clones.';
 
 // One automatic sweep per app session: a failed sweep must not re-run, and
 // prompt for keychain access again, every time the modal re-renders.
@@ -199,6 +212,8 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
         </div>
       ) : null}
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-panel border border-hairline bg-panel p-5 shadow-panel">
+        {/* First thing a new install shows, so it carries the mark. */}
+        <BrandMark size={22} className="mb-3" />
         <h2 id="youtube-connect-title" className="text-[20px] font-medium leading-tight">
           {expired ? "YouTube sign-in expired" : "Sign in to YouTube"}
         </h2>
@@ -214,13 +229,24 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
           Not found automatically. Three steps:
         </p>
         <ol className="mt-3 space-y-3">
-          {step(
-            1,
-            `Install ${ext.extension} in ${ext.browserLabel}`,
-            <>
-              From {ext.where}. It exports cookies on this computer and sends them nowhere.
-            </>,
-          )}
+          {ext.extension
+            ? step(
+                1,
+                `Install ${ext.extension} in ${ext.browserLabel}`,
+                <>
+                  From {ext.where}. It exports cookies on this computer and sends them nowhere.{" "}
+                  {COOKIE_EXTENSION_WARNING}
+                </>,
+              )
+            : step(
+                1,
+                `${ext.browserLabel}: let the app read the browser directly`,
+                <>
+                  We have not verified a cookies.txt extension for {ext.browserLabel}, so none is
+                  recommended. Use Check browsers again below, which reads {ext.browserLabel} itself.
+                  {ext.note ? ` ${ext.note}` : ""} Or export from Chrome or Firefox instead.
+                </>,
+              )}
           {step(
             2,
             "Export the youtube.com cookies",

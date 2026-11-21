@@ -11,9 +11,10 @@ import UrlBar from "../UrlBar";
 import YouTubeStatusChip from "../YouTubeStatusChip";
 import UpdateStatus from "../UpdateStatus";
 import { formatTimestamp } from "../../lib/clip";
+import BrandMark from "./BrandMark";
 import CampaignChip from "./CampaignChip";
 import HelpButton from "./HelpButton";
-import { IconChannel, IconCopy, IconMark, IconSettings, IconSymbol } from "./icons";
+import { IconChannel, IconCopy, IconSettings, IconSymbol } from "./icons";
 import { useDismiss } from "./useDismiss";
 
 export type AppHeaderProps = {
@@ -98,9 +99,9 @@ export default function AppHeader(p: AppHeaderProps) {
 
   return (
     <header className="relative z-30 flex min-h-header flex-wrap items-center gap-x-2 gap-y-1 border-b border-hairline px-3 py-1">
-      <div className="flex items-center gap-2 pr-1" aria-label="Clipper">
-        <IconMark />
-        <span className="text-section">Clipper</span>
+      {/* Mark only, no wordmark. role+label so it still has an accessible name. */}
+      <div className="flex items-center pr-1" role="img" aria-label="Clipper">
+        <BrandMark size={18} />
       </div>
 
       <CampaignChip menu={p.campaignMenu} />

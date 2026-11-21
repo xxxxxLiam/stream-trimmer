@@ -228,7 +228,7 @@ export function buildSetupItems(s: SetupInput): SetupItem[] {
   items.push({
     id: "after-cutting",
     title: "Choose what happens after cutting",
-    what: "Nothing, reveal the file, or send it to Final Cut Pro or Premiere Pro.",
+    what: "Nothing, reveal the file, or send it to Final Cut Pro.",
     why: "Saves you dragging every clip into your editor by hand.",
     done: !afterBlocked && s.afterCutting !== null,
     blocked: afterBlocked,
@@ -266,7 +266,7 @@ export function buildSetupItems(s: SetupInput): SetupItem[] {
         "fcp-library",
         "Final Cut library",
         "Name the .fcpbundle the import must land in.",
-        "With several libraries open, this stops a clip landing in the wrong client's library.",
+        "With several libraries open, this aims the import at the right one. The library must already exist.",
         nonEmpty(fc.fcpLibrary),
       ),
       sub(

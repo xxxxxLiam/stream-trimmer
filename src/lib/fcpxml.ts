@@ -23,14 +23,14 @@ export const FCPXML_VERSION = "1.10";
 // Settings (the per-campaign "After cutting" choice)
 // ---------------------------------------------------------------------------
 
-export type AfterCutting = "nothing" | "reveal" | "finalcut" | "premiere";
+/**
+ * "premiere" was removed: Adobe documents that Premiere Pro cannot import
+ * .fcpxml directly (it needs a paid third-party converter), so a send button
+ * could never work. A stored "premiere" falls back to "nothing".
+ */
+export type AfterCutting = "nothing" | "reveal" | "finalcut";
 
-export const AFTER_CUTTING_VALUES: readonly AfterCutting[] = [
-  "nothing",
-  "reveal",
-  "finalcut",
-  "premiere",
-];
+export const AFTER_CUTTING_VALUES: readonly AfterCutting[] = ["nothing", "reveal", "finalcut"];
 
 export type TimelineKind = "vertical" | "source" | "custom";
 
@@ -79,7 +79,9 @@ export interface EditorHandoffSettings {
   /**
    * Absolute path of the .fcpbundle the import must land in (or a file:// URL).
    * Blank means the document names no library and Final Cut picks its own.
-   * With many libraries open this is the only safe way to target one.
+   * Written as <import-options><option key="library location">, the only
+   * mechanism Apple documents for import (the <library location> attribute is
+   * export-only and ignored on import).
    */
   fcpLibrary: string;
   /** Event that holds the raw clip. Blank means use the campaign/source name. */
@@ -592,15 +594,26 @@ export function resolveTimeline(
 }
 
 /**
- * `location` for <library>: a .fcpbundle path or a file:// URL. Directories get
- * a trailing slash, the way Final Cut writes its own. Relative paths throw, so
- * a typo can never become a silent wrong-library import.
+ * The value for the "library location" import option: the file:// URL of the
+ * .fcpbundle itself (a path or a URL is accepted; no trailing slash). Relative
+ * paths throw, so a typo can never become a silent wrong-library import.
  */
 export function libraryLocation(library: string): string {
   const t = library.trim();
   if (!t) return "";
   const url = /^file:\/\//i.test(t) ? t : fileUrl(t);
-  return url.endsWith("/") ? url : url + "/";
+  return url.replace(/\/+$/, "");
+}
+
+/** The local path behind a library setting (path or file:// URL), for existence checks. */
+export function libraryPath(library: string): string {
+  const url = libraryLocation(library);
+  if (!url) return "";
+  try {
+    return decodeURIComponent(url.replace(/^file:\/\//i, ""));
+  } catch {
+    return url.replace(/^file:\/\//i, "");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -611,7 +624,7 @@ export interface FcpxmlInput {
   /** The event that holds the raw clips. */
   eventName: string;
   clips: FcpClip[];
-  /** .fcpbundle path or file:// URL. Omitted: no `location`, Final Cut decides. */
+  /** .fcpbundle path or file:// URL. Omitted: no import-options, Final Cut decides. */
   library?: string;
   /** Present: also create one project per clip in its own event. */
   project?: FcpxmlProject;
@@ -721,6 +734,9 @@ export function buildFcpxml(input: FcpxmlInput): string {
   }
 
   const location = libraryLocation(input.library ?? "");
+  // Apple's import shape: import-options first (the DTD requires it before
+  // resources), then resources, then bare events. If nothing exists at the
+  // location Final Cut creates a library there, so callers check it first.
   // The DTD lists format and asset under one <resources>; formats first so each
   // asset's format reference resolves in document order.
   return [
@@ -728,13 +744,18 @@ export function buildFcpxml(input: FcpxmlInput): string {
     `<!DOCTYPE fcpxml>`,
     ``,
     `<fcpxml version="${FCPXML_VERSION}">`,
+    ...(location
+      ? [
+          `  <import-options>`,
+          `    <option key="library location" value="${xmlEscape(location)}"/>`,
+          `  </import-options>`,
+        ]
+      : []),
     `  <resources>`,
     ...formats.map((f) => f.xml),
     ...assets,
     `  </resources>`,
-    location ? `  <library location="${xmlEscape(location)}">` : `  <library>`,
-    ...events,
-    `  </library>`,
+    ...events.map((l) => l.slice(2)),
     `</fcpxml>`,
     ``,
   ].join("\n");
@@ -785,8 +806,29 @@ export async function buildSessionFcpxml(
   clips: SessionClip[],
   eventName: string,
   probe: (path: string) => Promise<RawProbe>,
-  options: { library?: string; project?: FcpxmlProject } = {},
+  options: {
+    library?: string;
+    project?: FcpxmlProject;
+    /**
+     * Required when `library` is set. Final Cut CREATES a library when nothing
+     * exists at the location, so a typo would silently spawn a stray one; the
+     * build is refused instead. Receives the local path of the .fcpbundle.
+     */
+    libraryExists?: (localPath: string) => Promise<boolean>;
+  } = {},
 ): Promise<SessionResult> {
+  const libraryText = (options.library ?? "").trim();
+  if (libraryText) {
+    const local = libraryPath(libraryText); // throws on a relative path
+    if (!options.libraryExists) {
+      throw new Error("The library could not be checked, so nothing was sent. Clear the Library field or use the desktop app.");
+    }
+    if (!(await options.libraryExists(local))) {
+      throw new Error(
+        `There is no library at ${local}. Final Cut would create a new one there, so nothing was sent. Check the path, or clear the Library field.`,
+      );
+    }
+  }
   const ready: FcpClip[] = [];
   const skipped: SessionResult["skipped"] = [];
   for (const clip of clips) {

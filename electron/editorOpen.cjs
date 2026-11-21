@@ -300,6 +300,26 @@ async function reveal(target, { shell, fsImpl = fs }) {
 }
 
 /**
+ * Does something exist at this absolute path, and is it a directory?
+ *
+ * The renderer needs this before naming a Final Cut library in an import:
+ * Final Cut CREATES a library when nothing exists at the URL it is given, so a
+ * typo would silently produce a stray library rather than fail. A .fcpbundle is
+ * a package, which is a directory on disk, so isDirectory is the useful answer.
+ */
+function pathExists(target, fsImpl = fs) {
+  if (!isAbsolutePath(target)) {
+    return { ok: false, error: "Needs an absolute path." };
+  }
+  try {
+    const st = fsImpl.statSync(target);
+    return { ok: true, exists: true, isDirectory: st.isDirectory() };
+  } catch {
+    return { ok: true, exists: false, isDirectory: false };
+  }
+}
+
+/**
  * Register the IPC channels. B12 adds one line to main.cjs:
  *   require("./editorOpen.cjs").registerEditorHandlers({ ipcMain, shell });
  */
@@ -317,6 +337,7 @@ function registerEditorHandlers({ ipcMain, shell }) {
   ipcMain.handle("editor:openWith", guard((payload) => openWithApp(payload || {})));
   ipcMain.handle("editor:reveal", guard((target) => reveal(target, { shell })));
   ipcMain.handle("editor:copyFiles", guard((payload) => copyFiles(payload || {})));
+  ipcMain.handle("editor:pathExists", guard((target) => pathExists(target)));
 }
 
 module.exports = {
@@ -328,6 +349,7 @@ module.exports = {
   resolveBinary,
   writeFcpxml,
   copyFiles,
+  pathExists,
   reveal,
   safeFilename,
   registerEditorHandlers,
