@@ -39,12 +39,12 @@ const VID2 = "stub0000002";
       return top ? `${top.tagName}.${top.className}`.slice(0, 120) : "none";
     }));
     log("how many #clips-tab-bank elements are in the DOM:", await a.win.locator("#clips-tab-bank").count());
-    await a.win.locator("#clips-tab-bank").last().scrollIntoViewIfNeeded();
-    await a.win.locator("#clips-tab-bank").last().click({force:true});
+    await a.win.locator("#clips-tab-bank:visible").last().scrollIntoViewIfNeeded();
+    await a.win.locator("#clips-tab-bank:visible").last().click({force:true});
     log("importing into tab 2...");
     let summary = "(threw)";
     try {
-      const col = a.win.locator('#ui-col-clips').last();
+      const col = a.win.locator('#ui-col-clips:visible').last();
       await col.locator('button:has-text("Import timestamps")').scrollIntoViewIfNeeded();
       await col.locator('button:has-text("Import timestamps")').click();
       const ta = col.locator('textarea[placeholder="Paste your timestamps here"]');

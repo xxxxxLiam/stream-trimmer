@@ -99,7 +99,7 @@ test("G-1: two identical downloads at once each get their own folder and their o
 
 test("G-10: the cancel route kills that job's yt-dlp; an identical job running beside it finishes", SLOW, () =>
   withHarness(async (h) => {
-    h.configure({ delayMs: 4000 });
+    h.configure({ delayMs: 8000 });
     const body = { url: freshUrl(), segments: [{ start: 0, end: 4 }] };
     const a = downloadPath(h, "job_g10_a", body);
     await until(() => h.downloadPids().length >= 1, 15_000, "A's yt-dlp");
@@ -111,10 +111,12 @@ test("G-10: the cancel route kills that job's yt-dlp; an identical job running b
     assert.equal(cancel.status, 200);
     assert.deepEqual(await cancel.json(), { ok: true, found: true });
 
-    const ra = await a;
+    // yt-dlp would sleep 8 s; a real kill makes A answer almost at once.
+    const ra = await Promise.race([a, sleep(3000).then(() => null)]);
+    assert.ok(ra, "A was still running 3 s after Cancel: yt-dlp was not killed");
     assert.equal(ra.status, 499);
     assert.equal(ra.body.code, "cancelled");
-    await until(() => !pidAlive(pidA), 3000, "A's yt-dlp to die");
+    assert.ok(!pidAlive(pidA), "A's yt-dlp is still running");
     assert.ok(pidAlive(pidB), "cancelling A killed B's yt-dlp");
 
     const rb = await b;

@@ -78,7 +78,7 @@ function inPrivateTmp(fn: () => void) {
   }
 }
 
-test("jobDir gives every request its own folder even for identical inputs", () => {
+test("G-1: jobDir gives every request its own folder even for identical inputs", () => {
   inPrivateTmp(() => {
     const a = jobDir(CLIP_PREFIX, ["same"]);
     const b = jobDir(CLIP_PREFIX, ["same"]);
@@ -88,7 +88,7 @@ test("jobDir gives every request its own folder even for identical inputs", () =
   });
 });
 
-test("clearCache skips a folder that is in use until it is released", () => {
+test("G-8: clearCache skips a folder that is in use until it is released", () => {
   inPrivateTmp(() => {
     const busy = workDir(CLIP_PREFIX, ["busy"]);
     const idle = workDir(CLIP_PREFIX, ["idle"]);
@@ -104,7 +104,7 @@ test("clearCache skips a folder that is in use until it is released", () => {
   });
 });
 
-test("clearCache leaves a held (finished, uncollected) clip folder alone, until the hold lapses", () => {
+test("G-8: clearCache leaves a held (finished, uncollected) clip folder alone, until the hold lapses", () => {
   inPrivateTmp(() => {
     const dir = jobDir(CLIP_PREFIX, ["finished"]);
     fs.writeFileSync(path.join(dir, "clip.mp4"), "the only copy");
@@ -116,7 +116,7 @@ test("clearCache leaves a held (finished, uncollected) clip folder alone, until 
   });
 });
 
-test("tryClaim gives the shared folder to one job at a time", () => {
+test("G-1: tryClaim gives the shared folder to one job at a time", () => {
   inPrivateTmp(() => {
     const dir = workDir(CLIP_PREFIX, ["claim"]);
     const first = tryClaim(dir);

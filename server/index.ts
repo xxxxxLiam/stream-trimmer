@@ -1551,7 +1551,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     : [url, format, quality, segs[0].start.toFixed(2), segs[0].end.toFixed(2)];
   const sharedDir = workDir(CLIP_PREFIX, keyParts);
   const releaseShared = tryClaim(sharedDir);
-  const clipDir = jobDir(CLIP_PREFIX, keyParts);
+  const clipDir = sharedDir;
   const releaseClipDir = markInUse(clipDir);
   // Where segment files, `.part` files and the whole-file source go.
   const tempDir = releaseShared ? sharedDir : clipDir;
