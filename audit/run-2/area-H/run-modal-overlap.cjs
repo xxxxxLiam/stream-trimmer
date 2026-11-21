@@ -19,7 +19,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { buildStubRoot } = require("./lib/stub.cjs");
+const { buildStubRoot, script } = require("./lib/stub.cjs");
 const H = require("./lib/h2.cjs");
 
 const OUT = path.join(__dirname, "out");
@@ -103,10 +103,15 @@ const SHELL = () => {
   const out = {};
 
   // ---- 1. the sign-in gate, waited for properly ---------------------------
+  // A genuine fresh install: no cookies file, and the stub refuses the auth
+  // probe (`authFail`), so the gate is deterministic rather than racing a
+  // probe that would otherwise answer "signed in".
   {
-    const a = await H.open({ label: "h2-gate", cwd: STUB, outDir: path.join(OUT, "gate"), keepGate: true });
+    script(STUB, { authFail: true });
+    const a = await H.open({ label: "h2-gate", cwd: STUB, outDir: path.join(OUT, "gate"),
+      keepGate: true, signedIn: false });
     await H.setSize(a, 1280, 800);
-    await a.win.waitForSelector('[role="dialog"]', { timeout: 20000 });
+    await a.win.waitForSelector('[role="dialog"]', { timeout: 40000 });
     await a.win.waitForTimeout(800);
     say("=== the sign-in gate, with the dialog actually on screen ===");
     const st = await a.win.evaluate(MODAL);
@@ -166,6 +171,7 @@ const SHELL = () => {
 
   // ---- 2. the footer over the mark bar ------------------------------------
   {
+    script(STUB, { authFail: false });
     const a = await H.open({ label: "h2-overlap", cwd: STUB, outDir: path.join(OUT, "overlap"), skipSeeded: true });
     await H.setSize(a, 1280, 820);
     await H.loadVideo(a);

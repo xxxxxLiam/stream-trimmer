@@ -58,6 +58,7 @@ const DEFAULTS = {
   infoFromUrl: false,
   titles: {},
   durations: {},
+  section403: false,
 };
 
 const stub = `#!/usr/bin/env node
@@ -150,6 +151,14 @@ async function main() {
       fs.writeFileSync(target, vtt(c.transcriptLines ?? 60, c.transcriptCueSec ?? 4));
     }
     return;
+  }
+
+  // (run-2) Make the SECTIONED attempt 403 so the server falls back to downloading the
+  // whole media and trimming it locally — the path T1 changed for G-4 (pre-roll), which
+  // the sectioned path never reaches.
+  if (c.section403 && has("--download-sections")) {
+    process.stderr.write("ERROR: unable to download video data: HTTP Error 403: Forbidden\\n");
+    process.exit(1);
   }
 
   for (const p of c.progress || []) {

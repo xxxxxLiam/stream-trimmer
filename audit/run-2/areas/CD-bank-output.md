@@ -10,8 +10,8 @@ Scope. **C**: `src/lib/bank.ts`, `src/lib/bankImport.ts`, `src/lib/campaigns.ts`
 `src/components/CopyBlocks.tsx`, `src/components/shell/copyBlocksInput.ts`,
 `src/hooks/useClipper.ts`, `src/App.tsx`.
 
-**Counts: 1 blocker · 2 major · 10 minor · 3 polish (16 findings, CD2-1 … CD2-17).**
-All 16 are `confirmed` in the running app or by driving a product module
+**Counts: 1 blocker · 2 major · 11 minor · 3 polish (17 findings, CD2-1 … CD2-17).**
+All 17 are `confirmed` in the running app or by driving a product module
 unchanged; none is code-reading only.
 
 **Fix verdicts**
@@ -22,16 +22,21 @@ unchanged; none is code-reading only.
 | C-5 (duplicate campaign names) | **HELD** |
 | Campaign isolation (run 1: 24 of 24) | **HELD** — 24 of 24 again, with a slug campaign and an opaque campaign side by side |
 | D-2 (a save destroying a same-named file) | **HELD** for `clip:save` and `file:save`; **the one write path it did not reach still overwrites** (CD2-4), and the message names the wrong file (CD2-5) |
-| D-6 / D-7 (writes outside the chosen folder) | **HELD** — 36 fresh hostile calls, nothing escaped; one residual, CD2-6 |
+| D-6 / D-7 (writes outside the chosen folder) | **HELD** — 46 fresh hostile calls across all four write paths, nothing escaped; one residual, CD2-6 |
 | D-3 (Copy blocks dead) | **HELD** — all seven blocks byte-exact against a real transcript |
 | D-4 (silent automatic send) | **HELD** |
 | D-5 (a later cut shrinking the document) | **HELD** on the document, **REGRESSED into a cross-campaign leak** (CD2-1) |
 | D-9 (a sub-frame clip losing the batch) | **HELD** |
-| FCPXML: 1.10 DTD validity, `<import-options>`, never `<library>`, fail closed | **HELD** — 31 documents, all DTD-valid |
+| FCPXML: 1.10 DTD validity, `<import-options>`, never `<library>`, fail closed | **HELD** — 34 documents, all DTD-valid |
 | D-1 (drag-out) | guard **HELD**; the real drag freeze is **not provable here** — not passed |
 
-**No product code was changed.** `git status` shows only new files under
-`audit/run-2/area-CD/` and this file.
+**No product code was changed by this area.** The only files I wrote are
+`audit/run-2/area-CD/*` and this report (both were swept into another actor's
+`chore(audit): run 2 helper output in progress` snapshot commit while I worked;
+I committed nothing). One product file did change mid-run, by someone else and
+not for this area: `package.json` gained a `license` field, a packaged `LICENSE`
+file and `build.publish.repo` renamed from `stream-trimmer` to `clipr`. It does
+not affect anything measured here, but whoever owns the updater should know.
 
 ---
 
@@ -79,6 +84,7 @@ product's own buttons.
 | `d1-overwrite.cjs` | D-2 on `clip:save`, the comments CSV path, `file:saveFiles` | `out/d1-overwrite.txt` |
 | `d2-containment.cjs` | D-6/D-7: 36 hostile bridge calls, and the behaviour change | `out/d2-containment.txt` |
 | `d3-containment-tail.cjs` | `exportSave.cjs` and `dragTarget` unchanged; the allow-list's width; a folder deleted mid-save | `out/d3-containment-tail.txt` |
+| `d8-clipsave-dest.cjs` | the `clip:save` destination matrix the first pass could not reach | `out/d8-clipsave-dest.txt` |
 | `d4-copyblocks.cjs` | D-3 with a REAL transcript, all seven blocks, clipboard read back | `out/d4-copyblocks.txt` |
 | `d5-handoff.cjs` | D-4, D-5, the cross-campaign document, delete mid-cut | `out/d5-handoff.txt` |
 | `d6-fcpxml.ts` | D-9 and the hostile FCPXML matrix against Apple's 1.10 DTD | `out/d6-fcpxml.txt`, `out/d6/*.fcpxml` |
@@ -118,7 +124,7 @@ script named in a finding to reproduce it.
   the two clips it was offering to send were Client A's.
   Two independent session stores do this. `runAfterCutting` remembers every
   clip it is ever called with in `sessionBatch`, keyed **only by the clips
-  folder** (`EditorHandoff.tsx:239-251`), and `resetSessionHandoff()` exists but
+  folder** (`EditorHandoff.tsx:242-251`), and `resetSessionHandoff()` exists but
   **no product code calls it** (only its own test does). `App.tsx`'s
   `sessionClips` state, which feeds the panel's Export / Send all / Copy file
   path, is likewise never cleared when the campaign changes.
@@ -134,9 +140,9 @@ script named in a finding to reproduce it.
   the document itself is kept at `audit/run-2/area-CD/out/d5-C-cross/C-Client B.fcpxml`;
   screenshot `audit/run-2/area-CD/out/d5-C-cross/*-C-cross-campaign.png`;
   script `audit/run-2/area-CD/d5-handoff.cjs` (PART C).
-- **Suspected file**: `src/components/EditorHandoff.tsx:236-251` (`sessionBatch`
-  keyed by `ctx.clipsDir`, `rememberClips`), `:254` (`resetSessionHandoff`,
-  uncalled); `src/App.tsx:252` (`sessionClips`, never reset on a campaign change)
+- **Suspected file**: `src/components/EditorHandoff.tsx:242-251` (`sessionBatch`
+  keyed by `ctx.clipsDir`, `rememberClips`), `:253-258` (`resetSessionHandoff`,
+  uncalled); `src/App.tsx:252` (`sessionClips`, never reset on a campaign change); `src/App.tsx:300-321` (`afterSaved`)
 
 ---
 
@@ -151,7 +157,7 @@ script named in a finding to reproduce it.
      popover (the "am I in the right campaign?" check the brief describes).
   4. Wait for the clip to save, then read `clipper.campaigns`.
   Control: the identical sequence with no switch, in the same run.
-- **Expected**: what the main Cut button does. `App.tsx:275-290` captures
+- **Expected**: what the main Cut button does. `App.tsx:324-332` captures
   `cutCampaignId` before the download and passes it to `recordUse`, so a switch
   mid-cut cannot move the record (verified: PART B of the same script).
 - **Actual**: the no-reuse record is written against whichever campaign is
@@ -167,7 +173,7 @@ script named in a finding to reproduce it.
   gains a used range for a clip it has never cut, which will warn on and block
   that range for the wrong client. The control run records it against Client A
   correctly, which isolates the switch as the cause.
-  `ClipsColumn.tsx:168-172` calls `recordUse(vid, res.ranges, clip.id)` with no
+  `ClipsColumn.tsx:171` calls `recordUse(vid, res.ranges, clip.id)` with no
   campaign id, so `CampaignContext.recordUse` falls back to
   `activeIdRef.current`. The bank side of the same handler does use the id it
   captured (`bankStore.markCut(campaignId, …)`), which is why the two records
@@ -181,7 +187,7 @@ script named in a finding to reproduce it.
   PART A control (`[["Client A","{…A01…}"],["Client B","{}"]]`), PART B
   (the main Cut button, correct); the clip's duration measured with ffprobe as
   6.010998 s in both arms; script `audit/run-2/area-CD/r2-cross-campaign.cjs`
-- **Suspected file**: `src/components/ClipsColumn.tsx:162-180` (`cut`);
+- **Suspected file**: `src/components/ClipsColumn.tsx:163-182` (`cut`);
   `src/context/CampaignContext.tsx:262-276` (`recordUse` default),
   `:278-285` (`forgetUse`, uncalled)
 
@@ -211,7 +217,7 @@ script named in a finding to reproduce it.
 - **Proof**: `audit/run-2/area-CD/out/r2-cross-campaign.txt`, PART C
   (`with Client B active … "(1)"`, `copyPathDisabled:[false]`,
   `Copy file path while CLIENT B is active returns: …/Client A clips/AAA-stub0000001-01.mp4`)
-- **Suspected file**: `src/App.tsx:252` (`sessionClips`), `:410-418` (passed
+- **Suspected file**: `src/App.tsx:252` (`sessionClips`), `:415-419` (passed
   straight to `EditorHandoff`)
 
 ---
@@ -234,7 +240,7 @@ script named in a finding to reproduce it.
   CSV is gone: same inode (`1189065` before and after), 42 bytes of
   "the export I did yesterday and still need" replaced by 27 bytes of the new
   run, sha `90443e463487` → `29eee89b9fda`. `file:saveFiles` writes each file
-  with a plain `fsp.writeFile` (`electron/main.cjs:573-575`) and
+  with a plain `fsp.writeFile` (`electron/main.cjs:586`) and
   `electron/exportSave.cjs:82` moves each file with `fsp.rename`; neither goes
   through `writeWithoutOverwrite`. T2's own report records this as "not
   changed, noticed"; it is the one half of D-2 that is still open.
@@ -246,7 +252,7 @@ script named in a finding to reproduce it.
   (`SAME folder again (second run of the day) -> {"ok":true,...}`, then
   `content at the same CSV name after the second run: a,b / 3,4`);
   scripts `d1-overwrite.cjs` (section 4), `d3-containment-tail.cjs` (PART A)
-- **Suspected file**: `electron/main.cjs:567-576` (`file:saveFiles`);
+- **Suspected file**: `electron/main.cjs:583-588` (`file:saveFiles`, the plain `fsp.writeFile` at `:586`);
   `electron/exportSave.cjs:78-88`
 
 ---
@@ -416,7 +422,7 @@ script named in a finding to reproduce it.
   (the full alert text, `raw errno/stack shown: YES`,
   `Unexpected save location shown: no`, `ytclip- temp folders left behind: 1`);
   screenshot `audit/run-2/area-CD/out/d3-vanish/*-folder-vanished.png`
-- **Suspected file**: `electron/main.cjs:513-517` (`clip:save` returns
+- **Suspected file**: `electron/main.cjs:519-520` (`clip:save` returns
   `logger.describe(err)`), with `electron/pathSafety.cjs:105-136`
 
 ---
@@ -441,9 +447,9 @@ script named in a finding to reproduce it.
   same shape of defect as D-3 (a built panel with nothing feeding it), in a
   feature run 1 did not look for.
   Consequence for this run: the comments CSV is one of the two paths the brief
-  asked to re-check for D-2, and it can only be exercised over the bridge,
-  which is how CD2-6's `file:save` checks were done — there `file:save` does add
-  " 2" and does not destroy the earlier file.
+  asked to re-check for D-2, and it can only be exercised over the bridge —
+  which is how it was checked here: `file:save` does add " 2" and leaves the
+  earlier file byte-identical (`out/d2-containment.txt`, B2).
 - **Proof**: `audit/run-2/area-CD/out/d1-overwrite.txt`, section 3
   (`comment buttons on screen: []`, the planted CSV untouched because nothing
   ran); `audit/run-2/area-CD/out/d2-containment.txt`, B2 (`file:save` over an
@@ -475,8 +481,10 @@ script named in a finding to reproduce it.
   `z-20`, so the sticky row is below it.)
 - **Proof**: `audit/run-2/area-CD/out/d4-copyblocks.txt`
   (`does the open panel cover the Cut button? {"cutRect":[674,673,139,36],
-  "topElement":"LI","coveredByCopyBlocks":true}`); the first run's Playwright
-  refusal is in `audit/run-2/area-CD/out/d4-copyblocks/` logs
+  "topElement":"LI","coveredByCopyBlocks":true}`), which is a hit test on the
+  live page; a first pass of the same script had its `#ui-cut` click refused for
+  30 s by Playwright with "subtree intercepts pointer events", which is how the
+  measurement came to be added
 - **Suspected file**: `src/components/CopyBlocks.tsx:79-86`;
   `src/components/useDrawerClearance.ts`
 
@@ -498,13 +506,15 @@ script named in a finding to reproduce it.
   `ENAMETOOLONG: name too long, open '/…/LLLL…L.txt'`,
   `ENAMETOOLONG: name too long, mkdir '/…/LLLL…'`, and for the NUL byte
   `The argument 'path' must be a string, Uint8Array, or URL without null bytes.
-  Received '/…/nul\x00byte.txt…'`. Reachable without the bridge: the clip
-  filename comes from the campaign's clip-id pattern and prefix, both free
-  text, so a long prefix produces the same message from a Cut.
+  Received '/…/nul\x00byte.txt…'`. Reached here over the bridge. A route
+  without the bridge looks likely — the clip filename is built from the
+  campaign's clip-id pattern and prefix, both free text, so a very long prefix
+  should produce the same message from a Cut — but that was **not driven**, so
+  only the bridge path is claimed.
 - **Proof**: `audit/run-2/area-CD/out/d2-containment.txt` (the three rows
   `file:save 300-char filename inside chosen`, `saveFiles 300-char folder`,
   `file:save NUL in filename`)
-- **Suspected file**: `electron/main.cjs:541-545`, `:578-582`
+- **Suspected file**: `electron/main.cjs:546-550`, `:589-593`
 
 ---
 
@@ -518,11 +528,15 @@ script named in a finding to reproduce it.
   with the separators turned into underscores — `chosen/.._../esc2.csv`,
   `chosen/.._outside/esc3.csv`, `chosen/ok/.._.._.._esc4.csv` — and each
   answers `{"ok":true}`. A folder name containing a newline is likewise
-  created (`chosen/two\nlines/`). Containment is intact; the result is litter
-  in the user's delivery folder with a success message.
+  created (`chosen/two\nlines/`), and `clip:save` does the same with a clip
+  filename of `../../outside/trav.mp4`, which lands as
+  `chosen/.._.._outside_trav.mp4` and is logged as
+  `[clip] saved .._.._outside_trav.mp4`. Containment is intact; the result is
+  litter in the user's delivery folder with a success message.
 - **Proof**: `audit/run-2/area-CD/out/d2-containment.txt`
   (`paths created anywhere in the sandbox:` …, `CREATED OUTSIDE the chosen and
-  data folders: none`)
+  data folders: none`); `audit/run-2/area-CD/out/d8-clipsave-dest.txt`
+  (the `filename traversal` row)
 - **Suspected file**: `electron/pathSafety.cjs:66` (the `[\\/]` → `_` rule)
 
 ---
@@ -537,8 +551,9 @@ script named in a finding to reproduce it.
      does).
   2. Note that the popover offers only the valid ones, and that all three rows
      are still in `settings.json`.
-  3. Rename an unrelated campaign — any campaign create, edit, delete or
-     switch does the same, because they all go through `commit`.
+  3. Rename an unrelated campaign. Any campaign create, edit or delete does the
+     same, and so does **cutting a clip**, because `recordUse` commits the list
+     too (`CampaignContext.tsx:262-276`); only switching does not.
   4. Read `settings.json` again.
 - **Expected**: an entry the app cannot read is left alone, or the user is told
   it was dropped. It still holds a name, both folders and a used-ranges record.
@@ -565,12 +580,12 @@ script named in a finding to reproduce it.
   (`skipped` then lists each with its reason, and D-9's fix makes that work).
 - **Actual**: it throws with `M-SUBFRAME: the file is shorter than one timeline
   frame` and never mentions `M-BROKEN`, because the empty-`ready` branch uses
-  `skipped[0]?.reason` (`fcpxml.ts:846-849`). The user sees one clip named and
+  `skipped[0]?.reason` (`fcpxml.ts:850`). The user sees one clip named and
   has to guess at the rest. With at least one good clip the behaviour is
   correct, which is what D-9 was about, so this is the remaining edge.
 - **Proof**: `audit/run-2/area-CD/out/d6-fcpxml.txt`, case F
   (`{"ok":false,"threw":"M-SUBFRAME: the file is shorter than one timeline frame"}`)
-- **Suspected file**: `src/lib/fcpxml.ts:845-849`
+- **Suspected file**: `src/lib/fcpxml.ts:848-852`
 
 ---
 
@@ -632,3 +647,377 @@ script named in a finding to reproduce it.
   campaign's `dataDir`)
 
 ---
+
+## Did the fixes hold? One section per fix, with its negative control
+
+### C-2 — campaign identity: **HELD**, on all four questions the brief asked
+
+**The migration.** A `settings.json` in today's shape — two slug-id campaigns
+(`acme-q4`, `beta-launch`) with non-default bands, prefixes, patterns,
+qualities, formats and folders; two banks across two videos with categories,
+tiers, a note, a `cut` row and a `published` row; used ranges for two videos;
+`clipper.editorHandoff` keyed by slug id; `downloads`, `saveDirs`,
+`saveDirNames`, `workspaces`, `authSource`, `cookieBrowser` — boots with
+**nothing lost**. Both campaigns load with every field intact, both banks show
+in the UI under their own campaign (3 rows and 2 rows), the slug-keyed handoff
+record is read back into the panel (Library `/Volumes/Work/Acme.fcpbundle`,
+"Event for the projects" `Acme projects`, the project pattern, the checkbox),
+and after the app itself writes (one import) every seeded key is still present,
+`clipper.campaigns` is byte-identical except for the one write described in
+CD2-16, the other campaign's bank is byte-identical, and the `cut`/`published`
+statuses, categories, tiers and the note survive.
+
+**Old-style delete and recreate.** Removing the slug campaign deletes its bank
+key from disk (`acme-q4` gone, `beta-launch` untouched). Recreating the same
+name gives id `c-c05c639be6fd4301` and a bank view of `0 clips` /
+"Nothing banked for this video."
+
+**The mixed world.** A slug campaign and a UI-created opaque campaign
+(`c-44982064dc1b4b0d`) side by side; delete and recreate the opaque one (new id
+`c-bbd0ab06feb44ee1`, empty); then delete and recreate the slug one with the
+opaque one still present (new id `c-ab6f80ad45e44828`, **not** `acme-q4`,
+empty). No adoption in either style, and each delete left the other campaign's
+bank exactly as it was.
+
+**T5's choice not to prune old orphans** is safe for adoption and for speed and
+is a permanent retention leak; that is CD2-8, with the measured numbers.
+
+Negative control for the identity half: the whole point of the fix is that no
+newly minted id can equal a stored slug. `newCampaignId` returns `c-` + 16 hex
+(`crypto.randomUUID`), and the only `create` call site in the product is
+`CampaignMenu.tsx:84`; every id minted in these runs matched
+`/^c-[0-9a-f]{16}$/`. The control that proves the *test* can fail is the run-1
+behaviour itself, which is on record in `audit/run-1/verify/slice-5.md`
+(`campaigns after recreating 'Acme Q4': [{"id":"acme-q4", …}]`,
+`bank view after recreate: rowCount 2`) against the identical steps.
+
+Proof: `audit/run-2/area-CD/out/c1-identity.txt` (all four parts),
+screenshots under `out/c1-A-migration/`, `out/c1-B-slug-recreate/`,
+`out/c1-C-mixed/`, `out/c1-D-orphans/`.
+
+### C-5 — duplicate campaign names: **HELD** (12 of 12 assertions)
+
+"New campaign" with a name already in use keeps the form open and shows
+**"Another campaign already has that name."**; so does the same name in a
+different case with padding (`  acme q4 `); so does run 1's exact route,
+Edit → rename to `Acme Q4` → Save. A genuinely new name is accepted, and
+editing a campaign while keeping its own name is accepted. No campaign was
+created or renamed in any refused case.
+
+One thing worth recording for whoever reads the fix report: the model's
+`uniqueName` suffix ("Acme Q4 2") is **not reachable from the UI**, because
+`campaignFormProblems` refuses the clash before `create`/`update` is called and
+`CampaignMenu.tsx` is the only caller of either. The brief's two expectations
+are both implemented; the form's message is the one a user sees.
+
+Proof: `audit/run-2/area-CD/out/c2-names-isolation.txt`, PART A;
+screenshot `out/c2-A-names/*-A-name-clash.png`.
+
+### Campaign isolation: **HELD, 24 of 24**
+
+Deliberately re-run across the identity change with **one slug-id campaign and
+one opaque-id campaign**, each with its own imported rows, switched back and
+forth four times: on every view the rows were exactly that campaign's
+(`["L01","L02"]` / `["O01"]`), no row of the other campaign was present, and
+the filter chips carried no other campaign's categories or tiers
+(`["legacyhook","legacypay","Tier 1","Tier 2"]` / `["opaquehook","Tier 5"]`).
+The count line agreed with the rows every time. 24 assertions, 0 failures.
+
+What does cross campaigns is not the bank: it is the session handoff list and
+the used-ranges record (CD2-1, CD2-2, CD2-3).
+
+Proof: `audit/run-2/area-CD/out/c2-names-isolation.txt`, PART B
+(`ASSERTIONS: 36 passed, 0 failed` for the file as a whole, of which 24 are the
+isolation rounds).
+
+### D-2 — a save destroying a same-named file: **HELD** where it was applied
+
+`clip:save`: the planted 48-byte file came through a real cut untouched —
+`ino 1188637 size 48 sha df41a9663c8b` before **and** after — and the new 6.01 s
+clip was written beside it as `ACM-stub0000001-01 2.mp4`. A second collision on
+the same id produced ` 3` and left both earlier files byte-identical.
+`file:save`: `mine.txt` survived (`sha cc5f16644b` before and after) and the
+write landed as `mine 2.txt`.
+The comments CSV is the same handler, and it is the only D-2 path that cannot be
+driven from the UI at all (CD2-10).
+What is still open: `file:saveFiles` / `export:save` (CD2-4) and the message
+naming the wrong file (CD2-5).
+
+Proof: `out/d1-overwrite.txt` sections 1, 2 and 4; `out/d2-containment.txt` B2;
+`out/d7-clipid-and-toast.txt`; screenshots in `out/d1-clip-collision/`.
+
+### D-6 / D-7 — writes outside the chosen folder: **HELD**
+
+46 calls made from the renderer through the product's own preload bridge, all
+fresh for this run (36 in `d2-containment.cjs` plus 10 for `clip:save` in
+`d8-clipsave-dest.cjs`). Refused with `Unexpected save location`: a dotfile canary
+outside the chosen folder, an absolute path outside, `/etc`, `chosen/..`,
+`chosen/../..`, a **symlink inside the chosen folder pointing outside**, a
+relative `dirPath`, a filename of `..`, a 300-character `dirPath`, a unicode
+directory outside, a `dirPath` that is a **plain file**, `saveFiles` with
+`folder: ".."`, `folder: "."`, a `dirPath` outside, a `dirPath` that is a file,
+and `saveFiles` through the symlink.
+
+`clip:save` needed a second pass: in the first matrix both hostile calls were
+refused by its **source** check ("Unexpected clip location") before the
+destination check could run, so `d8-clipsave-dest.cjs` gives it a real file
+inside a real `ytclip-` folder under the OS temp dir — the only source shape it
+accepts — and then attacks the destination. All six are refused with
+`Unexpected save location` and logged as "refused save outside the chosen
+folders": a `dirPath` outside, the canary folder with a `.bashrc` name,
+`chosen/..`, a symlink out of `chosen`, `/etc`, and a relative `dirPath`; a
+filename of `..` is refused too. The two controls (inside the clips folder,
+inside the data folder) save normally. Nothing was created outside the chosen
+and data folders and the canary is byte-identical.
+Contained but accepted (litter, CD2-13): `folder: "../.."`, `folder: "../outside"`,
+a traversing file name, a folder or file name containing a newline, unicode
+names. Controls that must work still work: a file inside the chosen folder, a
+subfolder of it, a file in the data folder, `folder: "ok-folder"`.
+
+**Filesystem proof, not answer proof**: the canary `.bashrc` was
+`ino 1198231 size 9` before and after, still reading `original`, and a diff of
+the whole sandbox tree before and after the 36 calls lists
+`CREATED OUTSIDE the chosen and data folders: none`.
+
+The export path is owner-gated, so in a public build the bridge answers
+`Could not save.` before containment is reached; `electron/exportSave.cjs` was
+therefore **required unchanged** and driven directly with real `ytchan-` temp
+sources: `folder: ".."`, a `dirPath` outside and a canary dotfile are all
+`Unexpected save location`, and the good export wrote only inside the chosen
+folder.
+
+**The behaviour change does not block legitimate use.** A brand-new folder is
+refused before it is chosen (`Unexpected save location`) and accepted the moment
+it is picked through the product's own footer chip and the native dialog
+(`{"ok":true,"path":".../Brand New Folder/after-pick.txt"}`). Switching to a
+campaign whose clips folder was **never** the global one and cutting works: the
+clip landed in `Client B clips` (`[clip] saved CLB-stub0000001-01.mp4`), because
+`App.tsx:267-271` mirrors the campaign's folder into `saveDir`, which adds it to
+`saveDirs`. The residual is CD2-6: the fence is only as narrow as that list.
+
+Proof: `out/d2-containment.txt` (all 36 rows, the canary, the tree diff, parts
+C1 and C2), `out/d8-clipsave-dest.txt` (the 10 `clip:save` rows and its own
+tree diff), `out/d3-containment-tail.txt` (parts A and C).
+
+### D-3 — Copy blocks: **HELD**, against a real transcript
+
+The stub serves a real six-cue WebVTT through the product's own
+`/api/transcript` (`{"status":200,"available":true,"lines":6,...}`), so the panel
+is reading lines the product parsed. All seven blocks were clicked and the
+**system clipboard read back** and compared against text computed from the cues
+and the marked segments, not taken from the product:
+
+- with a video + transcript and no segment: 3 of 7 available (source, whole
+  transcript, clip id), and both available texts exact;
+- with one segment 00:00:04–00:00:12: **7 of 7 available and all seven exact**,
+  including the segment transcript (2 lines), the script lines
+  (`[SPEAKER, 00:00:04] …`), `00:00:04 to 00:00:12`, and
+  `stub0000001 (video): 00:00:04 to 00:00:12 (ACM-stub0000001-01)`;
+- with two segments: the segment transcript, script lines, ranges
+  (`…; 00:00:18 to 00:00:22`) and used-material line all exact;
+- after a completed cut the clip id block advances to `ACM-stub0000001-02` and
+  the used-material line follows it;
+- focus on open lands on `BUTTON#ui-copy-block-source`, not on `document.body`.
+
+With nothing loaded all seven are correctly disabled; block 7's reason is now
+"No value for {videoId}." rather than run 1's misleading "This campaign has no
+clip id pattern."
+
+14 of 15 clipboard assertions passed in the panel run; the one failure was my
+driver (the open panel blocks the Cut button, CD2-11, so the cut in that step
+never completed) and is settled in `d7-clipid-and-toast.cjs`, where the cut
+happens first and the id does advance.
+
+Proof: `out/d4-copyblocks.txt`, `out/d7-clipid-and-toast.txt`, screenshots in
+`out/d4-copyblocks/`.
+
+### D-4 — the automatic send's failure: **HELD**
+
+With `afterCutting: "finalcut"` and a library that does not exist, a real cut
+now puts the sentence on screen:
+"There is no library at …/this-library-does-not-exist.fcpbundle. Final Cut would
+create a new one there, so nothing was sent. Check the path, or clear the
+Library field." The handoff panel opens itself (`expanded: "true"`) and carries
+the message in its own status area. Fail-closed is unchanged: no library
+directory was created at the bad path and no `.fcpxml` was written.
+
+Proof: `out/d5-handoff.txt`, PART A; screenshot `out/d5-A-silent/*-A-missing-library.png`.
+
+### D-5 — a later cut shrinking the document: **HELD** on the document
+
+Two clips cut, then Send all with a real library, `Raw clips تجربة` as the media
+event, "Also create a project" on and `Acme projects` as the project event: the
+document holds 2 assets, 4 `asset-clip`s (2 in the event, 2 in the projects'
+spines), 2 events, 2 projects, DTD OK. Then "After cutting" switched to Final
+Cut and a third clip cut: the file at the **same path and the same inode**
+(`1286501`) grew from 2,791 to 3,885 bytes and now holds **3 assets, 6
+asset-clips, 3 projects**, with all three clip ids present, `count(//library)`
+= 0 and one `<import-options><option key="library location">`. Still DTD-valid.
+
+So the document is no longer reduced — and the same mechanism now carries the
+previous campaign's clips into the next campaign's file, which is CD2-1.
+
+Proof: `out/d5-handoff.txt`, PART B; the two documents are kept side by side as
+`out/d5-B-batch/B-before.fcpxml` and `out/d5-B-batch/B-after.fcpxml`.
+
+### D-9 — a sub-frame clip losing the batch: **HELD**
+
+`src/lib/fcpxml.ts` imported unchanged, driven with media made by real ffmpeg
+and probed with the real ffprobe invocation `editorOpen.cjs: probeMedia` uses:
+
+| case | before (run 1) | now |
+|---|---|---|
+| 3 good + an unprobeable 0-byte file, project on | 3 included, 1 skipped | 3 included, 1 skipped `M-BROKEN` |
+| 3 good + a 0.001 s 1000 fps file, project on | **threw, no document** | 3 included, skipped `M-SUBFRAME: the file is shorter than one timeline frame`, DTD OK |
+| the same clip, project off | included | included (unchanged) |
+| 2 good + **one frame of ordinary 60 fps** (slice-2's case D), project on | **threw** | 2 included, skipped `M-60FPS: …shorter than one timeline frame`, DTD OK |
+| sub-frame with a "match source" timeline | included | included (unchanged) |
+| a missing file among good ones | — | 2 included, skipped with a plain reason |
+
+The remaining edge is CD2-15 (every clip unusable → only the first reason).
+
+Proof: `out/d6-fcpxml.txt`, cases A–I and the four verdict assertions.
+
+### The FCPXML work that held in run 1: **still holds after D-5's change**
+
+**34 documents** in this run — 31 written by `src/lib/fcpxml.ts` driven
+unchanged, and 3 written by the running app — every one re-validated with
+`xmllint --noout` and `xmllint --noout --dtdvalid FCPXMLv1_10.dtd` against
+Apple's real FCPXML 1.10 DTD (which enforces element order through its content
+models): **0 invalid**. Re-check with
+
+```
+for f in audit/run-2/area-CD/out/d6/*.fcpxml; do xmllint --noout --dtdvalid <dtd> "$f"; done
+```
+
+and the three the app wrote are `out/d5-B-batch/B-before.fcpxml`,
+`out/d5-B-batch/B-after.fcpxml` and `out/d5-C-cross/C-Client B.fcpxml`, all
+DTD OK (re-validated after the fact as well as in the run).
+
+The hostile matrix was rebuilt for this run, not re-run from run 1's script:
+clip names containing `& < > " '`, emoji with RTL text, a newline, 500
+characters; event names empty, whitespace, 500 characters,
+`a/b\c:d*e?f"g<h>i|j`, `& < > " '` with NUL and BEL control characters, and one
+equal to the project event (which correctly merges into a single `<event>`);
+library paths with spaces and Arabic, a **symlinked** library, one containing
+`..`, one with a newline, one that is a file, a relative one, a 300-character
+one and one that does not exist; mixed frame rates (25 and 30000/1001) in one
+document; duplicate project names; several segments in one clip.
+
+- `count(//library)` is **0** in every document, and every document with a
+  library carries exactly one
+  `<import-options><option key="library location" value="file://…"/>` as the
+  **first child of `<fcpxml>`** (`name(/fcpxml/*[1])` = `import-options`).
+- A library that is missing, a file, relative, 300 characters or newline-bearing
+  is refused with the plain sentence, and **no stray library directory was
+  created** by any refused send.
+- Structure: two events, the raw clips as `asset-clip` in the first, one
+  `project` per clip in the second, each project's `spine/asset-clip/@ref`
+  pointing at the **same** asset (`ref="a1"`, `ref="a2"` against
+  `id="a1"`, `id="a2"`), the timeline format (1080x1920 at 1/30 s) separate
+  from the source format.
+
+Run 1's two cosmetic FCPXML findings are unchanged and still visible in these
+documents: the `<note>` / `</asset-clip>` indentation (D-23) and the dangling
+separator in a project name from an empty token (D-16:
+`<project name="H-24 - - Audit CD">`).
+
+Proof: `out/d6-fcpxml.txt`, `out/d6/*.fcpxml` (31 files).
+
+### D-1 — the drag-out: the guard **HELD**; the freeze is **not provable here**
+
+`file:startDrag` with no gesture in progress never reaches the main process:
+the preload only forwards it within 1 s of a genuine `isTrusted` `dragstart`
+(`preload.cjs:54-57`). Called from the renderer with a real file inside the
+clips folder and with a file outside every known folder, both returned
+immediately and the **next IPC call answered in 0 ms** in both cases
+(`{"answered":true,"ms":0}` — run 1 saw `*** NO ANSWER after 8s ***`), and the
+main log contains **no `[drag]` lines at all**, which is what proves the call
+was stopped in the preload rather than handled.
+
+The main-side half cannot be reached without a real gesture, so `dragTarget`
+was required unchanged and driven directly: a file inside a known folder
+resolves, and `REFUSED` for a file outside every known folder, a **symlink
+inside the folder pointing out**, a missing file, the folder itself, a relative
+path, a path with a newline and a non-string.
+
+**The real drag freeze is not provable here** — this container has no window
+manager and no real pointer — so D-1 is **not passed**. A genuine drag gesture
+reaching `event.sender.startDrag` still needs macOS/Windows verification, as
+T2's own report says.
+
+Proof: `out/d2-containment.txt`, parts C3/C4 and the empty drag log;
+`out/d3-containment-tail.txt`, PART B.
+
+---
+
+## The regression hunt
+
+| attack | result |
+|---|---|
+| Switching campaign **mid-download** (main Cut button) | **Safe.** The clip landed in Client A's folder with Client A's prefix and Client A's used range, although Client B was active when it finished (`out/r1-regressions.txt` PART A). |
+| Switching campaign **mid-cut of a banked row** | **CD2-2** — the used range goes to the wrong client. |
+| A campaign **deleted while its clip is cutting** | **Safe.** The clip still saved, the bank key was pruned, no used range was written anywhere, no page error, no crash (`out/d5-handoff.txt` PART D). |
+| Saving into a folder **removed mid-save** | **CD2-9** — still a raw stack, now naming the new helper; containment did not misfire. |
+| The **bank at scale** after the identity change | **No regression.** 2,000 live rows: boot 1,486 ms, one search keystroke 162 ms (49 ms at 20 rows — run 1's C-6, unfixed). Adding 40 orphaned banks: boot 1,256 ms, keystroke 183 ms, switch 1,619 ms, no page errors — but `settings.json` doubles to 1.1 MB (CD2-8). |
+| The **sticky primary-action row** (T10 item 4) | **No regression.** At 1100x760 and 1440x900, with 0 and 3 segments and with the handoff panel open, Cut, Add segment and the In field are all on screen and hit-test `OK`, and `document.documentElement.scrollWidth` equals the viewport (no sideways scroll). At the 900x600 minimum Cut is still below the fold, exactly as T10 documented and accepted. |
+| The **Copy blocks** panel over the new sticky row | **CD2-11** — the panel (`z-20`) covers Cut (`z-10`). |
+| **Folder naming** after the exporter rename | **CD2-17** — the suggested folder is now `data`, so the footer reads "Data data"; the campaign's own `dataDir` stays empty. |
+| A **malformed campaign list** plus the identity change | **CD2-14** — unreadable entries are written out of existence by the next campaign edit (or the next cut), orphaning their banks. |
+
+---
+
+## Coverage: what was exercised and passed
+
+- **Bulk timestamp import** through the product's own importer (the real
+  textarea and the real "Import N clips" button), with ids, categories and
+  tiers, in nine separate launches, each time with the stored rows, the rows on
+  screen, the filter chips and the count line asserted afterwards. Run 1's
+  import-shape work (39 pastes) was not repeated — nothing in the fix list
+  touched `src/lib/bankImport.ts`.
+- **Delete and recreate** in both id styles, in four combinations, with the
+  other campaign's bank asserted untouched each time.
+- **Per-campaign banks** across a slug/opaque mix, four switch rounds.
+- **A real clip, end to end**, more than a dozen times across these suites: paste → mark →
+  Add segment → Cut → real yt-dlp-shaped invocation
+  (`--download-sections *2.00-8.00 --force-keyframes-at-cuts`) → real ffmpeg →
+  `clip:save` → a 6.01 s file in the campaign's folder, measured with ffprobe.
+- **Collision handling** at ` 2` and ` 3`, with inode/size/sha256 on both sides.
+- **46 hostile bridge calls** across `file:save`, `file:saveFiles`, `clip:save`
+  and `export:save`, with whole-tree diffs and a dotfile canary.
+- **The editor handoff** end to end: library, media event, "create a project",
+  project event, Send all, the automatic send, and the document re-read from
+  disk and DTD-validated after each.
+- **34 FCPXML documents** against Apple's 1.10 DTD, including the full hostile
+  matrix.
+- **All 58 symbols** were NOT re-checked: run 1 proved them byte-exact and
+  nothing in the fix list touched `src/lib/symbols.ts`.
+
+## Not provable here
+
+- **The real drag-out freeze** (D-1): no window manager, no real pointer. Not
+  passed.
+- **Final Cut Pro, CapCut (and the removed Premiere path) actually opening**:
+  macOS only. Every send in these runs stopped at the platform guard with
+  "Opening Final Cut Pro from here is macOS only. The file is saved at …", which
+  is the right message and the right path. Whether Final Cut honours
+  `<option key="library location">`, creates the project in the second event, or
+  asks about a duplicate project name is **not provable here**.
+- **The native directory dialog itself**: it cannot be opened or photographed
+  here, so `dialog.showOpenDialog` was replaced inside Electron where a pick was
+  needed. Run 1's D-22 (every picker titled "Choose download folder") therefore
+  stays `likely`.
+- **Real YouTube**: no claim is made about real clip lengths, chosen formats,
+  1080p or signed-in behaviour. The stub stands in, and the cut lengths above
+  are the stub's real ffmpeg cuts of the local fixture.
+- **`export:save` end to end in an owner build**: the handler is owner-gated and
+  these runs are the public shape, so its containment was proved at the module
+  level instead (`electron/exportSave.cjs`, required unchanged).
+- **A read-only target folder**: the container runs as root, so `chmod` does not
+  produce one. Unwritability was produced with a target that is a plain file and
+  with a folder deleted mid-save instead.
+- **Two app windows over one settings file**: Electron's single-instance lock is
+  per `--user-data-dir` and every launch gets its own.
+- **The packaged build**: everything above ran against `electron/main.cjs` in
+  dev shape with the built renderer from `dist/`. Installers, signing and
+  auto-update are outside this area.
