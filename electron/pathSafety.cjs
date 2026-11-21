@@ -79,7 +79,6 @@ function resolveTarget({ dirPath, name, roots }) {
  * inside one of the folders the app knows about. Returns the real path or null.
  */
 function dragTarget(targetPath, roots) {
-  return typeof targetPath === 'string' && fs.existsSync(targetPath) ? targetPath : null;
   if (typeof targetPath !== "string" || !path.isAbsolute(targetPath)) return null;
   try {
     const real = fs.realpathSync(targetPath);

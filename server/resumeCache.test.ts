@@ -6,11 +6,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   CLIP_PREFIX,
   appendJsonl,
+  clearCache,
+  holdFolder,
+  jobDir,
+  markInUse,
   partialBytes,
+  tryClaim,
   readJson,
   readJsonl,
   workDir,
@@ -56,4 +62,67 @@ test("writeJson/readJson round-trip, missing file reads as null", () => {
   writeJson(file, { selected: ["a"] });
   assert.deepEqual(readJson<{ selected: string[] }>(file), { selected: ["a"] });
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// clearCache() sweeps the OS temp dir, so these run against a private one.
+function inPrivateTmp(fn: () => void) {
+  const prev = process.env.TMPDIR;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rc-test-"));
+  process.env.TMPDIR = root;
+  try {
+    fn();
+  } finally {
+    if (prev === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = prev;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("jobDir gives every request its own folder even for identical inputs", () => {
+  inPrivateTmp(() => {
+    const a = jobDir(CLIP_PREFIX, ["same"]);
+    const b = jobDir(CLIP_PREFIX, ["same"]);
+    assert.notEqual(a, b);
+    assert.ok(path.basename(a).startsWith(CLIP_PREFIX));
+    assert.ok(fs.existsSync(a) && fs.existsSync(b));
+  });
+});
+
+test("clearCache skips a folder that is in use until it is released", () => {
+  inPrivateTmp(() => {
+    const busy = workDir(CLIP_PREFIX, ["busy"]);
+    const idle = workDir(CLIP_PREFIX, ["idle"]);
+    const release = markInUse(busy);
+    const first = clearCache();
+    assert.deepEqual(first, { removed: 1, skipped: 1 });
+    assert.ok(fs.existsSync(busy));
+    assert.ok(!fs.existsSync(idle));
+    release();
+    release(); // idempotent
+    assert.equal(clearCache().removed, 1);
+    assert.ok(!fs.existsSync(busy));
+  });
+});
+
+test("clearCache leaves a held (finished, uncollected) clip folder alone, until the hold lapses", () => {
+  inPrivateTmp(() => {
+    const dir = jobDir(CLIP_PREFIX, ["finished"]);
+    fs.writeFileSync(path.join(dir, "clip.mp4"), "the only copy");
+    holdFolder(dir, 60_000);
+    assert.equal(clearCache().removed, 0);
+    assert.ok(fs.existsSync(path.join(dir, "clip.mp4")));
+    holdFolder(dir, -1);
+    assert.equal(clearCache().removed, 1);
+  });
+});
+
+test("tryClaim gives the shared folder to one job at a time", () => {
+  inPrivateTmp(() => {
+    const dir = workDir(CLIP_PREFIX, ["claim"]);
+    const first = tryClaim(dir);
+    assert.ok(first);
+    assert.equal(tryClaim(dir), null);
+    first!();
+    assert.ok(tryClaim(dir));
+  });
 });

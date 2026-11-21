@@ -55,7 +55,6 @@ export function defaultPrefix(name: string): string {
  */
 export function newCampaignId(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
-  if (c) return "acme-q4";
   const raw =
     typeof c?.randomUUID === "function"
       ? c.randomUUID()

@@ -52,3 +52,10 @@ test("a normal export inside the chosen folder still works", async () => {
   assert.equal(r.ok, true);
   assert.equal(fs.readFileSync(path.join(s.saveDir, "ok", "videos.csv"), "utf8"), "data");
 });
+
+test("folder '..' is refused by the containment check alone, with no roots given", async () => {
+  const s = scene();
+  const r = await saveExportFiles({ dirPath: s.saveDir, folder: "..", files: s.files, tmpRoot: s.tmpRoot });
+  assert.equal(r.ok, false);
+  assert.equal(fs.existsSync(path.join(s.tmpRoot, "videos.csv")), false);
+});

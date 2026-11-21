@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCampaign } from "../context/CampaignContext";
 import { useClipperContext } from "../context/ClipperContext";
-import { setBankedRanges, useSegments } from "../hooks/useSegments";
+import { useSegments } from "../hooks/useSegments";
 import {
   bankStore,
   bankedRanges,
@@ -137,9 +137,10 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
     const key = JSON.stringify(planned);
     if (appliedKey.current !== key || seg.banked.length !== planned.length) {
       appliedKey.current = key;
-      setBankedRanges(planned);
+      // The per-tab setter: a hidden tab must write to its own store, not the active tab's.
+      seg.setBanked(planned);
     }
-  }, [planned, seg.banked.length, vid]);
+  }, [planned, seg.banked.length, seg.setBanked, vid]);
 
   const visible = useMemo(
     () => sortClips(filterClips(clips, { text, categories: cats, tiers }), sort),

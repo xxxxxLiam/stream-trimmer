@@ -1,0 +1,4 @@
+files [ 'settings.json', 'settings.json.corrupt-6a1d68dddb' ]
+backup identical to original: true
+live keys 2
+log: [ '2026-11-21T20:09:24.323Z [settings] settings.json could not …' ]

@@ -13,7 +13,8 @@ function escapeRe(s) {
 }
 
 /** Query or fragment parameter names whose values are never worth keeping. */
-const SENSITIVE_PARAM_EXACT = new Set(["s", "ip", "si", "n"]);
+// `id` is the per-session stream identifier on googlevideo URLs (F-19).
+const SENSITIVE_PARAM_EXACT = new Set(["s", "ip", "si", "n", "id"]);
 const SENSITIVE_PARAM_CONTAINS =
   /sig|token|secret|key|auth|pass|session|cookie|credential|pot|sid|visitor|ticket/i;
 
@@ -104,7 +105,9 @@ const REDACTION_RULES = [
       }
       return out
         .replace(/(?<![\w-])[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s"']+/gi, "~")
-        .replace(/(?<![\w~-])\/(?:Users|home)\/[^/\s"']+/g, "~");
+        .replace(/(?<![\w~-])\/(?:Users|home)\/[^/\s"']+/g, "~")
+        // Linux root's home has no user name after it: /root/Videos is the home directory.
+        .replace(/(?<![\w~-])\/root(?=[\\/\s"']|$)/g, "~");
     },
   },
   {

@@ -2689,9 +2689,13 @@ app.get("/api/cache/usage", (_req: Request, res: Response) => {
 });
 
 app.post("/api/cache/clear", (_req: Request, res: Response) => {
-  const { removed } = clearCache();
-  console.log(`[server] cleared ${removed} unfinished work folder(s)`);
-  return res.json({ ok: true, removed, ...cacheUsage() });
+  // Folders a running job is writing to, and finished clips still waiting to be
+  // collected, are skipped: this clears abandoned work, nothing in flight.
+  const { removed, skipped } = clearCache();
+  console.log(
+    `[server] cleared ${removed} unfinished work folder(s), left ${skipped} in use`,
+  );
+  return res.json({ ok: true, removed, skipped, ...cacheUsage() });
 });
 
 // SPA fallback for the packaged UI — must be registered after all API routes.

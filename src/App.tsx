@@ -4,7 +4,7 @@
  * Description: Root layout. Header, three-column workspace (transcript | centre | clips),
  *   footer, and the Phase B mount points. See BUILD-SPEC sections 3 and 12.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
@@ -18,6 +18,7 @@ import {
   useWorkspace,
 } from "./context/WorkspaceContext";
 import { CampaignProvider, useCampaign } from "./context/CampaignContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
 import { CHANNEL_DATA_BUILT, useOwnerAccess } from "./lib/ownerGate";
@@ -46,6 +47,7 @@ import AppHeader from "./components/shell/AppHeader";
 import AppFooter from "./components/shell/AppFooter";
 import ThreeColumnLayout from "./components/shell/ThreeColumnLayout";
 import DownloadBar from "./components/shell/DownloadBar";
+import { buildCopyBlocksInput } from "./components/shell/copyBlocksInput";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "./components/CampaignMenu";
 import TranscriptColumn from "./components/TranscriptColumn"; // B3, left column
@@ -206,6 +208,8 @@ function Layout({ active }: { active: boolean }) {
     downloads,
     setStartText,
     setEndText,
+    transcript,
+    ensureTranscript,
   } = useClipperContext();
   const {
     active: campaign,
@@ -216,12 +220,32 @@ function Layout({ active }: { active: boolean }) {
     pickClipsDir,
     pickDataDir,
   } = useCampaign();
-  const { playhead, clear: clearSegments } = useSegments();
+  const { playhead, segments: tabSegments, clear: clearSegments } = useSegments();
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Live input for the Copy blocks panel (D-3). The transcript loads on demand, so opening
+  // the panel asks for it rather than showing "No transcript loaded" for a video that has one.
+  useEffect(() => {
+    if (active && copyOpen && videoId) ensureTranscript();
+  }, [active, copyOpen, videoId, ensureTranscript]);
+  const copyInput = useMemo(
+    () =>
+      buildCopyBlocksInput({
+        sourceUrl,
+        videoId,
+        transcript,
+        segments: tabSegments,
+        campaign,
+        nextClipId:
+          campaign && videoId
+            ? nextClipId(videoId, downloads.map((d) => d.label.replace(/\.[^.]+$/, "")))
+            : null,
+      }),
+    [sourceUrl, videoId, transcript, tabSegments, campaign, nextClipId, downloads],
+  );
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
   const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
@@ -361,9 +385,7 @@ function Layout({ active }: { active: boolean }) {
 
       <main className="flex h-full w-full flex-col overflow-hidden">
         <AppHeader
-          screen={screen}
-          onScreen={setScreen}
-          channelAvailable={channelAvailable}
+          {...(CHANNEL_DATA_BUILT ? { screen, onScreen: setScreen, channelAvailable } : null)}
           copyOpen={copyOpen}
           onToggleCopy={() => setCopyOpen((v) => !v)}
           symbolsOpen={symbolsOpen}
@@ -376,7 +398,7 @@ function Layout({ active }: { active: boolean }) {
           campaignMenu={<CampaignMenu />}
         />
 
-        {screen === "workspace" ? (
+        {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
           <ThreeColumnLayout
             transcript={<TranscriptColumn playhead={playhead} />}
             centre={
@@ -419,7 +441,7 @@ function Layout({ active }: { active: boolean }) {
       </main>
 
       <SymbolPalette open={symbolsOpen} onClose={closeSymbols} />
-      <CopyBlocks open={copyOpen} onClose={closeCopy} />
+      <CopyBlocks open={copyOpen} onClose={closeCopy} input={copyInput} />
       {active && <SavedToast />}
     </>
   );
@@ -471,10 +493,12 @@ function Shell() {
 
 export default function App() {
   return (
-    <WorkspaceProvider>
-      <CampaignProvider>
-        <Shell />
-      </CampaignProvider>
-    </WorkspaceProvider>
+    <ErrorBoundary>
+      <WorkspaceProvider>
+        <CampaignProvider>
+          <Shell />
+        </CampaignProvider>
+      </WorkspaceProvider>
+    </ErrorBoundary>
   );
 }

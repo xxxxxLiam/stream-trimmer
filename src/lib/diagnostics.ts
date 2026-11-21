@@ -47,6 +47,28 @@ export function needsDeveloper(code: unknown): boolean {
   return classifyFailureKind(code) === "needsDeveloper";
 }
 
+/**
+ * The renderer's own sentence for a clip that was built but whose transfer from the local engine
+ * broke. It is a code-level failure that carries no engine `code`, and its text sends the user to
+ * Copy diagnostics, so the button must stay for it.
+ */
+export const TRANSFER_BROKEN_PREFIX = "The clip was built, but the transfer from the local engine broke";
+
+/**
+ * Whether the "Copy diagnostics" button belongs next to this failure (F-8).
+ *
+ * The button is for failures that are the developer's to fix, and the engine says so by sending a
+ * `code` it does not list as user-fixable (`unknown`, `join_failed`, a code from a newer build). A
+ * response with NO `code` is not that: those are plain `{ error }` bodies such as an unreadable
+ * browser cookie store, whose message already says what to do. `classifyFailureKind` keeps its
+ * "unknown means the developer" rule for a code that arrives; this adds "no code at all is not a
+ * code-level failure".
+ */
+export function offersDeveloperDiagnostics(code: unknown, message?: string | null): boolean {
+  if (typeof code === "string" && code.length > 0) return needsDeveloper(code);
+  return typeof message === "string" && message.startsWith(TRANSFER_BROKEN_PREFIX);
+}
+
 // ---------------------------------------------------------------------------
 // Redactor
 // ---------------------------------------------------------------------------
@@ -66,7 +88,9 @@ function escapeRe(s: string): string {
 }
 
 /** Query or fragment parameter names whose values are never worth keeping. */
-const SENSITIVE_PARAM_EXACT = new Set(["s", "ip", "si", "n"]);
+// `id` is the per-session stream identifier on googlevideo URLs (F-19). The watch-page `v` and
+// `list` parameters are different names and stay readable.
+const SENSITIVE_PARAM_EXACT = new Set(["s", "ip", "si", "n", "id"]);
 const SENSITIVE_PARAM_CONTAINS =
   /sig|token|secret|key|auth|pass|session|cookie|credential|pot|sid|visitor|ticket/i;
 
@@ -157,7 +181,9 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
       }
       return out
         .replace(/(?<![\w-])[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s"']+/gi, "~")
-        .replace(/(?<![\w~-])\/(?:Users|home)\/[^/\s"']+/g, "~");
+        .replace(/(?<![\w~-])\/(?:Users|home)\/[^/\s"']+/g, "~")
+        // Linux root's home has no user name after it: /root/Videos is the home directory.
+        .replace(/(?<![\w~-])\/root(?=[\\/\s"']|$)/g, "~");
     },
   },
   {

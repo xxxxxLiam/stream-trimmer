@@ -4,11 +4,12 @@
  * Description: Copy-blocks handoff panel (opened with Cmd+Shift+C by the shell).
  *   One row per block: label, one-line note, monospace preview, Copy button.
  *   Blocks are never concatenated, each goes somewhere different.
- * Contract: self-positioned (fixed) panel, null when closed. Owns its own Escape.
+ * Contract: self-positioned (fixed) panel at z-20, UNDER the header (z-30) so it can never cover
+ *   the header's own controls or the "?" (F-3). Null when closed. Owns its own Escape.
  *   `input` carries the live video, transcript and segments; Phase C passes it
  *   from App. Without it the panel says there is nothing to copy yet.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { buildHandoffBlocks, writeClipboard, type HandoffInput } from "../lib/handoff";
 
 export type CopyBlocksProps = {
@@ -19,6 +20,24 @@ export type CopyBlocksProps = {
 
 const CONFIRM_MS = 1200;
 const PREVIEW_LINES = 3;
+
+// useLayoutEffect warns when the panel is rendered to a string (the help catalogue test does).
+const useLayoutEffectOnClient = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+const EDGE_GAP = 16;
+
+/**
+ * How far in from the right edge the panel sits. The help drawer is a 400px column on the right
+ * and is drawn above this panel (F-3), so with the drawer open the panel moves to its left instead
+ * of hiding behind it: the tutorial asks the user to press a block here while the drawer is up.
+ */
+function rightOffset(): number {
+  const drawer = typeof document === "undefined" ? null : document.getElementById("ui-help-drawer");
+  if (!drawer) return EDGE_GAP;
+  const r = drawer.getBoundingClientRect();
+  // Stacked under the app (narrow window): it is not at the right edge, nothing to dodge.
+  return r.left > 0 && r.width > 0 ? Math.round(window.innerWidth - r.left) + EDGE_GAP : EDGE_GAP;
+}
 
 const EMPTY: HandoffInput = { lines: [], segments: [] };
 
@@ -33,6 +52,22 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const [right, setRight] = useState(EDGE_GAP);
+
+  useLayoutEffectOnClient(() => {
+    if (!open) return;
+    const update = () => setRight(rightOffset());
+    update();
+    window.addEventListener("resize", update);
+    // The drawer opens and closes without telling this panel.
+    const mo = new MutationObserver(update);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      window.removeEventListener("resize", update);
+      mo.disconnect();
+    };
+  }, [open]);
 
   const blocks = useMemo(() => buildHandoffBlocks(input ?? EMPTY), [input]);
 
@@ -76,7 +111,8 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
       ref={panelRef}
       role="dialog"
       aria-label="Copy blocks"
-      className="surface-panel fixed right-4 top-14 z-50 flex max-h-[calc(100vh-72px)] w-[560px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
+      className="surface-panel fixed top-14 z-20 flex max-h-[calc(100vh-72px)] w-[560px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
+      style={{ right }}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
@@ -119,6 +155,9 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
               </div>
               <button
                 type="button"
+                // A stable id per block: `ui-copy-block-transcript`, `ui-copy-block-script`, ... The
+                // help tutorials point their spotlight at these.
+                id={`ui-copy-block-${b.id}`}
                 data-copy
                 className="btn min-w-[84px] shrink-0"
                 disabled={!b.available}

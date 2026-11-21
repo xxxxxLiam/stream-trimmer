@@ -81,7 +81,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
       ref={asideRef}
       id="ui-help-drawer"
       aria-label="Help"
-      className="surface-panel flex min-h-0 w-full shrink-0 flex-col border-l border-hairline shadow-drawer md:w-[400px]"
+      className="surface-panel relative z-[55] flex min-h-0 w-full shrink-0 flex-col border-l border-hairline shadow-drawer md:w-[400px]"
     >
       <header className="flex items-center gap-2 px-4 pb-2 pt-4">
         <h2 className="flex-1 text-section">Help</h2>
@@ -209,7 +209,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
               })}
             </ol>
 
-            {!present && current && (
+            {!present && current && current.anchorId && (
               <p role="status" className="rounded-control border border-accent bg-accent-soft p-3 text-meta text-accent">
                 That control is not on screen right now. It may be on another screen or tab, or it
                 appears once a video is loaded.

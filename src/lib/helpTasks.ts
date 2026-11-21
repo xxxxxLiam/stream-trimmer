@@ -7,8 +7,12 @@
  *   (the element's DOM id). Channel-export tasks live in CHANNEL_HELP_TASKS so a
  *   public build, which compiles the exporter out, can drop them.
  *
- * anchorId convention: new ids are `help-anchor-<thing>`. Where Phase A already put a
- *   stable `ui-*` id on a control, that id is reused as is.
+ * anchorId rule: an anchor is the id a control ACTUALLY carries in the running app. A step may
+ *   not invent an id and hope a component adopts it: helpTasks.test.ts reads src/ and fails when
+ *   an anchor is not rendered by the component that is meant to render it, in the state the step
+ *   needs (F-1: 19 of 26 invented ids were absent and 8 of 14 tutorials were dead). Where the
+ *   precise control has no id yet, the step points at the nearest real container and
+ *   PENDING_PRECISE_ANCHORS (below) names the id the owning component should add.
  */
 
 export type HelpStep = {
@@ -16,8 +20,12 @@ export type HelpStep = {
   do: string;
   /** Why it matters / what it does. One short line. */
   why: string;
-  /** DOM id of the control to highlight. */
-  anchorId: string;
+  /**
+   * DOM id of the control to highlight, or null when the step happens outside the app (a browser,
+   * a native dialog) or no control carries an id yet. The drawer shows no "not on screen" notice
+   * for null. helpTasks.test.ts lists every null and why.
+   */
+  anchorId: string | null;
 };
 
 export type HelpTask = {
@@ -32,35 +40,50 @@ export const MAX_STEPS = 4;
 export const MIN_STEPS = 2;
 export const MAX_DO_LENGTH = 90;
 
-/** Every anchor id a step may use. Other packages must put these ids on their controls. */
+/** Every anchor id a step may use. Each is the id of a real element; the test proves it. */
 export const ANCHORS = {
   sourceChip: "ui-source-chip",
   campaignChip: "ui-campaign-chip",
   copyBlocks: "ui-copy-blocks",
   symbols: "ui-symbols",
-  primaryAction: "ui-primary-action",
   footerClips: "ui-footer-clips",
   footerData: "ui-footer-data",
   footerFormat: "ui-footer-format",
-  transcriptSearch: "help-anchor-transcript-search",
-  transcriptLines: "help-anchor-transcript-lines",
-  timeline: "help-anchor-timeline",
-  markIn: "help-anchor-mark-in",
-  markOut: "help-anchor-mark-out",
-  addSegment: "help-anchor-add-segment",
-  segmentList: "help-anchor-segment-list",
-  nudge: "help-anchor-nudge",
-  usedWarning: "help-anchor-used-check",
-  campaignList: "help-anchor-campaign-list",
-  copyTranscript: "help-anchor-copy-transcript",
-  copyScript: "help-anchor-copy-script",
-  symbolSearch: "help-anchor-symbol-search",
-  symbolList: "help-anchor-symbol-list",
-  youtubeStatus: "help-anchor-youtube-status",
-  cookiesImport: "help-anchor-cookies-import",
-  clipsTabs: "help-anchor-clips-tabs",
-  savedClipRow: "help-anchor-saved-clip",
+  /** Transcript column: its search box and its lines. */
+  transcriptColumn: "ui-col-transcript",
+  /** Centre column: the timeline, the mark bar and the segment list. */
+  centreColumn: "ui-col-centre",
+  markIn: "ui-mark-in",
+  markOut: "ui-mark-out",
+  addSegment: "ui-add-segment",
+  stitchedTotal: "ui-stitched-total",
+  usedWarning: "ui-overlap-warning",
+  /** "Cut as one file". */
+  cut: "ui-cut",
+  copyTranscript: "ui-copy-block-transcript",
+  copyScript: "ui-copy-block-script",
+  clipsTabAll: "clips-tab-all",
+  clipsPanel: "clips-panel",
 } as const;
+
+/**
+ * Ids the catalogue WANTS so a step can highlight the exact control rather than its container.
+ * None of them exist yet, so no step may use them (the test enforces that). Each names the
+ * component that must carry it. When one lands, move it into ANCHORS and re-point the step.
+ */
+export const PENDING_PRECISE_ANCHORS: Readonly<Record<string, string>> = {
+  "help-anchor-youtube-status": "YouTubeStatusChip main button (also what SetupChecklist 'sign-in' clicks)",
+  "help-anchor-clips-tabs": "ClipsColumn tablist (also what SetupChecklist 'open-bank' reads)",
+  "ui-segment-list": "SegmentList wrapper",
+  "ui-timeline": "Timeline root",
+  "ui-transcript-search": "TranscriptColumn search input",
+  "ui-transcript-lines": "TranscriptColumn line scroller",
+  "ui-campaign-list": "CampaignMenu listbox",
+  "ui-symbol-list": "SymbolPalette results",
+  "ui-saved-clip": "DownloadsPanel first row",
+  "ui-channel-start": "ChannelExportPanel Start",
+  "ui-channel-stop": "ChannelExportPanel Stop",
+};
 
 const A = ANCHORS;
 
@@ -70,9 +93,9 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Cut a clip",
     aliases: ["download", "trim", "make a clip", "save a clip", "export a clip", "start end"],
     steps: [
-      { do: "Click a transcript line where the clip starts.", why: "Moves the video to that moment.", anchorId: A.transcriptLines },
-      { do: "Press I to mark in, then O to mark out.", why: "Sets the start and end of the range.", anchorId: A.timeline },
-      { do: "Press Cut as one file.", why: "Downloads the range into your clips folder.", anchorId: A.primaryAction },
+      { do: "Click a transcript line where the clip starts.", why: "Moves the video to that moment.", anchorId: A.transcriptColumn },
+      { do: "Press I to mark in, then O to mark out.", why: "Sets the start and end of the range.", anchorId: A.markIn },
+      { do: "Press Cut as one file.", why: "Downloads the range into your clips folder.", anchorId: A.cut },
     ],
   },
   {
@@ -81,8 +104,8 @@ export const HELP_TASKS: HelpTask[] = [
     aliases: ["stitch", "join", "combine", "merge", "two segments", "multi segment", "concatenate"],
     steps: [
       { do: "Mark the first moment, then press Add segment.", why: "Keeps that range and clears the marks.", anchorId: A.addSegment },
-      { do: "Mark the second moment and add it too.", why: "Segments are joined in list order.", anchorId: A.segmentList },
-      { do: "Press Cut as one file.", why: "One download, joined into a single file.", anchorId: A.primaryAction },
+      { do: "Mark the second moment and add it too.", why: "Segments are joined in list order.", anchorId: A.addSegment },
+      { do: "Press Cut as one file.", why: "One download, joined into a single file.", anchorId: A.cut },
     ],
   },
   {
@@ -90,8 +113,8 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Find a moment by what was said",
     aliases: ["search transcript", "look up", "locate", "keyword", "phrase", "quote"],
     steps: [
-      { do: "Press Cmd F and type a word or phrase.", why: "Searches every caption line, not just those on screen.", anchorId: A.transcriptSearch },
-      { do: "Press Enter to jump to the next match.", why: "The video seeks to that line.", anchorId: A.transcriptLines },
+      { do: "Press Cmd F and type a word or phrase.", why: "Searches every caption line, not just those on screen.", anchorId: A.transcriptColumn },
+      { do: "Press Enter to jump to the next match.", why: "The video seeks to that line.", anchorId: A.transcriptColumn },
     ],
   },
   {
@@ -99,8 +122,8 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Nudge an edge frame by frame",
     aliases: ["fine tune", "adjust start", "adjust end", "trim edge", "precise", "frame", "arrow keys"],
     steps: [
-      { do: "Click the edge you want to move.", why: "That edge becomes the active one.", anchorId: A.timeline },
-      { do: "Press the arrow keys; add Shift for one frame.", why: "Plain arrows move 0.25s, Shift moves one frame.", anchorId: A.nudge },
+      { do: "Click the edge you want to move.", why: "That edge becomes the active one.", anchorId: A.centreColumn },
+      { do: "Press the arrow keys; add Shift for one frame.", why: "Plain arrows move 0.25s, Shift moves one frame.", anchorId: A.centreColumn },
     ],
   },
   {
@@ -108,7 +131,7 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Check a moment has not been used",
     aliases: ["reuse", "duplicate", "already published", "overlap", "used before", "no reuse"],
     steps: [
-      { do: "Look for the grey hatch and the used tag.", why: "Marks ranges earlier clips already took.", anchorId: A.transcriptLines },
+      { do: "Look for the grey hatch and the used tag.", why: "Marks ranges earlier clips already took.", anchorId: A.transcriptColumn },
       { do: "Read the overlap warning when you cut.", why: "Names the clip that used it before.", anchorId: A.usedWarning },
     ],
   },
@@ -117,8 +140,8 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Reorder segments",
     aliases: ["move segment", "change order", "drag", "sequence", "remove segment", "delete segment"],
     steps: [
-      { do: "Drag a segment up or down in the list.", why: "The clip plays segments in this order.", anchorId: A.segmentList },
-      { do: "Press the x on a segment to remove it.", why: "Drops that range from the clip.", anchorId: A.segmentList },
+      { do: "Drag a segment up or down in the list.", why: "The clip plays segments in this order.", anchorId: A.centreColumn },
+      { do: "Press the x on a segment to remove it.", why: "Drops that range from the clip.", anchorId: A.centreColumn },
     ],
   },
   {
@@ -127,7 +150,7 @@ export const HELP_TASKS: HelpTask[] = [
     aliases: ["change campaign", "new campaign", "other campaign", "project", "client", "account"],
     steps: [
       { do: "Open the campaign chip in the header.", why: "Lists every campaign you have made.", anchorId: A.campaignChip },
-      { do: "Pick a campaign from the list.", why: "Re-points length band, format and both folders.", anchorId: A.campaignList },
+      { do: "Pick a campaign from the list.", why: "Re-points length band, format and both folders.", anchorId: A.campaignChip },
     ],
   },
   {
@@ -172,7 +195,7 @@ export const HELP_TASKS: HelpTask[] = [
     aliases: ["arabic", "bismillah", "salawat", "sallallahu", "phrase", "glyph", "special character", "paste symbol"],
     steps: [
       { do: "Open Symbols (Cmd ;).", why: "A click-to-copy palette that stays on top.", anchorId: A.symbols },
-      { do: "Search, then click the entry you want.", why: "It copies at once; paste where you need it.", anchorId: A.symbolList },
+      { do: "Search, then click the entry you want.", why: "It copies at once; paste where you need it.", anchorId: A.symbols },
     ],
   },
   {
@@ -180,9 +203,9 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Fix a 360p download",
     aliases: ["low quality", "blurry", "resolution", "cookies", "sign in", "session expired", "1080p", "720p"],
     steps: [
-      { do: "Check the sign-in chip in the header.", why: "360p means YouTube sees no valid session.", anchorId: A.youtubeStatus },
-      { do: "Export youtube.com cookies from your browser.", why: "A cookies.txt extension makes the file.", anchorId: A.youtubeStatus },
-      { do: "Drop the cookies file onto the app.", why: "Signs you in again; then retry the cut.", anchorId: A.cookiesImport },
+      { do: "Check the sign-in chip in the header.", why: "360p means YouTube sees no valid session.", anchorId: null },
+      { do: "Export youtube.com cookies from your browser.", why: "A cookies.txt extension makes the file.", anchorId: null },
+      { do: "Drop the cookies file onto the app.", why: "Signs you in again; then retry the cut.", anchorId: null },
     ],
   },
   {
@@ -190,9 +213,9 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Re-cut a saved clip",
     aliases: ["recut", "redo", "edit clip", "change clip", "adjust saved", "reopen", "fix clip"],
     steps: [
-      { do: "Open the All saved tab in the clips column.", why: "Lists every clip you have cut.", anchorId: A.clipsTabs },
-      { do: "Click the clip to load its segments.", why: "They return to the mark bar for adjusting.", anchorId: A.savedClipRow },
-      { do: "Adjust, then press Cut as one file.", why: "Writes a new file from the new ranges.", anchorId: A.primaryAction },
+      { do: "Open the All saved tab in the clips column.", why: "Lists every clip you have cut.", anchorId: A.clipsTabAll },
+      { do: "Click the clip to load its segments.", why: "They return to the mark bar for adjusting.", anchorId: A.clipsPanel },
+      { do: "Adjust, then press Cut as one file.", why: "Writes a new file from the new ranges.", anchorId: A.cut },
     ],
   },
 ];
@@ -205,7 +228,7 @@ export const CHANNEL_HELP_TASKS: HelpTask[] = [
     aliases: ["channel export", "csv", "scrape", "comments", "video list", "research data"],
     steps: [
       { do: "Open Channel data in the header.", why: "The exporter is its own screen.", anchorId: "ui-channel-link" },
-      { do: "Paste the channel link and press Start.", why: "Streams rows to your data folder as it goes.", anchorId: "help-anchor-channel-start" },
+      { do: "Paste the channel link and press Start.", why: "Streams rows to your data folder as it goes.", anchorId: null },
     ],
   },
   {
@@ -213,7 +236,7 @@ export const CHANNEL_HELP_TASKS: HelpTask[] = [
     title: "Stop a run and keep what it got",
     aliases: ["cancel", "abort", "halt", "interrupt", "stop export", "partial"],
     steps: [
-      { do: "Press Stop while the export runs.", why: "Ends the run without losing rows so far.", anchorId: "help-anchor-channel-stop" },
+      { do: "Press Stop while the export runs.", why: "Ends the run without losing rows so far.", anchorId: null },
       { do: "Check your data folder for the file.", why: "Everything fetched before Stop is saved.", anchorId: "ui-footer-data" },
     ],
   },

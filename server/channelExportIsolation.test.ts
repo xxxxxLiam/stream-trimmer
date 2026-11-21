@@ -106,6 +106,27 @@ function checkpointDirs(h: Harness): string[] {
     .filter((d) => fs.existsSync(path.join(d, "selection.json")));
 }
 
+/**
+ * Waits until an export is demonstrably mid-run: its checkpoint exists and at
+ * least one video has been flushed to it. Polling rather than a fixed sleep, so
+ * a loaded machine cannot make the test act too early.
+ */
+async function midRun(h: Harness): Promise<string> {
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    const [dir] = checkpointDirs(h);
+    if (dir) {
+      try {
+        if (fs.readFileSync(path.join(dir, "statuses.jsonl"), "utf8").trim()) return dir;
+      } catch {
+        /* not created yet */
+      }
+    }
+    if (Date.now() > deadline) throw new Error("export never got going");
+    await sleep(50);
+  }
+}
+
 const CHANNEL: FakeChannel = {
   longform: 6,
   shorts: 0,
@@ -117,8 +138,7 @@ const CHANNEL: FakeChannel = {
 test("E-2: clearing the cache mid-export does not empty the CSVs", SLOW, () =>
   withHarness(CHANNEL, async (harness) => {
     const running = startExport(harness);
-    await sleep(1200); // two or three videos in
-    assert.equal(checkpointDirs(harness).length, 1, "the export is mid-run");
+    await midRun(harness);
     const cleared = await post(harness, "/api/cache/clear", {});
     assert.equal(cleared.status, 200);
 
@@ -136,9 +156,7 @@ test("E-2: clearing the cache mid-export does not empty the CSVs", SLOW, () =>
 test("E-2: a checkpoint that vanishes mid-run is an error, never an empty success", SLOW, () =>
   withHarness(CHANNEL, async (harness) => {
     const running = startExport(harness);
-    await sleep(1200);
-    const [dir] = checkpointDirs(harness);
-    assert.ok(dir, "the export is mid-run");
+    const dir = await midRun(harness);
     // Whatever the cause — a cache sweep, antivirus, a user — the live files go.
     fs.rmSync(dir, { recursive: true, force: true });
 
@@ -154,9 +172,7 @@ test("E-2: a checkpoint that vanishes mid-run is an error, never an empty succes
 test("E-2: only the comments file vanishing is also caught", SLOW, () =>
   withHarness(CHANNEL, async (harness) => {
     const running = startExport(harness);
-    await sleep(1200);
-    const [dir] = checkpointDirs(harness);
-    assert.ok(dir);
+    const dir = await midRun(harness);
     fs.rmSync(path.join(dir, "comments.jsonl"), { force: true });
     const done = await running;
     assert.notEqual(done.status, 200);
@@ -200,7 +216,7 @@ test("E-3: two identical exports at once are isolated or refused, never corrupt"
 test("E-3: a refused duplicate leaves the running export's checkpoint alone", SLOW, () =>
   withHarness(CHANNEL, async (harness) => {
     const first = startExport(harness);
-    await sleep(800);
+    await midRun(harness);
     const second = await startExport(harness);
     assert.equal(second.status, 409);
     const done = await first;

@@ -14,7 +14,7 @@ import {
 import {
   buildDiagnosticsBundle,
   fenceForClipboard,
-  needsDeveloper,
+  offersDeveloperDiagnostics,
   type FailureAttempt,
   type FailureDiagnostics,
 } from "../lib/diagnostics";
@@ -24,8 +24,8 @@ const CONFIRM_MS = 1200;
 
 /**
  * The per-failure report. Shown only when the failure is the developer's to fix: for the
- * seven failures the user can fix themselves it renders nothing, because the fix is
- * already on screen. Separate from the whole-log disclosure below.
+ * failures the user can fix themselves, and for a response that carries no `code` at all
+ * (F-8), it renders nothing, because the fix is already on screen. Separate from the whole-log disclosure below.
  */
 export function CopyFailureDiagnostics({
   code,
@@ -44,7 +44,7 @@ export function CopyFailureDiagnostics({
   // New failure, fresh button.
   useEffect(() => setState("idle"), [message, code]);
 
-  if (!needsDeveloper(code)) return null;
+  if (!offersDeveloperDiagnostics(code, message)) return null;
 
   const copy = async () => {
     const report = buildDiagnosticsBundle({
