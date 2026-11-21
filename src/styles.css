@@ -415,4 +415,10 @@
     min-height: 0;
     overflow-y: auto;
   }
+  /* The primary action stays on screen: MarkBar's Cut row sticks to the bottom of the
+     scrolling centre column. Not applied when the columns wrap (see MarkBar). */
+  .cut-row {
+    position: sticky;
+    bottom: 0;
+  }
 }
