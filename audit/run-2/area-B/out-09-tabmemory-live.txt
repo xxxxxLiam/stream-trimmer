@@ -1,2 +1,18 @@
 === B-8 tab memory ===
 ROOT=/home/user/stream-trimmer  TAG=LIVE
+tabs: ["Memory AAA","Memory BBB"]
+persisted now: {"tabs":[{"id":"ws_mwqyd21e_ay8pw","name":"","url":"https://www.youtube.com/watch?v=hhhhhhhhhhh","segments":[{"start":10,"end":20},{"start":60,"end":90}]},{"id":"ws_mwqyd4op_oiamr","name":"","url":"https://www.youtube.com/watch?v=iiiiiiiiiii","segments":[{"start":120,"end":150}]}],"activeId":"ws_mwqyd4op_oiamr"}
+reopen wording anywhere on screen: { reopen: false, recentlyClosed: false, undoClose: false, title: [] }
+dialogs so far: [{"type":"confirm","message":"This tab has 1 marked segment that have not been cut. Close it anyway? Ctrl+Shift+T brings it back."}]
+tabs after close: ["Memory AAA"]
+persisted after close: {"tabs":[{"id":"ws_mwqyd21e_ay8pw","name":"","url":"https://www.youtube.com/watch?v=hhhhhhhhhhh","segments":[{"start":10,"end":20},{"start":60,"end":90}]}],"activeId":"ws_mwqyd21e_ay8pw"}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b09-LIVE/01-after-close.png
+tabs after Ctrl+Shift+T: ["Memory AAA","Memory BBB"]
+the reopened tab's pane: {"rows":[],"total":"00:10:00","source":"Memory BBB 00:10:00 Change","markIn":"","markOut":"00:10:00","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"Choose a clips folder in the footer","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":false,"cancelVisible":false}
+persisted after reopen: {"tabs":[{"id":"ws_mwqyd21e_ay8pw","name":"","url":"https://www.youtube.com/watch?v=hhhhhhhhhhh","segments":[{"start":10,"end":20},{"start":60,"end":90}]},{"id":"ws_mwqyd4op_oiamr","name":"","url":"https://www.youtube.com/watch?v=iiiiiiiiiii"}],"activeId":"ws_mwqyd4op_oiamr"}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b09-LIVE/02-after-reopen.png
+tab 1 after all of that: {"rows":["1 00:00:10 to 00:00:20 0:10 line 2 charlie says something","2 00:01:00 to 00:01:30 0:30 the needle in the haystack"],"total":"00:00:40","source":"Memory AAA 00:10:00 Change","markIn":"","markOut":"","timelineSegments":4,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+
+persisted before quitting: {"tabs":[{"id":"ws_mwqyd21e_ay8pw","name":"","url":"https://www.youtube.com/watch?v=hhhhhhhhhhh","segments":[{"start":10,"end":20},{"start":60,"end":90}]},{"id":"ws_mwqyd4op_oiamr","name":"","url":"https://www.youtube.com/watch?v=iiiiiiiiiii"}],"activeId":"ws_mwqyd21e_ay8pw"}
+
+=== relaunch ===
