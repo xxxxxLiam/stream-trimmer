@@ -1,17 +1,12 @@
 /**
  * File: App.tsx
  * Path: src/App.tsx
- * Description: Root layout — full-viewport two-column grid, overlay loader, form + preview.
+ * Description: Root layout. Header, three-column workspace (transcript | centre | clips),
+ *   footer, and the Phase B mount points. See BUILD-SPEC sections 3 and 12.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Download,
-  Scissors,
-  CheckCircleFill,
-  FolderSymlink,
-  X,
-} from "react-bootstrap-icons";
+import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
 import {
   ChannelExportProvider,
@@ -22,187 +17,32 @@ import {
   TabActiveProvider,
   useWorkspace,
 } from "./context/WorkspaceContext";
+import { CampaignProvider } from "./context/CampaignContext";
 import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
 import ChannelLockGate from "./components/ChannelLockGate";
 import { isLockConfigured } from "./lib/channelLock";
-import UrlBar from "./components/UrlBar";
-import TimeRangeControls from "./components/TimeRangeControls";
-import FormatQualityFields from "./components/FormatQualityFields";
 import PreviewPanel from "./components/PreviewPanel";
-import TranscriptDock from "./components/TranscriptDock";
-import DownloadsPanel from "./components/DownloadsPanel";
 import OverlayLoader from "./components/OverlayLoader";
-import DestinationSelector from "./components/DestinationSelector";
-import UpdateStatus from "./components/UpdateStatus";
 import DragOutHandle from "./components/DragOutHandle";
-import { formatTimestamp } from "./lib/clip";
-import { formatBytes } from "./lib/clip";
-import YouTubeStatusChip from "./components/YouTubeStatusChip";
 import YouTubeConnectModal from "./components/YouTubeConnectModal";
 import {
   restoreConnection,
   useYouTubeConnection,
 } from "./lib/youtubeConnection";
-
-function Meta() {
-  const { info, duration, loadingInfo } = useClipperContext();
-  return (
-    <AnimatePresence mode="wait">
-      {info && !loadingInfo ? (
-        <motion.div
-          key={info.id}
-          initial={{ opacity: 0, y: 3 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          className="flex items-center gap-2 rounded-row bg-panel-hover px-3 py-2 text-[12px] text-fg-muted"
-        >
-          <span className="truncate text-fg">{info.title}</span>
-          <span className="ml-auto shrink-0 tabular-nums text-fg-faint">
-            {formatTimestamp(duration)}
-          </span>
-        </motion.div>
-      ) : loadingInfo ? (
-        <div className="flex items-center gap-2 rounded-row bg-panel-hover px-3 py-2">
-          <div className="h-3 w-1/2 animate-pulse rounded-chip bg-hairlineStrong" />
-          <div className="ml-auto h-3 w-10 animate-pulse rounded-chip bg-hairlineStrong" />
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 rounded-row bg-panel-hover px-3 py-2 text-[12px] text-fg-faint">
-          <span className="truncate">No video loaded</span>
-          <span className="ml-auto shrink-0 tabular-nums">--:--</span>
-        </div>
-      )}
-
-    </AnimatePresence>
-  );
-}
-
-function ErrorBanner() {
-  const { error } = useClipperContext();
-  return (
-    <AnimatePresence>
-      {error && (
-        <motion.div
-          key="err"
-          initial={{ opacity: 0, y: -3 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.14 }}
-          className="rounded-row border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-accent"
-          role="alert"
-        >
-          {error}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function FooterBar() {
-  const {
-    info,
-    downloading,
-    validationError,
-    format,
-    download,
-    start,
-    end,
-    estimatedBytes,
-    isElectron,
-    saveDir,
-    downloadProgress,
-    downloadPhase,
-    downloadNote,
-    cancelDownload,
-  } = useClipperContext();
-  const needsSaveDir = isElectron && !saveDir;
-  const disabled =
-    !info || downloading || Boolean(validationError) || needsSaveDir;
-  const status = !info
-    ? "Ready"
-    : validationError
-      ? "Invalid selection"
-      : needsSaveDir
-        ? "Choose a save folder"
-        : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
-  const sizeLabel =
-    info && !validationError && estimatedBytes > 0
-      ? `~${formatBytes(estimatedBytes)} estimated`
-      : "";
-
-  const pct = Math.max(0, Math.min(100, downloadProgress));
-  const processing = downloadPhase === "processing";
-
-  return (
-    <div className="relative flex items-center justify-between gap-4 border-t border-hairline bg-bg-deep/60 px-4 py-2.5">
-      <div className="flex items-center gap-2 text-[12px] text-fg-muted">
-        <Scissors size={12} />
-        <span>{status}</span>
-        {sizeLabel && (
-          <>
-            <span className="text-fg-faint">·</span>
-            <span
-              className="text-fg-faint"
-              title="Approximate — actual size varies with scene bitrate"
-            >
-              {sizeLabel}
-            </span>
-          </>
-        )}
-      </div>
-      {downloading ? (
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-          <span className="shrink-0 text-[12px] tabular-nums text-fg-muted">
-            {processing
-              ? "Finishing up"
-              : downloadNote && pct === 0
-                ? downloadNote
-                : `Downloading ${Math.floor(pct)}%`}
-          </span>
-          <div className="relative h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-panel-raised">
-            {processing ? (
-              <motion.div
-                className="absolute inset-y-0 w-1/3 rounded-full bg-accent/70"
-                animate={{ x: ["-100%", "300%"] }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-              />
-            ) : (
-              <motion.div
-                className="absolute inset-y-0 left-0 rounded-full bg-accent"
-                animate={{ width: `${pct}%` }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={cancelDownload}
-            className="btn shrink-0 px-2 py-1.5 text-[12px]"
-            aria-label="Cancel download"
-            title="Cancel download"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={download}
-          disabled={disabled}
-          className="btn-primary text-[12px]"
-        >
-          <Download size={12} />
-          <span>{`Download ${format.toUpperCase()}`}</span>
-          <span className="kbd border-white/30 bg-white/10 text-white/90">
-            ⌘↵
-          </span>
-        </button>
-      )}
-    </div>
-  );
-}
+// Shell
+import AppHeader from "./components/shell/AppHeader";
+import AppFooter from "./components/shell/AppFooter";
+import ThreeColumnLayout from "./components/shell/ThreeColumnLayout";
+import DownloadBar from "./components/shell/DownloadBar";
+// Phase B mount points. Replace the files, never this wiring.
+import TranscriptColumn from "./components/TranscriptColumn"; // B3, left column
+import Timeline from "./components/Timeline"; // B2, centre under video
+import MarkBar from "./components/MarkBar"; // B2, centre under Timeline
+import ClipsColumn from "./components/ClipsColumn"; // B2/B4, right column
+import HelpDrawer from "./components/HelpDrawer"; // B6, right drawer
+import SymbolPalette from "./components/SymbolPalette"; // B5, overlay
+import CopyBlocks from "./components/CopyBlocks"; // B5, overlay
 
 function SavedToast() {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
@@ -222,7 +62,7 @@ function SavedToast() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-panel border border-hairline bg-panel-raised px-4 py-3 shadow-panel"
+          className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-panel border border-hairline surface-raised px-4 py-3 shadow-panel"
           role="status"
         >
           <CheckCircleFill size={16} className="shrink-0 text-accent" />
@@ -232,16 +72,16 @@ function SavedToast() {
             label={savedNotice.label}
           />
           <div className="flex min-w-0 flex-col">
-            <span className="text-[13px] font-medium text-fg">
+            <span className="text-body font-medium text-fg">
               {savedNotice.kind === "comments"
                 ? "Comments exported"
                 : "Clip saved"}
             </span>
-            <span className="max-w-[220px] truncate text-[11px] text-fg-faint">
+            <span className="max-w-[220px] truncate text-meta text-fg-dim">
               {savedNotice.label}
             </span>
             {savedNotice.detail && (
-              <span className="max-w-[260px] text-[11px] text-fg-faint">
+              <span className="max-w-[260px] text-meta text-fg-dim">
                 {savedNotice.detail}
               </span>
             )}
@@ -250,57 +90,23 @@ function SavedToast() {
             <button
               type="button"
               onClick={revealSaved}
-              className="btn ml-1 shrink-0 text-[12px]"
+              className="btn ml-1 shrink-0"
             >
-              <FolderSymlink size={12} />
+              <FolderSymlink size={16} />
               <span>Open folder</span>
             </button>
           )}
           <button
             type="button"
             onClick={dismissSavedNotice}
-            className="shrink-0 rounded-chip p-1 text-fg-faint hover:bg-panel-hover hover:text-fg"
+            className="icon-btn"
             aria-label="Dismiss"
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-type Mode = "clip" | "downloads" | "export";
-
-function ModeTabs({
-  mode,
-  setMode,
-}: {
-  mode: Mode;
-  setMode: (m: Mode) => void;
-}) {
-  const tabs: { value: Mode; label: string }[] = [
-    { value: "clip", label: "Clip" },
-    { value: "downloads", label: "Downloads" },
-    { value: "export", label: "Export" },
-  ];
-  return (
-    <div className="flex rounded-row border border-hairline bg-panel-raised p-0.5">
-      {tabs.map((t) => (
-        <button
-          key={t.value}
-          type="button"
-          onClick={() => setMode(t.value)}
-          className={`rounded-chip px-2.5 py-1 text-[12px] transition-colors ${
-            mode === t.value
-              ? "bg-accent text-white"
-              : "text-fg-muted hover:text-fg"
-          }`}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -332,78 +138,107 @@ function TabReporter({ id }: { id: string }) {
 }
 
 function Layout({ active }: { active: boolean }) {
-  const { exportingComments } = useClipperContext();
-  const [mode, setMode] = useState<Mode>("clip");
-  // Loading video info now renders inline; the overlay is reserved for the
+  const { exportingComments, revealLastSaved } = useClipperContext();
+  const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [symbolsOpen, setSymbolsOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const channelAvailable = isLockConfigured();
+
+  // Loading video info renders inline; the overlay is reserved for the
   // blocking comment export.
   const overlayVisible = active && exportingComments;
-  const overlayLabel = "Exporting comments";
+
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
+  const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
+  const closeCopy = useCallback(() => setCopyOpen(false), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
+  // Shell-level shortcuts (BUILD-SPEC section 12). Active tab only.
+  const revealRef = useRef(revealLastSaved);
+  revealRef.current = revealLastSaved;
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "/" && !e.shiftKey) {
+        e.preventDefault();
+        setHelpOpen((v) => !v);
+      } else if (k === ";" && !e.shiftKey) {
+        e.preventDefault();
+        setSymbolsOpen((v) => !v);
+      } else if (k === "c" && e.shiftKey) {
+        e.preventDefault();
+        setCopyOpen((v) => !v);
+      } else if (k === "," && !e.shiftKey) {
+        e.preventDefault();
+        setSettingsOpen((v) => !v);
+      } else if (k === "r" && !e.shiftKey) {
+        e.preventDefault();
+        revealRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
 
   return (
     <>
-      <OverlayLoader visible={overlayVisible} label={overlayLabel} />
+      <OverlayLoader visible={overlayVisible} label="Exporting comments" />
 
-      <main className="flex h-full w-full flex-col overflow-hidden bg-panel">
-        {/* Mode bar */}
-        <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-4 py-2">
-          <ModeTabs mode={mode} setMode={setMode} />
-        </div>
+      <main className="flex h-full w-full flex-col overflow-hidden">
+        <AppHeader
+          screen={screen}
+          onScreen={setScreen}
+          channelAvailable={channelAvailable}
+          copyOpen={copyOpen}
+          onToggleCopy={() => setCopyOpen((v) => !v)}
+          symbolsOpen={symbolsOpen}
+          onToggleSymbols={() => setSymbolsOpen((v) => !v)}
+          helpOpen={helpOpen}
+          onToggleHelp={() => setHelpOpen((v) => !v)}
+          settingsOpen={settingsOpen}
+          onToggleSettings={() => setSettingsOpen((v) => !v)}
+          onCloseSettings={closeSettings}
+        />
 
-        {mode === "clip" ? (
-          <>
-            {/* Command bar */}
-            <div className="border-b border-hairline px-4 py-3">
-              <UrlBar />
-            </div>
-
-            {/* Body */}
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 lg:p-5">
-              <div className="grid shrink-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
-                <section className="flex min-w-0 flex-col gap-3">
-                  <Meta />
-                  <TimeRangeControls />
-                  <FormatQualityFields />
-                  <DestinationSelector />
-                  <ErrorBanner />
-                </section>
-
-                <section className="flex min-w-0 flex-col gap-3">
-                  <PreviewPanel />
-                </section>
-              </div>
-
-              <div className="flex min-h-[180px] w-full flex-col">
-                <TranscriptDock />
-              </div>
-            </div>
-
-
-            <div className="shrink-0">
-              <FooterBar />
-            </div>
-          </>
-        ) : mode === "downloads" ? (
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
-            <div className="mx-auto w-full max-w-2xl">
-              <DownloadsPanel />
-            </div>
-          </div>
+        {screen === "workspace" ? (
+          <ThreeColumnLayout
+            transcript={<TranscriptColumn />}
+            centre={
+              <>
+                <PreviewPanel />
+                <Timeline />
+                <MarkBar />
+                <DownloadBar />
+              </>
+            }
+            clips={<ClipsColumn />}
+            drawer={<HelpDrawer open={helpOpen} onClose={closeHelp} />}
+          />
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
-
-            <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-              {/* Channel exporter stays hidden unless a passcode is baked in. */}
-              {isLockConfigured() && (
-                <ChannelLockGate>
-                  <ChannelExportPanel />
-                </ChannelLockGate>
-              )}
+          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2">
+              <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
+                {/* Channel exporter stays hidden unless a passcode is baked in. */}
+                {channelAvailable && (
+                  <ChannelLockGate>
+                    <ChannelExportPanel />
+                  </ChannelLockGate>
+                )}
+              </div>
             </div>
+            <HelpDrawer open={helpOpen} onClose={closeHelp} />
           </div>
         )}
 
+        <AppFooter />
       </main>
+
+      <SymbolPalette open={symbolsOpen} onClose={closeSymbols} />
+      <CopyBlocks open={copyOpen} onClose={closeCopy} />
       {active && <SavedToast />}
     </>
   );
@@ -420,16 +255,10 @@ function Shell() {
   }, []);
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-panel">
-      {/* Title bar with workspace tabs */}
-      <div className="flex items-center gap-3 border-b border-hairline bg-bg-deep/40 px-3 py-1.5">
+    <div className="surface-ground flex h-screen w-full flex-col overflow-hidden">
+      {/* Workspace tabs (multiple videos). Kept from v3; the header below is per tab. */}
+      <div className="flex items-center border-b border-hairline px-3 py-1">
         <WorkspaceTabs />
-        <div className="ml-auto flex shrink-0 items-center gap-3">
-          <YouTubeStatusChip />
-
-          <UpdateStatus />
-          <span className="text-[11px] text-fg-faint">Local · Private</span>
-        </div>
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -459,11 +288,12 @@ function Shell() {
   );
 }
 
-
 export default function App() {
   return (
     <WorkspaceProvider>
-      <Shell />
+      <CampaignProvider>
+        <Shell />
+      </CampaignProvider>
     </WorkspaceProvider>
   );
 }
