@@ -20,12 +20,13 @@ outward. Probe: `audit/run-1/area-H/lib/probe.js`.
 **Totals: 0 blocker, 6 major, 7 minor, 5 polish.** 18 findings, all `confirmed`.
 
 Good news first, because it bounds the rest: **token discipline is close to
-perfect.** Across all 27 measured states the running app uses only the approved
+perfect.** Across all 28 measured states the running app uses only the approved
 border radii (14/8/5 px, plus `9999px` for status dots), only the approved type
 sizes (20/16/13/12/26 px — no 11px, no strays), and only the approved text
 tiers (`#F5F5F7`, `#969697`, `#909092`, `#FF6363`). Exactly **one** off-token
 colour exists in the whole product (H-11). The previously reported
-`rgba(255,255,255,0.35)` tier is gone. 287 distinct text/background/size
+`rgba(255,255,255,0.35)` tier is gone.
+
 1,795 visible text nodes were measured across 28 states, collapsing to 123
 distinct colour × background × size × weight combinations. Five of the 123 come
 back under threshold on the pixel reading; three are real (two of them the same
@@ -52,7 +53,7 @@ So: **two genuine contrast defects in the whole product.**
   removed for failing. Behind the sign-in modal's scrim it is `#49494B` on
   `#161618` = **2.02:1**. The same element reads "Loading" during a fetch, so the
   one word that tells you the app is working is the least readable text in it.
-  Counted 18 occurrences across 15 of the 27 measured states — it is present on
+  Counted 18 occurrences across 15 of the 28 measured states — it is present on
   every screen, in every state, from the first frame.
   For comparison, the correctly-tokenised disabled controls beside it:
   `#909092` on `#202023` = 5.10:1 (Whole video), on `#1C1C1F` = 5.34:1 (Cut as

@@ -951,6 +951,32 @@ Every function the brief names, and how it was exercised.
 | Accessibility and layout | Keyboard-only copy in the palette and the copy-blocks panel; accessible names of every chip and button; tab order; 360px palette; `role`/`aria-label`/`tabindex` on the drag grip. | D-3, D-14, D-18, D-PASS-6 |
 | Errors | Every failure message in the area read back from the live UI. | D-10, D-19, D-PASS-2, D-PASS-7, D-PASS-12 |
 
+### Cross-area observation (not an area D finding)
+
+Not in my files, reported because it blocked two of my runs and because the
+multi-clip send is an area D function that depends on being able to cut more
+than one clip from a video.
+
+**One cut marks the first ten minutes of the video as used.** After a single
+cut of 00:00:02 to 00:00:08, the campaign record holds
+
+```
+usedRanges: {"stub0000001":[{"start":0,"end":600,"clipId":"AUD-stub0000001-01"}]}
+```
+
+— 0 to 600 seconds, which looks like the "Clip length capped at 10 minutes"
+cap being written in place of the segment. Marking 00:02:00 to 00:02:06
+afterwards then produces "Already used | This range (00:02:00 to 00:02:06)
+overlaps clip AUD-stub0000001-01 at 00:02:00 to 00:02:06." and **Cut as one
+file** is disabled with `title="Resolve the overlap warning first"`. There is
+an "Use it anyway" escape in the warning, so it is not a hard block, but every
+further clip inside the first ten minutes has to be forced.
+
+Proof: `audit/run-1/area-D/out/logs/three-clips.log`;
+`audit/run-1/area-D/out/three/01-overlap-warning.png`. Owner: the "Used-ranges
+record" row in area B (`recordUse`, `clipper.bank` / campaign `usedRanges`),
+not `src/lib/fcpxml.ts` or any file area D owns.
+
 ### Gaps inside this area
 
 - The **native directory dialog itself** was never opened (no window manager

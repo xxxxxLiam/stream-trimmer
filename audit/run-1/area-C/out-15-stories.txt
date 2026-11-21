@@ -24,3 +24,14 @@
 [C15] 9. controls offered to re-categorise a row: ["Cut","Remove T1-M01 from the bank"]
 [C15] 9. fixed by re-pasting the line instead: Imported: 1 added.
 [C15] 9. row now: ["repentance","T1-M01 the apology","M01 the apology","repentance"]
+FAIL locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#ui-col-clips button[aria-label^="Remove M02"]')[22m
+
+    at /home/user/stream-trimmer/audit/run-1/area-C/15-stories.cjs:141:75 {
+  log: [
+    `  - waiting for locator('#ui-col-clips button[aria-label^="Remove M02"]')`
+  ],
+  name: 'TimeoutError'
+}
+[C15] shot fail: /home/user/stream-trimmer/audit/out/area-C/C15-stories/08-fail.png
