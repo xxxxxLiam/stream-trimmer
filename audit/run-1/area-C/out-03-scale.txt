@@ -1,0 +1,98 @@
+[C03] 5k lines: preview appeared after 84 ms
+[C03] 5k lines: shot /home/user/stream-trimmer/audit/out/area-C/C03-paste/01-5k-preview.png
+[C03] 5k lines: import+render took 5395 ms
+[C03] 5k lines: rows persisted 5000
+[C03] 5k lines: summary Imported: 5000 added.
+[C03] 5k lines: shot /home/user/stream-trimmer/audit/out/area-C/C03-paste/02-5k-bank.png
+FAIL part1 page.waitForFunction: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /home/user/stream-trimmer/node_modules/electron/dist/electron --inspect=0 --remote-debugging-port=0 /home/user/stream-trimmer/electron/main.cjs --user-data-dir=/tmp/clipper-C03-paste-yQ6HIy --no-sandbox --disable-gpu
+<launched> pid=22081
+[pid=22081][err] Debugger listening on ws://127.0.0.1:46621/a3cf24b9-3850-46f3-bafb-05a6219d9d43
+[pid=22081][err] For help, see: https://nodejs.org/en/docs/inspector
+[pid=22081][err] Debugger attached.
+[pid=22081][err] [22081:1121/182331.322148:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=22081][err] [22081:1121/182331.326454:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=22081][err] [22081:1121/182331.326795:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=22081][err] [22081:1121/182331.326836:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=22081][err] [22081:1121/182331.327345:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=22081][err] [22081:1121/182331.327361:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=22081][err] [22081:1121/182331.327367:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=22081][err] [22081:1121/182331.337861:ERROR:bus.cc(407)] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=22081][err] 
+[pid=22081][err] DevTools listening on ws://127.0.0.1:40735/devtools/browser/07642090-7147-4d5b-ac15-65c138ba8399
+[pid=22081][out] 2026-11-21T18:23:31.350Z [app] crash handlers installed pid=22081 electron=33.4.11 chrome=130.0.6723.191 node=20.18.3 platform=linux
+[pid=22081][err] [22081:1121/182331.380588:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=22081][out] [electron] binDir=/home/user/stream-trimmer/node_modules/electron/dist/resources/bin (yt-dlp=MISSING, ffmpeg=MISSING, deno=MISSING)
+[pid=22081][out] [server] binDir=/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/stubC/resources/bin (yt-dlp=ok, ffmpeg=ok, deno=ok)
+[pid=22081][out] [server] child PATH prefix=/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/stubC/resources/bin
+[pid=22081][out] [server] yt-dlp ready: bundled (/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/stubC/resources/bin/yt-dlp)
+[pid=22081][out] [server] ffmpeg ready: /home/user/stream-trimmer/node_modules/ffmpeg-static/ffmpeg
+[pid=22081][out] [server] serving UI from /home/user/stream-trimmer/dist
+[pid=22081][err] [22081:1121/182331.798761:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=22081][out] [server] listening on http://localhost:34671
+[pid=22081][out] 2026-11-21T18:23:32.057Z [updater] install in place: yes
+[pid=22081][out] checkForUpdatesAndNotify called, downloadPromise is null
+[pid=22081][out] 2026-11-21T18:23:32.059Z [youtube] cookie check (launch) connected=false source=none
+[pid=22081][err] APPIMAGE env is not defined, current application is not an AppImage
+[pid=22081][out] [server] /api/auth/youtube/status source=chrome cookieFile=n/a
+[pid=22081][out] [server] /api/info url=https://www.youtube.com/watch?v=stub0000001 options={"dumpSingleJson":true,"noWarnings":true,"noPlaylist":true}
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] /api/transcript url=https://www.youtube.com/watch?v=stub0000001 options={"skipDownload":true,"writeAutoSubs":true,"writeSubs":true,"subLangs":"en","subFormat":"vtt","noPlaylist":true,"noWarnings":true,"output":"/tmp/yttxt-IoIMuQ/sub","ffmpegLocation":"/home/user/stream-trimmer/node_modules/ffmpeg-static/ffmpeg"}
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] /api/auth/youtube/status source=safari cookieFile=n/a
+[pid=22081][out] [server] transcript files: [ 'sub' ]
+[pid=22081][out] [server] /api/info url=https://www.youtube.com/watch?v=stub0000001 options={"dumpSingleJson":true,"noWarnings":true,"noPlaylist":true}
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] /api/auth/youtube/status source=edge cookieFile=n/a
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] /api/auth/youtube/status source=firefox cookieFile=n/a
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] /api/auth/youtube/status source=brave cookieFile=n/a
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] /api/auth/youtube/status source=chromium cookieFile=n/a
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+[pid=22081][out] [server] youtube auth probe inconclusive: no detail
+[pid=22081][out] [server] auth probe inconclusive on this target, trying the next one
+    at /home/user/stream-trimmer/audit/run-1/area-C/03-scale.cjs:83:17 {
+  log: []
+}
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+page.screenshot: Target page, context or browser has been closed
+    at Object.shot (/home/user/stream-trimmer/audit/harness/app.cjs:111:15)
+    at /home/user/stream-trimmer/audit/run-1/area-C/03-scale.cjs:112:31 {
+  log: []
+}
+
+Node.js v22.23.5

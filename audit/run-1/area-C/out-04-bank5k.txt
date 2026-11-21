@@ -1,0 +1,12 @@
+[C04] 5000 rows: count line painted after 22 ms
+[C04] rows in DOM: 5000
+[C04] filter chips: 10
+[C04] shot: /home/user/stream-trimmer/audit/out/area-C/C04-bank-5000/01-seeded-bank.png
+[C04] state: alive
+[C04] typing one character into the bank search...
+[C04] after 1 char, 2539 ms, alive
+[C04] search for one row resolved after 1227 ms
+[C04] shot: /home/user/stream-trimmer/audit/out/area-C/C04-bank-5000/02-search-one-row.png
+[C04] final state: alive
+[C04] stderr tail: ["APPIMAGE env is not defined, current application is not an AppImage\n"]
+[C04] pageErrors: []

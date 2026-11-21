@@ -1,0 +1,3 @@
+[C05] 5k lines parsed+previewed in 218 ms
+[C05] 5k import committed+painted in 6139 ms; alive
+[C05] shot: /home/user/stream-trimmer/audit/out/area-C/C05-huge/01-after-5k-import.png

@@ -1,0 +1,198 @@
+
+### empty paste
+  input:   ""
+  button:  (no button)
+  says:    (no preview shown)
+
+### one line, range
+  input:   "1:00-1:30"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### bare 1:23 (plain timestamp, no range)
+  input:   "1:23"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 1:23 | Nothing to import | Review the list, then confirm.
+
+### bare 01:23
+  input:   "01:23"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 01:23 | Nothing to import | Review the list, then confirm.
+
+### bare 1:23:45
+  input:   "1:23:45"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 1:23:45 | Nothing to import | Review the list, then confirm.
+
+### bare 00:01:23.456
+  input:   "00:01:23.456"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 00:01:23.456 | Nothing to import | Review the list, then confirm.
+
+### bare 83s
+  input:   "83s"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 No time range found, and it is not a heading (a heading ends with a colon) | 83s | Nothing to import | Review the list, then confirm.
+
+### bare 1m23s
+  input:   "1m23s"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 No time range found, and it is not a heading (a heading ends with a colon) | 1m23s | Nothing to import | Review the list, then confirm.
+
+### chapter list (youtube style)
+  input:   "0:00 intro\n1:23 the hook\n4:05 the payoff"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 3 lines not understood. They will be skipped. | Line 1 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 0:00 intro | Line 2 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 1:23 the hook | Line 3 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 4:05 the payoff | Nothing to import | Review the list, then confirm.
+
+### 1:23 vs 01:23 as ranges
+  input:   "1:23-1:30\n01:23-01:30"
+  button:  Import 2 clips
+  says:    2 clips, 2 segments, 0:14 in total | 0 with a category, 2 without | Import 2 clips | Review the list, then confirm.
+
+### 1:23:45 range
+  input:   "1:23:45-1:24:10"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 it ends at 1:24:10, past the end of the video (1:00:00) | 1:23:45-1:24:10 | Nothing to import | Review the list, then confirm.
+
+### fractional range
+  input:   "00:01:23.456-00:01:25.500"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:02 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### 83s style range
+  input:   "83s-90s"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 No time range found, and it is not a heading (a heading ends with a colon) | 83s-90s | Nothing to import | Review the list, then confirm.
+
+### 1m23s style range
+  input:   "1m23s-1m30s"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 No time range found, and it is not a heading (a heading ends with a colon) | 1m23s-1m30s | Nothing to import | Review the list, then confirm.
+
+### seconds only range
+  input:   "83-90"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:07 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### leading and trailing blank lines
+  input:   "\n\n1:00-1:30\n\n"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### CRLF
+  input:   "1:00-1:30\r\n2:00-2:30\r\n"
+  button:  Import 2 clips
+  says:    2 clips, 2 segments, 1:00 in total | 0 with a category, 2 without | Import 2 clips | Review the list, then confirm.
+
+### tabs between fields
+  input:   "A01\t1:00-1:30\tthe hook"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### tab separated start/end
+  input:   "1:00\t1:30\tthe hook"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | 1:00 1:30 the hook | Nothing to import | Review the list, then confirm.
+
+### description after the time
+  input:   "1:00-1:30 this is the description"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### description with a comma
+  input:   "1:00-1:30 one, two and three"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### description with a quote
+  input:   "1:00-1:30 he said \"do it now\""
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### description with an emoji
+  input:   "1:00-1:30 the best bit 🔥🔥"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### RTL description
+  input:   "1:00-1:30 מה שקרה אחר כך"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### description with a literal \n escape
+  input:   "1:00-1:30 first line\\nsecond line"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### duplicate timestamps, no ids
+  input:   "1:00-1:30 take one\n1:00-1:30 take two"
+  button:  Import 2 clips
+  says:    2 clips, 2 segments, 1:00 in total | 0 with a category, 2 without | Import 2 clips | Review the list, then confirm.
+
+### duplicate ids
+  input:   "A01 1:00-1:30\nA01 2:00-2:30"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | 1 line not understood. They will be skipped. | Line 2 The id A01 is already used on line 1 | A01 2:00-2:30 | Import 1 clip | Review the list, then confirm.
+
+### out of order
+  input:   "9:00-9:30\n2:00-2:30\n5:00-5:30"
+  button:  Import 3 clips
+  says:    3 clips, 3 segments, 1:30 in total | 0 with a category, 3 without | Import 3 clips | Review the list, then confirm.
+
+### beyond the video duration
+  input:   "1:00-1:30\n59:00-61:30"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:30 in total | 0 with a category, 1 without | 1 line not understood. They will be skipped. | Line 2 it ends at 1:01:30, past the end of the video (1:00:00) | 59:00-61:30 | Import 1 clip | Review the list, then confirm.
+
+### negative
+  input:   "-5 - 10"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 No time range found, and it is not a heading (a heading ends with a colon) | -5 - 10 | Nothing to import | Review the list, then confirm.
+
+### negative, explicit minus on both
+  input:   "-0:10 - -0:05"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 Found a time but no range. Write a start and an end, like 38:43 - 39:26 | -0:10 - -0:05 | Nothing to import | Review the list, then confirm.
+
+### 0:00
+  input:   "0:00-0:00"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 the start and end are the same (0:00) | 0:00-0:00 | Nothing to import | Review the list, then confirm.
+
+### 0:00 to 0:10
+  input:   "0:00-0:10"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:10 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### nonsense, no timestamps
+  input:   "the quick brown fox\njumped over\nthe lazy dog"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 3 lines not understood. They will be skipped. | Line 1 No time range found, and it is not a heading (a heading ends with a colon) | the quick brown fox | Line 2 No time range found, and it is not a heading (a heading ends with a colon) | jumped over | Line 3 No time range found, and it is not a heading (a heading ends with a colon) | the lazy dog | Nothing to import | Review the list, then confirm.
+
+### prose that ends in a colon
+  input:   "Notes from the call:\nnothing else here"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 2 No time range found, and it is not a heading (a heading ends with a colon) | nothing else here | Nothing to import | Review the list, then confirm.
+
+### category and tier written out
+  input:   "A02 4:10-4:50 category: hook tier: 2"
+  button:  Import 1 clip
+  says:    1 clip, 1 segment, 0:40 in total | 1 with a category, 0 without. 1 with a tier | hook | Tier 2 | Import 1 clip | Review the list, then confirm.
+
+### heading sets category
+  input:   "Hook moments:\nA06 12:00-12:40\nA07 14:00-14:30"
+  button:  Import 2 clips
+  says:    2 clips, 2 segments, 1:10 in total | 2 with a category, 0 without | Hook moments | Import 2 clips | Review the list, then confirm.
+
+### semicolon two segments
+  input:   "1:00-1:30; 2:00-2:10"
+  button:  Import 1 clip
+  says:    1 clip, 2 segments, 0:40 in total | 0 with a category, 1 without | Import 1 clip | Review the list, then confirm.
+
+### end before start
+  input:   "2:00-1:00"
+  button:  Nothing to import [disabled]
+  says:    0 clips, 0 segments, 0:00 in total | 0 with a category, 0 without | 1 line not understood. They will be skipped. | Line 1 the end (1:00) is before the start (2:00) | 2:00-1:00 | Nothing to import | Review the list, then confirm.
+
+shot: /home/user/stream-trimmer/audit/out/area-C/C01-shapes/01-last-case.png
+pageErrors: []

@@ -1,0 +1,22 @@
+[C02] A. no video yet, bank tab says: "This video\nBank\nAll saved\n\nPaste a link to see this video's clips."
+[C02] A. shot: /home/user/stream-trimmer/audit/out/area-C/C02-order/01-A-no-video.png
+[C02] B. first: Imported: 3 added.
+[C02] B. rows after first: A01,A02,B01
+[C02] B. second: Imported: 0 added, 3 updated.
+[C02] B. rows after second: A01,A02,B01 count= 3
+[C02] B. on screen: This video | Bank | All saved | Import timestamps | 3 clips | Sort by tier |  | Imported: 0 added, 3 updated.
+[C02] B. shot: /home/user/stream-trimmer/audit/out/area-C/C02-order/02-B-twice.png
+[C02] C. button promised: "Import 2 clips" -> stored rows with that range: 1 labels: ["take two"]
+[C02] C. summary line: Imported: 1 added, 1 updated.
+[C02] C. shot: /home/user/stream-trimmer/audit/out/area-C/C02-order/03-C-duplicate-ranges.png
+[C02] D. rows named D0x after double-click: 2 ["D01","D02"]
+[C02] D. shot: /home/user/stream-trimmer/audit/out/area-C/C02-order/04-D-doubleclick.png
+[C02] E. before switch, importer shows: This video | Bank | All saved | Import timestamps
+[C02] E. shot before: /home/user/stream-trimmer/audit/out/area-C/C02-order/05-E-mid-import.png
+[C02] E. after switch to Beta, clips column: "This video\nBank\nAll saved\nImport timestamps\n0 clips\nSort by tier\nNothing banked for this video. Import timestamps once and they stay here."
+[C02] E. shot after: /home/user/stream-trimmer/audit/out/area-C/C02-order/06-E-after-switch.png
+[C02] E. back on Acme: import box still open? no (paste discarded)
+[C02] E. shot back: /home/user/stream-trimmer/audit/out/area-C/C02-order/07-E-back-on-acme.png
+[C02] final acme ids: A01,A02,B01,B02,D01,D02
+[C02] final beta ids: 
+[C02] pageErrors: []
