@@ -9,7 +9,8 @@
  *   `input` carries the live video, transcript and segments; Phase C passes it
  *   from App. Without it the panel says there is nothing to copy yet.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useDrawerClearance } from "./useDrawerClearance";
 import { buildHandoffBlocks, writeClipboard, type HandoffInput } from "../lib/handoff";
 
 export type CopyBlocksProps = {
@@ -20,24 +21,6 @@ export type CopyBlocksProps = {
 
 const CONFIRM_MS = 1200;
 const PREVIEW_LINES = 3;
-
-// useLayoutEffect warns when the panel is rendered to a string (the help catalogue test does).
-const useLayoutEffectOnClient = typeof window === "undefined" ? useEffect : useLayoutEffect;
-
-const EDGE_GAP = 16;
-
-/**
- * How far in from the right edge the panel sits. The help drawer is a 400px column on the right
- * and is drawn above this panel (F-3), so with the drawer open the panel moves to its left instead
- * of hiding behind it: the tutorial asks the user to press a block here while the drawer is up.
- */
-function rightOffset(): number {
-  const drawer = typeof document === "undefined" ? null : document.getElementById("ui-help-drawer");
-  if (!drawer) return EDGE_GAP;
-  const r = drawer.getBoundingClientRect();
-  // Stacked under the app (narrow window): it is not at the right edge, nothing to dodge.
-  return r.left > 0 && r.width > 0 ? Math.round(window.innerWidth - r.left) + EDGE_GAP : EDGE_GAP;
-}
 
 const EMPTY: HandoffInput = { lines: [], segments: [] };
 
@@ -53,21 +36,7 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
   const timer = useRef<number | undefined>(undefined);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const [right, setRight] = useState(EDGE_GAP);
-
-  useLayoutEffectOnClient(() => {
-    if (!open) return;
-    const update = () => setRight(rightOffset());
-    update();
-    window.addEventListener("resize", update);
-    // The drawer opens and closes without telling this panel.
-    const mo = new MutationObserver(update);
-    mo.observe(document.body, { childList: true, subtree: true });
-    return () => {
-      window.removeEventListener("resize", update);
-      mo.disconnect();
-    };
-  }, [open]);
+  const right = useDrawerClearance(open);
 
   const blocks = useMemo(() => buildHandoffBlocks(input ?? EMPTY), [input]);
 

@@ -5,7 +5,14 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { requestEngineCancel, videoUrlProblem } from "./useClipper";
+import { readFileSync } from "node:fs";
+import {
+  DownloadCancelledError,
+  isCancelledResponse,
+  isQuietCancel,
+  requestEngineCancel,
+  videoUrlProblem,
+} from "./useClipper";
 
 test("B-5: channel, playlist and handle links are refused with a reason; video links pass", () => {
   for (const u of [
@@ -42,7 +49,6 @@ test("B-6: an engine that refuses or is gone does not break Cancel", async () =>
   );
 });
 
-import { readFileSync } from "node:fs";
 
 test("B-5/B-6 wiring: cancelDownload calls the engine, loadInfo and download refuse non-video links", () => {
   const src = readFileSync(new URL("./useClipper.ts", import.meta.url), "utf8");
@@ -52,4 +58,29 @@ test("B-5/B-6 wiring: cancelDownload calls the engine, loadInfo and download ref
   assert.match(load, /videoUrlProblem\(url\)/);
   const dl = src.slice(src.indexOf("const download = useCallback"), src.indexOf("const download = useCallback") + 500);
   assert.match(dl, /videoUrlProblem\(url\)/);
+});
+
+test("item 12: a 499 cancelled answer is quiet, an ordinary failure is not", () => {
+  const body = { error: "Cancelled", code: "cancelled", cancelled: true };
+  assert.equal(isCancelledResponse(499, body), true);
+  assert.equal(isCancelledResponse(499, undefined), true);
+  assert.equal(isCancelledResponse(200, body), true, "the code alone is enough");
+  assert.equal(isCancelledResponse(500, { code: "unknown" }), false);
+  assert.equal(isCancelledResponse(500, {}), false);
+  assert.equal(isCancelledResponse(502, null), false);
+  assert.equal(isQuietCancel(new DownloadCancelledError()), true);
+  assert.equal(isQuietCancel(new DOMException("x", "AbortError")), true);
+  assert.equal(isQuietCancel(new Error("Download failed")), false);
+});
+
+test("item 12: the download handler routes a cancelled answer to the quiet path, before it can raise an error", () => {
+  const src = readFileSync(new URL("./useClipper.ts", import.meta.url), "utf8");
+  const check = src.indexOf("if (isCancelledResponse(res.status, data)) throw new DownloadCancelledError();");
+  const raise = src.indexOf("throw new DownloadFailureError(", check);
+  assert.ok(check > 0 && check < raise, "cancel check must precede the failure throw");
+  const quiet = src.indexOf("if (isQuietCancel(e)) {");
+  assert.ok(quiet > 0);
+  const branch = src.slice(quiet, src.indexOf("} else {", quiet));
+  assert.match(branch, /setDownloadPhase\("idle"\)/);
+  assert.doesNotMatch(branch, /setError|setFailure/);
 });

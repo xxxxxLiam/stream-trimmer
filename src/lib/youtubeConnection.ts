@@ -18,6 +18,8 @@ import { readSetting, writeSetting } from "./persist";
 
 const SOURCE_KEY = "clipper.authSource";
 const BROWSER_KEY = "clipper.cookieBrowser";
+/** The user chose to continue without signing in. Survives restarts; the header chip still says "Not signed in". */
+const SKIPPED_KEY = "clipper.signInSkipped";
 
 export interface YouTubeConnectionState {
   connected: boolean;
@@ -187,7 +189,7 @@ let state: YouTubeConnectionState = {
   canImport: hasCookieFile(),
   expiresAt: null,
   expired: false,
-  skipped: false,
+  skipped: readSetting<boolean>(SKIPPED_KEY, false) === true,
 };
 
 /**
@@ -292,6 +294,7 @@ function failureMessage(result: ProbeResult, source: AuthSource): string {
 function markConnected(source: AuthSource) {
   signInEpoch += 1;
   writeSetting(SOURCE_KEY, source);
+  writeSetting(SKIPPED_KEY, null);
   set({
     skipped: false,
     connected: true,
@@ -673,11 +676,14 @@ export async function sweepBrowsers(): Promise<boolean> {
  * signed-out requests at 360p, so this is honest, not a bypass.
  */
 export function continueSignedOut(): void {
-  if (!state.connected) set({ skipped: true });
+  if (state.connected) return;
+  writeSetting(SKIPPED_KEY, true);
+  set({ skipped: true });
 }
 
 /** Brings the connect screen back after `continueSignedOut`. */
 export function resumeSignIn(): void {
+  writeSetting(SKIPPED_KEY, null);
   set({ skipped: false });
 }
 

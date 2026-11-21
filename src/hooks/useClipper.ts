@@ -76,6 +76,33 @@ class DownloadFailureError extends Error {
 }
 
 /**
+ * The engine answers a download that was cancelled (POST /api/download/cancel) with
+ * `499 {"error":"Cancelled","code":"cancelled","cancelled":true}`. That is the user's own Cancel
+ * arriving back, not a failure: no error banner, no diagnostics prompt.
+ */
+export function isCancelledResponse(
+  status: number,
+  body: { code?: string; cancelled?: boolean } | null | undefined,
+): boolean {
+  return status === 499 || body?.code === "cancelled" || body?.cancelled === true;
+}
+
+/** Thrown from the response handler for a cancelled download, and treated like an abort. */
+export class DownloadCancelledError extends Error {
+  constructor() {
+    super("Cancelled");
+  }
+}
+
+/** True for an aborted fetch or a cancelled-by-engine answer: both are the user stopping the cut. */
+export function isQuietCancel(e: unknown): boolean {
+  return (
+    e instanceof DownloadCancelledError ||
+    (typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError")
+  );
+}
+
+/**
  * Why a link cannot be cut, or null when it names one video. The engine will happily
  * answer /api/info for a channel or playlist URL, so without this check such a link loaded
  * as a source and "Cut" then silently did nothing (B-5).
@@ -675,10 +702,12 @@ export function useClipper() {
           error?: string;
           code?: string;
           diagnostics?: FailureDiagnostics;
+          cancelled?: boolean;
         };
         const data = await parseJson<FailureBody>(res).catch(
           () => ({}) as FailureBody,
         );
+        if (isCancelledResponse(res.status, data)) throw new DownloadCancelledError();
         if (data.code === "YOUTUBE_AUTH_REQUIRED") {
           markDisconnected(data.error);
         }
@@ -784,7 +813,7 @@ export function useClipper() {
       setDownloadPhase("done");
       saved = true;
     } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") {
+      if (isQuietCancel(e)) {
         setDownloadPhase("idle");
       } else {
         const raw = e instanceof Error ? e.message : "Download failed";

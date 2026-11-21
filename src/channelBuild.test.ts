@@ -18,6 +18,8 @@ const NEEDLES = [
   'onScreen("channel")',
   'screen==="channel"',
   "channelAvailable",
+  "Exported channel data",
+  "channel data",
 ];
 
 function build(env: Record<string, string>): string {
@@ -42,4 +44,5 @@ test("E-1: public build has no trace of the channel exporter; owner build keeps 
   for (const n of NEEDLES) assert.ok(!pub.includes(n), `public bundle contains ${JSON.stringify(n)}`);
   const owner = build({ VITE_ENABLE_CHANNEL_DATA: "1" });
   assert.ok(owner.includes("Channel data"), "owner bundle still has the feature");
+  assert.ok(owner.includes("Exported channel data will save"), "owner bundle keeps the footer wording");
 });

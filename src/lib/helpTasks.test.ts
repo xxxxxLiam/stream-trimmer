@@ -43,14 +43,14 @@ test("ids are unique and every anchor is a known, prefixed id", () => {
   const known = new Set<string>([
     ...Object.values(ANCHORS),
     "ui-channel-link",
-    "help-anchor-channel-start",
-    "help-anchor-channel-stop",
+    "ui-channel-start",
+    "ui-channel-stop",
   ]);
   for (const t of ALL)
     for (const s of t.steps) {
       if (s.anchorId === null) continue;
       assert.ok(known.has(s.anchorId), `${t.id}: unknown anchor ${s.anchorId}`);
-      assert.match(s.anchorId, /^(ui-[a-z0-9-]+|clips-[a-z-]+)$/);
+      assert.match(s.anchorId, /^(ui-[a-z0-9-]+|clips-[a-z-]+|help-anchor-[a-z-]+)$/);
     }
 });
 
@@ -172,7 +172,18 @@ const WHERE: Record<string, { file: string; state: string; opener?: string; temp
   "ui-copy-block-script": { file: "components/CopyBlocks.tsx", state: "Copy blocks open", opener: "ui-copy-blocks", templated: /id=\{`ui-copy-block-\$\{b\.id\}`\}/ },
   "clips-tab-all": { file: "components/ClipsColumn.tsx", state: "workspace screen", templated: /id=\{`clips-tab-\$\{t\.id\}`\}/ },
   "clips-panel": { file: "components/ClipsColumn.tsx", state: "workspace screen", opener: "clips-tab-all" },
+  "help-anchor-youtube-status": { file: "components/YouTubeStatusChip.tsx", state: "always (header)" },
+  "help-anchor-clips-tabs": { file: "components/ClipsColumn.tsx", state: "workspace screen" },
+  "ui-segment-list": { file: "components/SegmentList.tsx", state: "at least one segment added" },
+  "ui-timeline": { file: "components/Timeline.tsx", state: "workspace screen" },
+  "ui-transcript-search": { file: "components/TranscriptColumn.tsx", state: "workspace screen" },
+  "ui-transcript-lines": { file: "components/TranscriptColumn.tsx", state: "workspace screen" },
+  "ui-campaign-list": { file: "components/CampaignMenu.tsx", state: "campaign menu open", opener: "ui-campaign-chip" },
+  "ui-symbol-list": { file: "components/SymbolPalette.tsx", state: "Symbols open", opener: "ui-symbols" },
+  "ui-saved-clip": { file: "components/DownloadsPanel.tsx", state: "All saved tab, at least one clip saved", opener: "clips-tab-all", templated: /id=\{rowIndex === 0 \? "ui-saved-clip" : undefined\}/ },
   // Channel screens, present only in a build with the exporter.
+  "ui-channel-start": { file: "components/ChannelExportPanel.tsx", state: "channel exporter open, not running" },
+  "ui-channel-stop": { file: "components/ChannelExportPanel.tsx", state: "channel export running" },
   "ui-channel-link": { file: "components/shell/AppHeader.tsx", state: "channel exporter built in" },
 };
 
@@ -196,6 +207,7 @@ test("F-1: every anchor is rendered by the component that is meant to render it"
     if (w.templated) {
       assert.match(file.text, w.templated, `${id}: ${w.file} no longer builds this id from its list`);
       // The list the template is built from must still contain the suffix this anchor needs.
+      if (!id.startsWith("clips-tab-") && !id.startsWith("ui-copy-block-")) continue;
       const tab = id.startsWith("clips-tab-");
       const suffix = id.slice((tab ? "clips-tab-" : "ui-copy-block-").length);
       const producerFile = tab ? file : FILES_BY_PATH.get("lib/handoff.ts");
@@ -238,6 +250,24 @@ test("F-1: no step points at an id that no element carries", () => {
   assert.deepEqual(dead.map((d) => `${d.task.id}#${d.index + 1}:${d.id}`), []);
 });
 
+test("item 10: every precise id T8 asked for now exists, so the pending list is empty", () => {
+  const wanted = [
+    "help-anchor-youtube-status", "ui-segment-list", "ui-timeline",
+    "ui-transcript-search", "ui-transcript-lines", "ui-campaign-list", "ui-symbol-list",
+    "ui-saved-clip", "ui-channel-start", "ui-channel-stop",
+  ];
+  const usedIds = new Set(used().map((u) => u.id));
+  for (const id of wanted) assert.ok(usedIds.has(id), `${id} is not used by any step`);
+  assert.deepEqual(Object.keys(PENDING_PRECISE_ANCHORS), []);
+  // SetupChecklist (F-18) clicks these two by id; they must exist for it to work.
+  const literals = literalIds();
+  assert.ok((literals.get("help-anchor-youtube-status") ?? []).includes("components/YouTubeStatusChip.tsx"));
+  assert.ok((literals.get("help-anchor-clips-tabs") ?? []).includes("components/ClipsColumn.tsx"));
+  const checklist = FILES.find((f) => f.path === "components/SetupChecklist.tsx")!.text;
+  assert.match(checklist, /getElementById\("help-anchor-youtube-status"\)/);
+  assert.match(checklist, /getElementById\("help-anchor-clips-tabs"\)/);
+});
+
 test("F-1: wished-for ids are not used yet, and still do not exist (move them when they do)", () => {
   const literals = literalIds();
   const usedIds = new Set(used().map((u) => u.id));
@@ -250,11 +280,8 @@ test("F-1: wished-for ids are not used yet, and still do not exist (move them wh
 test("steps with no anchor are the ones that happen outside the app or await an id, and nothing else", () => {
   const got = ALL.flatMap((t) => t.steps.flatMap((s, i) => (s.anchorId === null ? [`${t.id}#${i + 1}`] : []))).sort();
   assert.deepEqual(got, [
-    "export-channel#2", // ChannelExportPanel Start: pending ui-channel-start
-    "fix-360p#1", // YouTubeStatusChip: pending help-anchor-youtube-status
     "fix-360p#2", // happens in the user's browser
     "fix-360p#3", // dropped onto the whole window
-    "stop-run#1", // ChannelExportPanel Stop: pending ui-channel-stop
   ]);
 });
 

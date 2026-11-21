@@ -395,8 +395,13 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
         </div>
       )}
 
-      {/* Stitched total, band, and the one primary action. */}
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+      {/* Stitched total, band, and the one primary action. Sticky to the bottom of
+          whatever scrolls (the centre column), so Cut never needs a scroll to reach
+          at the default window size, however many segments are listed above it. */}
+      <div
+        id="ui-cut-row"
+        className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-4 rounded-b-panel border-t border-hairline bg-[var(--c-panel)] px-4 pb-4 pt-3"
+      >
         <div className="flex min-w-[200px] flex-1 flex-col gap-1">
           <span className="text-meta text-fg-dim">
             {hasSegments

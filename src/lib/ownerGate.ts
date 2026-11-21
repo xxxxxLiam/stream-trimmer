@@ -67,13 +67,13 @@ export function checkOwnerAccess(): Promise<boolean> {
   const list = parseMachineList(RAW_LIST);
   cached = (async () => {
     let localMatch = false;
-    if (!list.includes(ANY_MACHINE)) {
-      try {
-        const ask = window.electronAPI?.isOwnerMachine;
-        if (ask) localMatch = (await ask(list, SALT)) === true;
-      } catch {
-        localMatch = false;
-      }
+    // Always asked, "*" included: the main process remembers the verdict so
+    // its own handlers (export:save) can refuse a non-owner.
+    try {
+      const ask = window.electronAPI?.isOwnerMachine;
+      if (ask) localMatch = (await ask(list, SALT)) === true;
+    } catch {
+      localMatch = false;
     }
     return decideAccess({ built: true, list, salt: SALT, localMatch });
   })();

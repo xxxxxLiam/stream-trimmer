@@ -11,6 +11,7 @@ import path from "node:path";
 import {
   CLIP_PREFIX,
   appendJsonl,
+  cacheUsage,
   clearCache,
   holdFolder,
   jobDir,
@@ -124,5 +125,28 @@ test("G-1: tryClaim gives the shared folder to one job at a time", () => {
     assert.equal(tryClaim(dir), null);
     first!();
     assert.ok(tryClaim(dir));
+  });
+});
+
+test("item 11: usage counts only what Clear would remove, so the Downloads label is true", () => {
+  inPrivateTmp(() => {
+    const idle = workDir(CLIP_PREFIX, ["idle-usage"]);
+    fs.writeFileSync(path.join(idle, "a.part"), "x".repeat(100));
+    const busy = workDir(CLIP_PREFIX, ["busy-usage"]);
+    fs.writeFileSync(path.join(busy, "b.part"), "x".repeat(1000));
+    const finished = jobDir(CLIP_PREFIX, ["finished-usage"]);
+    fs.writeFileSync(path.join(finished, "clip.mp4"), "x".repeat(5000));
+    const release = markInUse(busy);
+    holdFolder(finished, 60_000);
+
+    const usage = cacheUsage();
+    assert.deepEqual(usage, { folders: 1, bytes: 100, protectedFolders: 2 });
+
+    const cleared = clearCache();
+    assert.equal(cleared.removed, usage.folders, "what was shown is what went");
+    assert.equal(cleared.skipped, usage.protectedFolders);
+    assert.ok(fs.existsSync(path.join(finished, "clip.mp4")), "the finished clip survived");
+    assert.ok(fs.existsSync(path.join(busy, "b.part")), "the running job's partial survived");
+    release();
   });
 });

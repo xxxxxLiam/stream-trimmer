@@ -99,8 +99,17 @@ export function decideOwnerAccess(input: {
   return input.list.includes(hashMachineId(input.machineId, input.salt));
 }
 
+// Literal `process.env.X` reads, so scripts/build-server.cjs can bake the values
+// into an owner build (esbuild `define` only matches the literal form). In a
+// public build this whole module is replaced by a stub.
+function bakedSetting(name: string): string {
+  if (name === "VITE_OWNER_MACHINES") return String(process.env.VITE_OWNER_MACHINES ?? "");
+  if (name === "VITE_OWNER_SALT") return String(process.env.VITE_OWNER_SALT ?? "");
+  return "";
+}
+
 function ownerSetting(name: string): string {
-  const fromEnv = String(process.env[name] ?? "").trim();
+  const fromEnv = bakedSetting(name).trim();
   if (fromEnv) return fromEnv;
   // `npm run dev:server` does not load .env. Never in the packaged app.
   if (process.env.ELECTRON_RESOURCES) return "";

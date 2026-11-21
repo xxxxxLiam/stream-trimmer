@@ -11,6 +11,7 @@ import { useCampaign } from "../../context/CampaignContext";
 import FormatQualityFields from "../FormatQualityFields";
 import { IconChevronDown, IconFolder } from "./icons";
 import { useDismiss } from "./useDismiss";
+import { CHANNEL_DATA_BUILT } from "../../lib/ownerGate";
 
 const QUALITY_LABEL: Record<string, string> = {
   best: "Best",
@@ -155,7 +156,9 @@ function DataChip({
           className="popover absolute bottom-full left-0 z-40 mb-1 flex w-[320px] flex-col gap-3"
         >
           <p className="m-0 text-body">
-            Exported channel data will save to this folder, kept apart from your clips.
+            {CHANNEL_DATA_BUILT
+              ? "Exported channel data will save to this folder, kept apart from your clips."
+              : "Data will save to this folder, kept apart from your clips."}
           </p>
           <p className="m-0 break-all font-mono text-meta text-fg-dim">{dir}</p>
           <div className="flex justify-end gap-2">
@@ -227,7 +230,11 @@ export default function AppFooter({ onPickClipsDir, onPickDataDir }: AppFooterPr
         confirmed={folders.dataDirConfirmed}
         onPick={wrap(onPickDataDir)}
         onConfirm={confirmDataDir}
-        disabledReason="Exported channel data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
+        disabledReason={
+          CHANNEL_DATA_BUILT
+            ? "Exported channel data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
+            : "Data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
+        }
       />
       {problem && (
         <span role="alert" className="text-meta text-accent">

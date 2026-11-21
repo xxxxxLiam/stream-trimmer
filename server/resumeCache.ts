@@ -107,11 +107,24 @@ function cacheDirs(): string[] {
   }
 }
 
-export function cacheUsage(): { folders: number; bytes: number } {
-  const dirs = cacheDirs();
+/**
+ * What Clear would actually remove: folders a job is using, and finished clips still waiting to be
+ * collected, are protected (see below) and are NOT counted, so the number the user is shown is the
+ * number that goes. `protectedFolders` is how many were left out.
+ */
+export function cacheUsage(): { folders: number; bytes: number; protectedFolders: number } {
+  let folders = 0;
   let bytes = 0;
-  for (const d of dirs) bytes += dirSize(d);
-  return { folders: dirs.length, bytes };
+  let protectedFolders = 0;
+  for (const d of cacheDirs()) {
+    if (isProtected(d)) {
+      protectedFolders += 1;
+      continue;
+    }
+    folders += 1;
+    bytes += dirSize(d);
+  }
+  return { folders, bytes, protectedFolders };
 }
 
 // --- in-use markers --------------------------------------------------------

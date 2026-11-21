@@ -64,26 +64,29 @@ export const ANCHORS = {
   copyScript: "ui-copy-block-script",
   clipsTabAll: "clips-tab-all",
   clipsPanel: "clips-panel",
+  /** The YouTube sign-in chip's button in the header. */
+  youtubeStatus: "help-anchor-youtube-status",
+  /** The segment list (only while there are segments). */
+  segmentList: "ui-segment-list",
+  timeline: "ui-timeline",
+  transcriptSearch: "ui-transcript-search",
+  transcriptLines: "ui-transcript-lines",
+  /** The campaign menu's list (only while the menu is open). */
+  campaignList: "ui-campaign-list",
+  /** The symbols palette's results (only while it is open). */
+  symbolList: "ui-symbol-list",
+  /** The first row of "All saved" (only when something has been saved). */
+  savedClip: "ui-saved-clip",
 } as const;
 
 /**
- * Ids the catalogue WANTS so a step can highlight the exact control rather than its container.
- * None of them exist yet, so no step may use them (the test enforces that). Each names the
- * component that must carry it. When one lands, move it into ANCHORS and re-point the step.
+ * Ids the catalogue WANTS so a step can highlight the exact control rather than its container,
+ * but that no component carries yet. Empty now: every one T8 listed exists and was moved into
+ * ANCHORS (the channel exporter's two are literals in CHANNEL_HELP_TASKS, kept out of this file's
+ * public surface). The test fails if an id listed here appears in a component, so a new wish
+ * cannot rot unnoticed.
  */
-export const PENDING_PRECISE_ANCHORS: Readonly<Record<string, string>> = {
-  "help-anchor-youtube-status": "YouTubeStatusChip main button (also what SetupChecklist 'sign-in' clicks)",
-  "help-anchor-clips-tabs": "ClipsColumn tablist (also what SetupChecklist 'open-bank' reads)",
-  "ui-segment-list": "SegmentList wrapper",
-  "ui-timeline": "Timeline root",
-  "ui-transcript-search": "TranscriptColumn search input",
-  "ui-transcript-lines": "TranscriptColumn line scroller",
-  "ui-campaign-list": "CampaignMenu listbox",
-  "ui-symbol-list": "SymbolPalette results",
-  "ui-saved-clip": "DownloadsPanel first row",
-  "ui-channel-start": "ChannelExportPanel Start",
-  "ui-channel-stop": "ChannelExportPanel Stop",
-};
+export const PENDING_PRECISE_ANCHORS: Readonly<Record<string, string>> = {};
 
 const A = ANCHORS;
 
@@ -113,8 +116,8 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Find a moment by what was said",
     aliases: ["search transcript", "look up", "locate", "keyword", "phrase", "quote"],
     steps: [
-      { do: "Press Cmd F and type a word or phrase.", why: "Searches every caption line, not just those on screen.", anchorId: A.transcriptColumn },
-      { do: "Press Enter to jump to the next match.", why: "The video seeks to that line.", anchorId: A.transcriptColumn },
+      { do: "Press Cmd F and type a word or phrase.", why: "Searches every caption line, not just those on screen.", anchorId: A.transcriptSearch },
+      { do: "Press Enter to jump to the next match.", why: "The video seeks to that line.", anchorId: A.transcriptLines },
     ],
   },
   {
@@ -122,8 +125,8 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Nudge an edge frame by frame",
     aliases: ["fine tune", "adjust start", "adjust end", "trim edge", "precise", "frame", "arrow keys"],
     steps: [
-      { do: "Click the edge you want to move.", why: "That edge becomes the active one.", anchorId: A.centreColumn },
-      { do: "Press the arrow keys; add Shift for one frame.", why: "Plain arrows move 0.25s, Shift moves one frame.", anchorId: A.centreColumn },
+      { do: "Click the edge you want to move.", why: "That edge becomes the active one.", anchorId: A.timeline },
+      { do: "Press the arrow keys; add Shift for one frame.", why: "Plain arrows move 0.25s, Shift moves one frame.", anchorId: A.timeline },
     ],
   },
   {
@@ -140,8 +143,8 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Reorder segments",
     aliases: ["move segment", "change order", "drag", "sequence", "remove segment", "delete segment"],
     steps: [
-      { do: "Drag a segment up or down in the list.", why: "The clip plays segments in this order.", anchorId: A.centreColumn },
-      { do: "Press the x on a segment to remove it.", why: "Drops that range from the clip.", anchorId: A.centreColumn },
+      { do: "Drag a segment up or down in the list.", why: "The clip plays segments in this order.", anchorId: A.segmentList },
+      { do: "Press the x on a segment to remove it.", why: "Drops that range from the clip.", anchorId: A.segmentList },
     ],
   },
   {
@@ -150,7 +153,7 @@ export const HELP_TASKS: HelpTask[] = [
     aliases: ["change campaign", "new campaign", "other campaign", "project", "client", "account"],
     steps: [
       { do: "Open the campaign chip in the header.", why: "Lists every campaign you have made.", anchorId: A.campaignChip },
-      { do: "Pick a campaign from the list.", why: "Re-points length band, format and both folders.", anchorId: A.campaignChip },
+      { do: "Pick a campaign from the list.", why: "Re-points length band, format and both folders.", anchorId: A.campaignList },
     ],
   },
   {
@@ -195,7 +198,7 @@ export const HELP_TASKS: HelpTask[] = [
     aliases: ["arabic", "bismillah", "salawat", "sallallahu", "phrase", "glyph", "special character", "paste symbol"],
     steps: [
       { do: "Open Symbols (Cmd ;).", why: "A click-to-copy palette that stays on top.", anchorId: A.symbols },
-      { do: "Search, then click the entry you want.", why: "It copies at once; paste where you need it.", anchorId: A.symbols },
+      { do: "Search, then click the entry you want.", why: "It copies at once; paste where you need it.", anchorId: A.symbolList },
     ],
   },
   {
@@ -203,7 +206,7 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Fix a 360p download",
     aliases: ["low quality", "blurry", "resolution", "cookies", "sign in", "session expired", "1080p", "720p"],
     steps: [
-      { do: "Check the sign-in chip in the header.", why: "360p means YouTube sees no valid session.", anchorId: null },
+      { do: "Check the sign-in chip in the header.", why: "360p means YouTube sees no valid session.", anchorId: A.youtubeStatus },
       { do: "Export youtube.com cookies from your browser.", why: "A cookies.txt extension makes the file.", anchorId: null },
       { do: "Drop the cookies file onto the app.", why: "Signs you in again; then retry the cut.", anchorId: null },
     ],
@@ -214,7 +217,7 @@ export const HELP_TASKS: HelpTask[] = [
     aliases: ["recut", "redo", "edit clip", "change clip", "adjust saved", "reopen", "fix clip"],
     steps: [
       { do: "Open the All saved tab in the clips column.", why: "Lists every clip you have cut.", anchorId: A.clipsTabAll },
-      { do: "Click the clip to load its segments.", why: "They return to the mark bar for adjusting.", anchorId: A.clipsPanel },
+      { do: "Click the clip to load its segments.", why: "They return to the mark bar for adjusting.", anchorId: A.savedClip },
       { do: "Adjust, then press Cut as one file.", why: "Writes a new file from the new ranges.", anchorId: A.cut },
     ],
   },
@@ -228,7 +231,7 @@ export const CHANNEL_HELP_TASKS: HelpTask[] = [
     aliases: ["channel export", "csv", "scrape", "comments", "video list", "research data"],
     steps: [
       { do: "Open Channel data in the header.", why: "The exporter is its own screen.", anchorId: "ui-channel-link" },
-      { do: "Paste the channel link and press Start.", why: "Streams rows to your data folder as it goes.", anchorId: null },
+      { do: "Paste the channel link and press Start.", why: "Streams rows to your data folder as it goes.", anchorId: "ui-channel-start" },
     ],
   },
   {
@@ -236,7 +239,7 @@ export const CHANNEL_HELP_TASKS: HelpTask[] = [
     title: "Stop a run and keep what it got",
     aliases: ["cancel", "abort", "halt", "interrupt", "stop export", "partial"],
     steps: [
-      { do: "Press Stop while the export runs.", why: "Ends the run without losing rows so far.", anchorId: null },
+      { do: "Press Stop while the export runs.", why: "Ends the run without losing rows so far.", anchorId: "ui-channel-stop" },
       { do: "Check your data folder for the file.", why: "Everything fetched before Stop is saved.", anchorId: "ui-footer-data" },
     ],
   },

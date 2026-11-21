@@ -442,7 +442,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
 
   return (
     <div className={`flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 ${className ?? ""}`}>
-      <div role="tablist" aria-label="Clips" className="flex gap-1">
+      <div id="help-anchor-clips-tabs" role="tablist" aria-label="Clips" className="flex gap-1">
         {TABS.map((t, i) => (
           <button
             key={t.id}

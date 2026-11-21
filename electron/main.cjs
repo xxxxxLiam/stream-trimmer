@@ -46,6 +46,7 @@ const {
 } = require("./updater.cjs");
 const logger = require("./logger.cjs");
 const { readMachineId, hashMachineId } = require("./machineId.cjs");
+const ownerGate = require("./ownerCheck.cjs").createOwnerCheck({ readMachineId, hashMachineId });
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
@@ -601,6 +602,9 @@ function registerIpc() {
   // run the app out of memory.
   ipcMain.handle("export:save", async (_e, payload) => {
     try {
+      // Owner-only, like the exporter that produces these folders. A refusal
+      // carries no hint the feature exists.
+      if (!ownerGate.isOwner()) return { ok: false, error: "Could not save." };
       const result = await saveExportFiles({
         dirPath: payload?.dirPath,
         folder: payload?.folder,
@@ -774,18 +778,9 @@ function registerIpc() {
   // Owner gate: is this computer on the build's allowlist? Answers a boolean
   // and nothing else. The list and salt come from the renderer bundle because
   // this file is not bundled by Vite. Never logs or returns the id or hash.
-  let localMachineId;
-  ipcMain.handle("owner:check", async (_e, list, salt) => {
-    try {
-      if (!Array.isArray(list) || typeof salt !== "string" || !salt) return false;
-      if (localMachineId === undefined) localMachineId = await readMachineId();
-      if (!localMachineId) return false;
-      const mine = hashMachineId(localMachineId, salt);
-      return list.some((h) => typeof h === "string" && h.trim().toLowerCase() === mine);
-    } catch {
-      return false;
-    }
-  });
+  // The verdict is remembered in ownerGate so export:save can refuse non-owners
+  // too; only the boolean ever leaves it.
+  ipcMain.handle("owner:check", (_e, list, salt) => ownerGate.check(list, salt));
 
   // Editor handoff (BUILD-SPEC 11c): editor:installed / probe / writeFcpxml /
   // openWith / reveal / copyFiles. Failures come back as { ok:false, error }.

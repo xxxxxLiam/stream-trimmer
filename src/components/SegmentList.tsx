@@ -88,7 +88,7 @@ export default function SegmentList({
 
   return (
     <div className={className}>
-      <ol className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Segments, in the order they are joined">
+      <ol id="ui-segment-list" className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Segments, in the order they are joined">
         {segments.map((seg, i) => {
           const line = lineAtTime(lines, seg.start);
           const used = usedIndexes?.has(i) ?? false;

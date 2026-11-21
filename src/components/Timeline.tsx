@@ -96,7 +96,7 @@ export default function Timeline({
   const hasBanked = banked.some((b) => checkRange(b).ok);
 
   return (
-    <div className={`surface-panel flex flex-col gap-2 p-4 ${className ?? ""}`}>
+    <div id="ui-timeline" className={`surface-panel flex flex-col gap-2 p-4 ${className ?? ""}`}>
       <div
         ref={trackRef}
         role="slider"

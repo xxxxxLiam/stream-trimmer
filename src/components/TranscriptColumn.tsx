@@ -8,7 +8,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -319,7 +318,6 @@ export default function TranscriptColumn({
     return s;
   }, [w.matches, w.win.from, w.win.to]);
 
-  const searchId = useId();
   const hasTranscript = w.total > 0;
   const noMatches = w.query.trim() !== "" && w.matches.length === 0;
 
@@ -346,13 +344,13 @@ export default function TranscriptColumn({
       </header>
 
       <div className="flex shrink-0 items-center gap-1 px-4 pb-2">
-        <label htmlFor={searchId} className="relative min-w-0 flex-1">
+        <label htmlFor="ui-transcript-search" className="relative min-w-0 flex-1">
           <span className="sr-only">Search the transcript</span>
           <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-fg-dim">
             <IconSearch />
           </span>
           <input
-            id={searchId}
+            id="ui-transcript-search"
             ref={searchRef}
             type="text"
             value={w.query}
@@ -395,6 +393,7 @@ export default function TranscriptColumn({
       </div>
 
       <div
+        id="ui-transcript-lines"
         ref={scrollRef}
         className="relative min-h-0 flex-1 overflow-y-auto border-t border-hairline px-2 py-2"
       >
