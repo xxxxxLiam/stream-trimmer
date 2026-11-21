@@ -16,8 +16,8 @@ const log = (...a) => console.log(...a);
 
 const kids = (needle) => {
   try {
-    return execSync(`ps -eo pid,ppid,etimes,args | grep -F ${JSON.stringify(needle)} | grep -v grep || true`)
-      .toString().trim().split("\n").filter(Boolean);
+    const all = execSync("ps -eo pid,ppid,etimes,args").toString().split("\n");
+    return all.filter((l) => l.includes(needle) && !l.includes("ps -eo"));
   } catch { return []; }
 };
 const clipDirs = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("ytclip-"));

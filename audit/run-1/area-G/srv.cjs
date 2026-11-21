@@ -60,7 +60,7 @@ async function start(opts = {}) {
   for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
 
   const child = spawn(path.join(REPO, "node_modules", ".bin", "tsx"), [path.join(REPO, "server", "index.ts")], {
-    cwd: stub || REPO, env, stdio: ["ignore", "pipe", "pipe"],
+    cwd: stub || REPO, env, stdio: ["ignore", "pipe", "pipe"], detached: true,
   });
   const out = [], err = [];
   child.stdout.on("data", (d) => out.push(String(d)));
@@ -125,7 +125,10 @@ async function start(opts = {}) {
   };
 
   const stop = async () => {
-    child.kill("SIGKILL");
+    // tsx runs the server in a grandchild, so kill the whole group or the
+    // server keeps listening after the wrapper dies.
+    try { process.kill(-child.pid, "SIGKILL"); } catch { /* already gone */ }
+    try { child.kill("SIGKILL"); } catch { /* already gone */ }
     await new Promise((r) => setTimeout(r, 300));
   };
 
