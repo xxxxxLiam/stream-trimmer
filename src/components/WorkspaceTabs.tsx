@@ -50,10 +50,10 @@ export default function WorkspaceTabs() {
               setDraft(labelFor(tab.id));
               setEditingId(tab.id);
             }}
-            className={`group flex h-7 min-w-0 max-w-[190px] shrink-0 cursor-default items-center gap-1.5 rounded-row border px-2 text-[12px] transition-colors ${
+            className={`group flex h-7 min-w-0 max-w-[190px] shrink-0 cursor-default items-center gap-1.5 rounded-control border px-2 text-[12px] transition-colors ${
               active
                 ? "border-hairline bg-panel-raised text-fg"
-                : "border-transparent text-fg-muted hover:bg-panel-hover hover:text-fg"
+                : "border-transparent text-fg-dim hover:bg-panel-hover hover:text-fg"
             }`}
             title={labelFor(tab.id)}
           >
@@ -82,7 +82,7 @@ export default function WorkspaceTabs() {
                 e.stopPropagation();
                 closeTab(tab.id);
               }}
-              className="ml-auto shrink-0 rounded-chip p-0.5 text-fg-faint opacity-0 transition-opacity hover:bg-panel-hover hover:text-fg group-hover:opacity-100"
+              className="ml-auto shrink-0 rounded-chip p-0.5 text-fg-dim opacity-0 transition-opacity hover:bg-panel-hover hover:text-fg group-hover:opacity-100"
               aria-label={`Close ${labelFor(tab.id)}`}
             >
               <X size={12} />
@@ -93,7 +93,7 @@ export default function WorkspaceTabs() {
       <button
         type="button"
         onClick={addTab}
-        className="shrink-0 rounded-chip p-1.5 text-fg-faint hover:bg-panel-hover hover:text-fg"
+        className="shrink-0 rounded-chip p-1.5 text-fg-dim hover:bg-panel-hover hover:text-fg"
         aria-label="New tab"
         title="New tab"
       >

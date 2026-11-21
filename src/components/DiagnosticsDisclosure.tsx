@@ -4,13 +4,81 @@
  * Description: Surfaces the desktop app's local diagnostic log so a crash or a
  * rejected cookies.txt can be reported without hunting for a hidden folder.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Clipboard,
   FolderSymlink,
 } from "react-bootstrap-icons";
+import {
+  buildDiagnosticsBundle,
+  fenceForClipboard,
+  needsDeveloper,
+  type FailureAttempt,
+  type FailureDiagnostics,
+} from "../lib/diagnostics";
+import { writeClipboard } from "../lib/handoff";
+
+const CONFIRM_MS = 1200;
+
+/**
+ * The per-failure report. Shown only when the failure is the developer's to fix: for the
+ * seven failures the user can fix themselves it renders nothing, because the fix is
+ * already on screen. Separate from the whole-log disclosure below.
+ */
+export function CopyFailureDiagnostics({
+  code,
+  message,
+  attempt,
+  diagnostics,
+}: {
+  code?: string;
+  message: string;
+  attempt?: FailureAttempt;
+  diagnostics?: FailureDiagnostics;
+}) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  // New failure, fresh button.
+  useEffect(() => setState("idle"), [message, code]);
+
+  if (!needsDeveloper(code)) return null;
+
+  const copy = async () => {
+    const report = buildDiagnosticsBundle({
+      code,
+      message,
+      attempt,
+      diagnostics,
+      now: new Date(),
+    });
+    const res = await writeClipboard(fenceForClipboard(report));
+    setState(res.ok ? "copied" : "failed");
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState("idle"), res.ok ? CONFIRM_MS : 4000);
+  };
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        className="btn flex items-center gap-2"
+        onClick={() => void copy()}
+        style={state === "copied" ? { borderColor: "var(--accent)" } : undefined}
+      >
+        <Clipboard size={12} />
+        {state === "copied" ? "Copied" : "Copy diagnostics"}
+      </button>
+      {state === "failed" ? (
+        <span role="status" className="text-meta text-fg-dim">
+          Could not copy. Select the text and press Cmd+C.
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 export default function DiagnosticsDisclosure() {
   const api = typeof window === "undefined" ? undefined : window.electronAPI;
@@ -24,20 +92,20 @@ export default function DiagnosticsDisclosure() {
     try {
       const result = await api.readDiagnostics();
       setLogPath(result.path);
-      setText(result.text || "(the log is empty)");
+      setText(result.text || "The log is empty.");
     } catch {
-      setText("Could not read the log.");
+      setText("Could not read the log. Try Refresh.");
     }
   }, [api]);
 
-  // Nothing to show in the browser preview — there is no local log there.
+  // Nothing to show in the browser preview. There is no local log.
   if (!api?.readDiagnostics) return null;
 
   return (
     <div className="mt-3">
       <button
         type="button"
-        className="flex items-center gap-1 text-[11px] text-fg-faint hover:text-fg-muted"
+        className="flex items-center gap-1 text-meta text-fg-dim hover:text-fg"
         aria-expanded={open}
         onClick={() => {
           const next = !open;
@@ -51,10 +119,10 @@ export default function DiagnosticsDisclosure() {
 
       {open ? (
         <div className="mt-2">
-          <p className="text-[11px] leading-relaxed text-fg-faint">
-            The app's own event log. It records what happened and when — no
+          <p className="text-meta leading-relaxed text-fg-dim">
+            The app's event log. It records what happened and when, with no
             cookies, tokens or personal data. If the app closed unexpectedly,
-            this is what shows why.
+            the cause is here.
           </p>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -70,7 +138,7 @@ export default function DiagnosticsDisclosure() {
               className="btn flex items-center gap-2"
               onClick={async () => {
                 const result = await api.copyDiagnostics?.();
-                setNote(result?.ok ? "Copied to clipboard." : "Copy failed.");
+                setNote(result?.ok ? "Copied to clipboard." : "Could not copy the log.");
               }}
             >
               <Clipboard size={12} />
@@ -90,13 +158,13 @@ export default function DiagnosticsDisclosure() {
           </div>
 
           {note ? (
-            <p className="mt-2 text-[11px] text-fg-faint">{note}</p>
+            <p className="mt-2 text-meta text-fg-dim">{note}</p>
           ) : null}
           {logPath ? (
-            <p className="mt-2 break-all text-[10px] text-fg-faint">{logPath}</p>
+            <p className="mt-2 break-all text-meta text-fg-dim">{logPath}</p>
           ) : null}
 
-          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-[10px] leading-relaxed text-fg-faint">
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-meta leading-relaxed text-fg-dim">
             {text}
           </pre>
         </div>

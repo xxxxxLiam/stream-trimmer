@@ -55,7 +55,7 @@ export default function DragOutHandle({
         label ? `Drag ${label} to another app` : "Drag file to another app"
       }
       title="Drag to your editor"
-      className={`flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-row border border-hairline bg-panel text-fg-faint transition-opacity active:cursor-grabbing hover:text-accent ${
+      className={`flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-control border border-hairline bg-panel text-fg-dim transition-opacity active:cursor-grabbing hover:text-accent ${
         dragging ? "opacity-50" : "opacity-100"
       }`}
     >

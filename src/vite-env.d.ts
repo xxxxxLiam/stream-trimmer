@@ -2,8 +2,18 @@
 declare module "*.css";
 
 interface ImportMetaEnv {
-  readonly VITE_CHANNEL_PASSCODE_HASH?: string;
+  /** Off by default. Set to 1 to include the channel-data tool in a build. */
+  readonly VITE_ENABLE_CHANNEL_DATA?: string;
+  /** Comma-separated salted machine hashes (npm run machine-id). "*" = any. */
+  readonly VITE_OWNER_MACHINES?: string;
+  /** Salt for those hashes. Must be the same in every build. */
+  readonly VITE_OWNER_SALT?: string;
 }
+
+/** Baked by vite.config.ts. Prefer these over reading import.meta.env. */
+declare const __CHANNEL_DATA__: boolean;
+declare const __OWNER_MACHINES__: string;
+declare const __OWNER_SALT__: string;
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
@@ -62,7 +72,13 @@ interface ElectronAPI {
   fileExists?: (targetPath: string) => Promise<boolean>;
   startDrag?: (targetPath: string) => void;
   /** Reads the stored cookies.txt and reports whether a session is on disk. */
-  probeYouTube?: () => Promise<{ connected: boolean; error?: string }>;
+  probeYouTube?: () => Promise<{
+    connected: boolean;
+    error?: string;
+    /** Epoch ms when the sign-in lapses, if the file says. */
+    expiresAt?: number | null;
+    expired?: boolean;
+  }>;
   /** Deletes the stored cookies.txt. */
   disconnectYouTube?: () => Promise<{ ok: boolean }>;
   /** Picks a cookies.txt exported from the user's own browser and adopts it. */
@@ -72,6 +88,44 @@ interface ElectronAPI {
     count?: number;
     error?: string;
   }>;
+  /** Adopts cookies.txt text (a file dropped on the window). Validated in main. */
+  importYouTubeCookiesText?: (text: string) => Promise<{
+    ok: boolean;
+    count?: number;
+    kind?: string;
+    error?: string;
+  }>;
+  /**
+   * True when this computer's salted id is in `list`. Only a boolean crosses
+   * the bridge; the raw machine id stays in the main process.
+   */
+  isOwnerMachine?: (list: string[], salt: string) => Promise<boolean>;
+  /**
+   * Editor handoff, implemented in electron/editorOpen.cjs. Every call
+   * resolves; failures are { ok: false, error } in plain words.
+   */
+  editor?: {
+    installed: () => Promise<{
+      ok: boolean;
+      apps?: { finalcut: boolean; premiere: boolean; capcut: boolean };
+      error?: string;
+    }>;
+    probe: (file: string) => Promise<{ ok: boolean; error?: string; [k: string]: unknown }>;
+    writeFcpxml: (payload: {
+      dirPath: string;
+      filename: string;
+      contents: string;
+    }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+    openWith: (payload: {
+      app: "finalcut" | "premiere" | "capcut";
+      file?: string;
+    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; error?: string }>;
+    reveal: (target: string) => Promise<{ ok: boolean; error?: string }>;
+    copyFiles: (payload: {
+      dirPath: string;
+      files: unknown[];
+    }) => Promise<{ ok: boolean; error?: string; [k: string]: unknown }>;
+  };
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
   revealDiagnostics?: () => Promise<{

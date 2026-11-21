@@ -11,6 +11,42 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+/** "/a/b/clips" -> "/a/b/channel-data". Same rule as defaultDataDir in src/lib/campaigns.ts. */
+function siblingDataDir(clipsDir) {
+  const trimmed = String(clipsDir).replace(/[\\/]+$/, "");
+  const sep = trimmed.includes("\\") && !trimmed.includes("/") ? "\\" : "/";
+  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (cut < 0) return "channel-data";
+  return `${trimmed.slice(0, cut)}${sep}channel-data`;
+}
+
+/**
+ * v4 folder migration. Pure: returns a new object, never mutates its input.
+ *  - The single `clipper.saveDir` (or, failing that, the first entry of
+ *    `clipper.saveDirs`) becomes `clipper.clipsDir`. The old keys are left in
+ *    place so a downgrade still finds its folder.
+ *  - `clipper.dataDir` defaults to a sibling `channel-data` folder, flagged
+ *    `clipper.dataDirConfirmed: false` so the UI asks the user to confirm it
+ *    rather than silently choosing. Nothing is created on disk.
+ * Idempotent: values the user already set are never overwritten.
+ */
+function migrateSettings(input) {
+  const s = { ...input };
+  if (!s["clipper.clipsDir"]) {
+    const legacy =
+      (typeof s["clipper.saveDir"] === "string" && s["clipper.saveDir"]) ||
+      (Array.isArray(s["clipper.saveDirs"]) && typeof s["clipper.saveDirs"][0] === "string"
+        ? s["clipper.saveDirs"][0]
+        : "");
+    if (legacy) s["clipper.clipsDir"] = legacy;
+  }
+  if (s["clipper.clipsDir"] && !s["clipper.dataDir"]) {
+    s["clipper.dataDir"] = siblingDataDir(s["clipper.clipsDir"]);
+    s["clipper.dataDirConfirmed"] = false;
+  }
+  return s;
+}
+
 function createSettingsStore(filePath) {
   let cache = {};
   let loaded = false;
@@ -31,9 +67,12 @@ function createSettingsStore(filePath) {
 
   /** Reads the file into memory. Must run before the window is created. */
   function load() {
-    cache = readFile();
+    const raw = readFile();
+    cache = migrateSettings(raw);
     removed.clear();
     loaded = true;
+    // Write the migration back once, so the renderer and the file agree.
+    if (JSON.stringify(raw) !== JSON.stringify(cache)) persist();
     return cache;
   }
 
@@ -78,4 +117,4 @@ function createSettingsStore(filePath) {
   return { load, all, set, persist, path: filePath };
 }
 
-module.exports = { createSettingsStore };
+module.exports = { createSettingsStore, migrateSettings, siblingDataDir };

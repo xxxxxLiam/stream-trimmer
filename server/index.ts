@@ -28,29 +28,45 @@ import {
   classifyYouTubeAuthOutput,
   type YouTubeAuthProbeStatus,
 } from "./youtubeAuth";
-import {
-  COMMENT_COLUMNS,
-  STATUS_COLUMNS,
-  SUMMARY_COLUMNS,
-  TRANSCRIPT_COLUMNS,
-  VIDEO_COLUMNS,
-  describeParts,
-  writeCsv,
-  writeCsvFromJsonl,
-} from "./csv";
 import { isDegradedDelivery } from "./quality";
+import { registerChannelRoutes } from "./channelRoutes";
+import {
+  CookieJarMissingError,
+  acquireCookiePath,
+  type CookieLease,
+} from "./cookieJar";
+import {
+  STAGE_FOUND,
+  STAGE_WRITING,
+  classifyFailure,
+  estimateNeededMb,
+  joinFailure,
+  joinSegments,
+  lowQualityWithoutSession,
+  outPointFailure,
+  probeDurationSec,
+  refusedFailure,
+  pruneWorkDir,
+  resolveSegments,
+  runProcess,
+  sectionArg,
+  segmentFileName,
+  segmentWindow,
+  segmentsTotal,
+  staleSessionFailure,
+  stageDownloaded,
+  stageDownloading,
+  stageJoining,
+  type ClipFailure,
+  type Segment,
+} from "./segments";
 import {
   CLIP_PREFIX,
-  EXPORT_PREFIX,
-  appendJsonl,
   cacheUsage,
   clearCache,
   partialBytes,
-  readJson,
-  readJsonl,
   sweepStaleCache,
   workDir,
-  writeJson,
 } from "./resumeCache";
 
 
@@ -94,6 +110,106 @@ function resolveBinDir(): string | null {
 }
 
 const BIN_DIR = resolveBinDir();
+
+// --- per-run diagnostics -----------------------------------------------------
+// Every log line that names a job (`job=<id>`) is also kept in a small in-memory
+// ring keyed by that id, so a failure can hand the renderer exactly its own
+// lines instead of the whole log. Bounded in both directions.
+const JOB_LOG_MAX_LINES = 300;
+const JOB_LOG_MAX_JOBS = 40;
+const jobLogs = new Map<string, string[]>();
+{
+  const levels = ["log", "warn", "error"] as const;
+  for (const level of levels) {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      original(...args);
+      try {
+        const text = args
+          .map((a) => (typeof a === "string" ? a : String(a)))
+          .join(" ");
+        const m = /\bjob=(job_[\w]+)/.exec(text);
+        if (!m) return;
+        let lines = jobLogs.get(m[1]);
+        if (!lines) {
+          lines = [];
+          jobLogs.set(m[1], lines);
+          if (jobLogs.size > JOB_LOG_MAX_JOBS) {
+            const oldest = jobLogs.keys().next().value;
+            if (oldest !== undefined) jobLogs.delete(oldest);
+          }
+        }
+        lines.push(`${new Date().toISOString()} [${level}] ${text.slice(0, 600)}`);
+        if (lines.length > JOB_LOG_MAX_LINES) lines.shift();
+      } catch {
+        /* capturing a line must never break logging */
+      }
+    };
+  }
+}
+
+function readAppVersion(): string {
+  const fromEnv = process.env.CLIPPER_APP_VERSION || process.env.npm_package_version;
+  if (fromEnv) return fromEnv;
+  const candidates = [
+    path.resolve(process.cwd(), "package.json"),
+    process.env.ELECTRON_RESOURCES
+      ? path.resolve(process.env.ELECTRON_RESOURCES, "..", "app.asar", "package.json")
+      : "",
+    process.env.ELECTRON_RESOURCES
+      ? path.resolve(process.env.ELECTRON_RESOURCES, "..", "package.json")
+      : "",
+  ].filter(Boolean);
+  for (const file of candidates) {
+    try {
+      const v = JSON.parse(fs.readFileSync(file, "utf8")).version;
+      if (typeof v === "string" && v) return v;
+    } catch {
+      /* try the next one */
+    }
+  }
+  return "unknown";
+}
+
+let cachedFfmpegVersion: string | null | undefined;
+function ffmpegVersionLine(): string | null {
+  if (cachedFfmpegVersion !== undefined) return cachedFfmpegVersion;
+  try {
+    const out = spawnSync(String(resolvedFfmpeg), ["-version"], {
+      encoding: "utf8",
+      timeout: 5_000,
+      windowsHide: true,
+    }).stdout;
+    cachedFfmpegVersion = out.split(/\r?\n/)[0]?.replace(/^ffmpeg version\s+/i, "").trim() || null;
+  } catch {
+    cachedFfmpegVersion = null;
+  }
+  return cachedFfmpegVersion;
+}
+
+let cachedYtDlpVersion: string | null | undefined;
+
+/**
+ * What the renderer needs to describe one failed run. Raw on purpose: the one
+ * redactor lives in src/lib/diagnostics.ts and runs over the finished report.
+ */
+function buildRunDiagnostics(jobId: string, stderrRaw: string) {
+  if (cachedYtDlpVersion === undefined) {
+    cachedYtDlpVersion = yt ? ytDlpVersion(yt.binary) : null;
+  }
+  return {
+    jobId,
+    appVersion: readAppVersion(),
+    platform: process.platform,
+    osRelease: os.release(),
+    arch: process.arch,
+    homeDir: os.homedir(),
+    ytDlpVersion: cachedYtDlpVersion,
+    ffmpegVersion: ffmpegVersionLine(),
+    stderrTail: stderrRaw.split(/\r\n|\n|\r/).filter((l) => l.trim()).slice(-400),
+    logLines: [...(jobLogs.get(jobId) ?? [])],
+  };
+}
 
 function childEnv(): NodeJS.ProcessEnv {
   const base = { ...process.env };
@@ -383,27 +499,70 @@ export function resolveCookieOptions(
   return {};
 }
 
-const downloadSchema = z
-  .object({
-    url: urlSchema,
-    start: z.number().nonnegative(),
-    end: z.number().positive(),
-    format: z.enum(["mp4", "mp3"]).default("mp4"),
-    quality: z.string().default("best"),
-    // How the finished clip is handed back. "stream" sends the media as the
-    // response body. "path" returns only its location on disk, for the
-    // desktop app, whose main process can move the file itself — the media
-    // then never travels through the UI at all.
-    deliver: z.enum(["stream", "path"]).default("stream"),
-    // Optional sign-in path. "app" uses the session the user signed into
-    // inside the app; a browser name lets yt-dlp read that browser's session.
-    // Cookie contents never cross the API — only the source label.
-    cookiesFromBrowser: authSourceSchema.optional(),
-  })
-  .refine((v) => v.end > v.start, { message: "End must be greater than start" })
-  .refine((v) => v.end - v.start <= MAX_CLIP_SECONDS, {
-    message: `Clip length capped at ${MAX_CLIP_SECONDS} seconds (10 minutes)`,
-  });
+/**
+ * Runs `fn` with the cookie options for ONE yt-dlp run.
+ *
+ * yt-dlp writes its cookie jar back on every run, so a run is never given the
+ * canonical file: it gets a private copy from the cookie jar module, and only
+ * the single run flagged `refresher` may promote its result. A multi-segment
+ * cut runs one yt-dlp per segment, so segment one is the refresher and the
+ * rest are throwaway copies. The lease is released whether the run succeeds or
+ * not, and a failed run is released as `false` so it can never overwrite a good
+ * jar. A browser-sourced or absent session has no cookie file to protect.
+ */
+async function withRunCookies<T>(
+  mode: "app" | "browser" | "none",
+  base: Record<string, unknown>,
+  refresher: boolean,
+  fn: (cookieOptions: Record<string, unknown>) => Promise<T>,
+): Promise<T> {
+  if (mode !== "app" || !appCookieFile()) return fn(base);
+  let lease: CookieLease;
+  try {
+    lease = await acquireCookiePath({ refresher });
+  } catch (e) {
+    if (e instanceof CookieJarMissingError) {
+      // The file vanished between the check and the copy. Run unsigned and let
+      // the 360p-without-a-session notice say so, rather than failing the cut.
+      console.warn(`[server] cookie jar unavailable: ${e.message}`);
+      return fn({});
+    }
+    throw e;
+  }
+  let ok = false;
+  try {
+    const result = await fn({ ...base, cookies: lease.path });
+    ok = true;
+    return result;
+  } finally {
+    await lease.release(ok);
+  }
+}
+
+const downloadSchema = z.object({
+  url: urlSchema,
+  // A clip is a list of ranges, joined in order into one file. The older
+  // single `start`/`end` pair is still accepted and means one segment.
+  segments: z
+    .array(
+      z.object({ start: z.number().nonnegative(), end: z.number().positive() }),
+    )
+    .min(1)
+    .optional(),
+  start: z.number().nonnegative().optional(),
+  end: z.number().positive().optional(),
+  format: z.enum(["mp4", "mp3"]).default("mp4"),
+  quality: z.string().default("best"),
+  // How the finished clip is handed back. "stream" sends the media as the
+  // response body. "path" returns only its location on disk, for the
+  // desktop app, whose main process can move the file itself — the media
+  // then never travels through the UI at all.
+  deliver: z.enum(["stream", "path"]).default("stream"),
+  // Optional sign-in path. "app" uses the session the user signed into
+  // inside the app; a browser name lets yt-dlp read that browser's session.
+  // Cookie contents never cross the API — only the source label.
+  cookiesFromBrowser: authSourceSchema.optional(),
+});
 
 type DownloadInput = z.infer<typeof downloadSchema>;
 
@@ -901,39 +1060,76 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   });
 });
 
+/** Sends a failure in the table shape: cause, the one fix, the work kept. */
+function sendFailure(
+  res: Response,
+  f: ClipFailure,
+  extra: Record<string, unknown> = {},
+) {
+  return res.status(f.status).json({
+    error: f.error,
+    code: f.code,
+    cause: f.cause,
+    action: f.action,
+    preserved: f.preserved,
+    ...(f.detail ? { detail: f.detail } : {}),
+    ...extra,
+  });
+}
+
 app.post("/api/download", async (req: Request, res: Response) => {
   const parsed = downloadSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const {
-    url,
-    start,
-    end,
-    format,
-    quality,
-    deliver,
-    cookiesFromBrowser,
-  }: DownloadInput = parsed.data;
+  const { url, format, quality, deliver, cookiesFromBrowser }: DownloadInput =
+    parsed.data;
+  // A clip is a list of ranges. The old single start/end is one segment.
+  const resolvedSegments = resolveSegments(parsed.data, MAX_CLIP_SECONDS);
+  if (!resolvedSegments.ok) {
+    return res.status(400).json({ error: resolvedSegments.error });
+  }
+  const segs: Segment[] = resolvedSegments.segments;
+  const segCount = segs.length;
+  const multi = segCount > 1;
+  const totalSec = segmentsTotal(segs);
+  const lastEnd = Math.max(...segs.map((s) => s.end));
+
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
   const cookieMode: "app" | "browser" | "none" = !cookiesFromBrowser
     ? "none"
     : cookiesFromBrowser === "app"
       ? "app"
       : "browser";
-  console.log(`[server] /api/download auth mode=${cookieMode}`);
+  console.log(
+    `[server] /api/download auth mode=${cookieMode} segments=${segCount}`,
+  );
+
+  // True only when the probe confirmed a signed-in session. A clip that lands
+  // at 360p without one is reported as an expired or missing sign-in.
+  let sessionConfirmed = false;
 
   const requiresVerifiedSession =
     format === "mp4" && (quality === "best" || Number(quality) > 360);
   if (requiresVerifiedSession) {
     if (cookieMode === "none") {
+      const cause =
+        "No YouTube session is connected, and YouTube serves higher formats only to signed-in requests";
+      const preserved = "Your marked range is kept.";
       return res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
-        error: "Connect YouTube before downloading this quality.",
+        error: `${cause}. Connect YouTube. ${preserved}`,
+        cause,
+        action: { id: "import_cookies", label: "Connect YouTube" },
+        preserved,
       });
     }
-    const auth = await probeYouTubeAuth(cookieOptions, () => undefined);
+    // A private copy: this is one of possibly many runs in flight, and yt-dlp
+    // writes its jar back on every run.
+    const auth = await withRunCookies(cookieMode, cookieOptions, false, (c) =>
+      probeYouTubeAuth(c, () => undefined),
+    );
     const verdict = authProbeVerdict(auth.status);
     if (verdict === "rate_limited") {
       return res.status(429).json({
@@ -944,9 +1140,13 @@ app.post("/api/download", async (req: Request, res: Response) => {
       });
     }
     if (verdict === "blocked") {
+      const f = staleSessionFailure(401, "Your marked range is kept.");
       return res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
-        error: "Your YouTube connection is no longer valid. Connect again.",
+        error: f.error,
+        cause: f.cause,
+        action: f.action,
+        preserved: f.preserved,
         reason: auth.reason,
       });
     }
@@ -956,6 +1156,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
       console.log(
         `[server] /api/download proceeding on an unconfirmed session (${auth.status})`,
       );
+    } else {
+      sessionConfirmed = true;
     }
   }
 
@@ -974,21 +1176,24 @@ app.post("/api/download", async (req: Request, res: Response) => {
     ...opts,
   });
   let probeOptions: Record<string, unknown> = probeWith(cookieOptions);
-  const runProbe = async (opts: Record<string, unknown>) => {
-    console.log(
-      `[server] /api/download probe url=${url} options=${JSON.stringify(opts)}`,
-    );
-    return yt!.run(url, opts, { env: childEnv() } as any);
-  };
+  const runProbe = (opts: Record<string, unknown>) =>
+    withRunCookies(cookieMode, opts, false, (c) => {
+      const withCookies = probeWith(c);
+      probeOptions = withCookies;
+      console.log(
+        `[server] /api/download probe url=${url} options=${JSON.stringify(withCookies)}`,
+      );
+      return yt!.run(url, withCookies, { env: childEnv() } as any);
+    });
   try {
     let info: any;
     try {
-      info = await runProbe(probeOptions);
+      info = await runProbe(cookieOptions);
     } catch (first) {
       throw first;
     }
-    if (typeof info.duration === "number" && end > info.duration + 1) {
-      return res.status(400).json({ error: "End exceeds video duration" });
+    if (typeof info.duration === "number" && lastEnd > info.duration + 1) {
+      return sendFailure(res, outPointFailure(lastEnd, info.duration));
     }
     availableHeights = Array.from(
       new Set(
@@ -1007,28 +1212,46 @@ app.post("/api/download", async (req: Request, res: Response) => {
         .json({ error: cookieErrorMessage(cookiesFromBrowser) });
     }
     logYtError("/api/download probe", url, probeOptions, e);
-    return res.status(400).json({ error: fullErrMessage(e) });
+    return sendFailure(res, classifyFailure(fullErrMessage(e)));
   }
-
+  publishProgress(jobId, {
+    phase: "downloading",
+    percent: 0,
+    message: STAGE_FOUND,
+  });
 
   const isAudio = format === "mp3";
   const ext = isAudio ? "mp3" : "mp4";
-  // Keyed work folder: the same video at the same format/quality/range reuses
+  // Keyed work folder: the same video at the same format/quality/ranges reuses
   // the same folder, so yt-dlp's `.part` files survive a failure and the retry
   // continues from where it stopped. Any other combination gets its own folder.
-  const tempDir = workDir(CLIP_PREFIX, [
-    url,
-    format,
-    quality,
-    start.toFixed(2),
-    end.toFixed(2),
-  ]);
+  // One segment keeps exactly the key it always had.
+  const tempDir = workDir(
+    CLIP_PREFIX,
+    multi
+      ? [
+          url,
+          format,
+          quality,
+          "segments",
+          ...segs.map((s) => `${s.start.toFixed(2)}-${s.end.toFixed(2)}`),
+        ]
+      : [url, format, quality, segs[0].start.toFixed(2), segs[0].end.toFixed(2)],
+  );
   const outputPath = path.join(tempDir, `clip.${ext}`);
+  // Per-segment files and the join's inputs. A single segment writes straight
+  // to outputPath and none of these exist.
+  const segFiles = segs.map((_, i) =>
+    multi ? path.join(tempDir, segmentFileName(i, ext)) : outputPath,
+  );
+  const listPath = path.join(tempDir, "list.txt");
   // A finished clip left from a previous run is never reused — only partials.
-  try {
-    fs.rmSync(outputPath, { force: true });
-  } catch {
-    /* ignore */
+  for (const f of [outputPath, listPath, ...segFiles]) {
+    try {
+      fs.rmSync(f, { force: true });
+    } catch {
+      /* ignore */
+    }
   }
   const resumeBytes = partialBytes(tempDir);
   if (resumeBytes > 0) {
@@ -1115,6 +1338,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
   const PLAYER_CLIENTS_FALLBACK =
     "youtube:player_client=tv_samsung,web_embedded,visionos";
 
+  // Cookie options are deliberately NOT part of this: each yt-dlp run is given
+  // its own cookie file by withRunCookies, never the canonical one.
   const commonOptions: Record<string, unknown> = {
     noPlaylist: true,
     noWarnings: true,
@@ -1123,7 +1348,6 @@ app.post("/api/download", async (req: Request, res: Response) => {
     // Pick up any `.part` file left in this work folder by a failed run.
     continue: true,
     ffmpegLocation: resolvedFfmpeg,
-    ...cookieOptions,
   };
 
 
@@ -1136,13 +1360,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // different set of clients (see the degraded-delivery check below).
 
   // Attempt 1: let yt-dlp cut the section (fast, ffmpeg fetches the range).
-  const sectionOptionsFor = (clients: string): Record<string, unknown> => ({
+  // --force-keyframes-at-cuts is what makes the cut frame-accurate: without it
+  // the cut snaps to the nearest keyframe and starts early.
+  const sectionOptionsFor = (
+    clients: string,
+    seg: Segment,
+    out: string,
+    cookies: Record<string, unknown>,
+  ): Record<string, unknown> => ({
     ...commonOptions,
+    ...cookies,
     ...formatOptions,
     extractorArgs: clients,
-    downloadSections: `*${start.toFixed(2)}-${end.toFixed(2)}`,
+    downloadSections: sectionArg(seg),
     forceKeyframesAtCuts: true,
-    output: outputPath,
+    output: out,
     // Make ffmpeg's range request look like the one that minted the URL.
     addHeader: [
       "Referer:https://www.youtube.com/",
@@ -1153,8 +1385,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // Attempt 2 (fallback): yt-dlp downloads the whole media itself (native
   // downloader, no ffmpeg-fetched URLs), then we trim locally.
   const fullPath = path.join(tempDir, `source.${isAudio ? "m4a" : "mp4"}`);
-  const fullOptionsFor = (clients: string): Record<string, unknown> => ({
+  const fullOptionsFor = (
+    clients: string,
+    cookies: Record<string, unknown>,
+  ): Record<string, unknown> => ({
     ...commonOptions,
+    ...cookies,
     extractorArgs: clients,
     // Fetch HLS with yt-dlp's own segment downloader so ffmpeg only ever sees
     // a local file. Older bundled ffmpeg builds crash fetching m3u8 themselves.
@@ -1173,15 +1409,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   let options: Record<string, unknown> = sectionOptionsFor(
     PLAYER_CLIENTS_PRIMARY,
+    segs[0],
+    segFiles[0],
+    cookieOptions,
   );
 
   // Progress is driven by ffmpeg's `... time=HH:MM:SS.ss ...` output, which
   // streams continuously as the clip is processed (yt-dlp routes section
   // downloads through ffmpeg with --download-sections). Progress =
-  // processed time / clip length. yt-dlp's own `[download] NN%` only appears
-  // once at the very end, so it's used only as a fallback.
-  const clipDuration = Math.max(0.1, end - start);
+  // processed time / segment length. yt-dlp's own `[download] NN%` only
+  // appears once at the very end, so it's used only as a fallback.
+  let segDuration = Math.max(0.1, segs[0].end - segs[0].start);
   let lastReported = 0;
+  // The named stage the bar is currently in; carried on every tick so the UI
+  // always says what the percentage is a percentage of.
+  let currentStage = STAGE_FOUND;
   // Progress window the current phase maps onto (fallback splits the bar).
   let scaleFrom = 0;
   let scaleTo = 99;
@@ -1192,7 +1434,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
     );
     if (pct > lastReported) {
       lastReported = pct;
-      publishProgress(jobId, { phase: "downloading", percent: pct });
+      publishProgress(jobId, {
+        phase: "downloading",
+        percent: pct,
+        message: currentStage,
+        stage: currentStage,
+      });
     }
   };
   const hmsToSeconds = (h: string, m: string, s: string) =>
@@ -1210,7 +1457,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (tm) {
       const secs = hmsToSeconds(tm[1], tm[2], tm[3]);
       // Ignore ffmpeg's initial bogus negative timestamp.
-      if (secs >= 0) report(secs / clipDuration);
+      if (secs >= 0) report(secs / segDuration);
       return;
     }
     // Fallback: honor a real yt-dlp download percentage if one is emitted.
@@ -1218,6 +1465,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (dm) report(parseFloat(dm[1]) / 100);
   };
 
+
+  // Everything the engine wrote to stderr during THIS run, for Copy diagnostics.
+  const RUN_STDERR_MAX = 60_000;
+  let runStderrRaw = "";
 
   // Spawn a child and stream its output through updateFromLine, rejecting with
   // the trimmed stderr tail on non-zero exit.
@@ -1227,6 +1478,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
   ): Promise<void> =>
     new Promise<void>((resolve, reject) => {
       const child = spawnChild();
+      runStderrRaw = `${runStderrRaw}# ${label}\n`.slice(-RUN_STDERR_MAX);
+      child.stderr?.on("data", (c: Buffer | string) => {
+        runStderrRaw = (runStderrRaw + c.toString()).slice(-RUN_STDERR_MAX);
+      });
       let buf = "";
       let stderrTail = "";
       const onChunk = (chunk: Buffer | string) => {
@@ -1249,7 +1504,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
           .slice(-8)
           .join("\n")
           .trim();
-        console.error(`[server] ${label} exit ${code}:\n${tail}`);
+        console.error(`[server] ${label} exit ${code} job=${jobId}:\n${tail}`);
         const err: any = new Error(tail || `${label} exited with code ${code}`);
         err.tail = tail;
         reject(err);
@@ -1266,60 +1521,119 @@ app.post("/api/download", async (req: Request, res: Response) => {
     );
   };
 
+  // A finished whole-file download. A `.part` is not one: yt-dlp renames it
+  // only once the file is complete.
   const findDownloaded = (): string | null => {
     if (fs.existsSync(fullPath)) return fullPath;
     const match = fs
       .readdirSync(tempDir)
-      .filter((f) => f.startsWith("source."))
+      .filter((f) => f.startsWith("source.") && !/\.(part|ytdl)$/.test(f))
       .map((f) => path.join(tempDir, f))[0];
     return match ?? null;
   };
 
-  // One complete build of the clip on one set of player clients: sectioned
-  // first, whole-file-then-trim if the sectioned URLs 403.
-  const buildClip = async (clients: string): Promise<void> => {
-    const sectionOptions = sectionOptionsFor(clients);
-    options = sectionOptions;
-    lastReported = 0;
-    scaleFrom = 0;
-    scaleTo = 99;
-    console.log(
-      `[server] /api/download exec url=${url} options=${JSON.stringify(sectionOptions)}`,
-    );
-    try {
-      await runStreaming(
-        () => yt!.exec(url, sectionOptions, { env: childEnv() } as any),
-        "yt-dlp",
-      );
-    } catch (sectionErr) {
-      if (!isForbidden(sectionErr)) throw sectionErr;
-      console.warn(
-        "[server] sectioned download failed (403) — retrying with full download + local trim",
-      );
-      const fullOptions = fullOptionsFor(clients);
-      options = fullOptions;
-      lastReported = 0;
-      scaleFrom = 0;
-      scaleTo = 70;
-      publishProgress(jobId, { phase: "downloading", percent: 0 });
-      await runStreaming(
-        () => yt!.exec(url, fullOptions, { env: childEnv() } as any),
-        "yt-dlp (full)",
-      );
+  // Everything a build leaves beside the finished clip: segment files, the
+  // concat list and the whole-file source. Partials (`.part`) are never
+  // touched, they are what a retry resumes from.
+  const dropIntermediates = (keepSource: boolean) => {
+    const doomed = [...segFiles.filter((f) => f !== outputPath), listPath];
+    if (!keepSource) {
+      try {
+        for (const f of fs.readdirSync(tempDir)) {
+          if (f.startsWith("source.") && !/\.(part|ytdl)$/.test(f)) {
+            doomed.push(path.join(tempDir, f));
+          }
+        }
+      } catch {
+        /* folder gone */
+      }
+    }
+    for (const f of doomed) {
+      try {
+        fs.rmSync(f, { force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  };
 
-      const source = findDownloaded();
+  // One segment on one set of player clients: sectioned first, whole-file-then-
+  // trim if the sectioned URLs 403. `state.sectionsForbidden` carries the 403
+  // verdict from one segment to the next, so the rest go straight to the local
+  // trim instead of failing the same way again.
+  const buildSegment = async (
+    clients: string,
+    index: number,
+    state: { sectionsForbidden: boolean },
+  ): Promise<void> => {
+    const seg = segs[index];
+    const out = segFiles[index];
+    const win = segmentWindow(index, segCount);
+    segDuration = Math.max(0.1, seg.end - seg.start);
+    // Segment one is the one run allowed to refresh the user's saved session;
+    // every other is a throwaway copy.
+    await withRunCookies(cookieMode, cookieOptions, index === 0, async (cookies) => {
+      const sectionOptions = sectionOptionsFor(clients, seg, out, cookies);
+      options = sectionOptions;
+      lastReported = win.from;
+      scaleFrom = win.from;
+      scaleTo = win.to;
+      if (!state.sectionsForbidden) {
+        console.log(
+          `[server] /api/download exec job=${jobId} url=${url} segment=${index + 1}/${segCount} options=${JSON.stringify(sectionOptions)}`,
+        );
+        try {
+          await runStreaming(
+            () => yt!.exec(url, sectionOptions, { env: childEnv() } as any),
+            "yt-dlp",
+          );
+          return;
+        } catch (sectionErr) {
+          if (!isForbidden(sectionErr)) throw sectionErr;
+          state.sectionsForbidden = true;
+          console.warn(
+            `[server] sectioned download failed (403) job=${jobId} — retrying with full download + local trim`,
+          );
+        }
+      }
+
+      const fullOptions = fullOptionsFor(clients, cookies);
+      options = fullOptions;
+      // One segment splits the bar 70/29 exactly as it always has.
+      const mid =
+        segCount <= 1
+          ? 70
+          : Math.round(win.from + (win.to - win.from) * 0.7);
+      lastReported = win.from;
+      scaleFrom = win.from;
+      scaleTo = mid;
+      publishProgress(jobId, {
+        phase: "downloading",
+        percent: win.from,
+        message: currentStage,
+        stage: currentStage,
+      });
+      // The whole file is the same for every segment, so fetch it once.
+      let source = findDownloaded();
+      if (!source) {
+        await runStreaming(
+          () => yt!.exec(url, fullOptions, { env: childEnv() } as any),
+          "yt-dlp (full)",
+        );
+        source = findDownloaded();
+      }
       if (!source) throw new Error("yt-dlp produced no output");
 
-      scaleFrom = 70;
-      scaleTo = 99;
-      lastReported = 70;
+      scaleFrom = mid;
+      scaleTo = win.to;
+      lastReported = mid;
       const trimArgs = isAudio
         ? [
             "-y",
             "-ss",
-            String(start),
+            String(seg.start),
             "-to",
-            String(end),
+            String(seg.end),
             "-i",
             source,
             "-vn",
@@ -1327,21 +1641,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
             "libmp3lame",
             "-b:a",
             `${quality}k`,
-            outputPath,
+            out,
           ]
         : [
             "-y",
             "-ss",
-            String(start),
+            String(seg.start),
             "-to",
-            String(end),
+            String(seg.end),
             "-i",
             source,
             "-c",
             "copy",
             "-movflags",
             "+faststart",
-            outputPath,
+            out,
           ];
       await runStreaming(
         () =>
@@ -1352,11 +1666,86 @@ app.post("/api/download", async (req: Request, res: Response) => {
           }),
         "ffmpeg (trim)",
       );
-      try {
-        fs.rmSync(source, { force: true });
-      } catch {
-        /* ignore */
+      // A lone segment is done with the source. Several share it, so it goes
+      // when the whole clip is built.
+      if (!multi) {
+        try {
+          fs.rmSync(source, { force: true });
+        } catch {
+          /* ignore */
+        }
       }
+    });
+  };
+
+  // How the last join was made, for the response and the log.
+  let joinMethod: "copy" | "reencode" | null = null;
+
+  // One complete build of the clip on one set of player clients: each segment
+  // in order, then (for several) the join into one file.
+  const buildClip = async (clients: string): Promise<void> => {
+    lastReported = 0;
+    let built = false;
+    const state = { sectionsForbidden: false };
+    try {
+      for (let i = 0; i < segCount; i++) {
+        currentStage = stageDownloading(i + 1, segCount);
+        publishProgress(jobId, {
+          phase: "downloading",
+          percent: Math.max(lastReported, segmentWindow(i, segCount).from),
+          message: currentStage,
+          stage: currentStage,
+          segment: i + 1,
+          segments: segCount,
+        });
+        await buildSegment(clients, i, state);
+        const win = segmentWindow(i, segCount);
+        currentStage = stageDownloaded(i + 1, segCount);
+        lastReported = Math.max(lastReported, win.to);
+        publishProgress(jobId, {
+          phase: "downloading",
+          percent: win.to,
+          message: currentStage,
+          stage: currentStage,
+          segment: i + 1,
+          segments: segCount,
+        });
+      }
+
+      if (multi) {
+        currentStage = stageJoining(segCount);
+        publishProgress(jobId, {
+          phase: "processing",
+          percent: 92,
+          message: currentStage,
+          stage: currentStage,
+        });
+        const join = await joinSegments(
+          segFiles,
+          outputPath,
+          listPath,
+          totalSec,
+          { isAudio, audioKbps: quality },
+          {
+            run: (args) =>
+              runProcess(resolvedFfmpeg as string, args, childEnv()),
+            probeDuration: (file) =>
+              probeDurationSec(resolvedFfmpeg as string, file),
+            log: (m) => console.log(`[server] /api/download job=${jobId} ${m}`),
+          },
+        );
+        joinMethod = join.method;
+        if (!join.durationOk) {
+          console.warn(
+            `[server] /api/download job=${jobId} joined clip is ${join.duration?.toFixed(2) ?? "?"}s, expected ${totalSec.toFixed(2)}s even after ${join.method}`,
+          );
+        }
+      }
+      built = true;
+    } finally {
+      // Success or failure, the pieces are not the deliverable. On success the
+      // whole-file source goes too; on failure it stays, a resumable download.
+      dropIntermediates(!built);
     }
   };
 
@@ -1378,13 +1767,14 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
     if (!fs.existsSync(outputPath)) {
       // Work folder deliberately kept so the next attempt can resume.
-
+      pruneWorkDir(tempDir);
+      const f = classifyFailure("yt-dlp produced no output");
       publishProgress(jobId, {
         phase: "error",
         percent: 0,
         message: "no output",
       });
-      return res.status(500).json({ error: "yt-dlp produced no output" });
+      return sendFailure(res, f);
     }
 
     publishProgress(jobId, { phase: "processing", percent: 99 });
@@ -1464,6 +1854,24 @@ app.post("/api/download", async (req: Request, res: Response) => {
       );
     }
 
+    // A 360p file with no confirmed session behind it is the expired-sign-in
+    // failure, not a quality choice. The clip is still delivered (it is real
+    // work), but it never passes silently: the cause and the one fix travel
+    // with it.
+    const lowQuality = lowQualityWithoutSession({
+      deliveredHeight: delivered.height,
+      requested: requestedHeight,
+      sessionValid: sessionConfirmed,
+      isAudio,
+    })
+      ? staleSessionFailure(200, "The 360p clip is kept.")
+      : null;
+    if (lowQuality) {
+      console.warn(
+        `[server] /api/download low quality without a session job=${jobId} delivered=${delivered.height} auth=${cookieMode} confirmed=${sessionConfirmed}`,
+      );
+    }
+
     if (delivered.height) {
       res.setHeader("X-Delivered-Height", String(delivered.height));
     }
@@ -1474,6 +1882,13 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (availableHeights.length)
       res.setHeader("X-Available-Heights", availableHeights.join(","));
     res.setHeader("X-Auth-Mode", cookieMode);
+    res.setHeader("X-Segments", String(segCount));
+    if (joinMethod) res.setHeader("X-Join-Method", joinMethod);
+    if (lowQuality) {
+      res.setHeader("X-Quality-Cause", lowQuality.code);
+      res.setHeader("X-Quality-Message", lowQuality.cause);
+      res.setHeader("X-Quality-Action", lowQuality.action.id);
+    }
     // Both client sets came back degraded. Nothing left to retry, so say so
     // out loud rather than letting a 360p file pass for a 1080p download.
     if (degraded) {
@@ -1483,15 +1898,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
       );
     }
     console.log(
-      `[server] /api/download built job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode}`,
+      `[server] /api/download built job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} format=${chosenFormat || "?"} auth=${cookieMode} segments=${segCount}${joinMethod ? ` join=${joinMethod}` : ""}`,
     );
     res.setHeader(
       "Access-Control-Expose-Headers",
-      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode, X-Quality-Degraded",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode, X-Quality-Degraded, X-Segments, X-Join-Method, X-Quality-Cause, X-Quality-Message, X-Quality-Action",
     );
 
 
     const stat = fs.statSync(outputPath);
+    publishProgress(jobId, {
+      phase: "processing",
+      percent: 99,
+      message: STAGE_WRITING,
+      stage: STAGE_WRITING,
+    });
 
     // Desktop app: hand back the location, not the media. Sending a clip as
     // an HTTP body means the UI buffers the whole file, converts it to an
@@ -1504,8 +1925,28 @@ app.post("/api/download", async (req: Request, res: Response) => {
       console.log(
         `[server] /api/download handing off job=${jobId} bytes=${stat.size}`,
       );
-      publishProgress(jobId, { phase: "done", percent: 100 });
-      return res.json({ path: outputPath, size: stat.size });
+      publishProgress(jobId, {
+        phase: "done",
+        percent: 100,
+        ...(lowQuality ? { message: lowQuality.error } : {}),
+      });
+      return res.json({
+        path: outputPath,
+        size: stat.size,
+        segments: segCount,
+        ...(joinMethod ? { joinMethod } : {}),
+        ...(lowQuality
+          ? {
+              warning: {
+                code: lowQuality.code,
+                cause: lowQuality.cause,
+                action: lowQuality.action,
+                preserved: lowQuality.preserved,
+                error: lowQuality.error,
+              },
+            }
+          : {}),
+      });
     }
 
     const name = `clip.${ext}`;
@@ -1560,25 +2001,59 @@ app.post("/api/download", async (req: Request, res: Response) => {
     res.on("close", () => settle("connection closed early"));
     stream.pipe(res);
   } catch (e) {
-    // Work folders are intentionally left in place on failure: the partial
-    // download inside them is what makes the retry resumable. The staleness
-    // sweep and the "clear unfinished downloads" action reclaim the space.
+    // What is on disk now is what a retry resumes from. Measure it before the
+    // work folder is pruned down to exactly that: partial downloads stay,
+    // finished segment files, the concat list and half-written joins go.
+    const partial = partialBytes(tempDir);
+    pruneWorkDir(tempDir);
     if (cookiesFromBrowser && isCookieError(e)) {
       const msg = cookieErrorMessage(cookiesFromBrowser);
       publishProgress(jobId, { phase: "error", percent: 0, message: msg });
-      return res.status(400).json({ error: msg });
+      return res.status(400).json({
+        error: msg,
+        diagnostics: buildRunDiagnostics(jobId, fullErrMessage(e)),
+      });
     }
     logYtError("/api/download", url, options, e);
 
     const raw = fullErrMessage(e);
+    console.error(`[server] /api/download failed job=${jobId}: ${raw.slice(0, 400)}`);
+    // The per-run record for Copy diagnostics: this run's stderr and job id,
+    // never the whole log. A failure that never reached a child process still
+    // carries what the error itself said.
+    const diagnostics = buildRunDiagnostics(jobId, runStderrRaw || raw);
     // Keep the friendly sentence but append the real yt-dlp stderr tail so the
     // next YouTube-side change is diagnosable straight from the UI.
     const tail = ((e as { tail?: string } | null)?.tail || raw || "").trim();
-    const msg = isForbidden(e)
-      ? `YouTube refused the media request for this video. Try again in a moment, or pick a different quality.${tail ? `\n${tail}` : ""}`
-      : raw;
-    publishProgress(jobId, { phase: "error", percent: 0, message: msg });
-    res.status(500).json({ error: msg });
+    let failure: ClipFailure;
+    if ((e as { joinFailed?: boolean } | null)?.joinFailed) {
+      failure = joinFailure(tail);
+    } else {
+      const ctx = { percent: lastReported, partialBytes: partial };
+      failure = classifyFailure(raw, ctx);
+      if (failure.code === "disk_full") {
+        let freeMb: number | undefined;
+        try {
+          const st = fs.statfsSync(os.tmpdir());
+          freeMb = Math.floor((st.bavail * st.bsize) / (1024 * 1024));
+        } catch {
+          /* statfs unavailable: say it without the numbers */
+        }
+        failure = classifyFailure(raw, {
+          ...ctx,
+          freeMb,
+          neededMb: estimateNeededMb(totalSec, quality, isAudio, segCount),
+        });
+      } else if (failure.code === "unknown" && isForbidden(e)) {
+        failure = refusedFailure(tail);
+      }
+    }
+    publishProgress(jobId, {
+      phase: "error",
+      percent: 0,
+      message: failure.error,
+    });
+    sendFailure(res, failure, { diagnostics });
   }
 });
 
@@ -1683,6 +2158,10 @@ interface ProgressEvent {
   phase: "downloading" | "processing" | "done" | "error";
   percent: number;
   message?: string;
+  /** Named stage: Found the stream, Downloaded segment n of m, Joining n segments, Writing to your folder. */
+  stage?: string;
+  segment?: number;
+  segments?: number;
 }
 
 interface JobChannel {
@@ -1756,947 +2235,45 @@ app.get("/api/download/progress", (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Channel profile exporter — enumerate a channel, rank by views, and collect
-// metadata / comments / transcripts for the top N videos.
+// Channel profile exporter — lives in ./channelRoutes. It exists only in builds
+// made with VITE_ENABLE_CHANNEL_DATA (the same flag that gates the UI): without
+// it scripts/build-server.cjs aliases "./channelRoutes" to an empty stub, so the
+// exporter's code and URLs are absent from the packaged server, not just
+// unregistered. The runtime check below only matters when running from source
+// (`npm run dev:server`, tests); it is not what keeps the code out of a build.
 // ---------------------------------------------------------------------------
-
-// Hard ceiling on how deep a channel listing is read. A channel with more
-// videos than this exports its most-viewed CANDIDATE_CAP, not all of them.
-const CANDIDATE_CAP = 20000;
-const CHANNEL_LIMIT_MAX = 10000; // largest budget that can be asked for by number
-const SHORT_MAX_SECONDS = 60;
-
-/** How many videos to export: a count, or every video the channel lists. */
-type ChannelLimit = number | "all";
-
-const DEFAULT_LISTING_DEPTH = 3000;
-
-/**
- * How deep to read a channel tab.
- *
- * This was a flat 3000, which quietly capped an "export the whole channel" run
- * at 3000 candidates. It stays at least 3000 for numeric budgets: the Shorts
- * tab comes back newest-first, so a shallow listing would rank the newest
- * videos rather than the most-viewed ones.
- */
-function listingDepth(limit: ChannelLimit): number {
-  if (limit === "all") return CANDIDATE_CAP;
-  return Math.min(CANDIDATE_CAP, Math.max(DEFAULT_LISTING_DEPTH, limit * 2));
-}
-
-/** How many of a tab's ranked entries go into the candidate pool. */
-function poolCap(limit: ChannelLimit): number {
-  return limit === "all" ? CANDIDATE_CAP : Math.min(CANDIDATE_CAP, limit * 2);
-}
-
-// Collects #hashtags from a string, keeping first-seen casing.
-function collectHashtags(text: string, into: Map<string, string>): void {
-  if (!text) return;
-  const re = /#([\p{L}\p{N}_]+)/gu;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const tag = m[1];
-    const key = tag.toLowerCase();
-    if (!into.has(key)) into.set(key, tag);
-  }
-}
-
-// Merges yt-dlp's hashtag field with hashtags found in the title/description.
-function extractHashtags(meta: Record<string, any>): {
-  hashtags: string;
-  hashtags_in_title: string;
-} {
-  const all = new Map<string, string>();
-  const titleOnly = new Map<string, string>();
-  const field = (meta as any).hashtags ?? (meta as any).hashtag;
-  if (Array.isArray(field)) {
-    for (const raw of field) {
-      collectHashtags(String(raw).startsWith("#") ? String(raw) : `#${raw}`, all);
-    }
-  }
-  collectHashtags(String(meta.title ?? ""), titleOnly);
-  for (const [k, v] of titleOnly) if (!all.has(k)) all.set(k, v);
-  collectHashtags(String(meta.description ?? ""), all);
-  const fmt = (m: Map<string, string>) =>
-    [...m.values()].map((t) => `#${t}`).join("; ");
-  return { hashtags: fmt(all), hashtags_in_title: fmt(titleOnly) };
-}
-
-const META_CONCURRENCY = 3;
-
-const channelExportSchema = z.object({
-  url: urlSchema,
-  contentType: z.enum(["shorts", "longform", "all"]).default("all"),
-  limit: z
-    .union([z.literal("all"), z.number().int().min(1).max(CHANNEL_LIMIT_MAX)])
-    .default(100),
-  // What to collect. Each is its own CSV, and turning one off skips the work
-  // rather than just the file.
-  includeVideoDetails: z.boolean().default(true),
-  includeComments: z.boolean().default(true),
-  includeTranscripts: z.boolean().default(true),
-  // Throw away any saved progress for this exact request and start over.
-  fresh: z.boolean().default(false),
-  // "rows" returns every row in the JSON response, which is what a browser
-  // needs. "path" writes the CSVs on this machine and returns their paths, so
-  // a whole-channel export never has to fit in a JSON body — see
-  // finishExportToDisk below.
-  deliver: z.enum(["rows", "path"]).default("rows"),
-  cookiesFromBrowser: authSourceSchema.optional(),
-
-});
-
-type ChannelExportInput = z.infer<typeof channelExportSchema>;
-
-interface ChannelProgress {
-  phase: "listing" | "metadata" | "details" | "done" | "error" | "cancelled";
-  current: number;
-  total: number;
-  label?: string;
-  message?: string;
-}
-
-interface ChannelJob {
-  clients: Set<Response>;
-  last: ChannelProgress;
-  cancelled: boolean;
-  children: Set<ChildProcess>;
-  cleanupTimer?: NodeJS.Timeout;
-}
-
-const channelJobs = new Map<string, ChannelJob>();
-
-function getOrCreateChannelJob(id: string): ChannelJob {
-  let job = channelJobs.get(id);
-  if (!job) {
-    job = {
-      clients: new Set(),
-      last: { phase: "listing", current: 0, total: 0 },
-      cancelled: false,
-      children: new Set(),
-    };
-    channelJobs.set(id, job);
-  }
-  return job;
-}
-
-function publishChannel(id: string, evt: ChannelProgress) {
-  const job = getOrCreateChannelJob(id);
-  job.last = evt;
-  const payload = `data: ${JSON.stringify(evt)}\n\n`;
-  for (const client of job.clients) {
-    try {
-      client.write(payload);
-    } catch {
-      /* ignore */
-    }
-  }
-  if (evt.phase === "done" || evt.phase === "error" || evt.phase === "cancelled") {
-    if (job.cleanupTimer) clearTimeout(job.cleanupTimer);
-    job.cleanupTimer = setTimeout(() => {
-      for (const c of job.clients) {
-        try {
-          c.end();
-        } catch {
-          /* ignore */
-        }
-      }
-      channelJobs.delete(id);
-    }, 5000);
-  }
-}
-
-// Reduce any channel URL variant (@handle, /channel/UC…, /c/name, /user/name,
-// or a tab/video link under them) to the canonical channel root.
-function channelBaseUrl(raw: string): string | null {
-  try {
-    const u = new URL(raw);
-    if (!/youtube\.com$/.test(u.hostname.replace(/^(www|m)\./, "")))
-      return null;
-    const parts = u.pathname.split("/").filter(Boolean);
-    if (parts.length === 0) return null;
-    if (parts[0].startsWith("@")) return `https://www.youtube.com/${parts[0]}`;
-    if (["channel", "c", "user"].includes(parts[0]) && parts[1])
-      return `https://www.youtube.com/${parts[0]}/${parts[1]}`;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// Spawn yt-dlp for a job, registering the child so cancellation can kill it.
-function runForJob(
-  job: ChannelJob,
-  url: string,
-  opts: Record<string, unknown>,
-  timeoutMs = 180_000,
-): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if (job.cancelled) return reject(new Error("cancelled"));
-    const child = yt!.exec(url, opts, { env: childEnv() });
-    job.children.add(child);
-    const outChunks: Buffer[] = [];
-    const errChunks: Buffer[] = [];
-    let settled = false;
-    const timer = setTimeout(() => {
-      try {
-        child.kill("SIGKILL");
-      } catch {
-        /* ignore */
-      }
-    }, timeoutMs);
-    const finish = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      job.children.delete(child);
-      fn();
-    };
-    child.stdout?.on("data", (c: Buffer) => outChunks.push(c));
-    child.stderr?.on("data", (c: Buffer) => errChunks.push(c));
-    child.on("error", (err) => finish(() => reject(err)));
-    child.on("close", (code) => {
-      const stdout = Buffer.concat(outChunks).toString();
-      const stderr = Buffer.concat(errChunks).toString();
-      finish(() => {
-        if (code === 0) {
-          try {
-            resolve(stdout.trim().startsWith("{") ? JSON.parse(stdout) : stdout);
-          } catch {
-            resolve(stdout);
-          }
-        } else {
-          const err: any = new Error(stderr.trim() || `yt-dlp exited ${code}`);
-          err.stderr = stderr;
-          err.exitCode = code;
-          reject(err);
-        }
-      });
-    });
-  });
-}
-
-interface FlatEntry {
-  id?: string;
-  title?: string;
-  duration?: number | null;
-  view_count?: number | null;
-  url?: string;
-}
-
-interface RankedVideo {
-  id: string;
-  title: string;
-  duration: number;
-  view_count: number;
-}
-
-// One videos.csv row, built from the flat listing entry plus whatever full
-// metadata came back (an empty object when the metadata fetch failed).
-function buildVideoRow(
-  v: RankedVideo,
-  meta: Record<string, any>,
-  channelName: string,
-): Record<string, unknown> {
-  const duration = Number(meta.duration) || v.duration;
-  const views =
-    typeof meta.view_count === "number" ? meta.view_count : v.view_count;
-  return {
-    video_id: v.id,
-    url: `https://www.youtube.com/watch?v=${v.id}`,
-    title: meta.title ?? v.title,
-    description: meta.description ?? "",
-    upload_date: meta.upload_date ?? "",
-    duration_seconds: duration,
-    is_short: duration > 0 && duration <= SHORT_MAX_SECONDS,
-    view_count: views,
-    like_count: typeof meta.like_count === "number" ? meta.like_count : "",
-    comment_count:
-      typeof meta.comment_count === "number" ? meta.comment_count : "",
-    channel: meta.channel ?? channelName,
-    thumbnail: meta.thumbnail ?? "",
-    tags: Array.isArray(meta.tags) ? meta.tags.join("; ") : "",
-    tag_count: Array.isArray(meta.tags) ? meta.tags.length : 0,
-    ...extractHashtags(meta),
-  };
-}
-
-async function listChannelTab(
-  job: ChannelJob,
-  tabUrl: string,
-  cookieOptions: Record<string, unknown>,
-  listEnd: number,
-): Promise<{ entries: FlatEntry[]; channelName: string; subs: number | "" }> {
-  const info = await runForJob(job, tabUrl, {
-    dumpSingleJson: true,
-    flatPlaylist: true,
-    noWarnings: true,
-    playlistEnd: listEnd,
-    ...cookieOptions,
-  });
-  const entries: FlatEntry[] = Array.isArray(info?.entries) ? info.entries : [];
-  return {
-    entries,
-    channelName: info?.channel || info?.uploader || info?.title || "",
-    subs: typeof info?.channel_follower_count === "number"
-      ? info.channel_follower_count
-      : "",
-  };
-}
-
-async function fetchTranscript(
-  job: ChannelJob,
-  videoUrl: string,
-  cookieOptions: Record<string, unknown>,
-): Promise<VttLine[]> {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ytchan-"));
-  try {
-    await runForJob(job, videoUrl, {
-      skipDownload: true,
-      writeAutoSubs: true,
-      writeSubs: true,
-      subLangs: "en",
-      subFormat: "vtt",
-      noPlaylist: true,
-      noWarnings: true,
-      output: path.join(tempDir, "sub"),
-      ffmpegLocation: resolvedFfmpeg,
-      ...cookieOptions,
-    }, 120_000);
-    const files = fs.readdirSync(tempDir);
-    const vtt =
-      files.find((f) => /\.en\.vtt$/.test(f)) ||
-      files.find((f) => f.endsWith(".vtt"));
-    if (!vtt) return [];
-    return parseVtt(fs.readFileSync(path.join(tempDir, vtt), "utf8"));
-  } catch {
-    return [];
-  } finally {
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-// Run an async mapper over items with a small concurrency window, preserving
-// input order in the result array.
-async function mapLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, () =>
-    (async () => {
-      for (;;) {
-        const i = cursor++;
-        if (i >= items.length) return;
-        results[i] = await fn(items[i], i);
-      }
-    })(),
-  );
-  await Promise.all(workers);
-  return results;
-}
-
-// Optional local passcode gate: when a hash is baked into the build (or set in
-// a local .env during development), the exporter endpoint only answers
-// requests carrying the same hash.
-const DEFAULT_CHANNEL_PASSCODE_HASH =
-  "0cd257a54a58aa1c00862c07297225561f663bd746b5856c5e7dfaaa3d488add";
-
-function readPasscodeHash(): string {
-  const fromEnv = (process.env.CHANNEL_EXPORT_PASSCODE_HASH || "").trim();
-  if (fromEnv) return fromEnv;
+const CHANNEL_FLAG_RE = /^(1|true|yes|on)$/i;
+function readChannelFlag(): boolean {
+  const fromEnv = String(process.env.VITE_ENABLE_CHANNEL_DATA ?? "").trim();
+  if (fromEnv) return CHANNEL_FLAG_RE.test(fromEnv);
+  // `npm run dev:server` does not load .env, so read it there. Never in the packaged app.
+  if (process.env.ELECTRON_RESOURCES) return false;
   try {
     const raw = fs.readFileSync(path.join(process.cwd(), ".env"), "utf8");
-    const line = raw
-      .split(/\r?\n/)
-      .find((l) => l.startsWith("CHANNEL_EXPORT_PASSCODE_HASH="));
-    const fromFile = line ? line.split("=").slice(1).join("=").trim() : "";
-    if (fromFile) return fromFile;
+    const line = raw.split(/\r?\n/).find((l) => l.startsWith("VITE_ENABLE_CHANNEL_DATA="));
+    return CHANNEL_FLAG_RE.test((line ? line.split("=").slice(1).join("=") : "").trim());
   } catch {
-    // fall through to the baked-in hash
+    return false;
   }
-  return DEFAULT_CHANNEL_PASSCODE_HASH;
 }
 
-
-const CHANNEL_PASSCODE_HASH = readPasscodeHash();
-
-app.post("/api/channel/export", async (req: Request, res: Response) => {
-  if (
-    CHANNEL_PASSCODE_HASH &&
-    String(req.header("X-Channel-Key") || "").trim() !== CHANNEL_PASSCODE_HASH
-  ) {
-    return res.status(403).json({ error: "Channel exporter is locked." });
-  }
-  const parsed = channelExportSchema.safeParse(req.body);
-  if (!parsed.success)
-    return res.status(400).json({ error: parsed.error.issues[0].message });
-  if (!binariesOk) return binaryError(res);
-
-  const input: ChannelExportInput = parsed.data;
-  const base = channelBaseUrl(input.url);
-  if (!base)
-    return res.status(400).json({
-      error:
-        "That doesn't look like a channel link. Use youtube.com/@handle or /channel/UC…",
-    });
-
-  const jobId =
-    typeof req.query.jobId === "string" && req.query.jobId
-      ? req.query.jobId
-      : `chan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  if (
-    !input.includeVideoDetails &&
-    !input.includeComments &&
-    !input.includeTranscripts
-  ) {
-    return res.status(400).json({
-      error:
-        "Pick at least one thing to export — video details, comments or transcripts.",
-    });
-  }
-
-  const job = getOrCreateChannelJob(jobId);
-  const cookieOptions: Record<string, unknown> = resolveCookieOptions(
-    input.cookiesFromBrowser,
-  );
-
-
-  res.on("close", () => {
-    if (!res.writableEnded) cancelChannelJob(jobId);
+if (readChannelFlag()) {
+  registerChannelRoutes(app, {
+    app,
+    yt,
+    binariesOk,
+    binaryError,
+    resolvedFfmpeg,
+    urlSchema,
+    authSourceSchema,
+    childEnv,
+    appCookieFile,
+    resolveCookieOptions,
+    parseVtt,
+    fullErrMessage,
+    logYtError,
   });
-
-  // Checkpoint folder keyed on everything that changes what gets exported.
-  // Rows are flushed to disk per video, so a failure, a cancel or a quit only
-  // costs the video in flight — the rerun continues from the next one.
-  const ckDir = workDir(EXPORT_PREFIX, [
-    base,
-    input.contentType,
-    input.limit,
-    input.includeVideoDetails,
-    input.includeComments,
-    input.includeTranscripts,
-  ]);
-  const ckSelection = path.join(ckDir, "selection.json");
-  const ckMetadata = path.join(ckDir, "metadata.jsonl");
-  const ckComments = path.join(ckDir, "comments.jsonl");
-  const ckTranscripts = path.join(ckDir, "transcripts.jsonl");
-  const ckStatuses = path.join(ckDir, "statuses.jsonl");
-  const clearCheckpoint = () => {
-    try {
-      fs.rmSync(ckDir, { recursive: true, force: true });
-    } catch {
-      /* swept later */
-    }
-  };
-
-  // "Start fresh" — the saved progress from an earlier run of this exact
-  // request is discarded so nothing is carried over or skipped.
-  if (input.fresh) {
-    clearCheckpoint();
-    try {
-      fs.mkdirSync(ckDir, { recursive: true });
-    } catch {
-      /* the checkpoint is best-effort; the export still runs */
-    }
-  }
-
-  interface Checkpoint {
-    channelName: string;
-    subs: number | "";
-    videos: Record<string, unknown>[];
-    selected: { id: string; title: string }[];
-  }
-  const saved = readJson<Checkpoint>(ckSelection);
-
-  // In "path" mode comments and transcripts are never accumulated: they go to
-  // the JSONL checkpoint as they are collected and are streamed from there
-  // into CSVs at the end. They are the two that grow without bound — a few
-  // thousand videos is millions of caption lines — so holding them is what
-  // used to put a whole-channel export out of memory.
-  const toDisk = input.deliver === "path";
-  const videos: Record<string, unknown>[] = [];
-  const comments: Record<string, unknown>[] = [];
-  const transcripts: Record<string, unknown>[] = [];
-  const statuses: Record<string, unknown>[] = [];
-  let channelName = "";
-  let subs: number | "" = "";
-
-  // Which parts this run collected, echoed back so the UI reports on exactly
-  // what it asked for.
-  const parts = {
-    videoDetails: input.includeVideoDetails,
-    comments: input.includeComments,
-    transcripts: input.includeTranscripts,
-  };
-
-  /**
-   * The response body, in whichever delivery mode was asked for.
-   *
-   * "rows" hands back every row as JSON — fine for a browser and for small
-   * runs. "path" writes the CSVs into a temp folder on this machine and
-   * returns their paths: comments and transcripts are streamed straight out of
-   * the JSONL checkpoints, so neither the server nor the UI ever holds a
-   * whole channel's captions at once.
-   */
-  function buildResponse(cancelled: boolean) {
-    const channel = {
-      name: channelName || base,
-      url: base,
-      subscriber_count: subs,
-      exported_at: new Date().toISOString(),
-      filter: input.contentType,
-      requested: input.limit,
-      exported: videos.length,
-    };
-    if (!toDisk) {
-      return {
-        jobId,
-        cancelled,
-        channel,
-        parts,
-        videos,
-        comments,
-        transcripts,
-        statuses,
-      };
-    }
-
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), EXPORT_PREFIX));
-    const at = (name: string) => path.join(outDir, name);
-    // Only the requested CSVs are written. An unasked-for part yields no file
-    // at all rather than an empty one, so the folder says what the run was.
-    const names: string[] = [];
-    const counts = { videos: 0, comments: 0, transcripts: 0 };
-    if (parts.videoDetails) {
-      counts.videos = writeCsv(at("videos.csv"), VIDEO_COLUMNS, videos);
-      names.push("videos.csv");
-    }
-    if (parts.comments) {
-      counts.comments = writeCsvFromJsonl(
-        ckComments,
-        at("comments.csv"),
-        COMMENT_COLUMNS,
-      );
-      names.push("comments.csv");
-    }
-    if (parts.transcripts) {
-      counts.transcripts = writeCsvFromJsonl(
-        ckTranscripts,
-        at("transcripts.csv"),
-        TRANSCRIPT_COLUMNS,
-      );
-      names.push("transcripts.csv");
-    }
-    // Always written: one row saying what the run did, and a line per video
-    // saying which ones gave trouble. A few kilobytes between them.
-    writeCsv(at("summary.csv"), SUMMARY_COLUMNS, [
-      {
-        channel: channel.name,
-        channel_url: channel.url,
-        subscriber_count: channel.subscriber_count,
-        exported_at: channel.exported_at,
-        filter: channel.filter,
-        requested: channel.requested,
-        exported: channel.exported,
-        cancelled,
-        included: describeParts(parts),
-      },
-    ]);
-    writeCsv(at("video-status.csv"), STATUS_COLUMNS, statuses);
-    names.push("summary.csv", "video-status.csv");
-
-    const files = names.map((name) => {
-      let bytes = 0;
-      try {
-        bytes = fs.statSync(at(name)).size;
-      } catch {
-        /* reported as 0 */
-      }
-      return { name, path: at(name), bytes };
-    });
-    return { jobId, cancelled, channel, parts, dir: outDir, files, counts };
-  }
-
-  try {
-    let selected: { id: string; title: string }[] = [];
-    if (saved && Array.isArray(saved.selected) && saved.selected.length > 0) {
-      // Resuming: the ranking pass already ran, so the same top-N set is
-      // reused rather than re-fetching metadata for the whole candidate pool.
-      channelName = saved.channelName || "";
-      subs = saved.subs ?? "";
-      selected = saved.selected;
-      videos.push(...(saved.videos ?? []));
-      // Statuses are loaded either way: they are one short row per video, and
-      // they are what says which videos have already been collected.
-      statuses.push(...readJsonl<Record<string, unknown>>(ckStatuses));
-      if (!toDisk) {
-        comments.push(...readJsonl<Record<string, unknown>>(ckComments));
-        transcripts.push(...readJsonl<Record<string, unknown>>(ckTranscripts));
-      }
-    } else {
-      publishChannel(jobId, {
-        phase: "listing",
-        current: 0,
-        total: 0,
-        label: "Reading the channel listing",
-      });
-
-      // Flat channel listings are inconsistent: the Videos tab carries duration
-      // but no view counts, the Shorts tab carries view counts but no duration.
-      // So each tab is pre-ranked with whatever signal it has (the Videos tab is
-      // requested in YouTube's own "most popular" order), a candidate pool is
-      // taken from the top of each, and the final ranking uses the real view
-      // counts from full metadata.
-      const tabs =
-        input.contentType === "shorts"
-          ? [`${base}/shorts`]
-          : input.contentType === "longform"
-            ? [`${base}/videos?view=0&sort=p`]
-            : [`${base}/videos?view=0&sort=p`, `${base}/shorts`];
-
-      const seen = new Map<string, RankedVideo>();
-      const listEnd = listingDepth(input.limit);
-      const candidates = poolCap(input.limit);
-      let listedAny = false;
-      let lastListError = "";
-      for (const tab of tabs) {
-        try {
-          const { entries, channelName: name, subs: s } = await listChannelTab(
-            job,
-            tab,
-            cookieOptions,
-            listEnd,
-          );
-          listedAny = true;
-          if (!channelName && name) channelName = name;
-          if (subs === "" && s !== "") subs = s;
-          const tabVideos: RankedVideo[] = [];
-          for (const e of entries) {
-            if (!e.id || seen.has(e.id)) continue;
-            tabVideos.push({
-              id: e.id,
-              title: e.title ?? "",
-              duration: Number(e.duration) || 0,
-              view_count: Number(e.view_count) || 0,
-            });
-          }
-          // Only re-sort when the tab actually reported view counts; otherwise
-          // the listing order (popularity) is the better signal.
-          if (tabVideos.some((v) => v.view_count > 0)) {
-            tabVideos.sort((a, b) => b.view_count - a.view_count);
-          }
-          for (const v of tabVideos.slice(0, candidates)) seen.set(v.id, v);
-        } catch (e) {
-          lastListError = fullErrMessage(e);
-          if (job.cancelled) break;
-        }
-      }
-      if (job.cancelled) throw new Error("cancelled");
-      if (!listedAny)
-        throw new Error(lastListError || "Couldn't read this channel's videos.");
-
-      const pool = [...seen.values()];
-      if (pool.length === 0)
-        throw new Error("No videos matched that filter on this channel.");
-
-      // The metadata pass is one yt-dlp call per video and dominates a large
-      // export. It earns its cost for exactly two things: the videos.csv rows,
-      // and the view counts that rank a "Top N by views" run. When neither
-      // applies — video details not wanted, and everything being exported
-      // anyway — it is skipped outright. That is what makes a
-      // transcripts-only run of a few thousand videos practical.
-      const needsMetadata = input.includeVideoDetails || input.limit !== "all";
-
-      // Full metadata for the candidate pool (duration, views, likes, comments).
-      // Checkpointed per video: on a whole-channel run losing all of it to a
-      // single interruption made resuming pointless.
-      const cachedRows = new Map<string, Record<string, unknown>>();
-      for (const row of readJsonl<Record<string, unknown>>(ckMetadata)) {
-        const id = String((row as { video_id?: unknown })?.video_id ?? "");
-        if (id) cachedRows.set(id, row);
-      }
-      let metaDone = 0;
-      publishChannel(jobId, {
-        phase: "metadata",
-        current: 0,
-        total: needsMetadata ? pool.length : 0,
-        label: needsMetadata
-          ? "Collecting video details"
-          : "Skipping video details",
-      });
-      const fetched = !needsMetadata
-        ? // Everything the listing already knows, and nothing fetched. The
-          // rows are still built so the content-type filter and the selection
-          // below work unchanged; they simply never reach a CSV.
-          pool.map((v) => buildVideoRow(v, {}, channelName))
-        : await mapLimit(pool, META_CONCURRENCY, async (v) => {
-            const cached = cachedRows.get(v.id);
-            if (cached) {
-              metaDone += 1;
-              return cached;
-            }
-            if (job.cancelled) return null;
-            let meta: Record<string, any> = {};
-            try {
-              meta =
-                ((await runForJob(
-                  job,
-                  `https://www.youtube.com/watch?v=${v.id}`,
-                  {
-                    dumpSingleJson: true,
-                    noPlaylist: true,
-                    noWarnings: true,
-                    skipDownload: true,
-                    ...cookieOptions,
-                  },
-                  90_000,
-                )) as Record<string, any>) ?? {};
-            } catch {
-              meta = {};
-            } finally {
-              metaDone += 1;
-              publishChannel(jobId, {
-                phase: "metadata",
-                current: metaDone,
-                total: pool.length,
-                label: v.title || v.id,
-              });
-            }
-            const row = buildVideoRow(v, meta, channelName);
-            appendJsonl(ckMetadata, [row]);
-            return row;
-          });
-      if (job.cancelled) throw new Error("cancelled");
-
-      let ranked = fetched.filter(
-        (r): r is Record<string, unknown> => r !== null,
-      );
-      if (input.contentType === "shorts") {
-        ranked = ranked.filter(
-          (r) => Number(r.duration_seconds) === 0 || r.is_short === true,
-        );
-      } else if (input.contentType === "longform") {
-        ranked = ranked.filter(
-          (r) => Number(r.duration_seconds) === 0 || r.is_short === false,
-        );
-      }
-      ranked.sort((a, b) => Number(b.view_count) - Number(a.view_count));
-      const keep = input.limit === "all" ? ranked.length : input.limit;
-      selected = ranked.slice(0, keep).map((r) => ({
-        id: String(r.video_id),
-        title: String(r.title),
-      }));
-      if (selected.length === 0)
-        throw new Error("No videos matched that filter on this channel.");
-      videos.push(...ranked.slice(0, keep));
-      writeJson(ckSelection, { channelName, subs, videos, selected });
-    }
-
-    const alreadyDone = new Set(
-      statuses.map((s) => String((s as { video_id?: unknown }).video_id ?? "")),
-    );
-    if (alreadyDone.size > 0) {
-      console.log(
-        `[server] channel export resuming with ${alreadyDone.size} video(s) already collected`,
-      );
-      publishChannel(jobId, {
-        phase: "details",
-        current: alreadyDone.size,
-        total: selected.length,
-        label: `Resuming — ${alreadyDone.size} of ${selected.length} already collected`,
-      });
-    }
-
-
-    // Per-video comments + transcripts. Sequential: these are the heavy calls
-    // and YouTube throttles parallel comment scrapes aggressively.
-    if (input.includeComments || input.includeTranscripts) {
-      for (let i = 0; i < selected.length; i++) {
-        if (job.cancelled) break;
-        const v = selected[i];
-        // Already collected on an earlier attempt — its rows were loaded from
-        // the checkpoint, so skip the expensive scrape entirely.
-        if (alreadyDone.has(v.id)) continue;
-        const videoUrl = `https://www.youtube.com/watch?v=${v.id}`;
-        const notes: string[] = [];
-        const videoComments: Record<string, unknown>[] = [];
-        const videoTranscripts: Record<string, unknown>[] = [];
-        publishChannel(jobId, {
-          phase: "details",
-          current: i,
-          total: selected.length,
-          label: v.title || v.id,
-        });
-
-        if (input.includeComments) {
-          try {
-            const info = await runForJob(
-              job,
-              videoUrl,
-              {
-                dumpSingleJson: true,
-                writeComments: true,
-                noPlaylist: true,
-                noWarnings: true,
-                skipDownload: true,
-                extractorArgs:
-                  "youtube:comment_sort=top;max_comments=50,50,0,0",
-                ...cookieOptions,
-              },
-              240_000,
-            );
-            const raw: RawComment[] = Array.isArray(info?.comments)
-              ? info.comments
-              : [];
-            if (raw.length === 0) notes.push("no comments");
-            for (const c of raw) {
-              const isReply = Boolean(c.parent && c.parent !== "root");
-              videoComments.push({
-                video_id: v.id,
-                comment_id: c.id ?? "",
-                parent_id: isReply ? c.parent ?? "" : "",
-                is_reply: isReply,
-                author: c.author ?? "",
-                author_channel_id: c.author_id ?? "",
-                text: c.text ?? "",
-                like_count: typeof c.like_count === "number" ? c.like_count : "",
-                is_pinned: Boolean(c.is_pinned),
-                is_uploader: Boolean(c.author_is_uploader),
-                published_time: c.time_text ?? "",
-                timestamp: typeof c.timestamp === "number" ? c.timestamp : "",
-              });
-            }
-          } catch (e) {
-            notes.push(
-              /comments are disabled/i.test(fullErrMessage(e))
-                ? "comments disabled"
-                : "comments unavailable",
-            );
-          }
-        }
-
-        if (!job.cancelled && input.includeTranscripts) {
-          const lines = await fetchTranscript(job, videoUrl, cookieOptions);
-          if (lines.length === 0) notes.push("no captions");
-          for (const l of lines) {
-            videoTranscripts.push({
-              video_id: v.id,
-              start: l.start,
-              end: l.end,
-              text: l.text,
-            });
-          }
-        }
-
-        if (job.cancelled) break;
-        const statusRow = {
-          video_id: v.id,
-          title: v.title,
-          status: notes.length === 0 ? "ok" : notes.join("; "),
-        };
-        if (!toDisk) {
-          comments.push(...videoComments);
-          transcripts.push(...videoTranscripts);
-        }
-        statuses.push(statusRow);
-        // Flush this video to the checkpoint before moving on, so an
-        // interruption never costs more than the video in flight.
-        appendJsonl(ckComments, videoComments);
-        appendJsonl(ckTranscripts, videoTranscripts);
-        appendJsonl(ckStatuses, [statusRow]);
-      }
-    }
-
-    const cancelled = job.cancelled;
-    publishChannel(jobId, {
-      phase: cancelled ? "cancelled" : "done",
-      current: selected.length,
-      total: selected.length,
-    });
-    // Built before the checkpoint is dropped: in "path" mode the CSVs are
-    // streamed out of those very files.
-    const body = buildResponse(cancelled);
-    // A finished export has nothing left to resume.
-    if (!cancelled) clearCheckpoint();
-    return res.json(body);
-  } catch (e) {
-    const cancelled = job.cancelled || (e as Error)?.message === "cancelled";
-    if (cancelled) {
-      publishChannel(jobId, {
-        phase: "cancelled",
-        current: videos.length,
-        total: videos.length,
-      });
-      if (res.writableEnded || res.destroyed) return;
-      return res.json(buildResponse(true));
-    }
-    logYtError("/api/channel/export", input.url, { base }, e);
-    const msg = fullErrMessage(e);
-    publishChannel(jobId, {
-      phase: "error",
-      current: 0,
-      total: 0,
-      message: msg,
-    });
-    if (res.writableEnded || res.destroyed) return;
-    return res.status(500).json({ error: msg });
-  }
-});
-
-function cancelChannelJob(jobId: string) {
-  const job = channelJobs.get(jobId);
-  if (!job) return;
-  job.cancelled = true;
-  for (const child of job.children) {
-    try {
-      child.kill("SIGKILL");
-    } catch {
-      /* ignore */
-    }
-  }
-  job.children.clear();
 }
-
-app.post("/api/channel/export/cancel", (req: Request, res: Response) => {
-  const jobId = String((req.body ?? {}).jobId || "");
-  if (!jobId) return res.status(400).json({ error: "Missing jobId" });
-  cancelChannelJob(jobId);
-  res.json({ ok: true });
-});
-
-app.get("/api/channel/export/progress", (req: Request, res: Response) => {
-  const jobId = String(req.query.jobId || "");
-  if (!jobId) return res.status(400).end();
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders?.();
-
-  const job = getOrCreateChannelJob(jobId);
-  job.clients.add(res);
-  res.write(`data: ${JSON.stringify(job.last)}\n\n`);
-
-  const ping = setInterval(() => {
-    try {
-      res.write(": ping\n\n");
-    } catch {
-      /* ignore */
-    }
-  }, 15000);
-
-  req.on("close", () => {
-    clearInterval(ping);
-    job.clients.delete(res);
-  });
-});
 
 
 // --- Resume cache -------------------------------------------------------

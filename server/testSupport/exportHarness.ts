@@ -37,8 +37,6 @@ function findRepoRoot(): string {
 const repoRoot = findRepoRoot();
 const here = path.join(repoRoot, "server", "testSupport");
 
-export const PASSCODE_HASH = "test-passcode-hash";
-
 export interface FakeChannel {
   longform?: number;
   shorts?: number;
@@ -162,7 +160,7 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
       ...process.env,
       PORT: String(port),
       ELECTRON_RESOURCES: resources,
-      CHANNEL_EXPORT_PASSCODE_HASH: PASSCODE_HASH,
+      VITE_ENABLE_CHANNEL_DATA: "1",
       TMPDIR: serverTmp,
       TMP: serverTmp,
       TEMP: serverTmp,
@@ -258,7 +256,6 @@ export async function runExport(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Channel-Key": PASSCODE_HASH,
       },
       body: JSON.stringify({
         url: "https://www.youtube.com/@testchannel",

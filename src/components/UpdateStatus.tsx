@@ -21,7 +21,7 @@ export default function UpdateStatus() {
     const off = api.onUpdateStatus((payload) => {
       if (clearTimer.current) window.clearTimeout(clearTimer.current);
       setStatus(payload);
-      // "You're up to date" is worth saying, but not worth keeping on screen.
+      // "Up to date" is worth saying, but not worth keeping on screen.
       if (payload.state === "none") {
         clearTimer.current = window.setTimeout(
           () => setStatus({ state: "idle" }),
@@ -68,9 +68,9 @@ export default function UpdateStatus() {
       break;
     case "manual":
       // A real update exists; this build just cannot install it itself.
-      label = `Version ${status.version ?? "update"} available`;
+      label = `Update ${status.version ? `v${status.version} ` : ""}available`;
       detail =
-        "Downloads the installer — macOS builds aren't signed, so the app can't replace itself.";
+        "Downloads the installer. This macOS build is unsigned and cannot replace itself.";
       link = {
         text: `Download v${status.version ?? ""}`.trim(),
         href: status.url,
@@ -81,12 +81,12 @@ export default function UpdateStatus() {
       action = { text: "Restart", onClick: handleRestart };
       break;
     case "none":
-      label = "You're up to date";
+      label = "Up to date";
       break;
     case "error":
       label = "Update check failed";
       detail = status.message;
-      link = { text: "Download manually", href: status.url ?? RELEASES_URL };
+      link = { text: "Download update", href: status.url ?? RELEASES_URL };
       break;
     case "idle":
     default:
@@ -94,10 +94,10 @@ export default function UpdateStatus() {
   }
 
   return (
-    <div className="flex items-center gap-2 text-[11px] text-fg-faint">
+    <div className="flex items-center gap-2 text-meta text-fg-dim">
       {label && (
         <span
-          className="rounded-row bg-panel-hover px-2 py-1 text-fg-muted"
+          className="rounded-control bg-panel-hover px-2 py-1 text-fg-dim"
           style={{ backgroundColor: "#161618" }}
           title={detail}
         >
@@ -108,7 +108,7 @@ export default function UpdateStatus() {
         <button
           type="button"
           onClick={action.onClick}
-          className="rounded-row px-2 py-1 text-fg"
+          className="rounded-control px-2 py-1 text-fg"
           style={{ backgroundColor: "#FF6363", color: "#0B0B0C" }}
         >
           {action.text}
@@ -120,7 +120,7 @@ export default function UpdateStatus() {
           target="_blank"
           rel="noreferrer"
           title={detail}
-          className="rounded-row px-2 py-1 underline hover:text-fg"
+          className="rounded-control px-2 py-1 underline hover:text-fg"
           style={
             status.state === "manual"
               ? { backgroundColor: "#FF6363", color: "#0B0B0C" }
@@ -133,7 +133,7 @@ export default function UpdateStatus() {
       <button
         type="button"
         onClick={handleCheck}
-        className="rounded-row px-2 py-1 hover:text-fg"
+        className="rounded-control px-2 py-1 hover:text-fg"
         title="Check for updates"
       >
         Check

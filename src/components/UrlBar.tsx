@@ -29,31 +29,31 @@ export default function UrlBar() {
   }, [isTabActive]);
 
   return (
-    <div className="group flex items-center gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-1.5 transition-colors focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgba(255,99,99,0.18)]">
+    <div className="group flex items-center gap-2 rounded-control border border-hairline bg-panel-raised px-3 py-1.5 transition-colors focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgba(255,99,99,0.18)]">
       {loadingInfo ? (
         <ArrowRepeat className="shrink-0 animate-spin text-accent" size={14} />
       ) : (
-        <Search className="shrink-0 text-fg-muted" size={14} />
+        <Search className="shrink-0 text-fg-dim" size={14} />
       )}
       <input
         ref={inputRef}
         type="url"
-        placeholder="Paste a YouTube URL — it loads automatically"
+        placeholder="Paste a YouTube link. It loads on paste."
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         onPaste={() => flushAutoLoad()}
         onKeyDown={(e) => {
           if (e.key === "Enter") searchNow();
         }}
-        className="min-w-0 flex-1 bg-transparent py-1.5 text-[14px] text-fg outline-none"
+        className="min-w-0 flex-1 bg-transparent py-1.5 text-body text-fg outline-none"
       />
       <button
         type="button"
         onClick={searchNow}
         disabled={!videoId || loadingInfo}
-        className="flex items-center gap-1.5 rounded-chip px-2 py-1 text-fg-muted transition-colors hover:bg-panel-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-fg-muted"
-        aria-label="Reload video"
-        title="Reload this video"
+        className="flex items-center gap-1.5 rounded-chip px-2 py-1 text-fg-dim transition-colors hover:bg-panel-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-fg-dim"
+        aria-label="Reload source"
+        title="Reload this source"
       >
         <span className="text-[12px]">{loadingInfo ? "Loading" : "Reload"}</span>
       </button>

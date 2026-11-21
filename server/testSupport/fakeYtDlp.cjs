@@ -223,7 +223,25 @@ function download() {
   const primary = (valueOf("--extractor-args") || "").includes("default");
   const height = primary ? HEIGHT_PRIMARY : HEIGHT_FALLBACK;
   if (!height) return fail("fake yt-dlp: Requested format is not available\n");
-  fs.writeFileSync(out, `fake clip height=${height}\n`);
+  // The range asked for, so the fake media has the length a real cut would.
+  const range = (valueOf("--download-sections") || "").match(/\*([\d.]+)-([\d.]+)/);
+  const duration = range ? Number(range[2]) - Number(range[1]) : 0;
+  // FAKE_FAIL_AT_START=<seconds> fails the download whose range starts there,
+  // after leaving a partial file behind as an interrupted download would, with
+  // FAKE_FAIL_MESSAGE as its stderr. That is how a test fails one segment of
+  // several.
+  const failStart = process.env.FAKE_FAIL_AT_START;
+  if (failStart !== undefined && failStart !== "" && range && Number(range[1]) === Number(failStart)) {
+    fs.writeFileSync(`${out}.part`, "partial bytes");
+    return fail(process.env.FAKE_FAIL_MESSAGE || "ERROR: Connection reset by peer\n");
+  }
+  // yt-dlp writes its cookie jar back to --cookies on every run. This is that
+  // write-back, so a test can show whose file it landed on.
+  const jar = valueOf("--cookies");
+  if (jar && process.env.FAKE_CLOBBER_COOKIES) {
+    fs.writeFileSync(jar, "# clobbered by a download run\n");
+  }
+  fs.writeFileSync(out, `fake clip height=${height} duration=${duration}\n`);
   // The line the server scrapes to report which format yt-dlp settled on.
   return emit(`[info] Downloading 1 format(s): v${height}\n`);
 }

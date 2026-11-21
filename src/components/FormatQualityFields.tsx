@@ -29,7 +29,7 @@ export default function FormatQualityFields() {
     <div className="flex flex-col gap-3">
       <div className="flex gap-4">
       <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className="text-[11px] uppercase tracking-wider text-fg-faint">
+        <span className="text-meta uppercase tracking-wider text-fg-dim">
           Format
         </span>
         <select
@@ -44,7 +44,7 @@ export default function FormatQualityFields() {
       </label>
 
       <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <span className="text-[11px] uppercase tracking-wider text-fg-faint">
+        <span className="text-meta uppercase tracking-wider text-fg-dim">
           Quality
         </span>
         <select

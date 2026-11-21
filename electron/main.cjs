@@ -36,6 +36,7 @@ const {
   releasesUrl,
 } = require("./updater.cjs");
 const logger = require("./logger.cjs");
+const { readMachineId, hashMachineId } = require("./machineId.cjs");
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
@@ -360,6 +361,8 @@ function sweepStaleClips() {
     let removed = 0;
     for (const name of fs.readdirSync(root)) {
       if (!name.startsWith("ytclip-")) continue;
+      // Cookie copies are owned by server/cookieJar.ts, which sweeps its own.
+      if (name.startsWith("ytclip-cookies-")) continue;
       const dir = path.join(root, name);
       try {
         if (fs.statSync(dir).mtimeMs > cutoff) continue;
@@ -652,7 +655,12 @@ function registerIpc() {
   ipcMain.handle("youtube:probe", async () => {
     try {
       const result = await youtubeSession.probe();
-      return { connected: !!result.connected, error: result.error };
+      return {
+        connected: !!result.connected,
+        error: result.error,
+        expiresAt: result.expiresAt ?? null,
+        expired: !!result.expired,
+      };
     } catch (err) {
       logger.log("youtube", `probe: threw ${logger.describe(err)}`);
       return { connected: false, error: logger.describe(err) };
@@ -685,6 +693,45 @@ function registerIpc() {
       return { ok: false, error: logger.describe(err) };
     }
   });
+
+  // A cookies.txt dropped on the window. The renderer reads the text; the
+  // same validation and atomic commit as the picker runs here.
+  ipcMain.handle("youtube:importCookiesText", async (_e, text) => {
+    try {
+      if (typeof text !== "string" || text.length > 5_000_000) {
+        return { ok: false, error: "That does not look like a cookies.txt file." };
+      }
+      const result = await youtubeSession.importCookieText(text);
+      logger.log(
+        "youtube",
+        `cookie drop ok=${result.ok}${result.ok ? ` cookies=${result.count}` : `: ${result.error}`}`,
+      );
+      return result;
+    } catch (err) {
+      logger.log("youtube", `cookie drop threw: ${logger.describe(err)}`);
+      return { ok: false, error: logger.describe(err) };
+    }
+  });
+
+  // Owner gate: is this computer on the build's allowlist? Answers a boolean
+  // and nothing else. The list and salt come from the renderer bundle because
+  // this file is not bundled by Vite. Never logs or returns the id or hash.
+  let localMachineId;
+  ipcMain.handle("owner:check", async (_e, list, salt) => {
+    try {
+      if (!Array.isArray(list) || typeof salt !== "string" || !salt) return false;
+      if (localMachineId === undefined) localMachineId = await readMachineId();
+      if (!localMachineId) return false;
+      const mine = hashMachineId(localMachineId, salt);
+      return list.some((h) => typeof h === "string" && h.trim().toLowerCase() === mine);
+    } catch {
+      return false;
+    }
+  });
+
+  // Editor handoff (BUILD-SPEC 11c): editor:installed / probe / writeFcpxml /
+  // openWith / reveal / copyFiles. Failures come back as { ok:false, error }.
+  require("./editorOpen.cjs").registerEditorHandlers({ ipcMain, shell });
 
   ipcMain.handle("youtube:disconnect", async () => {
     try {

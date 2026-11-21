@@ -39,6 +39,22 @@ try {
     probeYouTube: () => ipcRenderer.invoke("youtube:probe"),
     disconnectYouTube: () => ipcRenderer.invoke("youtube:disconnect"),
     importYouTubeCookies: () => ipcRenderer.invoke("youtube:importCookies"),
+    // A cookies.txt dropped on the window: the renderer reads the text and
+    // main validates and commits it.
+    importYouTubeCookiesText: (text) =>
+      ipcRenderer.invoke("youtube:importCookiesText", text),
+    // Owner gate. Main hashes the local machine id with the supplied salt and
+    // answers with a boolean only; the raw id never crosses the bridge.
+    isOwnerMachine: (list, salt) => ipcRenderer.invoke("owner:check", list, salt),
+    // Editor handoff (electron/editorOpen.cjs). Paths and small payloads only.
+    editor: {
+      installed: () => ipcRenderer.invoke("editor:installed"),
+      probe: (file) => ipcRenderer.invoke("editor:probe", file),
+      writeFcpxml: (payload) => ipcRenderer.invoke("editor:writeFcpxml", payload),
+      openWith: (payload) => ipcRenderer.invoke("editor:openWith", payload),
+      reveal: (target) => ipcRenderer.invoke("editor:reveal", target),
+      copyFiles: (payload) => ipcRenderer.invoke("editor:copyFiles", payload),
+    },
     // Diagnostics: reads the app's own local log so a crash can be reported.
     readDiagnostics: () => ipcRenderer.invoke("diagnostics:read"),
     revealDiagnostics: () => ipcRenderer.invoke("diagnostics:reveal"),

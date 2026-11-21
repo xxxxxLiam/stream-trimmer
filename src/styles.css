@@ -2,25 +2,295 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens, BUILD-SPEC sections 1 and 2.
+ *
+ * The accent is ONE HSL triplet. Every gradient, glow, tint and ring below is
+ * derived from it, so changing --accent-h/s/l re-themes the whole app.
+ * #FF6363 = hsl(0 100% 69.41%).
+ */
+:root {
+  --accent-h: 0;
+  --accent-s: 100%;
+  --accent-l: 69.41%;
+
+  --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  /* aUp = lighten(accent, 10%), aDn = darken(accent, 10%), aTop = lighten 20% */
+  --accent-up: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) + 10%));
+  --accent-dn: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) - 10%));
+  --accent-top: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) + 20%));
+  --accent-5: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.05);
+  --accent-8: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.08);
+  --accent-9: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.09);
+  --accent-16: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.16);
+  --accent-18: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.18);
+  --accent-30: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.3);
+  --accent-42: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.42);
+  --accent-45: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.45);
+  --accent-50: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.5);
+
+  --c-bg: #0b0b0c;
+  --c-panel: #161618;
+  --c-raised: #1c1c1f;
+  --c-hover: #252527;
+  --c-plate: #08080a;
+  --c-fg: #f5f5f7;
+  --c-fg-dim: #969697;
+  --c-disabled: #909092;
+  --c-on-accent: #0b0b0c;
+  --c-hairline: rgba(255, 255, 255, 0.08);
+  --c-hairline-strong: rgba(255, 255, 255, 0.14);
+
+  /* Premium layer. Image layers only; the base colour is added by the
+     .surface-* classes below because a colour cannot sit in background-image. */
+  --g-ground:
+    radial-gradient(1000px 620px at 78% -14%, var(--accent-8), transparent 66%),
+    radial-gradient(760px 520px at 4% 114%, var(--accent-5), transparent 68%);
+  --g-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 180px);
+  --g-panel-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 28px 56px -36px rgba(0, 0, 0, 0.9);
+  --g-raised: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
+  --g-raised-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  --g-primary: linear-gradient(180deg, var(--accent-up), var(--accent-dn));
+  --g-primary-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 14px 32px -10px var(--accent-50);
+  --g-range-fill: linear-gradient(180deg, var(--accent-top), var(--accent-dn));
+  --g-range-glow: 0 0 28px var(--accent-42);
+  --g-accent-card: linear-gradient(180deg, var(--accent-16), var(--accent-5));
+  --g-accent-card-shadow:
+    inset 0 1px 0 var(--accent-30), 0 20px 44px -26px var(--accent-45);
+  --g-plate: radial-gradient(130% 95% at 50% 118%, var(--accent-9), transparent 62%);
+  --g-row-wash: linear-gradient(90deg, var(--accent-18), var(--accent-5) 62%, transparent);
+  --g-drawer-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06), -24px 0 64px -32px rgba(0, 0, 0, 0.95);
+
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 @layer base {
   html,
   body,
   #root {
-    @apply h-full bg-bg text-fg font-sans text-[13px] antialiased;
+    @apply h-full text-fg font-sans text-body antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+  }
+  body {
+    background: var(--g-ground), var(--c-bg);
+    background-attachment: fixed;
   }
   * {
     box-sizing: border-box;
   }
   input::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--c-fg-dim);
   }
   ::selection {
-    background: rgba(255, 99, 99, 0.35);
+    background: var(--accent-45);
+  }
+  /* Every timecode and count aligns. */
+  .tabular,
+  .font-mono,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  button,
+  a {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
   }
 }
 
 @layer components {
+  /* ---- Surfaces ------------------------------------------------------- */
+  .surface-ground {
+    background: var(--g-ground), var(--c-bg);
+  }
+  .surface-panel {
+    background: var(--g-panel), var(--c-panel);
+    box-shadow: var(--g-panel-shadow);
+    border: 1px solid var(--c-hairline);
+    border-radius: 14px;
+  }
+  .surface-raised {
+    background: var(--g-raised), var(--c-raised);
+    box-shadow: var(--g-raised-shadow);
+  }
+  .surface-plate {
+    background: var(--g-plate), var(--c-plate);
+  }
+  /* Error / warning: accent TEXT on an accent tint with an accent border.
+     Never a filled accent fill (that is reserved for the primary action). */
+  .card-alert {
+    background: var(--g-accent-card);
+    box-shadow: var(--g-accent-card-shadow);
+    border: 1px solid hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.55);
+    border-radius: 8px;
+    color: var(--accent);
+  }
+  .row-used-wash {
+    background: var(--g-row-wash);
+  }
+
+  /* ---- Type helpers --------------------------------------------------- */
+  .t-title { @apply text-title; }
+  .t-section { @apply text-section; }
+  .t-body { @apply text-body; }
+  .t-meta { @apply text-meta text-fg-dim; }
+  .t-numeral { @apply text-numeral font-mono; font-variant-numeric: tabular-nums; }
+  .t-timecode { @apply font-mono text-meta; font-variant-numeric: tabular-nums; }
+  .arabic-glyph {
+    font-family: "Geeza Pro", "Al Bayan", "Arabic Typesetting", "Noto Naskh Arabic", serif;
+    unicode-bidi: isolate;
+  }
+
+  /* ---- Controls ------------------------------------------------------- */
+  /* Geometry is fixed: 1px border always present, so hover never shifts layout. */
+  .btn {
+    @apply inline-flex h-btn items-center justify-center gap-2 rounded-control border px-4 text-body text-fg transition-colors;
+    background: var(--g-raised), var(--c-raised);
+    box-shadow: var(--g-raised-shadow);
+    border-color: var(--c-hairline);
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--g-raised), var(--c-hover);
+    border-color: var(--c-hairline-strong);
+  }
+  .btn:active:not(:disabled) {
+    background: var(--c-panel);
+  }
+  .btn:disabled {
+    color: var(--c-disabled);
+  }
+  .btn[aria-pressed="true"],
+  .btn[aria-expanded="true"],
+  .btn[aria-selected="true"] {
+    border-color: var(--accent);
+  }
+
+  .btn-primary {
+    @apply inline-flex h-btn items-center justify-center gap-2 rounded-control border px-4 text-body font-medium transition-colors;
+    background: var(--g-primary), var(--accent);
+    box-shadow: var(--g-primary-shadow);
+    border-color: transparent;
+    color: var(--c-on-accent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--g-primary), var(--accent-up);
+  }
+  .btn-primary:active:not(:disabled) {
+    background: var(--accent-dn);
+  }
+  .btn-primary:disabled {
+    background: var(--c-raised);
+    border-color: var(--c-hairline);
+    box-shadow: none;
+    color: var(--c-disabled);
+  }
+
+  .icon-btn {
+    @apply inline-flex size-icon shrink-0 items-center justify-center rounded-control border text-fg-dim transition-colors;
+    border-color: transparent;
+  }
+  .icon-btn:hover:not(:disabled) {
+    background: var(--c-hover);
+    border-color: var(--c-hairline-strong);
+    color: var(--c-fg);
+  }
+  .icon-btn:active:not(:disabled) {
+    background: var(--c-raised);
+  }
+  .icon-btn:disabled {
+    color: var(--c-disabled);
+  }
+  .icon-btn[aria-pressed="true"],
+  .icon-btn[aria-expanded="true"] {
+    border-color: var(--accent);
+    color: var(--c-fg);
+  }
+
+  .chip {
+    @apply inline-flex h-chip max-w-full items-center gap-1 rounded-chip border px-2 text-meta text-fg;
+    background: var(--c-raised);
+    border-color: var(--c-hairline);
+  }
+  button.chip,
+  a.chip {
+    @apply transition-colors;
+  }
+  button.chip:hover:not(:disabled),
+  a.chip:hover {
+    background: var(--c-hover);
+    border-color: var(--c-hairline-strong);
+  }
+  button.chip:active:not(:disabled) {
+    background: var(--c-panel);
+  }
+  button.chip:disabled {
+    color: var(--c-disabled);
+  }
+  button.chip[aria-expanded="true"] {
+    border-color: var(--accent);
+  }
+
+  .link-quiet {
+    @apply inline-flex h-row items-center gap-1 rounded-control border border-transparent px-2 text-body text-fg-dim transition-colors;
+  }
+  .link-quiet:hover {
+    background: var(--c-hover);
+    border-color: var(--c-hairline-strong);
+    color: var(--c-fg);
+  }
+  .link-quiet[aria-current="page"],
+  .link-quiet[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--c-fg);
+  }
+
+  .kbd {
+    @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded-chip border px-1.5 text-meta text-fg-dim;
+    border-color: var(--c-hairline-strong);
+    background: var(--c-raised);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .field {
+    @apply h-btn w-full rounded-control border px-3 text-body text-fg outline-none transition-colors;
+    background: var(--g-raised), var(--c-raised);
+    border-color: var(--c-hairline);
+  }
+  .field:hover:not(:disabled) {
+    border-color: var(--c-hairline-strong);
+  }
+  .field:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-18);
+  }
+  .field:disabled {
+    color: var(--c-disabled);
+  }
+
+  /* Popover surface used by the shell's chips (format, source, settings). */
+  .popover {
+    @apply rounded-control border p-3;
+    background: var(--g-raised), var(--c-raised);
+    border-color: var(--c-hairline-strong);
+    box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.9);
+  }
+
+  /* Status dots: differ by treatment, not hue (colour-blind safe). */
+  .dot { @apply inline-block size-2 shrink-0 rounded-full; }
+  .dot-saved { background: var(--c-fg); }
+  .dot-cutting { background: var(--accent); box-shadow: 0 0 8px var(--accent-50); }
+  .dot-queued { box-shadow: inset 0 0 0 1.5px var(--c-fg-dim); }
+
   /* Native dual-range slider thumb styling (can't be expressed purely with utilities) */
   .dual-input {
     -webkit-appearance: none;
@@ -72,40 +342,4 @@
     cursor: not-allowed;
   }
 
-  .kbd {
-    @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded-chip border border-hairlineStrong bg-panel-raised px-1.5 text-[11px] text-fg-muted;
-    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.4);
-  }
-
-  .field {
-    @apply w-full rounded-row border border-hairline bg-panel-raised px-3 py-2 text-fg outline-none transition-colors;
-  }
-  .field:focus-visible {
-    @apply border-accent/60;
-    box-shadow: 0 0 0 3px rgba(255, 99, 99, 0.18);
-  }
-  .field:disabled {
-    @apply opacity-50;
-  }
-
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-2 text-fg transition-colors;
-  }
-  .btn:hover:not(:disabled) {
-    @apply bg-panel-hover border-hairlineStrong;
-  }
-  .btn:disabled {
-    @apply cursor-not-allowed opacity-40;
-  }
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-row border border-accent/70 bg-accent px-3 py-2 text-white transition-colors;
-    box-shadow: 0 6px 18px -8px rgba(255, 99, 99, 0.6);
-  }
-  .btn-primary:hover:not(:disabled) {
-    background: #ff7676;
-  }
-  .btn-primary:disabled {
-    @apply cursor-not-allowed opacity-40;
-    box-shadow: none;
-  }
 }

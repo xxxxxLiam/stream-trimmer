@@ -123,9 +123,9 @@ export default function PlayerControls({
           <span>{loopSelection ? "Looping selection" : "Play selection"}</span>
         </button>
 
-        <span className="ml-auto text-[12px] tabular-nums text-fg-muted">
+        <span className="ml-auto text-[12px] tabular-nums text-fg-dim">
           {formatTimestamp(currentTime)}{" "}
-          <span className="text-fg-faint">/ {formatTimestamp(duration)}</span>
+          <span className="text-fg-dim">/ {formatTimestamp(duration)}</span>
         </span>
       </div>
     </div>

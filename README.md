@@ -6,17 +6,90 @@ Download a trimmed section (up to 10 minutes) of a YouTube video — video or au
 
 ## Download the app
 
-The easiest way to use YouTube Clipper — no terminal, no setup.
+No terminal, no setup. These links always point at the newest release:
 
-1. Go to the [**Releases**](../../releases) page.
-2. Download the latest build for your OS:
-   - **macOS (Apple Silicon):** `YouTube Clipper-<version>-mac-arm64.dmg.zip`
-   - **Windows:** `YouTube Clipper-<version>-win-x64.exe`
-3. Open it and follow your OS's one-time prompt (the app is unsigned — this is normal for free open-source apps):
-   - **macOS:** unzip, drag the app to Applications, then right-click it → **Open** → **Open**.
-   - **Windows:** run the installer → if SmartScreen appears, click **More info** → **Run anyway**.
+| Your computer | Download |
+| --- | --- |
+| **Windows 10/11** (64-bit) | [YouTube-Clipper-Windows-x64-Setup.exe](https://github.com/xxxxxLiam/stream-trimmer/releases/latest/download/YouTube-Clipper-Windows-x64-Setup.exe) |
+| **macOS** (Apple Silicon) | [YouTube-Clipper-macOS-AppleSilicon.dmg](https://github.com/xxxxxLiam/stream-trimmer/releases/latest/download/YouTube-Clipper-macOS-AppleSilicon.dmg) |
+| **Linux** (64-bit) | [YouTube-Clipper-Linux-x64.AppImage](https://github.com/xxxxxLiam/stream-trimmer/releases/latest/download/YouTube-Clipper-Linux-x64.AppImage) |
 
-That's it — yt-dlp and ffmpeg are bundled inside the app, so there's nothing else to install.
+Or browse every build on the [Releases](../../releases) page — note that GitHub
+hides the files under a collapsed **Assets** heading, so you may need to click
+that to see them.
+
+yt-dlp and ffmpeg are bundled inside the app. There is nothing else to install.
+
+**The app is not code-signed**, because a signing certificate costs a few
+hundred a year. That is normal for free open-source tools, but it means both
+Windows and macOS will interrupt you once. Here is exactly what to click.
+
+### Windows
+
+There are up to three separate blocks, and each one looks final until you know
+where the override is.
+
+**1. Your browser may refuse to keep the file.** Edge and Chrome flag installers
+that few people have downloaded yet.
+
+- **Edge:** open the Downloads flyout (**Ctrl+J**), find the file, click the
+  **⋯** next to it → **Keep**. If it asks again, choose **Show more** →
+  **Keep anyway**.
+- **Chrome:** same idea — in the download bar or **Ctrl+J**, click the **⋯** →
+  **Keep**, then **Keep anyway** if prompted.
+
+**2. Unblock the file before running it.** This step usually prevents the next
+one entirely, and it is the one most people miss:
+
+- Right-click `YouTube-Clipper-Windows-x64-Setup.exe` → **Properties**
+- At the bottom of the **General** tab, tick **Unblock**
+- **Apply** → **OK**, then double-click the installer
+
+**3. If SmartScreen still appears**, you will see a blue window titled
+**"Windows protected your PC"**. The only button is **Don't run** — the way
+through is the small link:
+
+- Click **More info** (under the message)
+- Then click **Run anyway**
+
+**If there is no "Run anyway" button at all,** Smart App Control is switched on.
+That is a Windows 11 feature which blocks unsigned apps outright with no
+override, and it is the one case where none of the above helps. Check
+**Windows Security → App & browser control → Smart App Control**. If it says
+**On**, your options are to turn it **Off** there, or not to install the app.
+
+⚠️ Check whether you can undo it before you do it. Smart App Control used to be
+a one-way switch: turning it off meant you could not turn it back on without
+resetting or reinstalling Windows. That was relaxed in April 2026 — on Windows 11
+24H2/25H2 with build 26100.8116 / 26200.8116 or newer, it can be toggled back
+on. Run `winver` to see your build. On anything older, treat it as permanent.
+Either way it is a real reduction in your machine's protection for the sake of
+one app, so if you are not comfortable with that, the honest answer is to wait
+until this app is signed.
+
+### macOS
+
+1. Open the `.dmg` and drag **YouTube Clipper** to your Applications folder.
+2. macOS will refuse to open it: *"Apple could not verify YouTube Clipper is
+   free of malware."* Clear the download flag from a terminal:
+
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/YouTube Clipper.app"
+   ```
+
+3. Open it normally.
+
+You will need to run that command again after each update, because every
+download arrives freshly quarantined. On recent macOS versions the old
+right-click → **Open** trick no longer works for unsigned apps; the terminal
+command, or **System Settings → Privacy & Security → Open Anyway**, is the way.
+
+### Linux
+
+```bash
+chmod +x YouTube-Clipper-Linux-x64.AppImage
+./YouTube-Clipper-Linux-x64.AppImage
+```
 
 ## Features
 
@@ -107,6 +180,12 @@ A React single-page app (Vite + TypeScript) talks to a local Express worker. The
 
 **Using the app:**
 
+- **Can't find the installer on the Releases page** — GitHub collapses the file
+  list under an **Assets** heading. Click it, or use the direct links at the top
+  of this page, which always point at the newest build.
+- **Windows: no "Run anyway" option appears** — that is Smart App Control, not
+  SmartScreen. See [Windows](#windows) above; SmartScreen can be clicked
+  through, Smart App Control cannot.
 - **"Preview unavailable"** — the video owner disabled embedding. Downloading still works; ignore it.
 - **"No transcript available"** — that video has no captions (or none in a supported language). A YouTube limitation, not a bug.
 - **"yt-dlp failed" with details** — if YouTube changed something and the bundled yt-dlp is behind, grab the newest release build, which bundles an updated yt-dlp.
@@ -274,27 +353,29 @@ npm run release:linux   # on Linux (x64)
 
 [MIT](./LICENSE).
 
-## Channel exporter passcode
+## Channel data tool (private builds only)
 
-The channel profile exporter is gated by a passcode so it stays yours. Only a
-SHA-256 hash of the passcode is stored — never the passcode itself.
+The channel profile exporter is not part of the public app. There is no
+passcode. It is compiled in only when you build with a flag, so the downloads
+other people get contain no exporter screen and no exporter endpoint.
 
-1. Generate the hash:
+| Variable | Purpose |
+| --- | --- |
+| `VITE_ENABLE_CHANNEL_DATA` | Off by default. Set to `1` to build the tool in. |
+| `VITE_OWNER_SALT` | Any long random string, used to salt device hashes. |
+| `VITE_OWNER_MACHINES` | Comma-separated device hashes allowed to see the tool. `*` means any machine. |
 
-   ```bash
-   node -e "console.log(require('crypto').createHash('sha256').update('your-passcode').digest('hex'))"
-   ```
+1. Put the variables in a local `.env` (gitignored, see `.env.example`).
+2. Add a device: run `npm run machine-id` on that computer and append the hash it
+   prints to `VITE_OWNER_MACHINES`.
+3. Build your private copy by hand, for example
+   `VITE_ENABLE_CHANNEL_DATA=1 npm run dist:mac`.
 
-2. Put it in a local `.env` (gitignored, see `.env.example`):
+The public release workflow leaves `VITE_ENABLE_CHANNEL_DATA` empty on purpose.
+Your private build is separate from the auto-updating public release: rebuild it
+by hand when you want a newer one.
 
-   ```
-   VITE_CHANNEL_PASSCODE_HASH=<hash>
-   CHANNEL_EXPORT_PASSCODE_HASH=<hash>
-   ```
-
-3. For released builds, add the same hash as the GitHub repository secret
-   `CHANNEL_PASSCODE_HASH`; the release workflow injects it at build time.
-
-Builds without a hash hide the channel exporter tab completely. Note that this
-is a local gate: it keeps the feature out of other people's hands in practice,
-but a determined technical user could patch a desktop bundle they own.
+Honest limit: in a build that has the tool, the code is present and the device
+list is in the bundle, so someone with developer tools could find it. This is
+obscurity plus a device check, not a security boundary. Leaving the flag off is
+what removes the feature entirely.

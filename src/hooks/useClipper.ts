@@ -30,6 +30,7 @@ import {
   type CommentsResponse,
 } from "../lib/clip";
 import { readSetting, writeSetting } from "../lib/persist";
+import type { FailureAttempt, FailureDiagnostics } from "../lib/diagnostics";
 import {
   cookiePayload,
   markDisconnected,
@@ -54,6 +55,25 @@ export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
 export type Quality =
   | (typeof VIDEO_QUALITIES)[number]
   | (typeof AUDIO_QUALITIES)[number];
+
+/** A failed download, kept with what Copy diagnostics needs. Matched to the error text by `message`. */
+export interface DownloadFailureInfo {
+  message: string;
+  code?: string;
+  diagnostics?: FailureDiagnostics;
+  attempt: FailureAttempt;
+}
+
+/** Carries the engine's failure fields from the response to the catch block. */
+class DownloadFailureError extends Error {
+  code?: string;
+  diagnostics?: FailureDiagnostics;
+  constructor(message: string, code?: string, diagnostics?: FailureDiagnostics) {
+    super(message);
+    this.code = code;
+    this.diagnostics = diagnostics;
+  }
+}
 
 export function useClipper() {
   const [url, setUrl] = useState("");
@@ -87,6 +107,7 @@ export function useClipper() {
   const dismissSavedNotice = useCallback(() => setSavedNotice(null), []);
   const downloadAbortRef = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
+  const [failure, setFailure] = useState<DownloadFailureInfo | null>(null);
 
   const [showTranscript, setShowTranscript] = useState(false);
   // Seek requests are a counter-stamped channel so repeated seeks to the same
@@ -513,21 +534,34 @@ export function useClipper() {
     downloadAbortRef.current = null;
   }, []);
 
-  const download = useCallback(async () => {
+  /**
+   * Cuts the clip. With no argument it cuts the in/out range as before. `opts.segments`
+   * cuts a list of ranges joined, in order, into one file (the server concatenates).
+   * `opts.clipId` names the file after the campaign's clip id. Resolves true when the
+   * clip was saved, so the caller can record the used ranges.
+   */
+  const download = useCallback(async (opts?: DownloadOptions): Promise<boolean> => {
     if (!info) {
       setError("Load a video first");
-      return;
+      return false;
     }
-    if (validationError) {
+    const multi = opts?.segments && opts.segments.length > 0 ? opts.segments : null;
+    // The in/out fields only matter when no segment list is given.
+    if (!multi && validationError) {
       setError(validationError);
-      return;
+      return false;
     }
+    const segs = multi ?? [{ start, end }];
+    const cutStart = segs[0].start;
+    const cutEnd = segs[segs.length - 1].end;
+    let saved = false;
     setError("");
     setDownloading(true);
     setDownloadProgress(0);
     setDownloadPhase("downloading");
     setDownloadNote("");
     setSavedNotice(null);
+    setFailure(null);
     const controller = new AbortController();
     downloadAbortRef.current = controller;
     // When the desktop app has somewhere to put the clip, the engine hands
@@ -575,8 +609,7 @@ export function useClipper() {
           signal: controller.signal,
           body: JSON.stringify({
             url: normalizeYouTubeUrl(url),
-            start,
-            end,
+            ...(segs.length > 1 ? { segments: segs } : { start: cutStart, end: cutEnd }),
             format,
             quality,
             deliver: deliverPath ? "path" : "stream",
@@ -585,13 +618,22 @@ export function useClipper() {
         },
       );
       if (!res.ok) {
-        const data = await parseJson<{ error?: string; code?: string }>(res).catch(
-          () => ({}) as { error?: string; code?: string },
+        type FailureBody = {
+          error?: string;
+          code?: string;
+          diagnostics?: FailureDiagnostics;
+        };
+        const data = await parseJson<FailureBody>(res).catch(
+          () => ({}) as FailureBody,
         );
         if (data.code === "YOUTUBE_AUTH_REQUIRED") {
           markDisconnected(data.error);
         }
-        throw new Error(data.error || "Download failed");
+        throw new DownloadFailureError(
+          data.error || "Download failed",
+          data.code,
+          data.diagnostics,
+        );
       }
       // For `deliver: "path"` the body is a few bytes of JSON naming the
       // finished file, not the clip itself.
@@ -600,7 +642,9 @@ export function useClipper() {
         : null;
       const blob = deliverPath ? null : await res.blob();
       const ext = format === "mp3" ? "mp3" : "mp4";
-      const filename = buildClipFilename(info.title, start, end, ext);
+      const filename = opts?.clipId
+        ? `${sanitizeFilename(opts.clipId)}.${ext}`
+        : buildClipFilename(info.title, cutStart, cutEnd, ext);
       // What the server actually produced — YouTube may only serve renditions
       // below the requested height, in which case the clip is still valid.
       const deliveredHeight = Number(res.headers.get("X-Delivered-Height"));
@@ -659,7 +703,7 @@ export function useClipper() {
           dir: saveDir,
           detail:
             detail ??
-            `${formatTimestamp(start)} – ${formatTimestamp(end)} · ${format.toUpperCase()}`,
+            `${segs.map((r) => `${formatTimestamp(r.start)} – ${formatTimestamp(r.end)}`).join("; ")} · ${format.toUpperCase()}`,
         });
       } else {
         setLastSavedPath(null);
@@ -685,11 +729,13 @@ export function useClipper() {
       }
       setDownloadProgress(100);
       setDownloadPhase("done");
+      saved = true;
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
         setDownloadPhase("idle");
       } else {
         const raw = e instanceof Error ? e.message : "Download failed";
+        const engineFailure = e instanceof DownloadFailureError ? e : null;
         // A bare "Failed to fetch" is what fetch() rejects with for any
         // transport-level failure. Left as-is it sends people hunting for a
         // YouTube or sign-in problem, when the clip itself built fine and
@@ -698,11 +744,22 @@ export function useClipper() {
           /failed to fetch|networkerror|load failed|network request failed/i.test(
             raw,
           );
-        setError(
-          transportFailure
-            ? "The clip was built, but the transfer from the local engine broke before it finished. This is not a YouTube or sign-in problem — copy the diagnostics log for the reason."
-            : raw,
-        );
+        const message = transportFailure
+          ? "The clip was built, but the transfer from the local engine broke before it finished. This is not a YouTube or sign-in problem. Copy the diagnostics for the reason."
+          : raw;
+        setError(message);
+        setFailure({
+          message,
+          code: engineFailure?.code,
+          diagnostics: engineFailure?.diagnostics,
+          attempt: {
+            operation: "download clip",
+            videoId: extractVideoId(url),
+            segments: segs,
+            format,
+            quality,
+          },
+        });
         setDownloadPhase("error");
       }
     } finally {
@@ -714,6 +771,7 @@ export function useClipper() {
         setDownloadProgress(0);
       }, 1200);
     }
+    return saved;
   }, [
     info,
     validationError,
@@ -748,6 +806,7 @@ export function useClipper() {
     downloadPhase,
     downloadNote,
     error,
+    failure,
     videoId,
     duration,
     start,
@@ -801,5 +860,10 @@ export function useClipper() {
     commentsNote,
   };
 }
+
+export type DownloadOptions = {
+  segments?: Array<{ start: number; end: number }>;
+  clipId?: string;
+};
 
 export type ClipperState = ReturnType<typeof useClipper>;

@@ -50,7 +50,7 @@ export default function OverlayLoader({
           >
             <div className="flex items-center gap-3">
               <ArrowRepeat className="h-4 w-4 animate-spin text-accent" />
-              <span className="text-[12px] text-fg-muted">{displayLabel}…</span>
+              <span className="text-meta text-fg-dim">{displayLabel}…</span>
             </div>
             {showBar && (
               <div className="relative h-1 w-full overflow-hidden rounded-full bg-panel-raised">

@@ -6,6 +6,10 @@ const path = require("node:path");
 const fs = require("node:fs");
 const esbuild = require("esbuild");
 
+const channelData = /^(1|true|yes|on)$/i.test(
+  String(process.env.VITE_ENABLE_CHANNEL_DATA || "").trim(),
+);
+
 const outFile = path.join(__dirname, "..", "electron", "dist", "server.cjs");
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 
@@ -42,11 +46,29 @@ esbuild
       "ffmpeg-static",
       "youtube-dl-exec",
     ],
-    // Bake the channel-exporter passcode hash into the packaged server; the
-    // packaged app has no .env to read at runtime.
+    // Channel exporter. A public build never contains it: "./channelRoutes" is
+    // resolved to an empty stub, so the module is not bundled at all. (esbuild
+    // does not fold `if (CONST)` without minifying, and minifying is off so
+    // support logs keep readable stack traces — a `define` would leave the
+    // routes and their URLs in the file.) Only VITE_ENABLE_CHANNEL_DATA=1
+    // bundles the real module.
+    plugins: channelData
+      ? []
+      : [
+          {
+            name: "channel-routes-stub",
+            setup(build) {
+              build.onResolve({ filter: /(^|\/)channelRoutes$/ }, () => ({
+                path: path.resolve(__dirname, "..", "server", "channelRoutes.stub.ts"),
+              }));
+            },
+          },
+        ],
+    // The packaged app has no .env; bake the flag in so the runtime check in
+    // server/index.ts agrees with what was bundled.
     define: {
-      "process.env.CHANNEL_EXPORT_PASSCODE_HASH": JSON.stringify(
-        process.env.CHANNEL_EXPORT_PASSCODE_HASH || "",
+      "process.env.VITE_ENABLE_CHANNEL_DATA": JSON.stringify(
+        channelData ? "1" : "",
       ),
     },
     logLevel: "info",

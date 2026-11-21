@@ -25,10 +25,10 @@ function TimestampField({
 }) {
   return (
     <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-      <span className="text-[11px] uppercase tracking-wider text-fg-faint">
+      <span className="text-meta uppercase tracking-wider text-fg-dim">
         {label}
       </span>
-      <div className="group flex items-center rounded-row border border-hairline bg-panel-raised transition-colors focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgba(255,99,99,0.18)]">
+      <div className="group flex items-center rounded-control border border-hairline bg-panel-raised transition-colors focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgba(255,99,99,0.18)]">
         <input
           type="text"
           inputMode="numeric"
@@ -42,7 +42,7 @@ function TimestampField({
           type="button"
           onClick={onPaste}
           disabled={disabled}
-          className="mr-1 flex items-center rounded-chip px-2 py-1 text-fg-muted transition-colors hover:bg-panel-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+          className="mr-1 flex items-center rounded-chip px-2 py-1 text-fg-dim transition-colors hover:bg-panel-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           aria-label={`Paste ${label.toLowerCase()}`}
         >
           <Clipboard size={12} />
@@ -105,7 +105,7 @@ export default function TimeRangeControls() {
           }}
           disabled={!info}
         />
-        <div className="flex justify-between text-[12px] text-fg-muted tabular-nums">
+        <div className="flex justify-between text-[12px] text-fg-dim tabular-nums">
           <span>{formatTimestamp(start)}</span>
           <span className="text-accent">
             {formatTimestamp(end - start)} selected

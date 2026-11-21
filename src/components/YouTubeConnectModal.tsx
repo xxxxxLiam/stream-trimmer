@@ -1,9 +1,14 @@
 /**
  * File: YouTubeConnectModal.tsx
  * Path: src/components/YouTubeConnectModal.tsx
- * Description: One-time YouTube connect. Primary path imports a cookies.txt
- * exported from a private/incognito window; reading a browser's own cookie
- * store is a secondary option.
+ * Description: YouTube connect, in order of least effort for the user:
+ *   1. On open, the app sweeps the installed browsers itself
+ *      (--cookies-from-browser). If one works the user does nothing at all.
+ *   2. Otherwise a guided three-step cookies.txt import: install the
+ *      extension, export youtube.com cookies, drop the file on the window
+ *      (or use the picker). The extension is named for the user's browser.
+ *   3. After that the sign-in is remembered and refreshes itself. The app
+ *      never promises it lasts forever: YouTube can end a session.
  *
  * The incognito procedure is yt-dlp's own, reproduced step for step from
  * https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies —
@@ -13,7 +18,7 @@
  * a new one. A private session that is closed and never reopened is never
  * rotated, so the file keeps working.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRepeat,
@@ -29,6 +34,7 @@ import DiagnosticsDisclosure from "./DiagnosticsDisclosure";
 import {
   checkBrowserConnection,
   importCookies,
+  importDroppedCookies,
   openYouTubeSignIn,
   selectBrowser,
   sweepBrowsers,
@@ -48,7 +54,7 @@ function Working({ label }: { label: string }) {
           aria-hidden
           className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-accent"
         />
-        <span className="min-w-0 flex-1 text-[12px] text-fg-muted">{label}</span>
+        <span className="min-w-0 flex-1 text-[12px] text-fg-dim">{label}</span>
       </div>
       <div className="relative mt-2 h-1 w-full overflow-hidden rounded-full bg-panel-raised">
         <motion.div
@@ -61,16 +67,81 @@ function Working({ label }: { label: string }) {
   );
 }
 
-const STEPS = [
-  "Open a new private browsing/incognito window and log into YouTube.",
-  "In the same window and same tab, go to https://www.youtube.com/robots.txt — this should be the only private/incognito tab open.",
-  "Export youtube.com cookies with a “Get cookies.txt LOCALLY” style extension.",
-  "Close the private window, so that session is never opened in the browser again. Then import the file below.",
-];
+/**
+ * The exporter to install for a browser. Named exactly so the user is never
+ * told to find "a cookies.txt extension". Safari has no maintained exporter,
+ * so the honest answer there is to borrow another browser for the export.
+ * The store pages are searched by name rather than deep-linked.
+ */
+export function extensionFor(browser: CookieBrowser | string): {
+  browserLabel: string;
+  extension: string;
+  where: string;
+} {
+  const label = browser ? browser[0].toUpperCase() + browser.slice(1) : "your browser";
+  switch (browser) {
+    case "firefox":
+      return { browserLabel: label, extension: "cookies.txt (by Lennon Hill)", where: "Firefox Add-ons" };
+    case "safari":
+      return {
+        browserLabel: label,
+        extension: "Get cookies.txt LOCALLY, in Chrome or Firefox",
+        where: "Safari has no cookies.txt exporter, so use Chrome or Firefox just for this export",
+      };
+    case "edge":
+      return { browserLabel: label, extension: "Get cookies.txt LOCALLY", where: "Microsoft Edge Add-ons, or the Chrome Web Store" };
+    default:
+      return { browserLabel: label, extension: "Get cookies.txt LOCALLY", where: "the Chrome Web Store" };
+  }
+}
+
+// One automatic sweep per app session: a failed sweep must not re-run, and
+// prompt for keychain access again, every time the modal re-renders.
+let autoSwept = false;
 
 export default function YouTubeConnectModal({ open }: { open: boolean }) {
   const state = useYouTubeConnection();
   const [showBrowserRoute, setShowBrowserRoute] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const ext = extensionFor(state.browser);
+  const expired = state.expired;
+
+  // Step 1 of the flow: look in the browsers before asking the user for anything.
+  useEffect(() => {
+    if (!open || autoSwept || state.restoring || !state.probed || state.connected) return;
+    autoSwept = true;
+    void sweepBrowsers();
+  }, [open, state.restoring, state.probed, state.connected]);
+
+  // Drop a cookies.txt anywhere on the window.
+  useEffect(() => {
+    if (!open) return;
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const over = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragging(true);
+    };
+    const leave = (e: DragEvent) => {
+      // relatedTarget is null when the pointer leaves the window itself.
+      if (!e.relatedTarget) setDragging(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragging(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) void importDroppedCookies(file);
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -84,11 +155,10 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
         aria-live="polite"
       >
         <div className="w-full max-w-[280px]">
-          <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+          <div className="flex items-center gap-2 text-[12px] text-fg-dim">
             <ArrowRepeat className="animate-spin" size={12} />
-            Checking your YouTube cookies…
+            Checking your sign-in…
           </div>
-          {/* Same yt-dlp check as a fresh import, so it can take a while too. */}
           <div className="relative mt-2 h-1 w-full overflow-hidden rounded-full bg-panel-raised">
             <motion.div
               className="absolute inset-y-0 w-1/3 rounded-full bg-accent/70"
@@ -101,6 +171,21 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
     );
   }
 
+  const step = (n: number, title: string, detail: React.ReactNode) => (
+    <li className="flex gap-3">
+      <span
+        aria-hidden
+        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-accent text-[12px] text-accent"
+      >
+        {n}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[13px] text-fg">{title}</span>
+        <span className="mt-1 block text-[12px] leading-snug text-fg-dim">{detail}</span>
+      </span>
+    </li>
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/90 p-6"
@@ -108,108 +193,141 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
       aria-modal="true"
       aria-labelledby="youtube-connect-title"
     >
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-row border border-hairline bg-panel p-5 shadow-xl">
-        <h2 id="youtube-connect-title" className="text-[15px] font-medium">
-          Connect YouTube
+      {dragging ? (
+        <div className="pointer-events-none absolute inset-4 z-10 flex items-center justify-center rounded-panel border-2 border-dashed border-accent bg-accent-card text-[16px] text-accent">
+          Drop cookies.txt to sign in
+        </div>
+      ) : null}
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-panel border border-hairline bg-panel p-5 shadow-panel">
+        <h2 id="youtube-connect-title" className="text-[20px] font-medium leading-tight">
+          {expired ? "YouTube sign-in expired" : "Sign in to YouTube"}
         </h2>
-        <p className="mt-1 text-[12px] leading-relaxed text-fg-muted">
-          Import a cookies.txt exported from your browser. It stays on this
-          computer, is read only by the downloader, and is never uploaded.
+        <p className="mt-2 text-[13px] leading-snug text-fg-dim">
+          {expired
+            ? "Without a valid sign-in YouTube gives 360p. Import a fresh cookies.txt to get 1080p back."
+            : "Without a sign-in YouTube gives 360p. The sign-in stays on this computer and is never uploaded."}
         </p>
 
-        <p className="mt-4 text-[12px] font-medium text-fg">
-          Export it from a private window
+        {state.busy && state.step ? <Working label={state.step} /> : null}
+
+        <p className="mt-5 text-[13px] text-fg">
+          Not found automatically. Three steps:
         </p>
-        <p className="mt-1 text-[11px] leading-relaxed text-fg-faint">
-          YouTube rotates account cookies on open YouTube tabs, so a file
-          exported from your normal browsing stops working within hours. A
-          private session you close and never reopen is never rotated — that's
-          the one that keeps working.
-        </p>
-        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-[11px] leading-relaxed text-fg-muted marker:text-fg-faint">
-          {STEPS.map((step) => (
-            <li key={step}>{step}</li>
-          ))}
+        <ol className="mt-3 space-y-3">
+          {step(
+            1,
+            `Install ${ext.extension} in ${ext.browserLabel}`,
+            <>
+              From {ext.where}. It exports cookies on this computer and sends them nowhere.
+            </>,
+          )}
+          {step(
+            2,
+            "Export the youtube.com cookies",
+            <>
+              Open a private window, sign in to YouTube, then in the same tab go to
+              youtube.com/robots.txt and export from there. Close the private
+              window afterwards. A session you keep browsing in rotates and
+              stops working within hours.
+            </>,
+          )}
+          {step(
+            3,
+            "Drop the file here",
+            <>Or choose it below. The file and sign-in are checked at once.</>,
+          )}
         </ol>
 
         <button
           type="button"
-          className="btn-primary mt-4 flex w-full items-center justify-center gap-2"
+          className="btn-primary mt-5 flex h-btn w-full items-center justify-center gap-2"
           disabled={state.busy || !state.canImport}
           onClick={() => void importCookies()}
         >
           {state.busy ? (
-            <ArrowRepeat className="animate-spin" size={12} />
+            <ArrowRepeat className="animate-spin" size={16} />
           ) : (
-            <FileEarmarkArrowUp size={12} />
+            <FileEarmarkArrowUp size={16} />
           )}
-          {state.busy ? "Checking…" : "Import cookies.txt"}
+          {state.busy ? "Checking…" : "Choose cookies.txt"}
         </button>
         {!state.canImport ? (
-          <p className="mt-2 text-[11px] leading-relaxed text-fg-faint">
+          <p className="mt-2 text-[12px] leading-snug text-fg-dim">
             Importing a file needs the desktop app. In the browser preview, use
             the browser option below.
           </p>
         ) : null}
 
-        {state.busy && state.step ? <Working label={state.step} /> : null}
-
         {state.message ? (
-          <div className="mt-4 flex items-start gap-2 rounded-chip bg-bg-deep/40 px-3 py-2 text-[12px] text-amber-400">
-            <ExclamationTriangleFill className="mt-0.5 shrink-0" size={12} />
+          <div
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-control border border-accent bg-accent-card px-3 py-2 text-[13px] leading-snug text-accent"
+          >
+            <ExclamationTriangleFill className="mt-0.5 shrink-0" size={16} />
             <span>{state.message}</span>
           </div>
         ) : null}
 
+        {state.notice ? (
+          <p role="status" className="mt-3 text-[12px] leading-snug text-fg-dim">
+            {state.notice}
+          </p>
+        ) : null}
+
         {state.reason ? (
           <details className="mt-2">
-            <summary className="cursor-pointer text-[11px] text-fg-faint">
+            <summary className="cursor-pointer text-[12px] text-fg-dim">
               Technical details
             </summary>
-            <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-[10px] leading-relaxed text-fg-faint">
+            <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-[12px] leading-snug text-fg-dim">
               {state.reason}
             </pre>
           </details>
         ) : null}
 
+        <p className="mt-4 text-[12px] leading-snug text-fg-dim">
+          Once imported, the sign-in is kept and refreshed each time you use the
+          app. YouTube can end a session at any time, for example after a
+          password change or signing out everywhere. The app tells you when
+          that happens.
+        </p>
+
         <div className="mt-5 border-t border-hairline pt-3">
-          <p className="text-[11px] leading-relaxed text-fg-faint">
-            Or let the downloader read a browser's own cookies. Firefox works
-            reliably on macOS and Windows; Chrome and Chromium on Windows
-            cannot be read at all, because Chrome 127 encrypts its cookie
-            database against other programs. Cookies read this way are the
-            rotating kind, so expect to redo it.
+          <p className="text-[12px] leading-snug text-fg-dim">
+            Or read a browser's own cookies. Firefox works on macOS and Windows.
+            Chrome and Chromium on Windows cannot be read, because Chrome 127
+            encrypts its cookies. Cookies read this way rotate, so expect to
+            redo it.
           </p>
           <button
             type="button"
-            className="btn mt-2 flex w-full items-center justify-center gap-2"
+            className="btn mt-2 flex h-btn w-full items-center justify-center gap-2"
             disabled={state.busy}
             onClick={() => void sweepBrowsers()}
           >
-            <Search size={12} />
-            Find my YouTube session
+            <Search size={16} />
+            Check browsers again
           </button>
 
           <button
             type="button"
-            className="mt-3 flex items-center gap-1 text-[11px] text-fg-faint hover:text-fg-muted"
+            className="mt-3 flex items-center gap-1 text-[12px] text-fg-dim hover:text-fg"
             aria-expanded={showBrowserRoute}
             onClick={() => setShowBrowserRoute((v) => !v)}
           >
             {showBrowserRoute ? (
-              <ChevronDown size={10} />
+              <ChevronDown size={12} />
             ) : (
-              <ChevronRight size={10} />
+              <ChevronRight size={12} />
             )}
-            Check one browser myself
+            Pick a browser
           </button>
 
           {showBrowserRoute ? (
             <div className="mt-3">
-              <p className="text-[11px] leading-relaxed text-fg-faint">
-                Sign in to YouTube in that browser first and leave the tab
-                open. Quit the browser fully before checking — a running
-                browser holds its cookie database locked.
+              <p className="text-[12px] leading-snug text-fg-dim">
+                Sign in to YouTube in that browser and leave the tab open. Then
+                quit the browser fully. A running browser locks its cookies.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
@@ -217,11 +335,11 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
                   className="btn flex items-center gap-2"
                   onClick={() => void openYouTubeSignIn()}
                 >
-                  <BoxArrowUpRight size={12} />
+                  <BoxArrowUpRight size={16} />
                   Open YouTube
                 </button>
                 <select
-                  className="input h-8 rounded-chip border border-hairline bg-panel-raised px-2 text-[12px] capitalize"
+                  className="input h-8 rounded-chip border border-hairline bg-panel-raised px-2 text-[13px] capitalize"
                   aria-label="Browser to check"
                   value={state.browser}
                   disabled={state.busy}
@@ -242,7 +360,7 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
                   onClick={() => void checkBrowserConnection()}
                 >
                   {state.busy ? (
-                    <ArrowRepeat className="animate-spin" size={12} />
+                    <ArrowRepeat className="animate-spin" size={16} />
                   ) : null}
                   {state.busy ? "Checking…" : "Check browser"}
                 </button>
