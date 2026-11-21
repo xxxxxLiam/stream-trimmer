@@ -30,6 +30,8 @@ const L = require("./v-lib.cjs");
 
 const EXT = "192.0.2.2"; // this container's eth0 address (os.networkInterfaces)
 const EVIL = "https://evil.example";
+const T0 = Date.now();
+const step = (m) => process.stderr.write(`[+${((Date.now()-T0)/1000).toFixed(1)}s] ${m}\n`);
 
 async function controlLoopbackOnly() {
   // A server bound to loopback only, to prove the probe can tell the difference.
@@ -53,8 +55,10 @@ async function controlLoopbackOnly() {
   const out = { runLabel, startedAt: new Date().toISOString(), extAddr: EXT };
 
   // The control runs first, with no app in the way.
+  step("control: loopback-only server");
   out.control_loopbackOnlyServer = await controlLoopbackOnly();
 
+  step("launching app");
   const stubRoot = L.makeStub(`g2-${runLabel}`);
   const a = await L.launchMirror({ shape: "public", label: `v-g2-${runLabel}`, stubRoot });
   out.apiBase = a.apiBase;
@@ -67,6 +71,7 @@ async function controlLoopbackOnly() {
   fs.writeFileSync(jar, L.cookieJarText());
   out.cookieJar = jar;
 
+  step("A: /proc/net/tcp");
   // ---- A. the listening socket -----------------------------------------
   const rows = L.listeningSockets(a.port);
   out.A_listenRows = rows.map((r) => ({
@@ -87,7 +92,8 @@ async function controlLoopbackOnly() {
   );
 
   // ---- B. from a non-loopback source address ----------------------------
-  const viaExt = await L.req({ host: EXT, port: a.port, path: "/api/cache/usage", localAddress: EXT });
+  step("B: non-loopback request");
+  const viaExt = await L.req({ host: EXT, port: a.port, path: "/api/cache/usage", localAddress: EXT, timeout: 15000 });
   const viaLoop = await L.req({ host: "127.0.0.1", port: a.port, path: "/api/cache/usage" });
   out.B_fromExternalAddress = {
     url: `http://${EXT}:${a.port}/api/cache/usage`,
@@ -100,6 +106,7 @@ async function controlLoopbackOnly() {
   out.B_fromLoopback = { status: viaLoop.status, body: (viaLoop.body || "").slice(0, 200) };
 
   // ---- D. CORS ----------------------------------------------------------
+  step("D: CORS");
   const pre = await L.req({
     host: EXT, port: a.port, localAddress: EXT, method: "OPTIONS", path: "/api/download",
     headers: { origin: EVIL, "access-control-request-method": "POST", "access-control-request-headers": "content-type" },
@@ -130,9 +137,11 @@ async function controlLoopbackOnly() {
 
   // ---- E. what an off-box caller reaches -------------------------------
   L.clearArgvLog(stubRoot);
+  step("E: endpoint sweep");
   const probes = [];
   const call = async (name, o) => {
     const r = await (o.json ? L.jsonReq : L.req)({ ...o, host: EXT, port: a.port, localAddress: EXT });
+    step("  E: " + name);
     probes.push({ name, method: o.method || (o.json ? "POST" : "GET"), path: o.path, status: r.status, ct: r.headers && r.headers["content-type"], body: (r.body || "").slice(0, 220), error: r.error });
     return r;
   };
@@ -147,7 +156,7 @@ async function controlLoopbackOnly() {
     json: 1, path: "/api/download",
     body: { url: "https://www.youtube.com/watch?v=stub0000001", quality: "360", format: "mp4", deliver: "path", segments: [{ start: 0, end: 4 }] },
   });
-  await call("GET /api/download/progress?jobId=x", { path: "/api/download/progress?jobId=probe_from_offbox" });
+  await call("GET /api/download/progress?jobId=x", { path: "/api/download/progress?jobId=probe_from_offbox", timeout: 5000 });
   out.E_reachable = probes;
 
   // Did the download actually write a file on this machine?
@@ -167,6 +176,7 @@ async function controlLoopbackOnly() {
   out.E_canonicalJarHandedToChild = cookieArgs.some((c) => c.cookiesValue === jar);
   out.E_authVerdict = (() => { try { return JSON.parse(auth.body).status; } catch { return auth.body; } })();
 
+  step("wrapping up");
   out.serverListenLine = a.logs.stdout.join("").split("\n").filter((l) => /listening on/.test(l));
   out.shot = await a.shot("app-running");
   await a.close();

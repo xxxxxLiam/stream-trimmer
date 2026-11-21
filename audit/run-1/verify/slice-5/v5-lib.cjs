@@ -55,7 +55,13 @@ async function boot(label, { seed = {}, signedIn = true, viewport = null } = {})
       if (signedIn) {
         fs.writeFileSync(path.join(a.userDataDir, "yt-cookies.txt"), cookieText());
       }
-      await a.win.waitForSelector("header", { timeout: 40000 });
+      // `header:visible` rather than `header`: with many workspace tabs seeded
+      // every tab mounts its own header and the first one in the DOM is hidden.
+      // Generous default: the clip-bank performance cases genuinely block the
+      // renderer's main thread for seconds at a time, and a 30s default would
+      // turn a slow app into a failed script.
+      a.win.setDefaultTimeout(180000);
+      await a.win.waitForSelector("header:visible", { timeout: 40000 });
       if (viewport) await a.win.setViewportSize(viewport);
       if (signedIn) {
         // The restore runs at launch; the cookie file may land a beat later, so

@@ -91,9 +91,31 @@ function writeStubCfg(root, cfg) {
   fs.writeFileSync(path.join(root, "stub.json"), JSON.stringify(cfg, null, 2));
 }
 
-/** Starts `tsx server/index.ts` with cwd = stub root, so it resolves the stub. */
+/** A port nothing is listening on right now. */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const net = require("node:net");
+    const s = net.createServer();
+    s.once("error", reject);
+    s.listen(0, "127.0.0.1", () => {
+      const p = s.address().port;
+      s.close(() => resolve(p));
+    });
+  });
+}
+
+/**
+ * Starts `tsx server/index.ts` with cwd = stub root, so it resolves the stub.
+ *
+ * Two things learned the hard way: `tsx` is a WRAPPER that spawns the real
+ * node process, so killing the wrapper orphans the server and a later run on
+ * the same port silently talks to the previous run's server. The child is
+ * therefore its own process group, killed as a group, and the port is picked
+ * fresh for every server rather than being a constant.
+ */
 async function startServer(stubRoot, port, extraEnv = {}) {
   const lines = [];
+  if (!port) port = await freePort();
   const child = spawn(
     path.join(REPO, "node_modules", ".bin", "tsx"),
     [path.join(REPO, "server", "index.ts")],
@@ -101,31 +123,48 @@ async function startServer(stubRoot, port, extraEnv = {}) {
       cwd: stubRoot,
       env: { ...process.env, PORT: String(port), ...extraEnv },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     },
   );
   child.stdout.on("data", (d) => String(d).split(/\n/).forEach((l) => l && lines.push(l)));
   child.stderr.on("data", (d) => String(d).split(/\n/).forEach((l) => l && lines.push(l)));
   const base = `http://127.0.0.1:${port}`;
-  const deadline = Date.now() + 40000;
-  for (;;) {
+  const killGroup = () => {
     try {
-      const r = await fetch(`${base}/api/cache/usage`);
-      if (r.ok) break;
-    } catch {}
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+    }
+  };
+  const deadline = Date.now() + 40000;
+  let listening = false;
+  for (;;) {
+    // The log line proves it is OUR process answering, not a leftover one.
+    if (lines.some((l) => l.includes(`listening on http://localhost:${port}`))) listening = true;
+    if (listening) {
+      try {
+        const r = await fetch(`${base}/api/cache/usage`);
+        if (r.ok) break;
+      } catch {}
+    }
     if (Date.now() > deadline) {
-      child.kill("SIGKILL");
+      killGroup();
       throw new Error("server never came up:\n" + lines.join("\n"));
     }
     await new Promise((r) => setTimeout(r, 250));
   }
   return {
     base,
+    port,
+    pid: child.pid,
     lines,
     stop: () =>
       new Promise((res) => {
-        child.on("exit", () => res());
-        child.kill("SIGKILL");
-        setTimeout(res, 1500);
+        child.on("exit", () => setTimeout(res, 300));
+        killGroup();
+        setTimeout(res, 2000);
       }),
   };
 }

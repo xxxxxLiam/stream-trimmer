@@ -48,12 +48,15 @@ if (fs.existsSync(fixture) && !fs.existsSync(path.join(root, "fixture.mp4"))) {
 const DEFAULTS = {
   info: { id: "stub0000001", title: "Stub video", duration: 3600, uploader: "Stub channel" },
   delayMs: 0,
+  infoDelayMs: null,
+  downloadDelayMs: null,
   progress: [0, 50, 100],
   writeMedia: true,
   // per-stage failure
   failVersion: null, // { exitCode, stderr }
   failInfo: null,
   failDownload: null,
+  failAuth: null,
   // what to write back over whatever --cookies path we were handed
   cookieWriteBack: null, // string
   cookieWriteDelayMs: 0,
@@ -118,9 +121,15 @@ async function main() {
     process.stdout.write("2099.12.31\\n");
     return;
   }
-  if (cfg.delayMs) await new Promise((r) => setTimeout(r, cfg.delayMs));
-
   const isInfo = has("-J") || has("--dump-json") || has("--dump-single-json");
+  // delayMs stalls every stage; infoDelayMs / downloadDelayMs stall one, so a
+  // cancel test can keep a section-download child alive without also stalling
+  // the metadata probe that must finish before it starts.
+  const stall = isInfo
+    ? (cfg.infoDelayMs != null ? cfg.infoDelayMs : (cfg.delayMs || 0))
+    : (cfg.downloadDelayMs != null ? cfg.downloadDelayMs : (cfg.delayMs || 0));
+  if (stall) await new Promise((r) => setTimeout(r, stall));
+
   if (isInfo) {
     if (cfg.failInfo) { await writeBackCookies(); return die(cfg.failInfo); }
     const ch = cfg.channel;
@@ -187,7 +196,11 @@ async function main() {
   // "Found YouTube account cookies" only when the jar it was handed actually
   // carries an auth cookie — so the verdict tracks the file on disk.
   if (has("--simulate")) {
-    if (cfg.failDownload) { await writeBackCookies(); return die(cfg.failDownload); }
+    // The auth probe gets its OWN failure switch. Failing it from the generic
+    // download switch would sign the app out mid-test and put the sign-in
+    // modal back over the workspace, which has nothing to do with the finding
+    // under test.
+    if (cfg.failAuth) { await writeBackCookies(); return die(cfg.failAuth); }
     const jar = valOf("--cookies");
     let signedIn = false;
     if (jar) {

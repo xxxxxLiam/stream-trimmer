@@ -82,7 +82,7 @@ async function run(label, stubCfg, segments, expectedSec, port) {
         { start: 10.1, end: 12.35 },
       ],
       4.0,
-      18311,
+      0,
     ),
   );
   results.push(
@@ -95,7 +95,7 @@ async function run(label, stubCfg, segments, expectedSec, port) {
         { start: 10, end: 15 },
       ],
       15.0,
-      18312,
+      0,
     ),
   );
   // control: keyframe-aligned marks on the same local-trim path
@@ -108,7 +108,7 @@ async function run(label, stubCfg, segments, expectedSec, port) {
         { start: 10, end: 20 },
       ],
       20.0,
-      18313,
+      0,
     ),
   );
   fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify(results, null, 2));

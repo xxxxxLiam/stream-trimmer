@@ -81,6 +81,13 @@ async function launchMirror(o = {}) {
   if (o.seed) {
     fs.writeFileSync(path.join(userDataDir, "settings.json"), JSON.stringify(o.seed, null, 2));
   }
+  // Extra files placed in the user-data dir BEFORE launch, e.g. yt-cookies.txt,
+  // so the app boots already holding a saved sign-in.
+  for (const [rel, text] of Object.entries(o.userFiles || {})) {
+    const p = path.join(userDataDir, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, text);
+  }
 
   const logs = { stdout: [], stderr: [], console: [], pageErrors: [] };
   const app = await electron.launch({
