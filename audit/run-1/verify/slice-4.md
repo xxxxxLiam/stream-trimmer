@@ -28,8 +28,11 @@ is said so.
   drag-and-drop route as well, which converges on the same `verifyImported()`.
   (2) `updater:status` payloads are sent over the real IPC channel with
   `app.evaluate` from the main process.
-- **No product file was changed.** `git status` shows only
-  `audit/run-1/verify/` as untracked.
+- **No product file was changed.** `git diff --name-only` and
+  `git diff --cached --name-only` are both empty; everything I wrote is new
+  under `audit/run-1/verify/slice-4/`. The only repo paths the builds touch
+  are `dist/` and `electron/dist/server.cjs`, which are the real build
+  scripts' own outputs and are gitignored.
 
 Scripts: `audit/run-1/verify/slice-4/*.cjs`. Output, screenshots and logs:
 `audit/run-1/verify/slice-4/out/`.
@@ -411,14 +414,29 @@ of those (A-5, E-8, F-4) also carry a factual over-claim in the finding text.
   folder the loser was still appending to.) `workDir()` keys the checkpoint on
   `[base, contentType, limit, parts…]` and not on the jobId, so both runs share
   one folder; there is no lock anywhere in `/api/channel/export`.
-- **Extra, which strengthens it**: this needs **no devtools**.
-  `ChannelExportProvider` is mounted per workspace tab
-  (`App.tsx:455 ChannelBoundary` inside the tab map), so two tabs give two
-  independent exporters and the "button disables while exporting" guard does
-  not apply across them. I drove that route through the UI as well
-  (`e3.twoTab*` in the run-2 report, `out/e38-2/…-e3-two-tabs.png`).
-  Silent corruption of the output, reachable from the shipped UI, reported as
-  success: blocker stands.
+- **Extra, and it makes this worse than filed: no devtools are needed, and the
+  end state is total loss.** `ChannelExportProvider` is mounted per workspace
+  tab (`App.tsx:455 ChannelBoundary` inside the tab map), so two tabs give two
+  independent exporters and the panel's "button disables while exporting"
+  guard does not apply across them. I drove the whole thing through the
+  shipped UI — `audit/run-1/verify/slice-4/v-e3-tabs.cjs`,
+  `out/e3-tabs-run1.json`, `out/e3-tabs-run2.json`,
+  `out/e3tabs-1/01-both-running.png`, `out/e3tabs-1/02-both-done.png` —
+  2 attempts, 2 identical:
+
+  ```
+  bothExporting : [true, true]        <- two panels running at once, no guard
+  tab A card    : "Export saved"  "8 videos · 14 comments · 14 transcript lines"
+  tab B card    : "Export saved"  "8 videos ·  0 comments ·  0 transcript lines"
+  folders saved : ["Stub Channel-export-2026-11-21"]      <- one, shared (E-5)
+  on disk       : videos.csv 8 rows, comments.csv 0 rows, transcripts.csv 0 rows
+  ```
+
+  Two green "Export saved" cards, 14 duplicated rows reported in one of them,
+  and because both runs save into the same date-named folder the **empty
+  result overwrites the full one**, so what survives on disk is nothing at all
+  for the two expensive parts. Silent corruption, then silent loss, from two
+  clicks in the shipped UI, reported twice as success: blocker stands.
 
 ---
 
@@ -528,14 +546,17 @@ of those (A-5, E-8, F-4) also carry a factual over-claim in the finding text.
   given one of these ids.
 - **Proof**: `audit/run-1/verify/slice-4/v-f1.cjs`;
   `out/f1-run1.json`, `out/f1-run2.json`;
-  `out/f1-1-loaded/00-loaded.png` and one screenshot per failing step.
+  `out/f1-1-loaded/01-00-loaded.png` and one screenshot per failing step.
 
   **My counts, identical in all four passes:**
   - **19 of the 26 declared anchors do not exist in any state I could build** —
     all 18 `help-anchor-*` ids plus `ui-primary-action`.
   - The 7 that do exist: `ui-source-chip`, `ui-campaign-chip`, `ui-copy-blocks`,
-    `ui-symbols`, `ui-footer-clips`, `ui-footer-data`, `ui-footer-format`
-    (the last two of which no step uses… `ui-footer-format` is used by none).
+    `ui-symbols`, `ui-footer-clips`, `ui-footer-data`, `ui-footer-format`.
+    (Five declared anchors are used by no public step at all —
+    `ui-source-chip`, `ui-footer-format`, `help-anchor-mark-in`,
+    `help-anchor-mark-out`, `help-anchor-symbol-search` — so the 32 steps draw
+    on 21 distinct ids.)
   - **24 of 32 steps have no anchor**, render no spotlight, and show
     "That control is not on screen right now…" — which is untrue; the control
     is on screen under a different id.
@@ -649,7 +670,7 @@ of those (A-5, E-8, F-4) also carry a factual over-claim in the finding text.
   `{state:"error", message:"ENOENT: …"}` on the real `updater:status` IPC
   channel from the main process, and clicked it afterwards each time.
 - **Proof**: same script; `out/f2-f3-f4-run{1,2}.json` (`f4`);
-  `out/f4-1/…-update-error-1024.png`. Both runs identical:
+  `out/f4-1/02-update-error-1024.png`. Both runs identical:
 
   | width | before (right, top, header h) | after | clickable after |
   |---|---|---|---|

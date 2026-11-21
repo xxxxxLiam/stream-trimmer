@@ -156,6 +156,32 @@ const STDERR = {
   await runCase("D1-disk-full", { failDownload: { exitCode: 1, stderr: STDERR.diskFull } });
   await runCase("D2-private-video", { failDownload: { exitCode: 1, stderr: STDERR.privateVideo } });
 
+  // ---- E: is F-8's branch reachable WITHOUT a planted `-v` line? --------
+  // The download path never passes `verbose` (only the auth probe at
+  // server/index.ts:960 does), so real yt-dlp would not print
+  // "Loading cookies from ..." there. Case C's trigger is therefore an
+  // artefact of the planted stderr. This case uses a REAL yt-dlp cookie
+  // error with a browser source, which needs no -v at all.
+  clearStub();
+  L.stub(stubRoot, { failDownload: { exitCode: 1, stderr: 'ERROR: could not find chrome cookies database in "/root/.config/google-chrome"' } });
+  const wireE = await L.jsonReq({
+    port: a.port, path: "/api/download?jobId=v_f58_E",
+    body: { url: URL1, quality: "360", format: "mp4", deliver: "stream", cookiesFromBrowser: "chrome", segments: [{ start: 2, end: 8 }] },
+    timeout: 120000,
+  });
+  let eb = null; try { eb = JSON.parse(wireE.body); } catch { eb = { raw: (wireE.body || "").slice(0, 200) }; }
+  out.E_genuineCookieError = {
+    status: wireE.status,
+    keys: Object.keys(eb || {}),
+    code: eb && eb.code,
+    hasCode: Object.prototype.hasOwnProperty.call(eb || {}, "code"),
+    error: String((eb && eb.error) || "").slice(0, 200),
+  };
+  // F-5's workaround question: does the whole-log route carry what the
+  // per-failure bundle dropped?
+  out.F5_preflightStderrInMainLog = a.mainLog().includes("NoneType' object is not subscriptable");
+  out.F5_mainLogBytes = a.mainLog().length;
+
   out.evidenceDir = a.outDir;
   await a.close();
 
@@ -170,6 +196,8 @@ const STDERR = {
     job: c.bundle ? c.bundle.jobLine : null,
     alert: c.alertText.slice(0, 90),
   }));
+  out.summaryExtra = { E_genuineCookieError: out.E_genuineCookieError, F5_preflightStderrInMainLog: out.F5_preflightStderrInMainLog };
   console.log(JSON.stringify(out.summary, null, 2));
+  console.log(JSON.stringify(out.summaryExtra, null, 2));
   console.log(L.save(`v-f58-${runLabel}.json`, out));
 })();
