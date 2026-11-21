@@ -76,7 +76,7 @@ export default function PreviewPanel() {
               <img
                 src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
                 alt={
-                  info?.title ? `Thumbnail — ${info.title}` : "Video thumbnail"
+                  info?.title ? `Thumbnail for ${info.title}` : "Source thumbnail"
                 }
                 className="h-full w-full object-cover opacity-40"
                 loading="lazy"
@@ -84,10 +84,10 @@ export default function PreviewPanel() {
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
                 <ExclamationTriangle size={22} className="text-accent" />
                 <span className="text-[13px] text-fg">
-                  In-app playback blocked by the owner
+                  The owner blocks playback here
                 </span>
-                <span className="max-w-sm text-[12px] text-fg-faint">
-                  Clipping and downloading still work exactly the same.
+                <span className="max-w-sm text-[12px] text-fg-dim">
+                  Cutting and downloading still work.
                 </span>
                 <button
                   type="button"
@@ -102,9 +102,9 @@ export default function PreviewPanel() {
           )}
 
           {!videoId && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg-faint">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg">
               <CameraVideo size={22} />
-              <span className="text-[12px]">Preview will appear here</span>
+              <span className="text-[12px]">Paste a link to preview it</span>
             </div>
           )}
         </div>

@@ -72,7 +72,7 @@ export class CookieJarMissingError extends Error {
   }
 }
 
-const TMP_PREFIX = "ytclip-cookies-";
+const TMP_PREFIX = "ytcookie-";
 const AUTH_COOKIES = ["SID", "__Secure-3PSID", "__Secure-1PSID"];
 const STALE_MS = 60 * 60 * 1000;
 

@@ -4,7 +4,7 @@
  * Description: Root layout. Header, three-column workspace (transcript | centre | clips),
  *   footer, and the Phase B mount points. See BUILD-SPEC sections 3 and 12.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "./context/ClipperContext";
@@ -20,8 +20,17 @@ import {
 import { CampaignProvider, useCampaign } from "./context/CampaignContext";
 import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
-import ChannelLockGate from "./components/ChannelLockGate";
-import { isLockConfigured } from "./lib/channelLock";
+import { CHANNEL_DATA_BUILT, useOwnerAccess } from "./lib/ownerGate";
+import EditorHandoff, { runAfterCutting } from "./components/EditorHandoff";
+import {
+  DEFAULT_EDITOR_SETTINGS,
+  normalizeEditorSettings,
+  type EditorHandoffSettings,
+  type SessionClip,
+} from "./lib/fcpxml";
+import { getDownloads } from "./lib/downloads";
+import { readSetting, writeSetting } from "./lib/persist";
+import type { BankedClip } from "./lib/bank";
 import PreviewPanel from "./components/PreviewPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DragOutHandle from "./components/DragOutHandle";
@@ -46,6 +55,30 @@ import ClipsColumn from "./components/ClipsColumn"; // B2/B4, right column
 import HelpDrawer from "./components/HelpDrawer"; // B6, right drawer
 import SymbolPalette from "./components/SymbolPalette"; // B5, overlay
 import CopyBlocks from "./components/CopyBlocks"; // B5, overlay
+
+const EDITOR_KEY = "clipper.editorHandoff";
+
+/** "After cutting" settings, kept per campaign beside the other campaign fields. */
+function useEditorSettings(campaignId: string | null) {
+  const [all, setAll] = useState<Record<string, unknown>>(() =>
+    readSetting<Record<string, unknown>>(EDITOR_KEY, {}),
+  );
+  const settings: EditorHandoffSettings = campaignId
+    ? normalizeEditorSettings(all[campaignId])
+    : DEFAULT_EDITOR_SETTINGS;
+  const setSettings = useCallback(
+    (next: EditorHandoffSettings) => {
+      if (!campaignId) return;
+      setAll((prev) => {
+        const merged = { ...prev, [campaignId]: next };
+        writeSetting(EDITOR_KEY, merged);
+        return merged;
+      });
+    },
+    [campaignId],
+  );
+  return [settings, setSettings] as const;
+}
 
 function SavedToast() {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
@@ -113,11 +146,26 @@ function SavedToast() {
   );
 }
 
+const NO_CHANNEL = { exporting: false, channelUrl: "", cancelExport: () => {} };
+
+/**
+ * Channel exporter state. CHANNEL_DATA_BUILT is a compile-time constant, so in a
+ * public build the context, hook and their endpoint strings are dropped from the
+ * bundle (the branch never changes at run time, so hook order is stable).
+ */
+function useChannelState() {
+  return CHANNEL_DATA_BUILT ? useChannelExportContext() : NO_CHANNEL;
+}
+
+function ChannelBoundary({ children }: { children: ReactNode }) {
+  return CHANNEL_DATA_BUILT ? <ChannelExportProvider>{children}</ChannelExportProvider> : <>{children}</>;
+}
+
 /** Publishes this tab's title and busy state up to the workspace tab strip. */
 function TabReporter({ id }: { id: string }) {
   const { info, downloading, exportingComments, loadingInfo, cancelDownload } =
     useClipperContext();
-  const { exporting, channelUrl, cancelExport } = useChannelExportContext();
+  const { exporting, channelUrl, cancelExport } = useChannelState();
   const { reportTab } = useWorkspace();
 
   const title = info?.title || (channelUrl ? channelUrl : "");
@@ -152,6 +200,8 @@ function Layout({ active }: { active: boolean }) {
     setFormat,
     setQuality,
     videoId,
+    url: sourceUrl,
+    info,
     download,
     downloads,
     setStartText,
@@ -172,7 +222,12 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const channelAvailable = isLockConfigured();
+  const ownerAccess = useOwnerAccess();
+  const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
+  const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
+  const [sessionClips, setSessionClips] = useState<SessionClip[]>([]);
+  const editorRef = useRef(editorSettings);
+  editorRef.current = editorSettings;
 
   // Loading video info renders inline; the overlay is reserved for the
   // blocking comment export.
@@ -216,6 +271,30 @@ function Layout({ active }: { active: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [format, quality]);
 
+  // Once a clip is saved: remember it for the session batch and run the campaign's
+  // "After cutting" choice. Never blocks or fails the cut itself.
+  const afterSaved = useCallback(
+    (clipId: string, label: string | undefined, segments: Segment[]) => {
+      const saved = getDownloads().find((d) => d.kind === "clip" && d.path);
+      if (!saved) return; // browser download: no file path to hand on
+      const clip: SessionClip = {
+        id: clipId,
+        label,
+        path: saved.path,
+        segments: segments.map((s) => ({ start: s.start, end: s.end })),
+        sourceUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : sourceUrl || undefined,
+      };
+      setSessionClips((prev) => [...prev.filter((c) => c.id !== clipId), clip]);
+      void runAfterCutting(editorRef.current, {
+        campaignName: campaign?.name,
+        sourceTitle: info?.title,
+        clipsDir: folders.clipsDir || saveDir || undefined,
+        clips: [clip],
+      }).catch(() => {});
+    },
+    [videoId, sourceUrl, campaign?.name, info?.title, folders.clipsDir, saveDir],
+  );
+
   // Cut: name the clip from the campaign pattern, then record its ranges as used so the
   // no-reuse check and the bank stay in agreement with no bookkeeping.
   const cutClip = useCallback(
@@ -227,11 +306,24 @@ function Layout({ active }: { active: boolean }) {
       const ok = await download({ segments, clipId: clipId ?? undefined });
       if (!ok) return;
       if (cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
+      afterSaved(clipId ?? `clip-${Date.now()}`, undefined, segments);
       clearSegments();
       setStartText("");
       setEndText("");
     },
-    [videoId, campaign, downloads, nextClipId, download, recordUse, setStartText, setEndText],
+    [videoId, campaign, downloads, nextClipId, download, recordUse, afterSaved, setStartText, setEndText],
+  );
+
+  // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
+  // The column marks it cut and records the used ranges itself once this resolves true.
+  const cutBanked = useCallback(
+    async (clip: BankedClip): Promise<boolean> => {
+      if (clip.segments.length === 0) return false;
+      const ok = await download({ segments: clip.segments, clipId: clip.id });
+      if (ok) afterSaved(clip.id, clip.label, clip.segments);
+      return ok;
+    },
+    [download, afterSaved],
   );
 
   // Shell-level shortcuts (BUILD-SPEC section 12). Active tab only.
@@ -293,21 +385,27 @@ function Layout({ active }: { active: boolean }) {
                 <Timeline />
                 <MarkBar onCut={(segs) => void cutClip(segs)} />
                 <DownloadBar />
+                <div className="px-2 pb-2">
+                  <EditorHandoff
+                    settings={editorSettings}
+                    onChange={setEditorSettings}
+                    campaignName={campaign?.name}
+                    sourceTitle={info?.title}
+                    clipsDir={folders.clipsDir || saveDir || undefined}
+                    clips={sessionClips}
+                  />
+                </div>
               </>
             }
-            clips={<ClipsColumn />}
+            clips={<ClipsColumn onCutBanked={cutBanked} />}
             drawer={<HelpDrawer open={helpOpen} onClose={closeHelp} />}
           />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2">
               <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
-                {/* Channel exporter stays hidden unless a passcode is baked in. */}
-                {channelAvailable && (
-                  <ChannelLockGate>
-                    <ChannelExportPanel />
-                  </ChannelLockGate>
-                )}
+                {/* Channel exporter: only in a VITE_ENABLE_CHANNEL_DATA build, on an owner machine. */}
+                {channelAvailable && <ChannelExportPanel />}
               </div>
             </div>
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
@@ -354,12 +452,12 @@ function Shell() {
               style={{ display: active ? undefined : "none" }}
             >
               <ClipperProvider>
-                <ChannelExportProvider>
+                <ChannelBoundary>
                   <TabActiveProvider active={active}>
                     <TabReporter id={tab.id} />
                     <Layout active={active} />
                   </TabActiveProvider>
-                </ChannelExportProvider>
+                </ChannelBoundary>
               </ClipperProvider>
             </div>
           );

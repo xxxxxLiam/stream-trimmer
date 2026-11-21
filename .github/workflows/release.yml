@@ -130,8 +130,11 @@ jobs:
         run: npm ci
       - name: Build front-end + bundle binaries + server
         env:
-          VITE_CHANNEL_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
-          CHANNEL_EXPORT_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
+          # Public release: the channel-data tool is compiled out. Never set
+          # these here; the owner's private build is made locally (see README).
+          VITE_ENABLE_CHANNEL_DATA: ""
+          VITE_OWNER_MACHINES: ""
+          VITE_OWNER_SALT: ""
         run: npm run build:electron
       # Uploads into a DRAFT release (see build.publish.releaseType in
       # package.json). Draft is deliberate: it keeps a half-finished release
@@ -140,8 +143,11 @@ jobs:
       - name: Build & upload installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VITE_CHANNEL_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
-          CHANNEL_EXPORT_PASSCODE_HASH: ${{ secrets.CHANNEL_PASSCODE_HASH }}
+          # Public release: the channel-data tool is compiled out. Never set
+          # these here; the owner's private build is made locally (see README).
+          VITE_ENABLE_CHANNEL_DATA: ""
+          VITE_OWNER_MACHINES: ""
+          VITE_OWNER_SALT: ""
         run: ${{ matrix.build }}
 
   # Runs only if every platform built, so a partial release is never made

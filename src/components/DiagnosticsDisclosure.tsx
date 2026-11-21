@@ -24,20 +24,20 @@ export default function DiagnosticsDisclosure() {
     try {
       const result = await api.readDiagnostics();
       setLogPath(result.path);
-      setText(result.text || "(the log is empty)");
+      setText(result.text || "The log is empty.");
     } catch {
-      setText("Could not read the log.");
+      setText("Could not read the log. Try Refresh.");
     }
   }, [api]);
 
-  // Nothing to show in the browser preview — there is no local log there.
+  // Nothing to show in the browser preview. There is no local log.
   if (!api?.readDiagnostics) return null;
 
   return (
     <div className="mt-3">
       <button
         type="button"
-        className="flex items-center gap-1 text-[11px] text-fg-faint hover:text-fg-muted"
+        className="flex items-center gap-1 text-meta text-fg-dim hover:text-fg"
         aria-expanded={open}
         onClick={() => {
           const next = !open;
@@ -51,10 +51,10 @@ export default function DiagnosticsDisclosure() {
 
       {open ? (
         <div className="mt-2">
-          <p className="text-[11px] leading-relaxed text-fg-faint">
-            The app's own event log. It records what happened and when — no
+          <p className="text-meta leading-relaxed text-fg-dim">
+            The app's event log. It records what happened and when, with no
             cookies, tokens or personal data. If the app closed unexpectedly,
-            this is what shows why.
+            the cause is here.
           </p>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -70,7 +70,7 @@ export default function DiagnosticsDisclosure() {
               className="btn flex items-center gap-2"
               onClick={async () => {
                 const result = await api.copyDiagnostics?.();
-                setNote(result?.ok ? "Copied to clipboard." : "Copy failed.");
+                setNote(result?.ok ? "Copied to clipboard." : "Could not copy the log.");
               }}
             >
               <Clipboard size={12} />
@@ -90,13 +90,13 @@ export default function DiagnosticsDisclosure() {
           </div>
 
           {note ? (
-            <p className="mt-2 text-[11px] text-fg-faint">{note}</p>
+            <p className="mt-2 text-meta text-fg-dim">{note}</p>
           ) : null}
           {logPath ? (
-            <p className="mt-2 break-all text-[10px] text-fg-faint">{logPath}</p>
+            <p className="mt-2 break-all text-meta text-fg-dim">{logPath}</p>
           ) : null}
 
-          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-[10px] leading-relaxed text-fg-faint">
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-meta leading-relaxed text-fg-dim">
             {text}
           </pre>
         </div>

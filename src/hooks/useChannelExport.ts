@@ -20,7 +20,6 @@ import {
   type ChannelPart,
   type ChannelParts,
 } from "../lib/channel";
-import { CHANNEL_PASSCODE_HASH } from "../lib/channelLock";
 import { addDownload } from "../lib/downloads";
 import { cookiePayload } from "../lib/youtubeConnection";
 
@@ -141,9 +140,6 @@ export function useChannelExport(options: {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            // Local parity check so the endpoint isn't callable without the
-            // same passcode that unlocks the UI.
-            "X-Channel-Key": CHANNEL_PASSCODE_HASH,
           },
           body: JSON.stringify({
             url: trimmed,

@@ -52,32 +52,32 @@ function describe(
   const parts: string[] = [];
   switch (status) {
     case "signed_in":
-      parts.push(`Using ${where}. It is remembered across restarts and refreshes itself while you use the app.`);
+      parts.push(`Using ${where}. It is kept between restarts and refreshes while you use the app.`);
       parts.push(
         expiresAt
-          ? `It is due to run out on ${formatExpiryDay(expiresAt)}. The app will tell you before then.`
-          : "It has no fixed end date, but YouTube can end a session at any time. The app will tell you the day it stops working.",
+          ? `It runs out on ${formatExpiryDay(expiresAt)}. The app warns you before then.`
+          : "It has no end date, but YouTube can end a session at any time. The app tells you when it stops working.",
       );
       break;
     case "expiring_soon":
       parts.push(
         expiresAt
           ? `This sign-in runs out on ${formatExpiryDay(expiresAt)}. Import a fresh cookies.txt before then to keep 1080p.`
-          : "This sign-in is about to run out. Import a fresh cookies.txt to keep 1080p.",
+          : "This sign-in runs out soon. Import a fresh cookies.txt to keep 1080p.",
       );
       break;
     case "expired":
       parts.push(
         expiresAt
-          ? `This sign-in ran out on ${formatExpiryDay(expiresAt)}. Without it YouTube serves 360p. Import a fresh cookies.txt.`
-          : "YouTube no longer accepts this sign-in, so it serves 360p. Import a fresh cookies.txt.",
+          ? `This sign-in ran out on ${formatExpiryDay(expiresAt)}. Without it YouTube gives 360p. Import a fresh cookies.txt.`
+          : "YouTube no longer accepts this sign-in and gives 360p. Import a fresh cookies.txt.",
       );
       break;
     case "not_signed_in":
-      parts.push("Sign in to unlock 1080p and higher.");
+      parts.push("Sign in to get 1080p and higher.");
       break;
     default:
-      parts.push("Checking your YouTube sign-in");
+      parts.push("Checking your sign-in");
   }
   if (notice) parts.push(notice);
   return parts.join(" ");
@@ -171,7 +171,7 @@ export default function YouTubeStatusChip() {
             }}
           >
             {conn.connected && status !== "expired"
-              ? "Import a fresh cookies.txt"
+              ? "Import new cookies.txt"
               : "Import cookies.txt"}
           </button>
           {conn.connected ? (
@@ -184,11 +184,11 @@ export default function YouTubeStatusChip() {
                 void checkConnection();
               }}
             >
-              Check with YouTube now
+              Check sign-in
             </button>
           ) : null}
           {/* The diagnostics log otherwise lives only inside the Connect
-              screen, which is hidden exactly when you are connected — i.e.
+              screen, which is hidden exactly when you are connected, i.e.
               whenever a download fails and the log is what you need. */}
           {window.electronAPI?.copyDiagnostics ? (
             <button
@@ -198,11 +198,11 @@ export default function YouTubeStatusChip() {
               onClick={async () => {
                 setMenuOpen(false);
                 const result = await window.electronAPI?.copyDiagnostics?.();
-                setCopied(result?.ok ? "Log copied" : "Copy failed");
+                setCopied(result?.ok ? "Log copied" : "Could not copy the log");
                 window.setTimeout(() => setCopied(""), 2500);
               }}
             >
-              Copy diagnostics log
+              Copy log
             </button>
           ) : null}
           {status !== "not_signed_in" ? (

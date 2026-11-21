@@ -113,12 +113,12 @@ export default function DownloadsPanel() {
   return (
     <div className="flex min-h-0 flex-col gap-3">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+        <div className="flex items-center gap-2 text-[12px] text-fg-dim">
           <Clock size={12} />
           <span>
             {downloads.length === 0
-              ? "No downloads yet"
-              : `${downloads.length} saved ${downloads.length === 1 ? "item" : "items"}`}
+              ? "Nothing saved yet"
+              : `${downloads.length} saved ${downloads.length === 1 ? "file" : "files"}`}
           </span>
         </div>
         {downloads.length > 0 && (
@@ -128,16 +128,16 @@ export default function DownloadsPanel() {
             className="btn text-[12px]"
           >
             <Trash size={12} />
-            <span>Clear all</span>
+            <span>Clear list</span>
           </button>
         )}
       </div>
 
       {cache && cache.bytes > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2">
-          <span className="min-w-0 text-[11px] text-fg-faint">
-            {formatBytes(cache.bytes)} of unfinished downloads kept so a failed
-            clip or export can carry on instead of starting over.
+        <div className="flex items-center justify-between gap-3 rounded-control border border-hairline bg-panel-raised px-3 py-2">
+          <span className="min-w-0 text-meta text-fg-dim">
+            {formatBytes(cache.bytes)} of partial downloads kept so a failed
+            cut or export can resume.
           </span>
           <button
             type="button"
@@ -146,15 +146,14 @@ export default function DownloadsPanel() {
             className="btn shrink-0 text-[12px]"
           >
             <Trash size={12} />
-            <span>{clearing ? "Clearing…" : "Clear unfinished"}</span>
+            <span>{clearing ? "Clearing…" : "Clear partials"}</span>
           </button>
         </div>
       )}
 
       {downloads.length === 0 ? (
-        <div className="rounded-row border border-dashed border-hairline px-3 py-6 text-center text-[12px] text-fg-faint">
-          Clips and exports you save will be listed here with a link straight to
-          their folder.
+        <div className="rounded-control border border-dashed border-hairline px-3 py-6 text-center text-[12px] text-fg-dim">
+          Saved clips and exports are listed here, with a shortcut to their folder.
         </div>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -167,7 +166,7 @@ export default function DownloadsPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.15 }}
-                className={`group flex items-center gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-2 ${
+                className={`group flex items-center gap-3 rounded-control border border-hairline bg-panel-raised px-3 py-2 ${
                   missing[entry.id] ? "opacity-60" : ""
                 }`}
               >
@@ -182,19 +181,19 @@ export default function DownloadsPanel() {
                   <span className="block truncate text-[12px] text-fg">
                     {entry.label}
                   </span>
-                  <span className="block truncate text-[10px] text-fg-faint">
+                  <span className="block truncate text-meta text-fg-dim">
                     {formatWhen(entry.savedAt)}
                     {entry.dir ? ` · ${labelForDir(entry.dir)}` : ""}
                     {entry.detail ? ` · ${entry.detail}` : ""}
                   </span>
                   {entry.path && (
-                    <span className="block truncate text-[10px] text-fg-faint">
+                    <span className="block truncate text-meta text-fg-dim">
                       {entry.path}
                     </span>
                   )}
                   {missing[entry.id] && (
-                    <span className="block text-[10px] text-fg-faint">
-                      File missing — moved or deleted outside the app
+                    <span className="block text-meta text-fg-dim">
+                      File missing. It was moved or deleted.
                     </span>
                   )}
                 </div>
@@ -203,16 +202,16 @@ export default function DownloadsPanel() {
                     type="button"
                     onClick={() => revealDownload(entry)}
                     className="btn shrink-0 text-[12px]"
-                    title="Show in folder"
+                    title="Show folder"
                   >
                     <FolderSymlink size={12} />
-                    <span>View</span>
+                    <span>Show folder</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => removeDownload(entry.id)}
-                  className="shrink-0 rounded p-1 text-fg-faint opacity-0 transition-opacity hover:text-accent group-hover:opacity-100"
+                  className="shrink-0 rounded p-1 text-fg-dim opacity-0 transition-opacity hover:text-accent group-hover:opacity-100"
                   title="Remove from list"
                   aria-label={`Remove ${entry.label} from list`}
                 >

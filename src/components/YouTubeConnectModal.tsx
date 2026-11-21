@@ -54,7 +54,7 @@ function Working({ label }: { label: string }) {
           aria-hidden
           className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-accent"
         />
-        <span className="min-w-0 flex-1 text-[12px] text-fg-muted">{label}</span>
+        <span className="min-w-0 flex-1 text-[12px] text-fg-dim">{label}</span>
       </div>
       <div className="relative mt-2 h-1 w-full overflow-hidden rounded-full bg-panel-raised">
         <motion.div
@@ -157,7 +157,7 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
         <div className="w-full max-w-[280px]">
           <div className="flex items-center gap-2 text-[12px] text-fg-dim">
             <ArrowRepeat className="animate-spin" size={12} />
-            Checking your YouTube sign-in…
+            Checking your sign-in…
           </div>
           <div className="relative mt-2 h-1 w-full overflow-hidden rounded-full bg-panel-raised">
             <motion.div
@@ -195,30 +195,30 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
     >
       {dragging ? (
         <div className="pointer-events-none absolute inset-4 z-10 flex items-center justify-center rounded-panel border-2 border-dashed border-accent bg-accent-card text-[16px] text-accent">
-          Drop your cookies.txt to sign in
+          Drop cookies.txt to sign in
         </div>
       ) : null}
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-panel border border-hairline bg-panel p-5 shadow-panel">
         <h2 id="youtube-connect-title" className="text-[20px] font-medium leading-tight">
-          {expired ? "Your YouTube sign-in expired" : "Sign in to YouTube"}
+          {expired ? "YouTube sign-in expired" : "Sign in to YouTube"}
         </h2>
         <p className="mt-2 text-[13px] leading-snug text-fg-dim">
           {expired
-            ? "YouTube serves 360p to a request without a valid sign-in. Import a fresh cookies.txt to get 1080p again."
-            : "Without a sign-in YouTube serves 360p. The sign-in stays on this computer, is read only by the downloader, and is never uploaded."}
+            ? "Without a valid sign-in YouTube gives 360p. Import a fresh cookies.txt to get 1080p back."
+            : "Without a sign-in YouTube gives 360p. The sign-in stays on this computer and is never uploaded."}
         </p>
 
         {state.busy && state.step ? <Working label={state.step} /> : null}
 
         <p className="mt-5 text-[13px] text-fg">
-          Not found automatically? Three steps, once:
+          Not found automatically. Three steps:
         </p>
         <ol className="mt-3 space-y-3">
           {step(
             1,
             `Install ${ext.extension} in ${ext.browserLabel}`,
             <>
-              From {ext.where}. It exports your cookies without sending them anywhere.
+              From {ext.where}. It exports cookies on this computer and sends them nowhere.
             </>,
           )}
           {step(
@@ -227,14 +227,14 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
             <>
               Open a private window, sign in to YouTube, then in the same tab go to
               youtube.com/robots.txt and export from there. Close the private
-              window afterwards so that session is never opened again. A session
-              you keep browsing in gets rotated and stops working within hours.
+              window afterwards. A session you keep browsing in rotates and
+              stops working within hours.
             </>,
           )}
           {step(
             3,
-            "Drop the file on this window",
-            <>Or choose it below. The format and the sign-in are checked straight away.</>,
+            "Drop the file here",
+            <>Or choose it below. The file and sign-in are checked at once.</>,
           )}
         </ol>
 
@@ -286,19 +286,18 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
         ) : null}
 
         <p className="mt-4 text-[12px] leading-snug text-fg-dim">
-          Once imported it is remembered, it refreshes itself each time you use
-          the app, and the app tells you the day it stops working. YouTube can
-          end a session at any time (a password change, or signing out
-          everywhere), so you may be asked again.
+          Once imported, the sign-in is kept and refreshed each time you use the
+          app. YouTube can end a session at any time, for example after a
+          password change or signing out everywhere. The app tells you when
+          that happens.
         </p>
 
         <div className="mt-5 border-t border-hairline pt-3">
           <p className="text-[12px] leading-snug text-fg-dim">
-            Or let the downloader read a browser's own cookies. Firefox works
-            reliably on macOS and Windows; Chrome and Chromium on Windows
-            cannot be read at all, because Chrome 127 encrypts its cookie
-            database against other programs. Cookies read this way are the
-            rotating kind, so expect to redo it.
+            Or read a browser's own cookies. Firefox works on macOS and Windows.
+            Chrome and Chromium on Windows cannot be read, because Chrome 127
+            encrypts its cookies. Cookies read this way rotate, so expect to
+            redo it.
           </p>
           <button
             type="button"
@@ -307,7 +306,7 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
             onClick={() => void sweepBrowsers()}
           >
             <Search size={16} />
-            Look in my browsers again
+            Check browsers again
           </button>
 
           <button
@@ -321,15 +320,14 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
             ) : (
               <ChevronRight size={12} />
             )}
-            Check one browser myself
+            Pick a browser
           </button>
 
           {showBrowserRoute ? (
             <div className="mt-3">
               <p className="text-[12px] leading-snug text-fg-dim">
-                Sign in to YouTube in that browser first and leave the tab
-                open. Quit the browser fully before checking — a running
-                browser holds its cookie database locked.
+                Sign in to YouTube in that browser and leave the tab open. Then
+                quit the browser fully. A running browser locks its cookies.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button

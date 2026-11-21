@@ -179,7 +179,7 @@ function DataChip({
                 close();
               }}
             >
-              Use this folder
+              Use folder
             </button>
           </div>
         </div>

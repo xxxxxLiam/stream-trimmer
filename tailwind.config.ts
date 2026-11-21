@@ -42,9 +42,6 @@ export default {
         fg: {
           DEFAULT: "#F5F5F7",
           dim: "#969697",
-          // TODO(Phase C): remove. Back-compat alias so components not yet
-          // migrated keep a readable muted colour instead of losing it.
-          muted: "#969697",
         },
         // Text inside disabled controls only (5.67:1 on panel).
         disabled: "#909092",
@@ -59,8 +56,6 @@ export default {
         panel: "14px",
         control: "8px",
         chip: "5px",
-        // Alias of control, kept for components not yet migrated.
-        row: "8px",
       },
       spacing: {
         // Control heights (spec section 2). Use as h-btn, h-row, size-icon...

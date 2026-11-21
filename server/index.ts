@@ -2509,38 +2509,28 @@ async function mapLimit<T, R>(
   return results;
 }
 
-// Optional local passcode gate: when a hash is baked into the build (or set in
-// a local .env during development), the exporter endpoint only answers
-// requests carrying the same hash.
-const DEFAULT_CHANNEL_PASSCODE_HASH =
-  "0cd257a54a58aa1c00862c07297225561f663bd746b5856c5e7dfaaa3d488add";
-
-function readPasscodeHash(): string {
-  const fromEnv = (process.env.CHANNEL_EXPORT_PASSCODE_HASH || "").trim();
-  if (fromEnv) return fromEnv;
+// Channel exporter: present only in builds made with VITE_ENABLE_CHANNEL_DATA
+// (the same flag that gates the UI). Without it the routes below are never
+// registered, so a public build has no such endpoint. No passcode, no header.
+// The packaged server has no .env, so scripts/build-server.cjs must bake this
+// variable in with an esbuild `define`.
+const CHANNEL_FLAG_RE = /^(1|true|yes|on)$/i;
+function readChannelFlag(): boolean {
+  const fromEnv = String(process.env.VITE_ENABLE_CHANNEL_DATA ?? "").trim();
+  if (fromEnv) return CHANNEL_FLAG_RE.test(fromEnv);
+  // `npm run dev:server` does not load .env, so read it there. Never in the packaged app.
+  if (process.env.ELECTRON_RESOURCES) return false;
   try {
     const raw = fs.readFileSync(path.join(process.cwd(), ".env"), "utf8");
-    const line = raw
-      .split(/\r?\n/)
-      .find((l) => l.startsWith("CHANNEL_EXPORT_PASSCODE_HASH="));
-    const fromFile = line ? line.split("=").slice(1).join("=").trim() : "";
-    if (fromFile) return fromFile;
+    const line = raw.split(/\r?\n/).find((l) => l.startsWith("VITE_ENABLE_CHANNEL_DATA="));
+    return CHANNEL_FLAG_RE.test((line ? line.split("=").slice(1).join("=") : "").trim());
   } catch {
-    // fall through to the baked-in hash
+    return false;
   }
-  return DEFAULT_CHANNEL_PASSCODE_HASH;
 }
+const CHANNEL_DATA_ENABLED = readChannelFlag();
 
-
-const CHANNEL_PASSCODE_HASH = readPasscodeHash();
-
-app.post("/api/channel/export", async (req: Request, res: Response) => {
-  if (
-    CHANNEL_PASSCODE_HASH &&
-    String(req.header("X-Channel-Key") || "").trim() !== CHANNEL_PASSCODE_HASH
-  ) {
-    return res.status(403).json({ error: "Channel exporter is locked." });
-  }
+if (CHANNEL_DATA_ENABLED) app.post("/api/channel/export", async (req: Request, res: Response) => {
   const parsed = channelExportSchema.safeParse(req.body);
   if (!parsed.success)
     return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -3071,14 +3061,14 @@ function cancelChannelJob(jobId: string) {
   job.children.clear();
 }
 
-app.post("/api/channel/export/cancel", (req: Request, res: Response) => {
+if (CHANNEL_DATA_ENABLED) app.post("/api/channel/export/cancel", (req: Request, res: Response) => {
   const jobId = String((req.body ?? {}).jobId || "");
   if (!jobId) return res.status(400).json({ error: "Missing jobId" });
   cancelChannelJob(jobId);
   res.json({ ok: true });
 });
 
-app.get("/api/channel/export/progress", (req: Request, res: Response) => {
+if (CHANNEL_DATA_ENABLED) app.get("/api/channel/export/progress", (req: Request, res: Response) => {
   const jobId = String(req.query.jobId || "");
   if (!jobId) return res.status(400).end();
   res.setHeader("Content-Type", "text/event-stream");

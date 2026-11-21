@@ -353,27 +353,29 @@ npm run release:linux   # on Linux (x64)
 
 [MIT](./LICENSE).
 
-## Channel exporter passcode
+## Channel data tool (private builds only)
 
-The channel profile exporter is gated by a passcode so it stays yours. Only a
-SHA-256 hash of the passcode is stored — never the passcode itself.
+The channel profile exporter is not part of the public app. There is no
+passcode. It is compiled in only when you build with a flag, so the downloads
+other people get contain no exporter screen and no exporter endpoint.
 
-1. Generate the hash:
+| Variable | Purpose |
+| --- | --- |
+| `VITE_ENABLE_CHANNEL_DATA` | Off by default. Set to `1` to build the tool in. |
+| `VITE_OWNER_SALT` | Any long random string, used to salt device hashes. |
+| `VITE_OWNER_MACHINES` | Comma-separated device hashes allowed to see the tool. `*` means any machine. |
 
-   ```bash
-   node -e "console.log(require('crypto').createHash('sha256').update('your-passcode').digest('hex'))"
-   ```
+1. Put the variables in a local `.env` (gitignored, see `.env.example`).
+2. Add a device: run `npm run machine-id` on that computer and append the hash it
+   prints to `VITE_OWNER_MACHINES`.
+3. Build your private copy by hand, for example
+   `VITE_ENABLE_CHANNEL_DATA=1 npm run dist:mac`.
 
-2. Put it in a local `.env` (gitignored, see `.env.example`):
+The public release workflow leaves `VITE_ENABLE_CHANNEL_DATA` empty on purpose.
+Your private build is separate from the auto-updating public release: rebuild it
+by hand when you want a newer one.
 
-   ```
-   VITE_CHANNEL_PASSCODE_HASH=<hash>
-   CHANNEL_EXPORT_PASSCODE_HASH=<hash>
-   ```
-
-3. For released builds, add the same hash as the GitHub repository secret
-   `CHANNEL_PASSCODE_HASH`; the release workflow injects it at build time.
-
-Builds without a hash hide the channel exporter tab completely. Note that this
-is a local gate: it keeps the feature out of other people's hands in practice,
-but a determined technical user could patch a desktop bundle they own.
+Honest limit: in a build that has the tool, the code is present and the device
+list is in the bundle, so someone with developer tools could find it. This is
+obscurity plus a device check, not a security boundary. Leaving the flag off is
+what removes the feature entirely.

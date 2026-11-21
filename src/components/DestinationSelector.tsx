@@ -17,8 +17,7 @@ export default function DestinationSelector() {
   if (!isElectron) {
     return (
       <div className="rounded-control border border-dashed border-hairline px-3 py-2 text-meta text-fg-dim">
-        Files save to your browser's Downloads folder. Install the desktop app to choose a
-        folder.
+        Files save to your browser's Downloads folder. Use the desktop app to pick a folder.
       </div>
     );
   }
@@ -33,7 +32,7 @@ export default function DestinationSelector() {
           {active ? `Data folder for ${active.name}` : "Data folder"}
         </span>
         <button type="button" className="btn" onClick={() => void change()}>
-          {dir ? "Change" : "Choose folder"}
+          {dir ? "Change folder" : "Choose folder"}
         </button>
       </div>
       {dir ? (
@@ -46,10 +45,10 @@ export default function DestinationSelector() {
       {dir && !folders.dataDirConfirmed && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-meta text-fg-dim">
-            Suggested, kept apart from your clips.
+            Suggested. Kept apart from your clips.
           </span>
           <button type="button" className="btn" onClick={confirmDataDir}>
-            Use this folder
+            Use folder
           </button>
         </div>
       )}

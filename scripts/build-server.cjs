@@ -42,11 +42,13 @@ esbuild
       "ffmpeg-static",
       "youtube-dl-exec",
     ],
-    // Bake the channel-exporter passcode hash into the packaged server; the
-    // packaged app has no .env to read at runtime.
+    // Bake the channel-exporter switch into the packaged server; the packaged
+    // app has no .env to read at runtime. Off by default, so a public build
+    // has no exporter routes at all — not disabled ones, absent ones. Only a
+    // build run with VITE_ENABLE_CHANNEL_DATA=1 registers them.
     define: {
-      "process.env.CHANNEL_EXPORT_PASSCODE_HASH": JSON.stringify(
-        process.env.CHANNEL_EXPORT_PASSCODE_HASH || "",
+      "process.env.VITE_ENABLE_CHANNEL_DATA": JSON.stringify(
+        process.env.VITE_ENABLE_CHANNEL_DATA || "",
       ),
     },
     logLevel: "info",

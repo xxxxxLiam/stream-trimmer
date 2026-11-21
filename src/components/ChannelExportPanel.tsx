@@ -36,29 +36,29 @@ function ProgressPanel() {
   const pct = total > 0 ? Math.min(100, (current / total) * 100) : 0;
   const phaseLabel =
     progress?.phase === "listing"
-      ? "Reading the channel listing"
+      ? "Reading the channel list"
       : progress?.phase === "metadata"
         ? `Video details ${current} of ${total}`
         : progress?.phase === "details"
-          ? `Comments & transcripts — video ${current + 1} of ${total}`
+          ? `Comments and transcripts, video ${current + 1} of ${total}`
           : "Working";
 
   return (
-    <div className="flex flex-col gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-3">
+    <div className="flex flex-col gap-2 rounded-control border border-hairline bg-panel-raised px-3 py-3">
       <div className="flex items-center gap-2 text-[12px] text-fg">
         <span className="truncate">{phaseLabel}</span>
         <button
           type="button"
           onClick={cancelExport}
-          className="btn ml-auto shrink-0 px-2 py-1 text-[11px]"
-          title="Stop and keep what's been collected"
+          className="btn ml-auto shrink-0 px-2 py-1 text-meta"
+          title="Stop and keep what is collected so far"
         >
           <X size={12} />
           <span>Stop</span>
         </button>
       </div>
       {progress?.label && (
-        <div className="truncate text-[11px] text-fg-faint">
+        <div className="truncate text-meta text-fg-dim">
           {progress.label}
         </div>
       )}
@@ -77,8 +77,8 @@ function ProgressPanel() {
           />
         )}
       </div>
-      <p className="text-[11px] text-fg-faint">
-        Stopping keeps everything collected so far and still writes the CSVs.
+      <p className="text-meta text-fg-dim">
+        Stop keeps everything collected so far and still writes the CSVs.
       </p>
     </div>
   );
@@ -126,7 +126,7 @@ export default function ChannelExportPanel() {
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+      <div className="flex items-center gap-2 text-[12px] text-fg-dim">
         <Broadcast size={13} />
         <span>Channel profile exporter</span>
       </div>
@@ -136,11 +136,11 @@ export default function ChannelExportPanel() {
         onChange={(e) => setChannelUrl(e.target.value)}
         placeholder="https://www.youtube.com/@channelhandle"
         spellCheck={false}
-        className="w-full rounded-row border border-hairline bg-panel-raised px-3 py-2 text-[13px] text-fg outline-none placeholder:text-fg-faint focus:border-accent/60"
+        className="w-full rounded-control border border-hairline bg-panel-raised px-3 py-2 text-[13px] text-fg outline-none placeholder:text-fg-dim focus:border-accent/60"
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-row border border-hairline bg-panel-raised p-0.5">
+        <div className="flex rounded-control border border-hairline bg-panel-raised p-0.5">
           {CONTENT_TYPES.map((t) => (
             <button
               key={t.value}
@@ -149,7 +149,7 @@ export default function ChannelExportPanel() {
               className={`rounded-chip px-2.5 py-1 text-[12px] transition-colors ${
                 contentType === t.value
                   ? "bg-accent text-white"
-                  : "text-fg-muted hover:text-fg"
+                  : "text-fg-dim hover:text-fg"
               }`}
             >
               {t.label}
@@ -157,9 +157,7 @@ export default function ChannelExportPanel() {
           ))}
         </div>
         <label
-          className={`flex items-center gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-1.5 text-[12px] ${
-            exportAll ? "text-fg-faint" : "text-fg-muted"
-          }`}
+          className="flex items-center gap-2 rounded-control border border-hairline bg-panel-raised px-3 py-1.5 text-[12px] text-fg-dim"
         >
           <span>Top</span>
           <input
@@ -169,7 +167,7 @@ export default function ChannelExportPanel() {
             value={limitText}
             disabled={exportAll}
             onChange={(e) => setLimitText(e.target.value)}
-            className="w-20 bg-transparent text-right tabular-nums text-fg outline-none disabled:text-fg-faint"
+            className="w-20 bg-transparent text-right tabular-nums text-fg outline-none disabled:text-disabled"
           />
           <span>by views</span>
         </label>
@@ -177,28 +175,28 @@ export default function ChannelExportPanel() {
           type="button"
           onClick={() => setExportAll(!exportAll)}
           aria-pressed={exportAll}
-          title="Export every video the channel lists, not just the top N"
-          className={`rounded-row border px-2.5 py-1.5 text-[12px] transition-colors ${
+          title="Export every video on the channel, not just the top N"
+          className={`rounded-control border px-2.5 py-1.5 text-[12px] transition-colors ${
             exportAll
               ? "border-accent bg-accent text-white"
-              : "border-hairline bg-panel-raised text-fg-muted hover:text-fg"
+              : "border-hairline bg-panel-raised text-fg-dim hover:text-fg"
           }`}
         >
           Everything
         </button>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-row border border-hairline bg-panel-raised px-3 py-2.5">
+      <div className="flex flex-col gap-2 rounded-control border border-hairline bg-panel-raised px-3 py-2.5">
         <div className="flex items-baseline gap-2">
           <span className="text-[12px] text-fg">What to export</span>
-          <span className="text-[11px] text-fg-faint">
-            one CSV each — untick what you don't need
+          <span className="text-meta text-fg-dim">
+            one CSV each. Untick what you don't need.
           </span>
         </div>
         {PART_INFO.map((part) => (
           <label
             key={part.key}
-            className="flex items-start gap-2 text-[12px] text-fg-muted"
+            className="flex items-start gap-2 text-[12px] text-fg-dim"
           >
             <input
               type="checkbox"
@@ -210,37 +208,37 @@ export default function ChannelExportPanel() {
               <span className={parts[part.key] ? "text-fg" : undefined}>
                 {part.label}
               </span>
-              <span className="text-fg-faint"> — {part.hint}</span>
+              <span className="text-fg-dim">, {part.hint}</span>
             </span>
           </label>
         ))}
         {!anyPartSelected(parts) && (
-          <p className="text-[11px] text-accent">
-            Nothing selected — pick at least one.
+          <p className="text-meta text-accent">
+            Nothing selected. Tick at least one.
           </p>
         )}
         {!parts.videoDetails && limit === "all" && (
-          <p className="text-[11px] leading-relaxed text-fg-faint">
-            Skipping video details also skips a yt-dlp call per video, so this
-            run is much faster than a full one.
+          <p className="text-meta leading-relaxed text-fg-dim">
+            Without video details the run skips one lookup per video and
+            finishes much faster.
           </p>
         )}
         {!parts.videoDetails && limit !== "all" && (
-          <p className="text-[11px] leading-relaxed text-fg-faint">
+          <p className="text-meta leading-relaxed text-fg-dim">
             A "Top {limit === null ? "N" : limit} by views" run still reads view
-            counts to rank on — they just won't be written to a CSV. Choose
-            Everything to skip that work too.
+            counts to rank the videos. They are not written to a CSV. Choose
+            Everything to skip that too.
           </p>
         )}
-        <p className="text-[11px] leading-relaxed text-fg-faint">
-          summary.csv and video-status.csv are always written — they're a few
-          kilobytes, and they're how you tell what the run actually did.
+        <p className="text-meta leading-relaxed text-fg-dim">
+          summary.csv and video-status.csv are always written. They are a few
+          kilobytes and show what the run did.
         </p>
       </div>
 
       <label
-        className="flex items-center gap-2 text-[12px] text-fg-muted"
-        title="An interrupted export normally picks up where it stopped. Tick this to collect every video again from scratch."
+        className="flex items-center gap-2 text-[12px] text-fg-dim"
+        title="A stopped export picks up where it left off. Tick this to collect every video again."
       >
         <input
           type="checkbox"
@@ -248,23 +246,22 @@ export default function ChannelExportPanel() {
           onChange={(e) => setFresh(e.target.checked)}
           className="accent-accent"
         />
-        <span>Start fresh (ignore saved progress)</span>
+        <span>Start over (ignore saved progress)</span>
       </label>
 
       {heavy && (
-        <div className="rounded-row border border-hairline bg-panel-raised px-3 py-2 text-[11px] leading-relaxed text-fg-faint">
+        <div className="rounded-control border border-hairline bg-panel-raised px-3 py-2 text-meta leading-relaxed text-fg-dim">
           {isElectron ? (
             <>
-              A run this size takes hours. Rows are written to disk as they're
-              collected rather than held in memory, and progress is saved per
-              video — stop whenever you like and the next run carries on from
-              where it left off.
+              A run this size takes hours. Rows are written to disk as they are
+              collected and progress is saved per video. Stop any time and the
+              next run carries on from where it left off.
             </>
           ) : (
             <>
-              In the browser the whole export is assembled in memory before it
-              downloads, so a few thousand videos with transcripts on can
-              exhaust it. Use the desktop app for a whole-channel export.
+              The browser holds the whole export in memory before it downloads,
+              so a few thousand videos with transcripts can run it out. Use the
+              desktop app for a whole channel.
             </>
           )}
         </div>
@@ -274,7 +271,7 @@ export default function ChannelExportPanel() {
 
       {error && (
         <div
-          className="rounded-row border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-accent"
+          className="rounded-control border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-accent"
           role="alert"
         >
           {error}
@@ -291,21 +288,21 @@ export default function ChannelExportPanel() {
           className="btn-primary self-start text-[12px]"
         >
           <Download size={12} />
-          <span>Export channel data</span>
+          <span>Export channel</span>
         </button>
       )}
 
       {result && (
-        <div className="flex items-start gap-3 rounded-row border border-hairline bg-panel-raised px-3 py-3">
+        <div className="flex items-start gap-3 rounded-control border border-hairline bg-panel-raised px-3 py-3">
           <CheckCircleFill size={15} className="mt-0.5 shrink-0 text-accent" />
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-[13px] text-fg">
-              {result.cancelled ? "Partial export saved" : "Export complete"}
+              {result.cancelled ? "Partial export saved" : "Export saved"}
             </span>
-            <span className="truncate text-[11px] text-fg-faint">
+            <span className="truncate text-meta text-fg-dim">
               {result.folder}
             </span>
-            <span className="text-[11px] text-fg-faint">
+            <span className="text-meta text-fg-dim">
               {[
                 `${result.videos} videos`,
                 result.parts.comments && `${result.comments} comments`,
@@ -324,13 +321,13 @@ export default function ChannelExportPanel() {
                 className="btn text-[12px]"
               >
                 <FolderSymlink size={12} />
-                <span>Open folder</span>
+                <span>Show folder</span>
               </button>
             )}
             <button
               type="button"
               onClick={dismissResult}
-              className="rounded-chip p-1 text-fg-faint hover:bg-panel-hover hover:text-fg"
+              className="rounded-chip p-1 text-fg-dim hover:bg-panel-hover hover:text-fg"
               aria-label="Dismiss"
             >
               <X size={14} />
@@ -339,17 +336,16 @@ export default function ChannelExportPanel() {
         </div>
       )}
 
-      <p className="text-[11px] leading-relaxed text-fg-faint">
-        Everything here is public data read locally with yt-dlp — views, likes,
-        comment counts, comment text, and captions. Dislikes are not published
-        by YouTube and can't be exported.{" "}
+      <p className="text-meta leading-relaxed text-fg-dim">
+        Reads public data on this computer: views, likes, comment counts,
+        comment text and captions. YouTube does not publish dislikes.{" "}
         {limit === null
           ? "Set how many videos to export above."
           : limit === "all"
-            ? `Exporting ${describeChannelLimit(limit)} takes roughly ${perVideoSeconds} seconds per video, so a few thousand videos is a run of several hours.`
-            : `A run of ${describeChannelLimit(limit)} takes roughly ${minutes} minutes.`}{" "}
-        It can be stopped at any point; videos with comments disabled or no
-        captions are noted in video-status.csv.
+            ? `Exporting ${describeChannelLimit(limit)} takes about ${perVideoSeconds} seconds per video. A few thousand videos is several hours.`
+            : `A run of ${describeChannelLimit(limit)} takes about ${minutes} minutes.`}{" "}
+        Stop any time. Videos with comments off or no captions are listed in
+        video-status.csv.
       </p>
     </div>
   );

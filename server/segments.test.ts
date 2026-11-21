@@ -38,6 +38,8 @@ import {
   type JoinDeps,
 } from "./segments";
 import { startHarness, type Harness } from "./testSupport/exportHarness";
+import { acquireCookiePath } from "./cookieJar";
+import { CLIP_PREFIX, clearCache } from "./resumeCache";
 
 // --- the request ----------------------------------------------------------
 
@@ -530,7 +532,7 @@ test("no segment file, list or private cookie copy is left behind on success", a
   assert.deepEqual(fs.readdirSync(dir), ["clip.mp4"]);
   const leaked = fs
     .readdirSync(serverTmp(harness))
-    .filter((n) => n.startsWith("ytclip-cookies-"));
+    .filter((n) => n.startsWith("ytcookie-"));
   assert.deepEqual(leaked, []);
 });
 
@@ -551,12 +553,12 @@ test("a failed segment keeps its partial download and leaves nothing else", asyn
 
   const work = fs
     .readdirSync(serverTmp(harness))
-    .filter((n) => n.startsWith("ytclip-") && !n.startsWith("ytclip-cookies-"));
+    .filter((n) => n.startsWith("ytclip-"));
   assert.equal(work.length, 1, work.join());
   const files = fs.readdirSync(path.join(serverTmp(harness), work[0]));
   assert.deepEqual(files, ["seg-02.mp4.part"]);
   assert.deepEqual(
-    fs.readdirSync(serverTmp(harness)).filter((n) => n.startsWith("ytclip-cookies-")),
+    fs.readdirSync(serverTmp(harness)).filter((n) => n.startsWith("ytcookie-")),
     [],
   );
 });
@@ -623,4 +625,33 @@ test("asking for 360p and getting 360p is not a warning", async (t) => {
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.headers.get("X-Quality-Cause"), null);
   assert.equal(r.body.warning, undefined);
+});
+
+test("clearing the clip cache never removes a cookie copy a download is using", async () => {
+  // A cookie copy used to be named ytclip-cookies-*, which clearCache() and the
+  // stale sweep treated as a clip work folder, so it could be deleted mid-download.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ytcookie-root-"));
+  const canonical = path.join(root, "yt-cookies.txt");
+  fs.writeFileSync(canonical, "# Netscape HTTP Cookie File\n");
+  const prevTmp = process.env.TMPDIR;
+  const tmp = path.join(root, "tmp");
+  fs.mkdirSync(tmp);
+  process.env.TMPDIR = tmp;
+  let lease: Awaited<ReturnType<typeof acquireCookiePath>> | null = null;
+  try {
+    lease = await acquireCookiePath({ canonicalPath: canonical, tmpRoot: tmp, refresher: false });
+    const work = path.join(tmp, `${CLIP_PREFIX}abc123`);
+    fs.mkdirSync(work);
+    assert.ok(!path.basename(path.dirname(lease.path)).startsWith(CLIP_PREFIX));
+
+    const { removed } = clearCache();
+    assert.equal(removed, 1, "only the clip work folder is removed");
+    assert.ok(fs.existsSync(lease.path), "the live cookie copy survives");
+    assert.ok(!fs.existsSync(work));
+  } finally {
+    await lease?.release(false);
+    if (prevTmp === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = prevTmp;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
