@@ -17,7 +17,8 @@ const { execFileSync } = require("node:child_process");
 
 const REPO = "/home/user/stream-trimmer";
 const channel = process.argv.includes("--channel");
-const MIRROR = channel ? "/tmp/f-app-channel" : "/tmp/f-app";
+const nonOwner = process.argv.includes("--non-owner");
+const MIRROR = nonOwner ? "/tmp/f-app-channel-nonowner" : channel ? "/tmp/f-app-channel" : "/tmp/f-app";
 
 fs.rmSync(MIRROR, { recursive: true, force: true });
 fs.mkdirSync(path.join(MIRROR, "electron"), { recursive: true });
@@ -35,7 +36,12 @@ if (fs.existsSync(path.join(REPO, "resources"))) {
 }
 
 const env = { ...process.env };
-if (channel) {
+if (nonOwner) {
+  // Built WITH the exporter but this machine is not an owner machine.
+  env.VITE_ENABLE_CHANNEL_DATA = "1";
+  env.VITE_OWNER_MACHINES = "0000000000000000000000000000000000000000000000000000000000000000";
+  env.VITE_OWNER_SALT = "audit-salt";
+} else if (channel) {
   env.VITE_ENABLE_CHANNEL_DATA = "1";
   env.VITE_OWNER_MACHINES = "*";
   env.VITE_OWNER_SALT = "audit-salt";

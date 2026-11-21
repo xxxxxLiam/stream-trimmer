@@ -100,6 +100,14 @@ async function boot(opts) {
     null,
     { timeout: 30000 },
   );
+  if (!opts.signedOut) {
+    // The connect / "Checking your sign-in…" overlay sits over the workspace.
+    await a.win.waitForFunction(
+      () => !document.querySelector("div.fixed.inset-0.z-50"),
+      null,
+      { timeout: 45000 },
+    );
+  }
   return a;
 }
 

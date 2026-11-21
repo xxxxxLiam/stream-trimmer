@@ -109,9 +109,19 @@ const VID = "trans000001";
   console.log("  cross-line phrase counter:", await a.win.locator("#ui-col-transcript span.w-12").locator("visible=true").first().innerText());
   // a query with no hits
   await search.fill("zzzz-not-present");
-  await a.win.waitForTimeout(1000);
-  console.log("  no-hit counter:", await a.win.locator("#ui-col-transcript span.w-12").locator("visible=true").first().innerText());
-  console.log("  no-hit message:", await a.win.locator("#ui-col-transcript").locator("visible=true").first().innerText().then((t) => t.split("\n").find((l) => l.includes("No lines match")) || "(none)"));
+  await a.win.waitForTimeout(1500);
+  console.log("  no-hit:", JSON.stringify(await a.win.evaluate(() => {
+    const col = Array.from(document.querySelectorAll('#ui-col-transcript')).find((e) => e.offsetParent !== null);
+    if (!col) return { columnGone: true, body: document.body.innerText.slice(0, 200) };
+    const counter = col.querySelector('span.w-12');
+    return {
+      counter: counter ? counter.innerText : null,
+      counterVisible: counter ? counter.offsetParent !== null : null,
+      message: (col.innerText.split('\n').find((l) => l.includes('No lines match')) || '(none)'),
+      rows: col.querySelectorAll('[data-line]').length,
+    };
+  })));
+  console.log("  pageErrors:", JSON.stringify(a.logs.pageErrors.slice(-2)));
   console.log("shot:", await a.shot("search-no-hits"));
   await search.fill("");
   await a.win.waitForTimeout(800);

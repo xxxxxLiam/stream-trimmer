@@ -4,6 +4,11 @@
  */
 async function loadVideo(a, url = "https://www.youtube.com/watch?v=stub0000001") {
   const box = a.win.locator('input[placeholder*="youtube" i], input[placeholder*="link" i], input[type="url"]').first();
+  if ((await box.count()) === 0) {
+    // Already loaded: the paste box is replaced by the source chip.
+    await a.win.waitForTimeout(500);
+    return;
+  }
   await box.fill(url);
   await box.press("Enter");
   // Wait for the duration readout to stop being 00:00:00.
@@ -61,6 +66,14 @@ async function cut(a, waitMs = 40000) {
       if (b) b.click();
     });
     await a.win.waitForTimeout(250);
+  }
+  if (await a.win.locator("#ui-cut").isDisabled()) {
+    const why = await a.win.evaluate(() => ({
+      title: document.querySelector("#ui-cut")?.getAttribute("title"),
+      overlap: document.querySelector("#ui-overlap-warning")?.innerText.replace(/\n+/g, " | ") ?? null,
+      statuses: Array.from(document.querySelectorAll('[role="status"]')).map((e) => e.innerText.trim()).slice(0, 6),
+    }));
+    return { ok: false, why: "Cut is disabled: " + JSON.stringify(why) };
   }
   await a.win.click("#ui-cut");
   const deadline = Date.now() + waitMs;

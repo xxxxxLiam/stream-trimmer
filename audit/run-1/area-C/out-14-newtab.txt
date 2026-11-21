@@ -1,0 +1,8 @@
+[C14:A] bank view: ["This video","Bank","All saved","Import timestamps","0 clips","Sort by tier"]
+[C14:A] before New tab: shot /home/user/stream-trimmer/audit/out/area-C/C14-newtab-A/01-before-new-tab.png
+[C14:A] after New tab: {"rootChildren":1,"header":true,"text":"Stub video\nNew tab\nCampaign\nAcme Q4\nReload\nCopy blocks\nSymbols\nChannel data\nNot signed in\nCheck\nTranscript\nFollow\nSearch"}
+[C14:A] pageErrors: []
+[C14:A] shot: /home/user/stream-trimmer/audit/out/area-C/C14-newtab-A/02-after-new-tab.png
+[C14:A] 6s later root children: 1
+[C14:A] bank on disk after the crash: {}
+FAIL page.waitForSelector: Timeout 30000ms exceeded.
