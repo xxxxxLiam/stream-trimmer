@@ -99,9 +99,9 @@ export default function AppHeader(p: AppHeaderProps) {
 
   return (
     <header className="relative z-30 flex min-h-header flex-wrap items-center gap-x-2 gap-y-1 border-b border-hairline px-3 py-1">
-      <div className="flex items-center gap-2 pr-1" aria-label="Clipper">
+      {/* Mark only, no wordmark. role+label so it still has an accessible name. */}
+      <div className="flex items-center pr-1" role="img" aria-label="Clipper">
         <BrandMark size={18} />
-        <span className="text-section">Clipper</span>
       </div>
 
       <CampaignChip menu={p.campaignMenu} />
