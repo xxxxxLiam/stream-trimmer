@@ -142,10 +142,9 @@ export function normalizeEditorSettings(raw: unknown): EditorHandoffSettings {
     mediaEvent: typeof r.mediaEvent === "string" ? r.mediaEvent : "",
     projectEvent: typeof r.projectEvent === "string" ? r.projectEvent : "",
     createProject: r.createProject === true,
+    // A blank pattern is kept as typed (so the field can be edited); naming falls back to the default.
     projectNamePattern:
-      typeof r.projectNamePattern === "string" && r.projectNamePattern.trim()
-        ? r.projectNamePattern
-        : DEFAULT_PROJECT_PATTERN,
+      typeof r.projectNamePattern === "string" ? r.projectNamePattern : DEFAULT_PROJECT_PATTERN,
     timelineFormat: normalizeTimeline(r.timelineFormat),
   };
 }

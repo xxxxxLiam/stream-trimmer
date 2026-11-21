@@ -14,11 +14,16 @@
  *   `runAfterCutting` is exported for the cut flow to call once a clip is saved.
  *   No filled-accent button here: the primary action belongs to the screen.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
+  FRAME_RATE_CHOICES,
   buildSessionFcpxml,
+  libraryLocation,
   resolveEventName,
+  resolveProjectNames,
   type AfterCutting,
+  type FcpxmlProject,
+  type TimelineKind,
   type EditorHandoffSettings,
   type RawProbe,
   type SessionClip,
@@ -43,6 +48,55 @@ function bridge(): EditorBridge | undefined {
 
 const NEEDS_DESKTOP = "This needs the desktop app.";
 
+// ---------------------------------------------------------------------------
+// The project name for the NEXT clip, typed before cutting. It usually comes
+// from the user's own notes, so it is a draft kept outside the settings: it is
+// used once by the next saved clip and then cleared.
+// ---------------------------------------------------------------------------
+
+let nextProjectName = "";
+const nameListeners = new Set<() => void>();
+
+export function setNextProjectName(name: string): void {
+  nextProjectName = name;
+  nameListeners.forEach((l) => l());
+}
+
+/** Project names typed for clips already cut, by clip id (this session only). */
+const typedProjectNames = new Map<string, string>();
+
+function takeNextProjectName(): string {
+  const n = nextProjectName.trim();
+  if (nextProjectName) setNextProjectName("");
+  return n;
+}
+
+function useNextProjectName(): string {
+  return useSyncExternalStore(
+    (cb) => {
+      nameListeners.add(cb);
+      return () => nameListeners.delete(cb);
+    },
+    () => nextProjectName,
+  );
+}
+
+/** The project block for the document, or undefined when no project is wanted. */
+export function projectOptions(
+  settings: EditorHandoffSettings,
+  ctx: { campaignName?: string; sourceTitle?: string },
+): FcpxmlProject | undefined {
+  const eventName = settings.projectEvent.trim();
+  if (!settings.createProject || !eventName) return undefined;
+  return {
+    eventName,
+    namePattern: settings.projectNamePattern,
+    timeline: settings.timelineFormat,
+    campaignName: ctx.campaignName,
+    sourceTitle: ctx.sourceTitle,
+  };
+}
+
 export interface HandoffContext {
   campaignName?: string;
   sourceTitle?: string;
@@ -63,6 +117,7 @@ export interface HandoffOutcome {
 export async function exportFcpxml(
   ctx: HandoffContext,
   openWith?: "finalcut" | "premiere",
+  settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
   const api = bridge();
   if (!api) return { ok: false, message: NEEDS_DESKTOP };
@@ -77,7 +132,7 @@ export async function exportFcpxml(
     campaignName: ctx.campaignName,
     sourceTitle: ctx.sourceTitle,
   });
-  return exportNamed(api, ctx, eventName, openWith);
+  return exportNamed(api, ctx, eventName, openWith, settings);
 }
 
 async function exportNamed(
@@ -85,14 +140,29 @@ async function exportNamed(
   ctx: HandoffContext,
   eventName: string,
   openWith?: "finalcut" | "premiere",
+  settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
+  // Premiere has bins, not events or libraries, so it gets the plain one-event
+  // file; the library and project structure is only written for Final Cut and
+  // for a plain export.
+  const structured = settings && openWith !== "premiere" ? settings : undefined;
+  const clips = ctx.clips.map((c) =>
+    !c.projectName && typedProjectNames.has(c.id) ? { ...c, projectName: typedProjectNames.get(c.id) } : c,
+  );
   let built;
   try {
-    built = await buildSessionFcpxml(ctx.clips, eventName, async (file) => {
-      const r = await api.probe(file);
-      if (!r.ok) throw new Error(r.error);
-      return r;
-    });
+    const library = structured?.fcpLibrary.trim() || undefined;
+    if (library) libraryLocation(library); // throws on a relative path before anything runs
+    built = await buildSessionFcpxml(
+      clips,
+      structured?.mediaEvent.trim() || eventName,
+      async (file) => {
+        const r = await api.probe(file);
+        if (!r.ok) throw new Error(r.error);
+        return r;
+      },
+      { library, project: structured ? projectOptions(structured, ctx) : undefined },
+    );
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
@@ -105,8 +175,12 @@ async function exportNamed(
     return { ok: false, message: written.error ?? "The editor file could not be saved.", skipped: built.skipped };
   }
   const count = `${built.included} ${built.included === 1 ? "clip" : "clips"}`;
+  const projects =
+    built.projectNames.length > 0
+      ? ` and ${built.projectNames.length} ${built.projectNames.length === 1 ? "project" : "projects"}`
+      : "";
   if (!openWith) {
-    return { ok: true, message: `Saved ${built.filename} with ${count}.`, skipped: built.skipped, path: written.path };
+    return { ok: true, message: `Saved ${built.filename} with ${count}${projects}.`, skipped: built.skipped, path: written.path };
   }
   const opened = await api.openWith({ app: openWith, file: written.path });
   if (!opened.ok) {
@@ -114,7 +188,7 @@ async function exportNamed(
   }
   return {
     ok: true,
-    message: `Saved ${built.filename} with ${count} and sent it to ${openWith === "finalcut" ? "Final Cut Pro" : "Premiere Pro"}.`,
+    message: `Saved ${built.filename} with ${count}${projects} and sent it to ${openWith === "finalcut" ? "Final Cut Pro" : "Premiere Pro"}.`,
     skipped: built.skipped,
     path: written.path,
   };
@@ -132,6 +206,12 @@ export async function runAfterCutting(
   const notes: string[] = [];
   let outcome: HandoffOutcome | null = null;
 
+  // The name typed before this cut belongs to the clip just saved, once. It is
+  // remembered by clip id so a later "Send all" still uses it.
+  const typed = takeNextProjectName();
+  const justSaved = ctx.clips[ctx.clips.length - 1];
+  if (typed && justSaved) typedProjectNames.set(justSaved.id, typed);
+
   if (settings.afterCutting === "reveal") {
     const last = ctx.clips[ctx.clips.length - 1];
     if (api && last) {
@@ -145,7 +225,7 @@ export async function runAfterCutting(
       campaignName: ctx.campaignName,
       sourceTitle: ctx.sourceTitle,
     });
-    outcome = await exportNamed(api, ctx, eventName, settings.afterCutting);
+    outcome = await exportNamed(api, ctx, eventName, settings.afterCutting, settings);
   }
 
   if (api && settings.capcutDropDir && ctx.clips.length > 0) {
@@ -205,6 +285,25 @@ export default function EditorHandoff({
 
   const ctx: HandoffContext = { campaignName, sourceTitle, clipsDir, clips };
   const eventName = resolveEventName({ from: settings.eventName, campaignName, sourceTitle });
+  const nextName = useNextProjectName();
+  const projectOn = settings.createProject && settings.projectEvent.trim() !== "";
+  const libraryText = settings.fcpLibrary.trim();
+  let libraryProblem = "";
+  if (libraryText) {
+    try {
+      libraryLocation(libraryText);
+      if (!/\.fcpbundle\/?$/i.test(libraryText)) libraryProblem = "This does not end in .fcpbundle. Check it points at the library itself.";
+    } catch {
+      libraryProblem = "Use the full path of the library, starting with /.";
+    }
+  }
+  const previewNames = projectOn
+    ? resolveProjectNames(clips.slice(-3), {
+        namePattern: settings.projectNamePattern,
+        campaignName,
+        sourceTitle,
+      })
+    : [];
   const hasClips = clips.length > 0;
   const noClipsReason = hasClips ? undefined : "No clips yet";
 
@@ -280,7 +379,9 @@ export default function EditorHandoff({
             <p className="t-meta m-0">
               {settings.afterCutting === "premiere"
                 ? "Premiere reads the same file. Clip names and media links come across; the notes with the source link and timecodes may not show. "
-                : "Final Cut places the event in the library that is open. "}
+                : settings.fcpLibrary.trim()
+                  ? "Final Cut is told which library to use (set below). "
+                  : "No library is set, so Final Cut uses its own default. With several libraries open, set one below. "}
               DaVinci Resolve reads this file too.
             </p>
           )}
@@ -298,6 +399,157 @@ export default function EditorHandoff({
             <span className="t-meta" dir="auto">{eventName}</span>
           </label>
 
+          <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+            <h3 className="text-body m-0">Final Cut Pro library and events</h3>
+            <label className="flex flex-col gap-1">
+              <span className="text-body">Library</span>
+              <div className="flex items-center gap-2">
+                <input
+                  className="field min-w-0 flex-1"
+                  dir="auto"
+                  placeholder="/Users/you/Movies/Client.fcpbundle"
+                  value={settings.fcpLibrary}
+                  onChange={(e) => set({ fcpLibrary: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    const dir = await window.electronAPI?.pickDirectory?.();
+                    if (dir) set({ fcpLibrary: dir });
+                  }}
+                >
+                  Choose
+                </button>
+              </div>
+              <span className={libraryProblem ? "text-body" : "t-meta"} role={libraryProblem ? "alert" : undefined}>
+                {libraryProblem ||
+                  (libraryText
+                    ? "Every import is aimed at this library, whichever one is active."
+                    : "Blank means Final Cut picks the library. Set this if you keep several open.")}
+              </span>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-body">Event for the raw clip</span>
+              <input
+                className="field"
+                dir="auto"
+                placeholder={eventName}
+                value={settings.mediaEvent}
+                onChange={(e) => set({ mediaEvent: e.target.value })}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-body">
+              <input
+                type="checkbox"
+                checked={settings.createProject}
+                onChange={(e) => set({ createProject: e.target.checked })}
+              />
+              Also create a project with the clip on its timeline
+            </label>
+            {settings.createProject && (
+              <>
+                <label className="flex flex-col gap-1">
+                  <span className="text-body">Event for the projects</span>
+                  <input
+                    className="field"
+                    dir="auto"
+                    value={settings.projectEvent}
+                    onChange={(e) => set({ projectEvent: e.target.value })}
+                  />
+                  {!settings.projectEvent.trim() && (
+                    <span className="t-meta">Blank means no project is created.</span>
+                  )}
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-body">Project name</span>
+                  <input
+                    className="field"
+                    dir="auto"
+                    value={settings.projectNamePattern}
+                    onChange={(e) => set({ projectNamePattern: e.target.value })}
+                  />
+                  <span className="t-meta">
+                    Use {"{clipId}"}, {"{label}"}, {"{campaign}"} and {"{source}"}.
+                    {previewNames.length > 0 ? ` Now: ${previewNames.join(", ")}` : ""}
+                  </span>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-body">Name for the next clip</span>
+                  <input
+                    className="field"
+                    dir="auto"
+                    placeholder="Leave blank to use the pattern"
+                    value={nextName}
+                    onChange={(e) => setNextProjectName(e.target.value)}
+                  />
+                  <span className="t-meta">Type it before you cut. It applies to that clip only.</span>
+                </label>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-body">Timeline</span>
+                    <select
+                      className="field"
+                      value={settings.timelineFormat.kind}
+                      onChange={(e) => {
+                        const kind = e.target.value as TimelineKind;
+                        const fps = kind !== "source" && settings.timelineFormat.fps === "source" ? "30" : settings.timelineFormat.fps;
+                        set({ timelineFormat: { ...settings.timelineFormat, kind, fps } });
+                      }}
+                    >
+                      <option value="vertical">Vertical 1080 x 1920</option>
+                      <option value="source">Match source</option>
+                      <option value="custom">Custom size</option>
+                    </select>
+                  </label>
+                  {settings.timelineFormat.kind === "custom" && (
+                    <>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-body">Width</span>
+                        <input
+                          className="field w-24"
+                          inputMode="numeric"
+                          value={settings.timelineFormat.width}
+                          onChange={(e) => set({ timelineFormat: { ...settings.timelineFormat, width: Number(e.target.value.replace(/\D/g, "")) } })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-body">Height</span>
+                        <input
+                          className="field w-24"
+                          inputMode="numeric"
+                          value={settings.timelineFormat.height}
+                          onChange={(e) => set({ timelineFormat: { ...settings.timelineFormat, height: Number(e.target.value.replace(/\D/g, "")) } })}
+                        />
+                      </label>
+                    </>
+                  )}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-body">Frame rate</span>
+                    <select
+                      className="field"
+                      value={settings.timelineFormat.fps}
+                      onChange={(e) => set({ timelineFormat: { ...settings.timelineFormat, fps: e.target.value } })}
+                    >
+                      {settings.timelineFormat.kind === "source" && <option value="source">Same as source</option>}
+                      {FRAME_RATE_CHOICES.map((r) => (
+                        <option key={r} value={r}>
+                          {r} fps
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <span className="t-meta">
+                  The timeline never copies the source unless you choose Match source.
+                </span>
+              </>
+            )}
+            <p className="t-meta m-0">
+              Premiere Pro uses bins, not events or libraries, so it gets the plain clip only.
+            </p>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -308,7 +560,7 @@ export default function EditorHandoff({
                 void run(async () => {
                   const api = bridge();
                   if (!api) return { ok: false, message: NEEDS_DESKTOP };
-                  return exportNamed(api, ctx, eventName);
+                  return exportNamed(api, ctx, eventName, undefined, settings);
                 })
               }
             >
@@ -340,8 +592,8 @@ export default function EditorHandoff({
             </button>
           </div>
           <p className="t-meta m-0">
-            Send all puts every clip from this session into one event
-            {hasClips ? ` (${clips.length})` : ""}.
+            Send all puts every clip from this session into one file
+            {hasClips ? ` (${clips.length})` : ""}{projectOn ? ", each with its own project" : ""}.
           </p>
 
           <div className="flex flex-col gap-2 border-t border-hairline pt-3">
@@ -416,6 +668,6 @@ export default function EditorHandoff({
   function runSend(app: "finalcut" | "premiere"): Promise<HandoffOutcome> {
     const api = bridge();
     if (!api) return Promise.resolve({ ok: false, message: NEEDS_DESKTOP });
-    return exportNamed(api, ctx, eventName, app);
+    return exportNamed(api, ctx, eventName, app, settings);
   }
 }

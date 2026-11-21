@@ -13,8 +13,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
+  DEFAULT_EDITOR_SETTINGS,
   buildFcpxml,
   buildSessionFcpxml,
+  libraryLocation,
+  normalizeTimeline,
+  projectNameFor,
+  resolveProjectNames,
+  resolveTimeline,
+  type FcpxmlProject,
   clipName,
   clipNotes,
   fcpxmlFilename,
@@ -58,7 +65,7 @@ function clip(over: Partial<FcpClip> = {}): FcpClip {
 const DTD = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "fcpxml-1.10.dtd");
 const hasXmllint = spawnSync("xmllint", ["--version"]).status === 0;
 
-/** Validate against the Apple DTD excerpt; returns xmllint's complaint or "". */
+/** Validate against Apple's full FCPXML 1.10 DTD; returns xmllint's complaint or "". */
 function validate(xml: string): string {
   const dir = mkdtempSync(join(tmpdir(), "fcpxml-"));
   const file = join(dir, "t.fcpxml");
@@ -286,7 +293,7 @@ test("awkward names produce well-formed XML that parses back to the originals", 
   if (hasXmllint) {
     assert.equal(validate(xml), "");
     // Re-read the attributes through a real XML parser: the names must round-trip.
-    const py = "import sys,json,xml.etree.ElementTree as E;r=E.fromstring(sys.stdin.buffer.read());print(json.dumps([r.find('event').get('name')]+[a.get('name') for a in r.iter('asset-clip')]+[m.get('src') for m in r.iter('media-rep')],ensure_ascii=False))";
+    const py = "import sys,json,xml.etree.ElementTree as E;r=E.fromstring(sys.stdin.buffer.read());print(json.dumps([next(r.iter('event')).get('name')]+[a.get('name') for a in r.iter('asset-clip')]+[m.get('src') for m in r.iter('media-rep')],ensure_ascii=False))";
     const out = JSON.parse(execFileSync("python3", ["-I", "-c", py], { input: xml, encoding: "utf8" }));
     assert.equal(out[0], `Q&A "live" <1>`);
     assert.equal(out[1], `M-a-01 - Bob's "big" idea & more <b>`);
@@ -377,4 +384,194 @@ test("a real 29.97 fps file probes and validates end to end", { skip: !hasFfmpeg
   const xml = buildFcpxml({ eventName: "Real", clips: [clip({ path: file, media })] });
   assert.match(xml, /frameDuration="1001\/30000s" width="640" height="360"/);
   if (hasXmllint) assert.equal(validate(xml), "");
+});
+
+// ---- A6: two events, a project, library targeting, vertical timeline --------
+
+const PROJECT: FcpxmlProject = {
+  eventName: "Exports",
+  namePattern: "{clipId} {label}",
+  timeline: { kind: "vertical", width: 1080, height: 1920, fps: "30" },
+};
+
+/** Parse with python so assertions read the real tree, not regexes. */
+function tree(xml: string): { library: string | null; events: { name: string; clips: string[]; projects: { name: string; fmt: string; refs: string[] }[] }[]; formats: Record<string, string>; assets: string[] } {
+  const py = `
+import sys,json,xml.etree.ElementTree as E
+r=E.fromstring(sys.stdin.buffer.read())
+lib=r.find('library')
+fm={f.get('id'):f.get('width')+'x'+f.get('height')+'@'+f.get('frameDuration') for f in r.iter('format')}
+ev=[]
+for e in lib.findall('event'):
+  ev.append({'name':e.get('name'),'clips':[c.get('ref') for c in e.findall('asset-clip')],
+   'projects':[{'name':p.get('name'),'fmt':p.find('sequence').get('format'),'refs':[c.get('ref') for c in p.iter('asset-clip')]} for p in e.findall('project')]})
+print(json.dumps({'library':lib.get('location'),'events':ev,'formats':fm,'assets':[a.get('id') for a in r.iter('asset')]},ensure_ascii=False))`;
+  return JSON.parse(execFileSync("python3", ["-I", "-c", py], { input: xml, encoding: "utf8" }));
+}
+
+test("clip in ONE event, no project, when no project is asked for", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({ eventName: "Raw", clips: [clip()] });
+  assert.equal(validate(xml), "");
+  const t = tree(xml);
+  assert.equal(t.events.length, 1);
+  assert.deepEqual(t.events[0].clips, ["a1"]);
+  assert.equal(t.events[0].projects.length, 0);
+  assert.ok(!xml.includes("<project"));
+  assert.ok(!xml.includes("<sequence"));
+});
+
+test("clip in TWO events: raw asset-clip plus a project that references the SAME asset", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: PROJECT });
+  assert.equal(validate(xml), "");
+  const t = tree(xml);
+  assert.deepEqual(t.events.map((e) => e.name), ["Raw", "Exports"]);
+  assert.deepEqual(t.events[0].clips, ["a1"]);
+  assert.deepEqual(t.events[1].projects, [{ name: "M-abc-01 the hook", fmt: "r2", refs: ["a1"] }]);
+  assert.deepEqual(t.assets, ["a1"], "the asset is referenced, never duplicated");
+  assert.equal((xml.match(/<asset /g) ?? []).length, 1);
+});
+
+test("several clips in one batch: each gets its own project and asset", { skip: !hasXmllint }, () => {
+  const clips = [
+    clip({ id: "A-01", label: "one", path: "/c/a.mp4" }),
+    clip({ id: "A-02", label: "two", path: "/c/b.mp4", projectName: "From my notes" }),
+    clip({ id: "A-03", label: "", path: "/c/c.mp4" }),
+  ];
+  const xml = buildFcpxml({ eventName: "Raw", clips, project: PROJECT });
+  assert.equal(validate(xml), "");
+  const t = tree(xml);
+  assert.deepEqual(t.events[1].projects.map((p) => p.name), ["A-01 one", "From my notes", "A-03"]);
+  assert.deepEqual(t.events[1].projects.map((p) => p.refs[0]), ["a1", "a2", "a3"]);
+  assert.deepEqual(t.assets, ["a1", "a2", "a3"]);
+});
+
+test("a vertical timeline over a horizontal source does NOT inherit the source", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: PROJECT });
+  const t = tree(xml);
+  assert.equal(t.formats.r1, "1920x1080@1001/30000s", "source format stays on the asset");
+  assert.equal(t.formats.r2, "1080x1920@1/30s", "timeline is vertical at the chosen rate");
+  assert.equal(t.events[1].projects[0].fmt, "r2");
+  assert.match(xml, /<asset [^>]*format="r1"/);
+});
+
+test("timeline choices: vertical, match source, custom, each with an explicit rate", () => {
+  assert.deepEqual(resolveTimeline({ kind: "vertical", width: 1, height: 1, fps: "29.97" }, NTSC), { width: 1080, height: 1920, fps: { num: 30000, den: 1001 } });
+  assert.deepEqual(resolveTimeline({ kind: "source", width: 1, height: 1, fps: "source" }, NTSC), { width: 1920, height: 1080, fps: { num: 30000, den: 1001 } });
+  assert.deepEqual(resolveTimeline({ kind: "source", width: 1, height: 1, fps: "25" }, NTSC), { width: 1920, height: 1080, fps: { num: 25, den: 1 } });
+  assert.deepEqual(resolveTimeline({ kind: "custom", width: 1080, height: 1080, fps: "24" }, NTSC), { width: 1080, height: 1080, fps: { num: 24, den: 1 } });
+  // bad stored values fall back to vertical 1080x1920 at 30, never to the source
+  assert.deepEqual(normalizeTimeline({ kind: "nope", fps: "banana", width: -4 }), { kind: "vertical", width: 1080, height: 1920, fps: "30" });
+  assert.equal(normalizeTimeline({ kind: "vertical", fps: "source" }).fps, "30");
+  assert.equal(DEFAULT_EDITOR_SETTINGS.timelineFormat.kind, "vertical");
+  assert.equal(DEFAULT_EDITOR_SETTINGS.createProject, false);
+});
+
+test("a custom rate different from the source gives whole timeline frames", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({
+    eventName: "Raw",
+    clips: [clip()],
+    project: { ...PROJECT, timeline: { kind: "custom", width: 1080, height: 1350, fps: "25" } },
+  });
+  assert.equal(validate(xml), "");
+  assert.match(xml, /<sequence format="r2" duration="250\/25s"/); // 10.01 s source -> 250 frames
+  assert.equal(tree(xml).formats.r2, "1080x1350@1/25s");
+});
+
+test("library location present when set, absent when not", { skip: !hasXmllint }, () => {
+  const withLib = buildFcpxml({ eventName: "Raw", clips: [clip()], project: PROJECT, library: "/Users/me/Movies/Client A's Library.fcpbundle" });
+  assert.equal(validate(withLib), "");
+  assert.equal(tree(withLib).library, "file:///Users/me/Movies/Client%20A%27s%20Library.fcpbundle/");
+  const without = buildFcpxml({ eventName: "Raw", clips: [clip()], project: PROJECT });
+  assert.equal(validate(without), "");
+  assert.equal(tree(without).library, null);
+  assert.ok(!without.includes("location="));
+  const blank = buildFcpxml({ eventName: "Raw", clips: [clip()], library: "   " });
+  assert.ok(!blank.includes("location="));
+});
+
+test("library accepts a file URL as is, and refuses a relative path", () => {
+  assert.equal(libraryLocation("file:///Users/me/L.fcpbundle/"), "file:///Users/me/L.fcpbundle/");
+  assert.equal(libraryLocation("file:///Users/me/L.fcpbundle"), "file:///Users/me/L.fcpbundle/");
+  assert.throws(() => libraryLocation("Movies/L.fcpbundle"), /relative/);
+});
+
+test("escaping: apostrophes, ampersands and non-Latin names in events, projects and library", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({
+    eventName: `Bob's "raw" & co`,
+    library: "/Users/me/\u65E5\u672C\u8A9E & Co/L's.fcpbundle",
+    project: { ...PROJECT, eventName: "\u0645\u0631\u062D\u0628\u0627 <exports>" },
+    clips: [clip({ label: "Tom & Jerry's \u0420\u0443\u0441" })],
+  });
+  assert.equal(validate(xml), "");
+  const t = tree(xml);
+  assert.equal(t.events[0].name, `Bob's "raw" & co`);
+  assert.equal(t.events[1].name, "\u0645\u0631\u062D\u0628\u0627 <exports>");
+  assert.equal(t.events[1].projects[0].name, "M-abc-01 Tom & Jerry's \u0420\u0443\u0441");
+  assert.equal(decodeURIComponent(t.library ?? ""), "file:///Users/me/\u65E5\u672C\u8A9E & Co/L's.fcpbundle/");
+  assert.ok(!xml.includes("Tom & Jerry"), "raw ampersand must not appear");
+});
+
+test("project name: pattern tokens, dangling separators, per-clip override, duplicates", () => {
+  const c = { id: "M-01", label: "hook" };
+  assert.equal(projectNameFor(c, "{clipId} {label}"), "M-01 hook");
+  assert.equal(projectNameFor({ id: "M-01" }, "{clipId} - {label}"), "M-01");
+  assert.equal(projectNameFor(c, "{campaign}: {clipId}", { campaignName: "Shorts" }), "Shorts: M-01");
+  assert.equal(projectNameFor({ id: "M-01", projectName: "  My   notes\u2014name " }, "{clipId}"), "My notes - name");
+  assert.equal(projectNameFor({ id: "M-01" }, "{label}"), "M-01", "an empty name falls back to the id");
+  assert.deepEqual(
+    resolveProjectNames([{ id: "A", projectName: "Same" }, { id: "B", projectName: "Same" }, { id: "C", projectName: "Same" }], { namePattern: "{clipId}" }),
+    ["Same", "Same 2", "Same 3"],
+  );
+});
+
+test("same name for both events merges them into one event", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({ eventName: "Shared", clips: [clip()], project: { ...PROJECT, eventName: " Shared " } });
+  assert.equal(validate(xml), "");
+  const t = tree(xml);
+  assert.equal(t.events.length, 1);
+  assert.equal(t.events[0].clips.length, 1);
+  assert.equal(t.events[0].projects.length, 1);
+});
+
+test("session batch with a project: names reported, library and timeline carried", async () => {
+  const result = await buildSessionFcpxml(
+    [
+      { id: "A-01", label: "x", path: "/c/a.mp4", segments: [{ start: 0, end: 5 }] },
+      { id: "A-02", path: "/c/b.mp4", segments: [{ start: 0, end: 5 }], projectName: "Typed" },
+    ],
+    "Raw",
+    async () => ({ kind: "ffprobe", json: { streams: [{ codec_type: "video", width: 1920, height: 1080, avg_frame_rate: "30000/1001" }], format: { duration: "5" } } }),
+    { library: "/L/Client.fcpbundle", project: PROJECT },
+  );
+  assert.deepEqual(result.projectNames, ["A-01 x", "Typed"]);
+  assert.match(result.xml, /<library location="file:\/\/\/L\/Client\.fcpbundle\/">/);
+  assert.equal((result.xml.match(/<project /g) ?? []).length, 2);
+  assert.equal(validateIfPossible(result.xml), "");
+});
+
+function validateIfPossible(xml: string): string {
+  return hasXmllint ? validate(xml) : "";
+}
+
+test("DTD check rejects a project outside an event (mutation guard for the structure)", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: PROJECT }).replace('<project name="M-abc-01 the hook">', '<project name="x"><bogus/>');
+  assert.notEqual(validate(xml), "");
+});
+
+test("a file:// library URL containing & is escaped in the attribute", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], library: "file:///Users/me/A&B.fcpbundle" });
+  assert.equal(validate(xml), "");
+  assert.equal(tree(xml).library, "file:///Users/me/A&B.fcpbundle/");
+});
+
+test("settings from an older version gain safe defaults for the new fields", () => {
+  const s = normalizeEditorSettings({ afterCutting: "finalcut", eventName: "source" });
+  assert.equal(s.fcpLibrary, "");
+  assert.equal(s.createProject, false);
+  assert.equal(s.projectEvent, "");
+  assert.equal(s.projectNamePattern, "{clipId} {label}");
+  assert.equal(s.timelineFormat.kind, "vertical");
+  const t = normalizeEditorSettings({ fcpLibrary: "  /L/a.fcpbundle ", createProject: true, projectEvent: "X", timelineFormat: { kind: "custom", width: 1080, height: 1350, fps: "25" } });
+  assert.equal(t.fcpLibrary, "/L/a.fcpbundle");
+  assert.deepEqual(t.timelineFormat, { kind: "custom", width: 1080, height: 1350, fps: "25" });
 });
