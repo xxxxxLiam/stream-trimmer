@@ -4,7 +4,9 @@
  * Description: Per-campaign "After cutting" setting and the editor handoff
  *   actions (BUILD-SPEC 11c). Off by default and collapsed, so a user who does
  *   not use these editors sees one quiet row.
- *   - Final Cut Pro and Premiere Pro both read the same FCPXML file.
+ *   - Final Cut Pro reads the FCPXML file. Premiere Pro cannot import it
+ *     directly (Adobe: needs a third-party converter), so there is no
+ *     Premiere action, only the plain export and a one-line note.
  *   - CapCut cannot import project files from other editors, so it gets only a
  *     drop folder, Reveal, Copy file path and Open CapCut. Nothing here implies
  *     a project-level CapCut integration.
@@ -37,7 +39,13 @@ export interface EditorBridge {
   installed: () => Promise<{ ok: boolean; apps?: { finalcut: boolean; premiere: boolean; capcut: boolean } }>;
   probe: (file: string) => Promise<({ ok: true } & RawProbe) | { ok: false; error: string }>;
   writeFcpxml: (p: { dirPath: string; filename: string; contents: string }) => Promise<Result>;
-  openWith: (p: { app: "finalcut" | "premiere" | "capcut"; file?: string }) => Promise<Result>;
+  openWith: (p: { app: "finalcut" | "capcut"; file?: string }) => Promise<Result>;
+  /**
+   * Whether a directory exists at this absolute path (needs `editor:pathExists`
+   * in electron/editorOpen.cjs). Absent bridge method: a library cannot be
+   * verified, so a send that names one is refused rather than guessed.
+   */
+  pathExists?: (target: string) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;
   reveal: (target: string) => Promise<Result>;
   copyFiles: (p: { dirPath: string; files: string[] }) => Promise<Result & { copied?: string[]; failed?: string[] }>;
 }
@@ -116,7 +124,7 @@ export interface HandoffOutcome {
 /** Probe, build ONE document for `ctx.clips`, write it, optionally open it. */
 export async function exportFcpxml(
   ctx: HandoffContext,
-  openWith?: "finalcut" | "premiere",
+  openWith?: "finalcut",
   settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
   const api = bridge();
@@ -139,13 +147,10 @@ async function exportNamed(
   api: EditorBridge,
   ctx: HandoffContext,
   eventName: string,
-  openWith?: "finalcut" | "premiere",
+  openWith?: "finalcut",
   settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
-  // Premiere has bins, not events or libraries, so it gets the plain one-event
-  // file; the library and project structure is only written for Final Cut and
-  // for a plain export.
-  const structured = settings && openWith !== "premiere" ? settings : undefined;
+  const structured = settings;
   const clips = ctx.clips.map((c) =>
     !c.projectName && typedProjectNames.has(c.id) ? { ...c, projectName: typedProjectNames.get(c.id) } : c,
   );
@@ -153,6 +158,11 @@ async function exportNamed(
   try {
     const library = structured?.fcpLibrary.trim() || undefined;
     if (library) libraryLocation(library); // throws on a relative path before anything runs
+    const libraryExists = async (local: string) => {
+      if (!api.pathExists) return false;
+      const r = await api.pathExists(local);
+      return r.ok && r.exists === true && r.isDirectory !== false;
+    };
     built = await buildSessionFcpxml(
       clips,
       structured?.mediaEvent.trim() || eventName,
@@ -161,7 +171,7 @@ async function exportNamed(
         if (!r.ok) throw new Error(r.error);
         return r;
       },
-      { library, project: structured ? projectOptions(structured, ctx) : undefined },
+      { library, libraryExists, project: structured ? projectOptions(structured, ctx) : undefined },
     );
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
@@ -188,7 +198,7 @@ async function exportNamed(
   }
   return {
     ok: true,
-    message: `Saved ${built.filename} with ${count}${projects} and sent it to ${openWith === "finalcut" ? "Final Cut Pro" : "Premiere Pro"}.`,
+    message: `Saved ${built.filename} with ${count}${projects} and sent it to Final Cut Pro.`,
     skipped: built.skipped,
     path: written.path,
   };
@@ -218,7 +228,7 @@ export async function runAfterCutting(
       const r = await api.reveal(last.path);
       outcome = { ok: r.ok, message: r.ok ? "Revealed the clip." : r.error ?? "Could not reveal the clip." };
     }
-  } else if (settings.afterCutting === "finalcut" || settings.afterCutting === "premiere") {
+  } else if (settings.afterCutting === "finalcut") {
     if (!api) return { ok: false, message: NEEDS_DESKTOP };
     const eventName = resolveEventName({
       from: settings.eventName,
@@ -257,7 +267,6 @@ const OPTIONS: { value: AfterCutting; label: string }[] = [
   { value: "nothing", label: "Nothing" },
   { value: "reveal", label: "Reveal in Finder" },
   { value: "finalcut", label: "Send to Final Cut Pro" },
-  { value: "premiere", label: "Send to Premiere Pro" },
 ];
 
 export default function EditorHandoff({
@@ -369,20 +378,16 @@ export default function EditorHandoff({
                 <option key={o.value} value={o.value}>
                   {o.label}
                   {apps && o.value === "finalcut" && !apps.finalcut ? " (not found)" : ""}
-                  {apps && o.value === "premiere" && !apps.premiere ? " (not found)" : ""}
                 </option>
               ))}
             </select>
           </label>
 
-          {(settings.afterCutting === "finalcut" || settings.afterCutting === "premiere") && (
+          {settings.afterCutting === "finalcut" && (
             <p className="t-meta m-0">
-              {settings.afterCutting === "premiere"
-                ? "Premiere reads the same file. Clip names and media links come across; the notes with the source link and timecodes may not show. "
-                : settings.fcpLibrary.trim()
-                  ? "Final Cut is told which library to use (set below). "
-                  : "No library is set, so Final Cut uses its own default. With several libraries open, set one below. "}
-              DaVinci Resolve reads this file too.
+              {settings.fcpLibrary.trim()
+                ? "Final Cut is told which library to use (set below). "
+                : "No library is set, so Final Cut uses its own default. With several libraries open, set one below. "}
             </p>
           )}
 
@@ -425,7 +430,7 @@ export default function EditorHandoff({
               <span className={libraryProblem ? "text-body" : "t-meta"} role={libraryProblem ? "alert" : undefined}>
                 {libraryProblem ||
                   (libraryText
-                    ? "Every import is aimed at this library, whichever one is active."
+                    ? "The import is aimed at this library, whichever one is active. It must already exist: if nothing is there, Final Cut would make a new library, so the send is refused."
                     : "Blank means Final Cut picks the library. Set this if you keep several open.")}
               </span>
             </label>
@@ -472,6 +477,12 @@ export default function EditorHandoff({
                   <span className="t-meta">
                     Use {"{clipId}"}, {"{label}"}, {"{campaign}"} and {"{source}"}.
                     {previewNames.length > 0 ? ` Now: ${previewNames.join(", ")}` : ""}
+                  </span>
+                  <span className="t-meta">
+                    A project name that already exists in Final Cut makes it ask whether to replace or keep both, for the whole import.
+                    {settings.projectNamePattern.trim() && !settings.projectNamePattern.includes("{clipId}")
+                      ? " Add {clipId} to the name so every project is unique."
+                      : ""}
                   </span>
                 </label>
                 <label className="flex flex-col gap-1">
@@ -545,9 +556,6 @@ export default function EditorHandoff({
                 </span>
               </>
             )}
-            <p className="t-meta m-0">
-              Premiere Pro uses bins, not events or libraries, so it gets the plain clip only.
-            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -575,15 +583,6 @@ export default function EditorHandoff({
             >
               Send all to Final Cut Pro
             </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={busy || !hasClips}
-              title={noClipsReason}
-              onClick={() => void run(() => runSend("premiere"))}
-            >
-              Send all to Premiere Pro
-            </button>
             <button type="button" className="btn" disabled={!hasClips} title={noClipsReason} onClick={() => void copyPaths()}>
               Copy file path
             </button>
@@ -591,6 +590,9 @@ export default function EditorHandoff({
               Reveal in Finder
             </button>
           </div>
+          <p className="t-meta m-0">
+            Premiere Pro cannot open this file without a third-party converter.
+          </p>
           <p className="t-meta m-0">
             Send all puts every clip from this session into one file
             {hasClips ? ` (${clips.length})` : ""}{projectOn ? ", each with its own project" : ""}.
@@ -665,7 +667,7 @@ export default function EditorHandoff({
     </section>
   );
 
-  function runSend(app: "finalcut" | "premiere"): Promise<HandoffOutcome> {
+  function runSend(app: "finalcut"): Promise<HandoffOutcome> {
     const api = bridge();
     if (!api) return Promise.resolve({ ok: false, message: NEEDS_DESKTOP });
     return exportNamed(api, ctx, eventName, app, settings);

@@ -13,10 +13,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
+  AFTER_CUTTING_VALUES,
   DEFAULT_EDITOR_SETTINGS,
+  DEFAULT_PROJECT_PATTERN,
   buildFcpxml,
   buildSessionFcpxml,
   libraryLocation,
+  libraryPath,
   normalizeTimeline,
   projectNameFor,
   resolveProjectNames,
@@ -206,7 +209,9 @@ test("event name: campaign or source, with a fallback", () => {
 test("settings default to off and coerce junk", () => {
   assert.equal(normalizeEditorSettings(undefined).afterCutting, "nothing");
   assert.equal(normalizeEditorSettings({ afterCutting: "bogus" }).afterCutting, "nothing");
-  assert.equal(normalizeEditorSettings({ afterCutting: "premiere" }).afterCutting, "premiere");
+  // Premiere was removed (it cannot import FCPXML); a stored value falls back to nothing.
+  assert.equal(normalizeEditorSettings({ afterCutting: "premiere" }).afterCutting, "nothing");
+  assert.equal(normalizeEditorSettings({ afterCutting: "finalcut" }).afterCutting, "finalcut");
   assert.equal(normalizeEditorSettings({ eventName: "source" }).eventName, "source");
 });
 
@@ -395,17 +400,17 @@ const PROJECT: FcpxmlProject = {
 };
 
 /** Parse with python so assertions read the real tree, not regexes. */
-function tree(xml: string): { library: string | null; events: { name: string; clips: string[]; projects: { name: string; fmt: string; refs: string[] }[] }[]; formats: Record<string, string>; assets: string[] } {
+function tree(xml: string): { library: string | null; hasLibraryEl: boolean; order: string[]; events: { name: string; clips: string[]; projects: { name: string; fmt: string; refs: string[] }[] }[]; formats: Record<string, string>; assets: string[] } {
   const py = `
 import sys,json,xml.etree.ElementTree as E
 r=E.fromstring(sys.stdin.buffer.read())
-lib=r.find('library')
+opt=[o.get('value') for o in r.iterfind('import-options/option') if o.get('key')=='library location']
 fm={f.get('id'):f.get('width')+'x'+f.get('height')+'@'+f.get('frameDuration') for f in r.iter('format')}
 ev=[]
-for e in lib.findall('event'):
+for e in r.findall('event'):
   ev.append({'name':e.get('name'),'clips':[c.get('ref') for c in e.findall('asset-clip')],
    'projects':[{'name':p.get('name'),'fmt':p.find('sequence').get('format'),'refs':[c.get('ref') for c in p.iter('asset-clip')]} for p in e.findall('project')]})
-print(json.dumps({'library':lib.get('location'),'events':ev,'formats':fm,'assets':[a.get('id') for a in r.iter('asset')]},ensure_ascii=False))`;
+print(json.dumps({'library':(opt[0] if opt else None),'hasLibraryEl':r.find('library') is not None,'order':[c.tag for c in r],'events':ev,'formats':fm,'assets':[a.get('id') for a in r.iter('asset')]},ensure_ascii=False))`;
   return JSON.parse(execFileSync("python3", ["-I", "-c", py], { input: xml, encoding: "utf8" }));
 }
 
@@ -477,21 +482,31 @@ test("a custom rate different from the source gives whole timeline frames", { sk
   assert.equal(tree(xml).formats.r2, "1080x1350@1/25s");
 });
 
-test("library location present when set, absent when not", { skip: !hasXmllint }, () => {
+test("library goes in import-options (not <library location>), events are bare", { skip: !hasXmllint }, () => {
   const withLib = buildFcpxml({ eventName: "Raw", clips: [clip()], project: PROJECT, library: "/Users/me/Movies/Client A's Library.fcpbundle" });
   assert.equal(validate(withLib), "");
-  assert.equal(tree(withLib).library, "file:///Users/me/Movies/Client%20A%27s%20Library.fcpbundle/");
+  const tw = tree(withLib);
+  assert.equal(tw.library, "file:///Users/me/Movies/Client%20A%27s%20Library.fcpbundle");
+  assert.ok(tw.library?.startsWith("file:///"));
+  assert.match(withLib, /<option key="library location" value="file:\/\/\//);
+  assert.deepEqual(tw.order, ["import-options", "resources", "event", "event"]);
+  assert.equal(tw.hasLibraryEl, false);
+  assert.ok(!withLib.includes("<library"), "the export-only <library location> must be gone");
+  assert.ok(!withLib.includes("location=\""), "no location attribute anywhere");
   const without = buildFcpxml({ eventName: "Raw", clips: [clip()], project: PROJECT });
   assert.equal(validate(without), "");
   assert.equal(tree(without).library, null);
-  assert.ok(!without.includes("location="));
+  assert.ok(!without.includes("import-options"));
+  assert.deepEqual(tree(without).order, ["resources", "event", "event"]);
   const blank = buildFcpxml({ eventName: "Raw", clips: [clip()], library: "   " });
-  assert.ok(!blank.includes("location="));
+  assert.ok(!blank.includes("import-options"));
 });
 
 test("library accepts a file URL as is, and refuses a relative path", () => {
-  assert.equal(libraryLocation("file:///Users/me/L.fcpbundle/"), "file:///Users/me/L.fcpbundle/");
-  assert.equal(libraryLocation("file:///Users/me/L.fcpbundle"), "file:///Users/me/L.fcpbundle/");
+  assert.equal(libraryLocation("file:///Users/me/L.fcpbundle/"), "file:///Users/me/L.fcpbundle");
+  assert.equal(libraryLocation("file:///Users/me/L.fcpbundle"), "file:///Users/me/L.fcpbundle");
+  assert.equal(libraryPath("file:///Users/me/My%20L.fcpbundle/"), "/Users/me/My L.fcpbundle");
+  assert.equal(libraryPath("/Users/me/L.fcpbundle"), "/Users/me/L.fcpbundle");
   assert.throws(() => libraryLocation("Movies/L.fcpbundle"), /relative/);
 });
 
@@ -507,7 +522,7 @@ test("escaping: apostrophes, ampersands and non-Latin names in events, projects 
   assert.equal(t.events[0].name, `Bob's "raw" & co`);
   assert.equal(t.events[1].name, "\u0645\u0631\u062D\u0628\u0627 <exports>");
   assert.equal(t.events[1].projects[0].name, "M-abc-01 Tom & Jerry's \u0420\u0443\u0441");
-  assert.equal(decodeURIComponent(t.library ?? ""), "file:///Users/me/\u65E5\u672C\u8A9E & Co/L's.fcpbundle/");
+  assert.equal(decodeURIComponent(t.library ?? ""), "file:///Users/me/\u65E5\u672C\u8A9E & Co/L's.fcpbundle");
   assert.ok(!xml.includes("Tom & Jerry"), "raw ampersand must not appear");
 });
 
@@ -541,10 +556,11 @@ test("session batch with a project: names reported, library and timeline carried
     ],
     "Raw",
     async () => ({ kind: "ffprobe", json: { streams: [{ codec_type: "video", width: 1920, height: 1080, avg_frame_rate: "30000/1001" }], format: { duration: "5" } } }),
-    { library: "/L/Client.fcpbundle", project: PROJECT },
+    { library: "/L/Client.fcpbundle", project: PROJECT, libraryExists: async (p) => p === "/L/Client.fcpbundle" },
   );
   assert.deepEqual(result.projectNames, ["A-01 x", "Typed"]);
-  assert.match(result.xml, /<library location="file:\/\/\/L\/Client\.fcpbundle\/">/);
+  assert.match(result.xml, /<option key="library location" value="file:\/\/\/L\/Client\.fcpbundle"\/>/);
+  assert.ok(!result.xml.includes("<library"));
   assert.equal((result.xml.match(/<project /g) ?? []).length, 2);
   assert.equal(validateIfPossible(result.xml), "");
 });
@@ -561,7 +577,7 @@ test("DTD check rejects a project outside an event (mutation guard for the struc
 test("a file:// library URL containing & is escaped in the attribute", { skip: !hasXmllint }, () => {
   const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], library: "file:///Users/me/A&B.fcpbundle" });
   assert.equal(validate(xml), "");
-  assert.equal(tree(xml).library, "file:///Users/me/A&B.fcpbundle/");
+  assert.equal(tree(xml).library, "file:///Users/me/A&B.fcpbundle");
 });
 
 test("settings from an older version gain safe defaults for the new fields", () => {
@@ -574,4 +590,41 @@ test("settings from an older version gain safe defaults for the new fields", () 
   const t = normalizeEditorSettings({ fcpLibrary: "  /L/a.fcpbundle ", createProject: true, projectEvent: "X", timelineFormat: { kind: "custom", width: 1080, height: 1350, fps: "25" } });
   assert.equal(t.fcpLibrary, "/L/a.fcpbundle");
   assert.deepEqual(t.timelineFormat, { kind: "custom", width: 1080, height: 1350, fps: "25" });
+});
+
+const FFPROBE_5S = async () => ({ kind: "ffprobe" as const, json: { streams: [{ codec_type: "video", width: 1920, height: 1080, avg_frame_rate: "30" }], format: { duration: "5" } } });
+const ONE = [{ id: "A-01", path: "/c/a.mp4", segments: [{ start: 0, end: 5 }] }];
+
+test("a library path that does not exist is refused, never sent", async () => {
+  await assert.rejects(
+    buildSessionFcpxml(ONE, "Raw", FFPROBE_5S, { library: "/L/Typo.fcpbundle", libraryExists: async () => false }),
+    /no library at \/L\/Typo\.fcpbundle.*nothing was sent/s,
+  );
+});
+
+test("a library that cannot be checked is refused too (fail closed)", async () => {
+  await assert.rejects(buildSessionFcpxml(ONE, "Raw", FFPROBE_5S, { library: "/L/X.fcpbundle" }), /could not be checked/);
+  // No library named: no check needed.
+  const ok = await buildSessionFcpxml(ONE, "Raw", FFPROBE_5S);
+  assert.ok(!ok.xml.includes("import-options"));
+});
+
+test("the checker receives the decoded local path, for a path or a file URL", async () => {
+  const seen: string[] = [];
+  const exists = async (p: string) => (seen.push(p), true);
+  await buildSessionFcpxml(ONE, "Raw", FFPROBE_5S, { library: "file:///L/My%20Lib.fcpbundle/", libraryExists: exists });
+  assert.deepEqual(seen, ["/L/My Lib.fcpbundle"]);
+});
+
+test("Premiere is not an After cutting choice", () => {
+  assert.deepEqual([...AFTER_CUTTING_VALUES], ["nothing", "reveal", "finalcut"]);
+});
+
+test("the default project name pattern includes the clip id, so names do not collide by construction", () => {
+  assert.ok(DEFAULT_PROJECT_PATTERN.includes("{clipId}"));
+  assert.ok(DEFAULT_EDITOR_SETTINGS.projectNamePattern.includes("{clipId}"));
+  // A blank pattern falls back to it.
+  assert.equal(projectNameFor({ id: "M-07", label: "x" }, "  "), "M-07 x");
+  const names = resolveProjectNames([{ id: "A", label: "same" }, { id: "B", label: "same" }], { namePattern: DEFAULT_PROJECT_PATTERN });
+  assert.notEqual(names[0], names[1]);
 });

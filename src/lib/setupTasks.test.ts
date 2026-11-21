@@ -125,7 +125,7 @@ test("campaigns exist but none selected: still blocked, with a pointer", () => {
 });
 
 test("Final Cut sub-items appear only when after cutting is Final Cut", () => {
-  for (const v of [null, "nothing", "reveal", "premiere"] as const) {
+  for (const v of [null, "nothing", "reveal"] as const) {
     const items = buildSetupItems(base({ afterCutting: v }));
     assert.ok(!ids(items).some((i) => i.startsWith("fcp-")), String(v));
   }
