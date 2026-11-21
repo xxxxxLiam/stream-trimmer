@@ -54,6 +54,7 @@ try {
       openWith: (payload) => ipcRenderer.invoke("editor:openWith", payload),
       reveal: (target) => ipcRenderer.invoke("editor:reveal", target),
       copyFiles: (payload) => ipcRenderer.invoke("editor:copyFiles", payload),
+      pathExists: (target) => ipcRenderer.invoke("editor:pathExists", target),
     },
     // Diagnostics: reads the app's own local log so a crash can be reported.
     readDiagnostics: () => ipcRenderer.invoke("diagnostics:read"),
