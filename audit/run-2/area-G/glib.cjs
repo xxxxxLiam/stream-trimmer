@@ -345,6 +345,29 @@ function pidAlive(pid) {
   }
 }
 
+/**
+ * The process state letter from /proc/<pid>/stat: R/S/D = running, Z = a
+ * reaped-but-not-collected zombie (which process.kill(pid,0) still calls
+ * alive), null = gone. Needed because a killed grandchild whose shell parent
+ * died first lingers as a zombie for a moment, and counting that as "still
+ * running" would invent a regression.
+ */
+function procState(pid) {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    const after = stat.slice(stat.lastIndexOf(")") + 2);
+    return after.split(" ")[0];
+  } catch {
+    return null;
+  }
+}
+
+/** True only while the process is really executing (not a zombie, not gone). */
+function pidRunning(pid) {
+  const st = procState(pid);
+  return st !== null && st !== "Z";
+}
+
 function psLines(pattern) {
   const r = spawnSync("ps", ["-eo", "pid,ppid,pgid,stat,args"], {
     encoding: "utf8",
@@ -402,6 +425,8 @@ module.exports = {
   decodeV4,
   pidForInode,
   pidAlive,
+  procState,
+  pidRunning,
   psLines,
   ffprobeDuration,
   sleep,
