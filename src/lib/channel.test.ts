@@ -20,3 +20,19 @@ test("E-5: a given instant and run id name a folder deterministically", () => {
   const at = new Date("2026-11-21T14:32:05Z");
   assert.equal(buildExportFolderName("Chan", at, "abc"), "Chan-export-2026-11-21-143205-abc");
 });
+
+import { rowsToCsv } from "./channel";
+import { csvHeader, csvLine } from "../../server/csv";
+
+test("E-7: the client CSV escapes formulas exactly as the server does", () => {
+  const cols = ["a", "b", "n"];
+  const rows = [
+    { a: "=HYPERLINK(\"x\")", b: "-5", n: -3 },
+    { a: "+1+1", b: "@SUM(A1)", n: 0 },
+    { a: "\tTab", b: "plain, \"quoted\"", n: "" },
+    { a: "-1.5", b: "- not a number", n: null },
+  ];
+  const server = csvHeader(cols) + rows.map((r) => csvLine(cols, r)).join("");
+  assert.equal(rowsToCsv(cols, rows), server);
+  assert.ok(rowsToCsv(cols, rows).includes(`"'=HYPERLINK(`));
+});
