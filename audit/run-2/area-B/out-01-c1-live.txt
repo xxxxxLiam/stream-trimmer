@@ -1,0 +1,33 @@
+=== C-1 negative control ===
+ROOT=/home/user/stream-trimmer
+TAG=LIVE
+
+[booted] alive rootChildren=1 bodyLen=664 panes=1 boundary=false answering=true reactErrors=0
+bank seeded as: {"auditc":{"aaaaaaaaaaa":[{"id":"A01","label":"hook","segments":[{"start":60,"end":90}],"status":"banked"}]}}
+[tab1 loaded AAA] alive rootChildren=1 bodyLen=774 panes=1 boundary=false answering=true reactErrors=0
+    pane: {"rows":[],"total":"00:00:00","source":"Loading","markIn":"","markOut":"","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"Loading the video","alert":null,"transcriptHeader":"","transcriptRows":0,"cutDisabled":true,"addDisabled":true,"cancelVisible":false}
+    clips column: This video Bank All saved Import timestamps 1 clips Sort by tier 00:01:00 - 00:01:30 0:30 A01 hook In band banked Cut Remove
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b01-c1-LIVE/01-tab1-aaa-with-bank.png
+[second tab opened (no video yet)] alive rootChildren=1 bodyLen=672 panes=2 boundary=false answering=true reactErrors=0
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b01-c1-LIVE/02-two-tabs-second-empty.png
+[tab2 loaded the SAME video AAA] alive rootChildren=1 bodyLen=784 panes=2 boundary=false answering=true reactErrors=0
+    ALL PANES: [{"i":0,"shown":false,"source":"Video AAA00:10:00Change","total":"00:10:00","rows":[]},{"i":1,"shown":true,"source":"Loading","total":"00:00:00","rows":[]}]
+    pane: {"rows":[],"total":"00:00:00","source":"Loading","markIn":"","markOut":"","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"Loading the video","alert":null,"transcriptHeader":"","transcriptRows":0,"cutDisabled":true,"addDisabled":true,"cancelVisible":false}
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b01-c1-LIVE/03-two-tabs-same-video.png
+[switch #1 -> tab 1] alive rootChildren=1 bodyLen=820 panes=2 boundary=false answering=true reactErrors=0
+[switch #2 -> tab 2] alive rootChildren=1 bodyLen=784 panes=2 boundary=false answering=true reactErrors=0
+[switch #3 -> tab 1] alive rootChildren=1 bodyLen=820 panes=2 boundary=false answering=true reactErrors=0
+[switch #4 -> tab 2] alive rootChildren=1 bodyLen=784 panes=2 boundary=false answering=true reactErrors=0
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b01-c1-LIVE/04-after-switching.png
+[added a segment with the bank live in two tabs] alive rootChildren=1 bodyLen=758 panes=2 boundary=false answering=true reactErrors=0
+    ALL PANES: [{"i":0,"shown":false,"source":"Video AAA00:10:00Change","total":"00:10:00","rows":[]},{"i":1,"shown":true,"source":"Video AAA 00:10:00 Change","total":"00:00:10","rows":["1 00:00:10 to 00:00:20 0:10"]}]
+[third tab, same video] alive rootChildren=1 bodyLen=794 panes=3 boundary=false answering=true reactErrors=0
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b01-c1-LIVE/05-three-tabs-same-video.png
+[6s later] alive rootChildren=1 bodyLen=832 panes=3 boundary=false answering=true reactErrors=0
+
+VERDICT[LIVE]: never crashed
+console errors:
+  [error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED
+  [error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED
+  [error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED
+  [error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED

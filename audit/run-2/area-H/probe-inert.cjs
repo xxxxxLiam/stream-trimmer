@@ -45,8 +45,38 @@ const STUB = "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-af
       mainIsEffectivelyInert: main ? Boolean(main.closest("[inert]")) : null,
       // A screen reader's virtual cursor follows aria-hidden, not Tab.
       mainHiddenFromAX: main ? Boolean(main.closest('[aria-hidden="true"]')) : null,
+      // The portalled Help button sits on document.body at z-70, ABOVE the z-50
+      // scrim. Is it inert with the gate up, or still live on top of it?
+      helpButton: (() => {
+        const b = document.getElementById("ui-help-button");
+        if (!b) return null;
+        const r = b.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return {
+          parent: b.parentElement?.tagName?.toLowerCase() ?? null,
+          zIndex: getComputedStyle(b).zIndex,
+          inertAttr: b.hasAttribute("inert"),
+          effectivelyInert: Boolean(b.closest("[inert]")),
+          hiddenFromAX: Boolean(b.closest('[aria-hidden="true"]')),
+          topmostAtItsOwnPixels: hit ? (hit.id ? "#" + hit.id : desc(hit)) : "none",
+          isOnTop: Boolean(hit && (hit === b || b.contains(hit))),
+        };
+      })(),
     };
   });
+  // Can it be clicked through the scrim?
+  const clicked = await (async () => {
+    const before = await a.win.evaluate(() => Boolean(document.getElementById("ui-help-drawer")));
+    try { await a.win.click("#ui-help-button", { timeout: 4000 }); } catch (e) { return { error: String(e).slice(0, 80) }; }
+    await a.win.waitForTimeout(600);
+    const after = await a.win.evaluate(() => ({
+      drawerOpen: Boolean(document.getElementById("ui-help-drawer")),
+      gateStillUp: Boolean(document.querySelector('[role="dialog"]')),
+      expanded: document.getElementById("ui-help-button")?.getAttribute("aria-expanded"),
+    }));
+    return { drawerBefore: before, ...after };
+  })();
+  d.helpClickThroughScrim = clicked;
   console.log(JSON.stringify(d, null, 2));
   await a.shot("inert");
   fs.writeFileSync(path.join(OUT, "data", "inert.json"), JSON.stringify(d, null, 2));

@@ -1,0 +1,11 @@
+=== B-5 / B-17 URL shapes ===
+ROOT=/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/ctrlA  TAG=ctrlA
+
+SCRIPT FAILED page.reload: Target page, context or browser has been closed
+Call log:
+[2m  - waiting for navigation until "load"[22m
+
+    at boot (/home/user/stream-trimmer/audit/run-2/area-B/lib.cjs:130:15)
+    at async /home/user/stream-trimmer/audit/run-2/area-B/b04-b5-urls-and-cut.cjs:46:13 {
+  log: [ '  - waiting for navigation until "load"' ]
+}

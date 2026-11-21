@@ -1,0 +1,38 @@
+=== B-1 transcript search ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+--- small: 12 cues ---
+[two segments marked] alive bodyLen=1295 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=12 segments=2
+[typed "needle"] alive bodyLen=1299 boundary=false answering=true reactErrors=0 | query="needle" counter="1/1" transcriptRows=12 segments=2
+[typed "needles" (result set empties)] alive bodyLen=1353 boundary=false answering=true reactErrors=0 | query="needles" counter="0/0" transcriptRows=12 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-small/01-after-typing-to-empty.png
+[cleared the box] alive bodyLen=1295 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=12 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-small/02-after-clearing.png
+[pressed Escape] alive bodyLen=1295 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=12 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-small/03-after-escape.png
+[stepped 4 matches of "says"] alive bodyLen=1300 boundary=false answering=true reactErrors=0 | query="says" counter="5/11" transcriptRows=12 segments=2
+[shrank the set while match 5 was active] alive bodyLen=1378 boundary=false answering=true reactErrors=0 | query="says something that is not there" counter="0/0" transcriptRows=12 segments=2
+[Enter / Shift+Enter with zero matches] alive bodyLen=1378 boundary=false answering=true reactErrors=0 | query="says something that is not there" counter="0/0" transcriptRows=12 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-small/04-zero-matches-stepping.png
+[typed haystackk one key at a time] alive bodyLen=1355 boundary=false answering=true reactErrors=0 | query="haystackk" counter="0/0" transcriptRows=12 segments=2
+[deleted it again one key at a time] alive bodyLen=1295 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=12 segments=2
+    final pane: {"rows":["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something","2 00:00:10 to 00:00:14 0:04 line 2 charlie says something"],"total":"00:00:07","source":"Search video 00:00:30 Change","markIn":"","markOut":"","timelineSegments":4,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"12 lines · 12 drawn","transcriptRows":12,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+
+--- 6000cues: 6000 cues ---
+[two segments marked] alive bodyLen=2305 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=40 segments=2
+[typed "needle"] alive bodyLen=2309 boundary=false answering=true reactErrors=0 | query="needle" counter="1/1" transcriptRows=40 segments=2
+[typed "needles" (result set empties)] alive bodyLen=2363 boundary=false answering=true reactErrors=0 | query="needles" counter="0/0" transcriptRows=40 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-6000cues/01-after-typing-to-empty.png
+[cleared the box] alive bodyLen=2305 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=40 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-6000cues/02-after-clearing.png
+[pressed Escape] alive bodyLen=2305 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=40 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-6000cues/03-after-escape.png
+[stepped 4 matches of "says"] alive bodyLen=2312 boundary=false answering=true reactErrors=0 | query="says" counter="5/5997" transcriptRows=40 segments=2
+[shrank the set while match 5 was active] alive bodyLen=2388 boundary=false answering=true reactErrors=0 | query="says something that is not there" counter="0/0" transcriptRows=40 segments=2
+[Enter / Shift+Enter with zero matches] alive bodyLen=2388 boundary=false answering=true reactErrors=0 | query="says something that is not there" counter="0/0" transcriptRows=40 segments=2
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-LIVE-6000cues/04-zero-matches-stepping.png
+[typed haystackk one key at a time] alive bodyLen=2365 boundary=false answering=true reactErrors=0 | query="haystackk" counter="0/0" transcriptRows=40 segments=2
+[deleted it again one key at a time] alive bodyLen=2305 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=40 segments=2
+    final pane: {"rows":["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something","2 00:00:10 to 00:00:14 0:04 line 2 charlie says something"],"total":"00:00:07","source":"Search video 00:00:30 Change","markIn":"","markOut":"","timelineSegments":4,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"6,000 lines · 40 drawn","transcriptRows":40,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+
+VERDICT[LIVE]: small=survived 6000cues=survived

@@ -1,0 +1,64 @@
+=== B-3 / B-10 / sticky cut row ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+--- 1440x900 ---
+  0 seg: cutRow=sticky add=OK markIn=OK cut=OK aspect={"top":86,"bottom":491,"left":370,"w":720} cut={"top":813,"bottom":849,"left":1014,"w":139}
+  1 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OK | cutRow={"top":730,"bottom":831,"left":294,"w":871} lastRow={"top":665,"bottom":717,"left":307,"w":845} centre={"scrollTop":0,"scrollHeight":842,"clientHeight":776}
+  2 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OK | cutRow={"top":760,"bottom":862,"left":294,"w":871} lastRow={"top":723,"bottom":776,"left":307,"w":845} centre={"scrollTop":0,"scrollHeight":900,"clientHeight":776}
+  3 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=COVERED by OUTPUT#ui-stitched-total [t-numeral text-fg] | cutRow={"top":760,"bottom":862,"left":294,"w":871} lastRow={"top":782,"bottom":834,"left":307,"w":845} centre={"scrollTop":0,"scrollHeight":959,"clientHeight":776}
+  4 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OK | cutRow={"top":760,"bottom":862,"left":294,"w":871} lastRow={"top":841,"bottom":893,"left":307,"w":845} centre={"scrollTop":0,"scrollHeight":1018,"clientHeight":776}
+  5 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":760,"bottom":862,"left":294,"w":871} lastRow={"top":899,"bottom":951,"left":307,"w":845} centre={"scrollTop":0,"scrollHeight":1076,"clientHeight":776}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/01-1440x900-five-segments.png
+
+--- 1280x800 ---
+  0 seg: cutRow=sticky add=OK markIn=OK cut=OK aspect={"top":86,"bottom":446,"left":330,"w":640} cut={"top":701,"bottom":737,"left":854,"w":139}
+  1 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OK | cutRow={"top":660,"bottom":762,"left":294,"w":711} lastRow={"top":620,"bottom":672,"left":307,"w":685} centre={"scrollTop":0,"scrollHeight":797,"clientHeight":676}
+  2 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=COVERED by OUTPUT#ui-stitched-total [t-numeral text-fg] | cutRow={"top":660,"bottom":762,"left":294,"w":711} lastRow={"top":678,"bottom":731,"left":307,"w":685} centre={"scrollTop":0,"scrollHeight":855,"clientHeight":676}
+  3 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OK | cutRow={"top":660,"bottom":762,"left":294,"w":711} lastRow={"top":737,"bottom":789,"left":307,"w":685} centre={"scrollTop":0,"scrollHeight":914,"clientHeight":676}
+  4 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":660,"bottom":762,"left":294,"w":711} lastRow={"top":796,"bottom":848,"left":307,"w":685} centre={"scrollTop":0,"scrollHeight":973,"clientHeight":676}
+  5 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":660,"bottom":762,"left":294,"w":711} lastRow={"top":854,"bottom":906,"left":307,"w":685} centre={"scrollTop":0,"scrollHeight":1031,"clientHeight":676}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/02-1280x800-five-segments.png
+
+--- 1100x760 ---
+  0 seg: cutRow=sticky add=OK markIn=OK cut=OK aspect={"top":86,"bottom":386,"left":293,"w":534} cut={"top":673,"bottom":709,"left":674,"w":139}
+  1 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=COVERED by DIV [flex min-w-[200px] flex-1 flex-col gap-1] | cutRow={"top":603,"bottom":722,"left":294,"w":532} lastRow={"top":606,"bottom":658,"left":307,"w":506} centre={"scrollTop":0,"scrollHeight":800,"clientHeight":636}
+  2 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=COVERED by DIV [flex min-w-[200px] flex-1 flex-col gap-1] | cutRow={"top":620,"bottom":722,"left":294,"w":532} lastRow={"top":664,"bottom":717,"left":307,"w":506} centre={"scrollTop":0,"scrollHeight":841,"clientHeight":636}
+  3 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=COVERED by FOOTER [flex min-h-footer flex-wrap items-center gap-x-2 gap-y-1 bor] | cutRow={"top":620,"bottom":722,"left":294,"w":532} lastRow={"top":723,"bottom":775,"left":307,"w":506} centre={"scrollTop":0,"scrollHeight":900,"clientHeight":636}
+  4 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":620,"bottom":722,"left":294,"w":532} lastRow={"top":782,"bottom":834,"left":307,"w":506} centre={"scrollTop":0,"scrollHeight":959,"clientHeight":636}
+  5 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":620,"bottom":722,"left":294,"w":532} lastRow={"top":840,"bottom":892,"left":307,"w":506} centre={"scrollTop":0,"scrollHeight":1017,"clientHeight":636}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/03-1100x760-five-segments.png
+    (warning: 5 segment rows would not clear)
+
+--- 1024x768 ---
+  0 seg: cutRow=sticky add=OK markIn=OK cut=OK aspect={"top":86,"bottom":343,"left":293,"w":458} cut={"top":681,"bottom":717,"left":598,"w":139}
+  1 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":611,"bottom":730,"left":294,"w":456} lastRow={"top":856,"bottom":908,"left":307,"w":430} centre={"scrollTop":0,"scrollHeight":1050,"clientHeight":644}
+  2 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":611,"bottom":730,"left":294,"w":456} lastRow={"top":915,"bottom":967,"left":307,"w":430} centre={"scrollTop":0,"scrollHeight":1109,"clientHeight":644}
+  3 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":611,"bottom":730,"left":294,"w":456} lastRow={"top":974,"bottom":1026,"left":307,"w":430} centre={"scrollTop":0,"scrollHeight":1168,"clientHeight":644}
+  4 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":611,"bottom":730,"left":294,"w":456} lastRow={"top":1032,"bottom":1084,"left":307,"w":430} centre={"scrollTop":0,"scrollHeight":1226,"clientHeight":644}
+  5 seg: addClick=clicked | add=OK markIn=OK cut=OK lastRowX=OFFSCREEN | cutRow={"top":611,"bottom":730,"left":294,"w":456} lastRow={"top":1091,"bottom":1143,"left":307,"w":430} centre={"scrollTop":0,"scrollHeight":1285,"clientHeight":644}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/04-1024x768-five-segments.png
+
+--- 900x600 ---
+  0 seg: cutRow=static add=OK markIn=OK cut=OFFSCREEN aspect={"top":113,"bottom":383,"left":353,"w":480} cut={"top":654,"bottom":690,"left":741,"w":139}
+  1 seg: addClick=clicked | add=OK markIn=OK cut=OFFSCREEN lastRowX=COVERED by FOOTER [flex min-h-footer flex-wrap items-center gap-x-2 gap-y-1 bor] | cutRow={"top":622,"bottom":723,"left":294,"w":598} lastRow={"top":556,"bottom":609,"left":307,"w":572} centre={"scrollTop":0,"scrollHeight":707,"clientHeight":707}
+  2 seg: addClick=clicked | add=OK markIn=OK cut=OFFSCREEN lastRowX=OFFSCREEN | cutRow={"top":680,"bottom":782,"left":294,"w":598} lastRow={"top":615,"bottom":667,"left":307,"w":572} centre={"scrollTop":0,"scrollHeight":765,"clientHeight":765}
+  3 seg: addClick=clicked | add=OK markIn=OK cut=OFFSCREEN lastRowX=OFFSCREEN | cutRow={"top":739,"bottom":840,"left":294,"w":598} lastRow={"top":674,"bottom":726,"left":307,"w":572} centre={"scrollTop":0,"scrollHeight":824,"clientHeight":824}
+  4 seg: addClick=clicked | add=OK markIn=OK cut=OFFSCREEN lastRowX=OFFSCREEN | cutRow={"top":798,"bottom":899,"left":294,"w":598} lastRow={"top":732,"bottom":785,"left":307,"w":572} centre={"scrollTop":0,"scrollHeight":883,"clientHeight":883}
+  5 seg: addClick=clicked | add=OK markIn=OK cut=OFFSCREEN lastRowX=OFFSCREEN | cutRow={"top":856,"bottom":958,"left":294,"w":598} lastRow={"top":791,"bottom":843,"left":307,"w":572} centre={"scrollTop":0,"scrollHeight":941,"clientHeight":941}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/05-900x600-five-segments.png
+
+--- overlap warning ('Already used') with a full segment list ---
+  warning: "Already used Segment 5 (00:01:45 to 00:02:05) overlaps clip C-used-01 at 00:01:45 to 00:02:05. Show what used it Use it "
+  hits: {"add":"OK","cut":"OK","markIn":"OK","lastRowX":"OFFSCREEN","overlapBtn":"OFFSCREEN"}
+  boxes: {"add":{"top":557,"bottom":593,"left":307,"w":150},"cut":{"top":673,"bottom":709,"left":674,"w":139},"markIn":{"top":511,"bottom":547,"left":307,"w":191},"cutRow":{"top":620,"bottom":722,"left":294,"w":532},"aspect":{"top":86,"bottom":386,"left":293,"w":534},"lastRow":{"top":840,"bottom":901,"left":307,"w":506}}
+  centre scroll: {"scrollTop":0,"scrollHeight":1143,"clientHeight":636}
+  pane: {"rows":["1 00:00:10 to 00:00:20 0:10 line 2 charlie says something","2 00:00:30 to 00:00:40 0:10 the needle in the haystack","3 00:00:50 to 00:01:00 0:10 line 9 bravo says something","4 00:02:50 to 00:03:00 0:10 line 9 bravo says something","5 00:01:45 to 00:02:05 0:20 used line 9 bravo says something"],"total":"00:01:00","source":"Layout video 00:10:00 Change","markIn":"","markOut":"","timelineSegments":10,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":"Already used Segment 5 (00:01:45 to 00:02:05) overlaps clip C-used-01 at 00:01:45 to 00:02:05. Show what used it Use it anyway","transcriptHeader":"10 lines · 10 drawn","transcriptRows":10,"cutDisabled":true,"addDisabled":true,"cancelVisible":false}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/06-overlap-warning-with-sticky-row.png
+  click 'Use it anyway': clicked
+  after: {"add":"COVERED by HEADER [relative z-30 flex min-h-header flex-wrap items-center gap-x]","cut":"OK","markIn":"COVERED by DIV [flex min-w-0 flex-1 items-center gap-1 overflow-x-auto]","lastRowX":"OK","overlapBtn":"OK"}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/07-after-use-it-anyway.png
+
+--- help drawer open at 1100x760, ONE segment, clean ---
+  before opening the drawer: {"add":"OK","cut":"OK","markIn":"OK","lastRowX":"OK","overlapBtn":"missing"}
+  hits: {"add":"OFFSCREEN","cut":"OFFSCREEN","markIn":"OFFSCREEN","lastRowX":"OFFSCREEN","overlapBtn":"missing"} cutRow: {"top":1007,"bottom":1126,"left":8,"w":419}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b05-LIVE/08-help-drawer-open.png

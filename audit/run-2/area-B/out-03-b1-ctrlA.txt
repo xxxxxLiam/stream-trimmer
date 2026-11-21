@@ -1,0 +1,18 @@
+=== B-1 transcript search ===
+ROOT=/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/ctrlA  TAG=ctrlA
+
+--- small: 12 cues ---
+[two segments marked] alive bodyLen=1295 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=12 segments=2
+[typed "needle"] alive bodyLen=1299 boundary=false answering=true reactErrors=0 | query="needle" counter="1/1" transcriptRows=12 segments=2
+[typed "needles" (result set empties)] *** CRASHED *** bodyLen=0 boundary=false answering=true reactErrors=0 | query=null counter=null transcriptRows=0 segments=0
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-ctrlA-small/01-after-typing-to-empty.png
+    final pane: null
+
+--- 6000cues: 6000 cues ---
+[two segments marked] alive bodyLen=2305 boundary=false answering=true reactErrors=0 | query="" counter=null transcriptRows=40 segments=2
+[typed "needle"] alive bodyLen=2309 boundary=false answering=true reactErrors=0 | query="needle" counter="1/1" transcriptRows=40 segments=2
+[typed "needles" (result set empties)] *** CRASHED *** bodyLen=0 boundary=false answering=true reactErrors=0 | query=null counter=null transcriptRows=0 segments=0
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b03-ctrlA-6000cues/01-after-typing-to-empty.png
+    final pane: null
+
+VERDICT[ctrlA]: small=CRASHED 6000cues=CRASHED

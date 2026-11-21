@@ -1,0 +1,14 @@
+=== B-7 edits during a cut ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+before the cut: ["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something","2 00:00:20 to 00:00:24 0:04 line 5 foxtrot says something","3 00:00:10 to 00:00:13 0:03 line 2 charlie says something"]
+mid-cut controls: {"rows":3,"removeDisabled":[true,true,true],"removeTitle":"Segments are locked while the cut runs","draggable":["false","false","false"],"addDisabled":true,"cutDisabled":true}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b08-LIVE/01-midcut-controls.png
+rows after clicking segment 2's x mid-cut: 3 -> 3
+rows after Delete and Alt+Up mid-cut: ["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something","2 00:00:20 to 00:00:24 0:04 line 5 foxtrot says something","3 00:00:10 to 00:00:13 0:03 line 2 charlie says something"]
+rows after trying to Add mid-cut: 3
+
+file produced: ["Mutate [00-00-02-00-00-13].mp4"]
+  Mutate [00-00-02-00-00-13].mp4: decoded=10.01s  (the cut was launched with 3 segments = 10s)
+sections the engine cut: ["https://www.youtube.com/watch?v=jNQXAC9IVRw","https://www.youtube.com/watch?v=ggggggggggg","*2.00-5.00","*20.00-24.00","*10.00-13.00","*2.00-5.00","*20.00-24.00","*10.00-13.00"]
+rows after the cut finished: []
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b08-LIVE/02-after-cut.png
