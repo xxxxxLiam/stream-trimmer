@@ -12,6 +12,8 @@ import {
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../context/ClipperContext";
 import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
+import { setPlayhead } from "../hooks/useSegments";
+import { useIsTabActive } from "../context/WorkspaceContext";
 import PlayerControls from "./PlayerControls";
 
 // Electron's window-open handler routes this to the system browser; in a
@@ -27,6 +29,13 @@ export default function PreviewPanel() {
   const player = useYouTubePlayer(videoId);
   const embedBlocked = player.blocked;
   const [loopSelection, setLoopSelection] = useState(false);
+
+  // Publish the playhead so the transcript highlight and the timeline follow it. The store is
+  // shared across workspace tabs, so only the visible tab may write.
+  const tabActive = useIsTabActive();
+  useEffect(() => {
+    if (tabActive) setPlayhead(player.currentTime);
+  }, [tabActive, player.currentTime]);
 
   // Apply seek requests coming from the transcript or the range slider.
   useEffect(() => {

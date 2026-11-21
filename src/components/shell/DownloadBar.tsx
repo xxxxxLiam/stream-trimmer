@@ -1,16 +1,14 @@
 /**
  * File: DownloadBar.tsx
  * Path: src/components/shell/DownloadBar.tsx
- * Description: Interim primary action in the centre column: status, real failure
- *   text, progress and the single filled-accent Download button (⌘↵). Carries the
- *   existing download() call unchanged. TODO(Phase C): fold into MarkBar's
- *   "Cut as one file" so there is exactly one primary action on screen.
+ * Description: Status strip in the centre column: the real failure text, progress and
+ *   Cancel. It has no primary button: the one filled-accent action on screen is MarkBar's
+ *   "Cut as one file" (also ⌘↵).
  */
-import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useClipperContext } from "../../context/ClipperContext";
-import { useIsTabActive } from "../../context/WorkspaceContext";
 import { formatBytes, formatTimestamp } from "../../lib/clip";
+import { useSegments } from "../../hooks/useSegments";
 
 export default function DownloadBar() {
   const {
@@ -19,7 +17,6 @@ export default function DownloadBar() {
     downloading,
     validationError,
     format,
-    download,
     start,
     end,
     estimatedBytes,
@@ -31,11 +28,10 @@ export default function DownloadBar() {
     cancelDownload,
     error,
   } = useClipperContext();
-  const active = useIsTabActive();
 
+  const { segments, total } = useSegments();
+  const hasSegments = segments.length > 0;
   const needsSaveDir = isElectron && !saveDir;
-  const disabled =
-    !info || downloading || Boolean(validationError) || needsSaveDir;
 
   // Fixes the old bug where a failed /api/info still read "Ready": when there is
   // no video and an error, say the error.
@@ -46,27 +42,17 @@ export default function DownloadBar() {
       ? "Loading the video"
       : !info
         ? "Paste a YouTube link to begin"
-        : validationError
-          ? validationError
-          : needsSaveDir
-            ? "Choose a clips folder in the footer"
-            : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
+        : needsSaveDir
+          ? "Choose a clips folder in the footer"
+          : hasSegments
+            ? `${segments.length} ${segments.length === 1 ? "segment" : "segments"}, ${formatTimestamp(total)} · ${format.toUpperCase()}`
+            : validationError
+              ? validationError
+              : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
   const sizeLabel =
-    info && !validationError && estimatedBytes > 0
+    info && !hasSegments && !validationError && estimatedBytes > 0
       ? `~${formatBytes(estimatedBytes)} estimated`
       : "";
-
-  useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "Enter") {
-        e.preventDefault();
-        if (!disabled) void download();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [active, disabled, download]);
 
   const pct = Math.max(0, Math.min(100, downloadProgress));
   const processing = downloadPhase === "processing";
@@ -119,18 +105,7 @@ export default function DownloadBar() {
               Cancel
             </button>
           </div>
-        ) : (
-          <button
-            type="button"
-            id="ui-primary-action"
-            onClick={() => void download()}
-            disabled={disabled}
-            className="btn-primary"
-          >
-            <span>{`Download ${format.toUpperCase()}`}</span>
-            <span className="kbd border-black/20 bg-black/10 text-on-accent">⌘↵</span>
-          </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

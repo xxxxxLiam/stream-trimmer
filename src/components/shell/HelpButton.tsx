@@ -20,7 +20,7 @@ export default function HelpButton({
       className="icon-btn"
       onClick={onToggle}
       aria-label="Help"
-      aria-pressed={open}
+      aria-expanded={open}
       aria-controls="ui-help-drawer"
       title="Help (⌘/)"
     >

@@ -17,7 +17,7 @@ import {
   TabActiveProvider,
   useWorkspace,
 } from "./context/WorkspaceContext";
-import { CampaignProvider } from "./context/CampaignContext";
+import { CampaignProvider, useCampaign } from "./context/CampaignContext";
 import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
 import ChannelLockGate from "./components/ChannelLockGate";
@@ -26,6 +26,8 @@ import PreviewPanel from "./components/PreviewPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DragOutHandle from "./components/DragOutHandle";
 import YouTubeConnectModal from "./components/YouTubeConnectModal";
+import { clearSegments, useSegments } from "./hooks/useSegments";
+import type { Segment } from "./lib/segments";
 import {
   restoreConnection,
   useYouTubeConnection,
@@ -36,6 +38,7 @@ import AppFooter from "./components/shell/AppFooter";
 import ThreeColumnLayout from "./components/shell/ThreeColumnLayout";
 import DownloadBar from "./components/shell/DownloadBar";
 // Phase B mount points. Replace the files, never this wiring.
+import CampaignMenu from "./components/CampaignMenu";
 import TranscriptColumn from "./components/TranscriptColumn"; // B3, left column
 import Timeline from "./components/Timeline"; // B2, centre under video
 import MarkBar from "./components/MarkBar"; // B2, centre under Timeline
@@ -138,7 +141,32 @@ function TabReporter({ id }: { id: string }) {
 }
 
 function Layout({ active }: { active: boolean }) {
-  const { exportingComments, revealLastSaved } = useClipperContext();
+  const {
+    exportingComments,
+    revealLastSaved,
+    isElectron,
+    saveDir,
+    setSaveDir,
+    format,
+    quality,
+    setFormat,
+    setQuality,
+    videoId,
+    download,
+    downloads,
+    setStartText,
+    setEndText,
+  } = useClipperContext();
+  const {
+    active: campaign,
+    folders,
+    update,
+    nextClipId,
+    recordUse,
+    pickClipsDir,
+    pickDataDir,
+  } = useCampaign();
+  const { playhead } = useSegments();
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
@@ -154,6 +182,57 @@ function Layout({ active }: { active: boolean }) {
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeCopy = useCallback(() => setCopyOpen(false), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
+  // Switching campaign re-points the saving folder, format and quality at once. The clips
+  // folder lives on the campaign; the clipper still saves to its own saveDir, so mirror it.
+  useEffect(() => {
+    if (isElectron && folders.clipsDir && folders.clipsDir !== saveDir) {
+      setSaveDir(folders.clipsDir);
+    }
+  }, [isElectron, folders.clipsDir, saveDir, setSaveDir]);
+
+  const campaignId = campaign?.id ?? null;
+  // True from the moment a switch asks the clipper to change format/quality until it has.
+  // Without it the write-back below would copy the OLD values over the new campaign.
+  const repointing = useRef(false);
+  useEffect(() => {
+    if (!campaign) return;
+    repointing.current = campaign.format !== format || campaign.quality !== quality;
+    setFormat(campaign.format);
+    setQuality(campaign.quality);
+    // Only a switch (or first load) re-points; later edits flow the other way below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId]);
+
+  // Format and quality are set in the footer and belong to the campaign.
+  useEffect(() => {
+    if (!campaign) return;
+    const same = campaign.format === format && campaign.quality === quality;
+    if (repointing.current) {
+      if (same) repointing.current = false;
+      return;
+    }
+    if (!same) update(campaign.id, { format, quality });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [format, quality]);
+
+  // Cut: name the clip from the campaign pattern, then record its ranges as used so the
+  // no-reuse check and the bank stay in agreement with no bookkeeping.
+  const cutClip = useCallback(
+    async (segments: Segment[]) => {
+      if (!videoId || segments.length === 0) return;
+      const cutCampaignId = campaign?.id;
+      const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
+      const clipId = campaign ? nextClipId(videoId, taken) : null;
+      const ok = await download({ segments, clipId: clipId ?? undefined });
+      if (!ok) return;
+      if (cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
+      clearSegments();
+      setStartText("");
+      setEndText("");
+    },
+    [videoId, campaign, downloads, nextClipId, download, recordUse, setStartText, setEndText],
+  );
 
   // Shell-level shortcuts (BUILD-SPEC section 12). Active tab only.
   const revealRef = useRef(revealLastSaved);
@@ -202,16 +281,17 @@ function Layout({ active }: { active: boolean }) {
           settingsOpen={settingsOpen}
           onToggleSettings={() => setSettingsOpen((v) => !v)}
           onCloseSettings={closeSettings}
+          campaignMenu={<CampaignMenu />}
         />
 
         {screen === "workspace" ? (
           <ThreeColumnLayout
-            transcript={<TranscriptColumn />}
+            transcript={<TranscriptColumn playhead={playhead} />}
             centre={
               <>
                 <PreviewPanel />
                 <Timeline />
-                <MarkBar />
+                <MarkBar onCut={(segs) => void cutClip(segs)} />
                 <DownloadBar />
               </>
             }
@@ -234,7 +314,10 @@ function Layout({ active }: { active: boolean }) {
           </div>
         )}
 
-        <AppFooter />
+        <AppFooter
+          onPickClipsDir={isElectron ? pickClipsDir : undefined}
+          onPickDataDir={isElectron ? pickDataDir : undefined}
+        />
       </main>
 
       <SymbolPalette open={symbolsOpen} onClose={closeSymbols} />

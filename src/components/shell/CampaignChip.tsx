@@ -2,10 +2,19 @@
  * File: CampaignChip.tsx
  * Path: src/components/shell/CampaignChip.tsx
  * Description: Header chip showing which campaign a clip will be cut for. Opens a
- *   popover whose body is the `menu` slot (TODO(B4): campaign picker + create UI).
+ *   popover whose body is the `menu` slot (App.tsx passes CampaignMenu).
  */
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useCallback,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { useCampaign } from "../../context/CampaignContext";
+import CampaignMenu from "../CampaignMenu";
 import { IconChevronDown } from "./icons";
 import { useDismiss } from "./useDismiss";
 
@@ -37,14 +46,13 @@ export default function CampaignChip({ menu }: { menu?: ReactNode }) {
         <div
           role="dialog"
           aria-label="Campaign"
-          className="popover absolute left-0 top-full z-40 mt-1 w-[280px]"
+          className="popover absolute left-0 top-full z-40 mt-1 w-[min(360px,calc(100vw-24px))]"
         >
-          {menu ?? (
-            // TODO(B4): replaced by campaigns agent (picker, create, edit).
-            <p className="text-meta text-fg-dim">
-              No campaigns yet. Create one to set a clip length band, a clip id
-              pattern and two save folders.
-            </p>
+          {isValidElement(menu) ? (
+            // The menu closes the popover itself after a switch or save.
+            cloneElement(menu as ReactElement<{ onClose?: () => void }>, { onClose: close })
+          ) : (
+            (menu ?? <CampaignMenu onClose={close} />)
           )}
         </div>
       )}

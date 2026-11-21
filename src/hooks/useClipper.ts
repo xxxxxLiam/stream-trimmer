@@ -513,15 +513,27 @@ export function useClipper() {
     downloadAbortRef.current = null;
   }, []);
 
-  const download = useCallback(async () => {
+  /**
+   * Cuts the clip. With no argument it cuts the in/out range as before. `opts.segments`
+   * cuts a list of ranges joined, in order, into one file (the server concatenates).
+   * `opts.clipId` names the file after the campaign's clip id. Resolves true when the
+   * clip was saved, so the caller can record the used ranges.
+   */
+  const download = useCallback(async (opts?: DownloadOptions): Promise<boolean> => {
     if (!info) {
       setError("Load a video first");
-      return;
+      return false;
     }
-    if (validationError) {
+    const multi = opts?.segments && opts.segments.length > 0 ? opts.segments : null;
+    // The in/out fields only matter when no segment list is given.
+    if (!multi && validationError) {
       setError(validationError);
-      return;
+      return false;
     }
+    const segs = multi ?? [{ start, end }];
+    const cutStart = segs[0].start;
+    const cutEnd = segs[segs.length - 1].end;
+    let saved = false;
     setError("");
     setDownloading(true);
     setDownloadProgress(0);
@@ -575,8 +587,7 @@ export function useClipper() {
           signal: controller.signal,
           body: JSON.stringify({
             url: normalizeYouTubeUrl(url),
-            start,
-            end,
+            ...(segs.length > 1 ? { segments: segs } : { start: cutStart, end: cutEnd }),
             format,
             quality,
             deliver: deliverPath ? "path" : "stream",
@@ -600,7 +611,9 @@ export function useClipper() {
         : null;
       const blob = deliverPath ? null : await res.blob();
       const ext = format === "mp3" ? "mp3" : "mp4";
-      const filename = buildClipFilename(info.title, start, end, ext);
+      const filename = opts?.clipId
+        ? `${sanitizeFilename(opts.clipId)}.${ext}`
+        : buildClipFilename(info.title, cutStart, cutEnd, ext);
       // What the server actually produced — YouTube may only serve renditions
       // below the requested height, in which case the clip is still valid.
       const deliveredHeight = Number(res.headers.get("X-Delivered-Height"));
@@ -659,7 +672,7 @@ export function useClipper() {
           dir: saveDir,
           detail:
             detail ??
-            `${formatTimestamp(start)} – ${formatTimestamp(end)} · ${format.toUpperCase()}`,
+            `${segs.map((r) => `${formatTimestamp(r.start)} – ${formatTimestamp(r.end)}`).join("; ")} · ${format.toUpperCase()}`,
         });
       } else {
         setLastSavedPath(null);
@@ -685,6 +698,7 @@ export function useClipper() {
       }
       setDownloadProgress(100);
       setDownloadPhase("done");
+      saved = true;
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
         setDownloadPhase("idle");
@@ -714,6 +728,7 @@ export function useClipper() {
         setDownloadProgress(0);
       }, 1200);
     }
+    return saved;
   }, [
     info,
     validationError,
@@ -801,5 +816,10 @@ export function useClipper() {
     commentsNote,
   };
 }
+
+export type DownloadOptions = {
+  segments?: Array<{ start: number; end: number }>;
+  clipId?: string;
+};
 
 export type ClipperState = ReturnType<typeof useClipper>;

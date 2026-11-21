@@ -61,6 +61,8 @@ function FormatChip() {
   );
 }
 
+type Pick = () => Promise<string | null | void> | void;
+
 function FolderChip({
   id,
   label,
@@ -71,7 +73,7 @@ function FolderChip({
   id: string;
   label: string;
   dir: string | null | undefined;
-  onPick?: () => void;
+  onPick?: Pick;
   disabledReason?: string;
 }) {
   const disabled = !onPick;
@@ -80,7 +82,7 @@ function FolderChip({
       type="button"
       id={id}
       className="chip"
-      onClick={onPick}
+      onClick={() => void onPick?.()}
       disabled={disabled}
       title={
         disabled
@@ -97,22 +99,115 @@ function FolderChip({
   );
 }
 
+/**
+ * The data folder starts as a suggestion (a sibling "channel-data" next to Clips). Until the
+ * user accepts or replaces it, the chip says so and opens a confirm step instead of picking.
+ */
+function DataChip({
+  dir,
+  confirmed,
+  onPick,
+  onConfirm,
+  disabledReason,
+}: {
+  dir: string;
+  confirmed: boolean;
+  onPick?: Pick;
+  onConfirm: () => void;
+  disabledReason: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(ref, open, close);
+
+  if (confirmed || !dir) {
+    return (
+      <FolderChip
+        id="ui-footer-data"
+        label="Data"
+        dir={dir}
+        onPick={onPick}
+        disabledReason={disabledReason}
+      />
+    );
+  }
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        id="ui-footer-data"
+        className="chip"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        title={`Data folder: ${dir}. Confirm or choose another.`}
+      >
+        <IconFolder className="shrink-0 text-fg-dim" />
+        <span className="text-fg-dim">Data</span>
+        <span className="max-w-[160px] truncate">{baseName(dir)}</span>
+        <span className="text-accent">Confirm</span>
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Confirm the data folder"
+          className="popover absolute bottom-full left-0 z-40 mb-1 flex w-[320px] flex-col gap-3"
+        >
+          <p className="m-0 text-body">
+            Exported channel data will save to this folder, kept apart from your clips.
+          </p>
+          <p className="m-0 break-all font-mono text-meta text-fg-dim">{dir}</p>
+          <div className="flex justify-end gap-2">
+            {onPick && (
+              <button
+                type="button"
+                className="btn"
+                onClick={async () => {
+                  await onPick();
+                  close();
+                }}
+              >
+                Choose another
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                onConfirm();
+                close();
+              }}
+            >
+              Use this folder
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export type AppFooterProps = {
-  /** Override the Clips picker. Defaults to the existing saveDir picker. */
-  onPickClipsDir?: () => void;
-  /** TODO(B4): campaign data-folder picker. Chip is disabled until provided. */
-  onPickDataDir?: () => void;
+  /** Opens the clips-folder picker. Resolves to a problem to show, or null. */
+  onPickClipsDir?: Pick;
+  /** Opens the data-folder picker. Resolves to a problem to show, or null. */
+  onPickDataDir?: Pick;
 };
 
 export default function AppFooter({ onPickClipsDir, onPickDataDir }: AppFooterProps) {
-  const { active } = useCampaign();
-  const { isElectron, saveDir, pickSaveDir, downloads } = useClipperContext();
+  const { active, folders, confirmDataDir, usedCount } = useCampaign();
+  const { saveDir, downloads } = useClipperContext();
+  const [problem, setProblem] = useState("");
 
-  const clipsDir = active?.clipsDir ?? saveDir;
-  const usedCount = active
-    ? Object.values(active.usedRanges).reduce((n, r) => n + r.length, 0)
-    : 0;
-  const pickClips = isElectron ? (onPickClipsDir ?? pickSaveDir) : undefined;
+  const wrap = (pick?: Pick): Pick | undefined =>
+    pick
+      ? async () => {
+          const r = await pick();
+          setProblem(typeof r === "string" ? r : "");
+          return r;
+        }
+      : undefined;
 
   return (
     <footer className="flex min-h-footer flex-wrap items-center gap-x-2 gap-y-1 border-t border-hairline px-3 py-1">
@@ -123,17 +218,22 @@ export default function AppFooter({ onPickClipsDir, onPickDataDir }: AppFooterPr
       <FolderChip
         id="ui-footer-clips"
         label="Clips"
-        dir={clipsDir}
-        onPick={pickClips}
+        dir={folders.clipsDir || saveDir}
+        onPick={wrap(onPickClipsDir)}
         disabledReason="Browser downloads go to your Downloads folder. Use the desktop app to choose a folder."
       />
-      <FolderChip
-        id="ui-footer-data"
-        label="Data"
-        dir={active?.dataDir}
-        onPick={onPickDataDir}
-        disabledReason="Create a campaign to set where exported channel data is saved."
+      <DataChip
+        dir={folders.dataDir}
+        confirmed={folders.dataDirConfirmed}
+        onPick={wrap(onPickDataDir)}
+        onConfirm={confirmDataDir}
+        disabledReason="Exported channel data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
       />
+      {problem && (
+        <span role="alert" className="text-meta text-accent">
+          {problem}
+        </span>
+      )}
       <div className="ml-auto flex items-center gap-3 text-meta text-fg-dim" aria-live="polite">
         <span>
           <span className="font-mono text-fg">{downloads.length}</span> saved
