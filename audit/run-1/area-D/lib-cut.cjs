@@ -19,26 +19,49 @@ async function loadVideo(a, url = "https://www.youtube.com/watch?v=stub0000001")
 }
 
 /** Mark in at `from`, out at `to` (seconds), add the segment. */
+const tc = (s) =>
+  [Math.floor(s / 3600), Math.floor((s % 3600) / 60), Math.floor(s % 60)]
+    .map((n) => String(n).padStart(2, "0"))
+    .join(":");
+
+/** Type the in and out timecodes into the product's own fields, then add. */
 async function addSegment(a, from, to) {
-  await a.win.evaluate((t) => {
-    const v = document.querySelector("video");
-    if (v) { v.currentTime = t; v.dispatchEvent(new Event("timeupdate")); }
-  }, from);
-  await a.win.waitForTimeout(250);
-  await a.win.click("#ui-mark-in");
-  await a.win.evaluate((t) => {
-    const v = document.querySelector("video");
-    if (v) { v.currentTime = t; v.dispatchEvent(new Event("timeupdate")); }
-  }, to);
-  await a.win.waitForTimeout(250);
-  await a.win.click("#ui-mark-out");
-  await a.win.waitForTimeout(250);
+  await a.win.fill("#ui-mark-in", tc(from));
+  await a.win.fill("#ui-mark-out", tc(to));
+  await a.win.waitForTimeout(400);
+  const enabled = !(await a.win.locator("#ui-add-segment").isDisabled());
+  if (!enabled) {
+    const why = await a.win.evaluate(() => {
+      const p = document.querySelector("#ui-overlap-warning");
+      const s = Array.from(document.querySelectorAll('[role="status"]')).map((e) => e.innerText.trim());
+      return { overlap: p ? p.innerText : null, statuses: s.slice(0, 6) };
+    });
+    throw new Error("Add segment stayed disabled for " + tc(from) + "-" + tc(to) + ": " + JSON.stringify(why));
+  }
   await a.win.click("#ui-add-segment");
   await a.win.waitForTimeout(400);
 }
 
-/** Click Cut and wait for the saved toast (or a failure). */
+/**
+ * Click Cut and wait for the saved toast (or a failure). The toast is sticky
+ * by design, so it is dismissed first or the next cut would see a stale one.
+ */
 async function cut(a, waitMs = 40000) {
+  await a.win.evaluate(() => {
+    const b = Array.from(document.querySelectorAll("button")).find((x) =>
+      /^(Dismiss|Close)/i.test(x.getAttribute("aria-label") || "") && x.closest('[role="status"]'));
+    if (b) b.click();
+  });
+  for (let i = 0; i < 20; i++) {
+    const stale = await a.win.evaluate(() => /Clip saved/.test(document.body.innerText));
+    if (!stale) break;
+    await a.win.evaluate(() => {
+      const t = Array.from(document.querySelectorAll('[role="status"]')).find((e) => /Clip saved/.test(e.innerText));
+      const b = t && Array.from(t.querySelectorAll("button")).pop();
+      if (b) b.click();
+    });
+    await a.win.waitForTimeout(250);
+  }
   await a.win.click("#ui-cut");
   const deadline = Date.now() + waitMs;
   while (Date.now() < deadline) {

@@ -1,0 +1,24 @@
+--- kill after 900ms ---
+[C10] clicking Import 5000 clips, then SIGKILL after 900 ms (pid 26941 )
+[C10] settings.json exists: true bytes: 701
+[C10] stray .tmp file left behind: false
+[C10] settings.json parses: yes
+[C10] rows on disk after the kill: 0
+[C10] campaigns on disk: ["acme"]
+[C10] after relaunch, count line: "0 clips"
+[C10] after relaunch, rows in DOM: 0
+[C10] after relaunch, rows on disk: 0
+[C10] shot: /home/user/stream-trimmer/audit/out/area-C/C10-relaunch/01-after-relaunch.png
+[C10] pageErrors: []
+--- kill after 3000ms ---
+[C10] clicking Import 5000 clips, then SIGKILL after 3000 ms (pid 27503 )
+[C10] settings.json exists: true bytes: 1148396
+[C10] stray .tmp file left behind: false
+[C10] settings.json parses: yes
+[C10] rows on disk after the kill: 5000
+[C10] campaigns on disk: ["acme"]
+[C10] after relaunch, count line: "5000 clips"
+[C10] after relaunch, rows in DOM: 5000
+[C10] after relaunch, rows on disk: 5000
+[C10] shot: /home/user/stream-trimmer/audit/out/area-C/C10-relaunch/01-after-relaunch.png
+[C10] pageErrors: []

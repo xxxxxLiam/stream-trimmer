@@ -12,7 +12,7 @@ const step1 = (win) =>
     const li = d?.querySelectorAll("ol li")[0];
     const sel = d?.querySelector("select");
     return {
-      step1: li ? li.innerText.split("\n")[0] : null,
+      step1: li ? li.innerText.split("\n").filter((s) => s.trim() && !/^\d+$/.test(s.trim()))[0] : null,
       dropdown: sel ? sel.value : "(collapsed)",
       working: Array.from(d?.querySelectorAll('[role="status"]') ?? []).map((e) => e.textContent.trim()),
     };

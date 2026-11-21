@@ -1,0 +1,31 @@
+[C08] start chip: Campaign Acme Q4 | footer: Acme Q4 uses | MP4 | Best | Clips | clips-acme | Data | data-acme | 0 saved | 0 ranges used
+[C08] create form folders: "New campaign | Name | Target min (s) | Target max (s) | Hard cap (s) | Clip id prefix | Clip id pattern |  | Next clip id looks like XX-VIDEOID-01 |  | Format | MP4 video | MP3 audio | Clips folder | clips-acme | Choose | Data folder | data-acme | Choose | Cancel | Create"
+[C08] after create, chip: Campaign Beta Launch
+[C08] after create, campaigns in state: [{"id":"acme","name":"Acme Q4","clipsDir":"/tmp/clips-acme","dataDir":"/tmp/data-acme"},{"id":"beta-launch","name":"Beta Launch","clipsDir":"/tmp/clips-acme","dataDir":"/tmp/data-acme"}]
+[C08] after create, footer: Beta Launch uses | MP4 | Best | Clips | clips-acme | Data | data-acme | 0 saved | 0 ranges used
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/01-created-beta.png
+[C08] rename to an existing name -> menu now: Acme Q4 | 0:30 to 1:00 | Edit | Remove | Acme Q4 | 0:30 to 1:00 | Edit | Remove | New campaign
+[C08] rename to an existing name -> ids/names: [["acme","Acme Q4"],["beta-launch","Acme Q4"]]
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/02-duplicate-names.png
+[C08] rename to empty -> blocked with a message? true "Give the campaign a name."
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/03-rename-empty.png
+[C08] 500-char name -> chip: "Campaign Q4 brand refresh for a client with a very long name Q4 brand refresh fo" len: 509
+[C08] 500-char name -> header metrics: {"scrollW":1100,"clientW":1100,"bodyScrollW":1100,"bodyClientW":1100}
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/04-long-name-header.png
+[C08] 500-char name -> menu row: "Acme Q4 | 0:30 to 1:00 | Edit | Remove | Q4 brand refresh for a client with a very long name Q4 brand refresh for a client with a very long name Q4 brand refresh for a client with a very long name Q4 "
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/05-long-name-menu.png
+[C08] emoji name -> chip: "Campaign 🔥🔥🔥"
+[C08] emoji name -> state: [["acme","Acme Q4","AC"],["beta-launch","🔥🔥🔥","BL"]]
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/06-emoji-name.png
+[C08] back on Acme, bank rows on screen: 1 clips
+[C08] bank before delete: {"acme":{"stub0000001":[{"id":"A01","label":"A01 label","segments":[{"start":60,"end":90}],"status":"banked","category":"hook","tier":"1"}]}}
+[C08] first click on Remove shows: "Acme Q4 | 0:30 to 1:00 | Edit | Confirm | 🔥🔥🔥 | 0:30 to 1:00 | Edit | Remove | New campaign"
+[C08] after delete, campaigns: [["beta-launch","🔥🔥🔥"]]
+[C08] after delete, bank in settings.json: {"acme":{"stub0000001":[{"id":"A01","label":"A01 label","segments":[{"start":60,"end":90}],"status":"banked","category":"hook","tier":"1"}]}}
+[C08] after delete, chip: Campaign 🔥🔥🔥
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/07-after-delete.png
+[C08] recreated same name -> id: [["beta-launch","🔥🔥🔥"],["acme-q4","Acme Q4"]]
+[C08] recreated same name -> bank view: ["This video","Bank","All saved","Import timestamps","0 clips","Sort by tier","Nothing banked for this video. Import timestamps once and they stay here."]
+[C08] recreated same name -> OLD ROWS BACK? false
+[C08] shot: /home/user/stream-trimmer/audit/out/area-C/C08-campaigns/08-recreated-same-name.png
+[C08] pageErrors: []
