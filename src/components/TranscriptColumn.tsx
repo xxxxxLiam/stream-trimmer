@@ -107,6 +107,16 @@ function highlight(text: string, q: string): ReactNode {
   return out;
 }
 
+/**
+ * The match the search is on, or null. `active` is reset in an effect, so for one render
+ * after the result set shrinks (typing one more character, clearing the box, Escape) it can
+ * point past the end of `matches`. Reading `.line` off that undefined threw, and with no
+ * error boundary React unmounted the whole app (B-1).
+ */
+export function pickActiveMatch<T>(matches: readonly T[], active: number): T | null {
+  return active >= 0 && active < matches.length ? matches[active] : null;
+}
+
 export default function TranscriptColumn({
   className,
   playhead,
@@ -302,7 +312,7 @@ export default function TranscriptColumn({
 
   // ---- derived view state ----------------------------------------------------------------
   const selected = drag ? snapRangeByIndex(w.all, drag.a, drag.b) : null;
-  const activeMatch = w.active >= 0 ? w.matches[w.active] : null;
+  const activeMatch = pickActiveMatch(w.matches, w.active);
   const matchLines = useMemo(() => {
     const s = new Set<number>();
     for (const m of w.matches) if (m.line >= w.win.from && m.line < w.win.to) s.add(m.line);

@@ -18,7 +18,7 @@
  * a new one. A private session that is closed and never reopened is never
  * rotated, so the file keeps working.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRepeat,
@@ -34,6 +34,7 @@ import DiagnosticsDisclosure from "./DiagnosticsDisclosure";
 import BrandMark from "./shell/BrandMark";
 import {
   checkBrowserConnection,
+  continueSignedOut,
   importCookies,
   importDroppedCookies,
   openYouTubeSignIn,
@@ -112,8 +113,14 @@ export const COOKIE_EXTENSION_WARNING =
 // prompt for keychain access again, every time the modal re-renders.
 let autoSwept = false;
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+
 export default function YouTubeConnectModal({ open }: { open: boolean }) {
   const state = useYouTubeConnection();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // The full dialog (not the launch-time placeholder) is showing.
+  const gated = open && !state.restoring && !state.skipped;
   const [showBrowserRoute, setShowBrowserRoute] = useState(false);
   const [dragging, setDragging] = useState(false);
   const ext = extensionFor(state.browser);
@@ -156,6 +163,62 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
     };
   }, [open]);
 
+  // Behave like the modal that aria-modal claims: take focus, keep Tab inside,
+  // and make everything behind it inert. This is only safe because the dialog
+  // also offers a way out (the "Continue without signing in" button, and
+  // Escape): never ship the trap without that route.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!gated || !dialog) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const hidden: Array<{ el: Element; aria: string | null }> = [];
+    for (const el of Array.from(dialog.parentElement?.children ?? [])) {
+      if (el === dialog || el.hasAttribute("inert")) continue;
+      hidden.push({ el, aria: el.getAttribute("aria-hidden") });
+      el.setAttribute("inert", "");
+      el.setAttribute("aria-hidden", "true");
+    }
+    dialog.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        continueSignedOut();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === dialog)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (!dialog.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      for (const { el, aria } of hidden) {
+        el.removeAttribute("inert");
+        if (aria === null) el.removeAttribute("aria-hidden");
+        else el.setAttribute("aria-hidden", aria);
+      }
+      if (previous && previous !== document.body && previous.isConnected) previous.focus();
+    };
+  }, [gated]);
+
   if (!open) return null;
 
   // Silent launch-time restore: show a quiet placeholder rather than the
@@ -184,6 +247,9 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
     );
   }
 
+  // The user chose to carry on signed out; the header chip is the way back.
+  if (state.skipped) return null;
+
   const step = (n: number, title: string, detail: React.ReactNode) => (
     <li className="flex gap-3">
       <span
@@ -201,7 +267,9 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/90 p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/90 p-6 outline-none"
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="youtube-connect-title"
@@ -221,6 +289,18 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
           {expired
             ? "Without a valid sign-in YouTube gives 360p. Import a fresh cookies.txt to get 1080p back."
             : "Without a sign-in YouTube gives 360p. The sign-in stays on this computer and is never uploaded."}
+        </p>
+
+        <button
+          type="button"
+          className="btn mt-4 w-full"
+          onClick={() => continueSignedOut()}
+        >
+          Continue without signing in (360p)
+        </button>
+        <p className="mt-2 text-[12px] leading-snug text-fg-dim">
+          Videos download at 360p until you sign in. You can sign in later from
+          the sign-in chip in the header.
         </p>
 
         {state.busy && state.step ? <Working label={state.step} /> : null}

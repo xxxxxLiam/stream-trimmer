@@ -75,6 +75,33 @@ class DownloadFailureError extends Error {
   }
 }
 
+/**
+ * Why a link cannot be cut, or null when it names one video. The engine will happily
+ * answer /api/info for a channel or playlist URL, so without this check such a link loaded
+ * as a source and "Cut" then silently did nothing (B-5).
+ */
+export function videoUrlProblem(url: string): string | null {
+  if (!url.trim()) return null;
+  if (extractVideoId(url.trim())) return null;
+  return "That link is not a single video (a channel, playlist or other page). Paste a link to one video.";
+}
+
+/**
+ * Tell the engine to stop the job's child processes. Aborting the fetch only hangs up the
+ * request; the engine keeps cutting unless it is told (B-6). Best effort: an engine without
+ * the route, or one that is already gone, must not break Cancel.
+ */
+export async function requestEngineCancel(
+  jobId: string,
+  post: (path: string, body: unknown) => Promise<unknown>,
+): Promise<void> {
+  try {
+    await post("/api/download/cancel", { jobId });
+  } catch {
+    /* the abort alone still frees the renderer */
+  }
+}
+
 export function useClipper() {
   const [url, setUrl] = useState("");
   const [info, setInfo] = useState<VideoInfo | null>(null);
@@ -106,6 +133,7 @@ export function useClipper() {
   } | null>(null);
   const dismissSavedNotice = useCallback(() => setSavedNotice(null), []);
   const downloadAbortRef = useRef<AbortController | null>(null);
+  const downloadJobRef = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [failure, setFailure] = useState<DownloadFailureInfo | null>(null);
 
@@ -376,6 +404,13 @@ export function useClipper() {
 
   const loadInfo = useCallback(async () => {
     if (!url) return;
+    const problem = videoUrlProblem(url);
+    if (problem) {
+      // Not a video: do not present it as a loaded source.
+      setInfo(null);
+      setError(problem);
+      return;
+    }
     setError("");
     setLoadingInfo(true);
     try {
@@ -530,8 +565,20 @@ export function useClipper() {
   }, [info, format, quality, start, end]);
 
   const cancelDownload = useCallback(() => {
+    const jobId = downloadJobRef.current;
     downloadAbortRef.current?.abort();
     downloadAbortRef.current = null;
+    downloadJobRef.current = null;
+    if (jobId) {
+      // The engine ends the job's yt-dlp/ffmpeg children on this call. (Server side is G-10.)
+      void requestEngineCancel(jobId, (path, body) =>
+        fetch(apiUrl(path), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      );
+    }
   }, []);
 
   /**
@@ -543,6 +590,11 @@ export function useClipper() {
   const download = useCallback(async (opts?: DownloadOptions): Promise<boolean> => {
     if (!info) {
       setError("Load a video first");
+      return false;
+    }
+    const sourceProblem = videoUrlProblem(url);
+    if (sourceProblem) {
+      setError(sourceProblem);
       return false;
     }
     const multi = opts?.segments && opts.segments.length > 0 ? opts.segments : null;
@@ -571,6 +623,7 @@ export function useClipper() {
       isElectron && window.electronAPI?.saveClip && saveDir,
     );
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    downloadJobRef.current = jobId;
     let es: EventSource | null = null;
     try {
       es = new EventSource(
@@ -765,6 +818,7 @@ export function useClipper() {
     } finally {
       es?.close();
       downloadAbortRef.current = null;
+      if (downloadJobRef.current === jobId) downloadJobRef.current = null;
       setDownloading(false);
       window.setTimeout(() => {
         setDownloadPhase("idle");
