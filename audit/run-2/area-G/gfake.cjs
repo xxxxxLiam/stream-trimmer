@@ -147,6 +147,26 @@ async function main() {
   // A download run.
   markPid(has("--download-sections") ? "section" : "full");
   if (cfg.delayMs) await sleep(cfg.delayMs);
+  // An interrupted download: leave a `.part` beside the output and fail, which
+  // is the shape a dropped connection leaves and what resume reads.
+  if (cfg.partialBytes) {
+    const out0 = valOf("--output") || valOf("-o");
+    if (out0) {
+      try {
+        fs.mkdirSync(path.dirname(out0), { recursive: true });
+        const want = Number(cfg.partialBytes);
+        const src = fs.readFileSync(process.env.G_FAKE_FIXTURE);
+        fs.writeFileSync(`${out0}.part`, src.subarray(0, want));
+      } catch (e) {
+        process.stderr.write(`fake partial failed: ${e}\n`);
+      }
+    }
+    process.stderr.write(
+      "ERROR: unable to download video data: <urlopen error [Errno 104] Connection reset by peer>\n",
+    );
+    await writeBack();
+    return 1;
+  }
   if (has("--download-sections") && cfg.failSections) {
     process.stderr.write("ERROR: unable to download: HTTP Error 403: Forbidden\n");
     await writeBack();

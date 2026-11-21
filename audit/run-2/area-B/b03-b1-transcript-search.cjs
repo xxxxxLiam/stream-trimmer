@@ -15,13 +15,15 @@ const SCRATCH = "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212
 const STUB = process.env.STUB || `${SCRATCH}/stub`;
 const ROOT = process.env.ROOT || "/home/user/stream-trimmer";
 const TAG = process.env.TAG || ROOT.split("/").pop();
-const SEARCH = "#ui-transcript-search";
+// The fixed tree gives the box an id; the run-1 tree uses a generated one, so select
+// by its placeholder and take the visible copy (every tab mounts one).
+const SEARCH = 'input[placeholder="Find what was said"]:visible';
 
 async function state(a, what) {
   const c = await crashState(a);
   const extra = await a.win
     .evaluate(() => {
-      const box = document.querySelector("#ui-transcript-search");
+      const box = Array.from(document.querySelectorAll('input[placeholder="Find what was said"]')).find((e) => e.offsetParent !== null) || null;
       const counter = document.querySelector('[aria-label^="Match"]');
       const col = document.querySelector("#ui-col-transcript");
       return {
