@@ -32,6 +32,40 @@ export const AFTER_CUTTING_VALUES: readonly AfterCutting[] = [
   "premiere",
 ];
 
+export type TimelineKind = "vertical" | "source" | "custom";
+
+export interface TimelineFormat {
+  kind: TimelineKind;
+  /** Used by "custom" (the vertical preset fixes 1080x1920). */
+  width: number;
+  height: number;
+  /** An explicit rate such as "30" or "29.97", or "source" (match source only). */
+  fps: string;
+}
+
+export const VERTICAL_SIZE = { width: 1080, height: 1920 } as const;
+
+/** Rates offered in the UI; any parseable rate is accepted when stored. */
+export const FRAME_RATE_CHOICES: readonly string[] = [
+  "23.976",
+  "24",
+  "25",
+  "29.97",
+  "30",
+  "50",
+  "59.94",
+  "60",
+];
+
+export const DEFAULT_TIMELINE: TimelineFormat = {
+  kind: "vertical",
+  width: VERTICAL_SIZE.width,
+  height: VERTICAL_SIZE.height,
+  fps: "30",
+};
+
+export const DEFAULT_PROJECT_PATTERN = "{clipId} {label}";
+
 export type EventNameSource = "campaign" | "source";
 
 export interface EditorHandoffSettings {
@@ -42,6 +76,21 @@ export interface EditorHandoffSettings {
   capcutDropDir: string;
   /** Also launch CapCut after a cut (only meaningful when it is installed). */
   openCapCut: boolean;
+  /**
+   * Absolute path of the .fcpbundle the import must land in (or a file:// URL).
+   * Blank means the document names no library and Final Cut picks its own.
+   * With many libraries open this is the only safe way to target one.
+   */
+  fcpLibrary: string;
+  /** Event that holds the raw clip. Blank means use the campaign/source name. */
+  mediaEvent: string;
+  /** Event that holds the created projects. Blank means create no project. */
+  projectEvent: string;
+  /** Off by default: also create a project with the clip on its timeline. */
+  createProject: boolean;
+  /** Tokens: {clipId} {label} {campaign} {source}. */
+  projectNamePattern: string;
+  timelineFormat: TimelineFormat;
 }
 
 export const DEFAULT_EDITOR_SETTINGS: EditorHandoffSettings = {
@@ -49,7 +98,35 @@ export const DEFAULT_EDITOR_SETTINGS: EditorHandoffSettings = {
   eventName: "campaign",
   capcutDropDir: "",
   openCapCut: false,
+  fcpLibrary: "",
+  mediaEvent: "",
+  projectEvent: "",
+  createProject: false,
+  projectNamePattern: DEFAULT_PROJECT_PATTERN,
+  timelineFormat: DEFAULT_TIMELINE,
 };
+
+function dimension(v: unknown, fallback: number): number {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  return Number.isInteger(n) && n >= 16 && n <= 16384 ? n : fallback;
+}
+
+/** Coerce a stored timeline format; a bad value falls back to vertical 1080x1920 at 30. */
+export function normalizeTimeline(raw: unknown): TimelineFormat {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const kind: TimelineKind =
+    r.kind === "source" || r.kind === "custom" || r.kind === "vertical" ? r.kind : "vertical";
+  const fpsText = typeof r.fps === "string" ? r.fps.trim() : typeof r.fps === "number" ? String(r.fps) : "";
+  let fps = DEFAULT_TIMELINE.fps;
+  if (fpsText === "source" && kind === "source") fps = "source";
+  else if (fpsText !== "source" && parseRational(fpsText)) fps = fpsText;
+  return {
+    kind,
+    width: dimension(r.width, VERTICAL_SIZE.width),
+    height: dimension(r.height, VERTICAL_SIZE.height),
+    fps,
+  };
+}
 
 /** Coerce anything stored (older versions, hand edits) into valid settings. */
 export function normalizeEditorSettings(raw: unknown): EditorHandoffSettings {
@@ -61,6 +138,15 @@ export function normalizeEditorSettings(raw: unknown): EditorHandoffSettings {
     eventName: r.eventName === "source" ? "source" : "campaign",
     capcutDropDir: typeof r.capcutDropDir === "string" ? r.capcutDropDir : "",
     openCapCut: r.openCapCut === true,
+    fcpLibrary: typeof r.fcpLibrary === "string" ? r.fcpLibrary.trim() : "",
+    mediaEvent: typeof r.mediaEvent === "string" ? r.mediaEvent : "",
+    projectEvent: typeof r.projectEvent === "string" ? r.projectEvent : "",
+    createProject: r.createProject === true,
+    projectNamePattern:
+      typeof r.projectNamePattern === "string" && r.projectNamePattern.trim()
+        ? r.projectNamePattern
+        : DEFAULT_PROJECT_PATTERN,
+    timelineFormat: normalizeTimeline(r.timelineFormat),
   };
 }
 
@@ -412,6 +498,8 @@ export interface FcpClip {
   segments: FcpSegment[];
   /** Canonical source link for this clip's video. */
   sourceUrl?: string;
+  /** Exact project name typed for this clip; wins over the campaign pattern. */
+  projectName?: string;
   /** From ffprobe on this exact file. */
   media: MediaInfo;
 }
@@ -440,43 +528,133 @@ export function clipNotes(clip: Pick<FcpClip, "sourceUrl" | "segments">): string
 }
 
 // ---------------------------------------------------------------------------
+// Project names, timeline and library targeting
+// ---------------------------------------------------------------------------
+
+export interface FcpxmlProject {
+  /** Event that will hold the projects. */
+  eventName: string;
+  namePattern: string;
+  timeline: TimelineFormat;
+  campaignName?: string;
+  sourceTitle?: string;
+}
+
+/** Name for one project: the clip's own override, else the pattern filled in. */
+export function projectNameFor(
+  clip: Pick<FcpClip, "id" | "label" | "projectName">,
+  pattern: string,
+  ctx: { campaignName?: string; sourceTitle?: string } = {},
+): string {
+  const own = (clip.projectName ?? "").replace(/\s+/g, " ").trim();
+  if (own) return noEmDash(own);
+  const values: Record<string, string> = {
+    clipId: clip.id,
+    label: (clip.label ?? "").trim(),
+    campaign: (ctx.campaignName ?? "").trim(),
+    source: (ctx.sourceTitle ?? "").trim(),
+  };
+  const filled = (pattern.trim() || DEFAULT_PROJECT_PATTERN)
+    .replace(/\{(clipId|label|campaign|source)\}/g, (_m, k: string) => values[k] ?? "")
+    .replace(/\s+/g, " ")
+    // An empty token leaves its separator dangling ("M-01 -"); trim those ends.
+    .replace(/^[\s\-:|,]+|[\s\-:|,]+$/g, "");
+  return noEmDash(filled) || clip.id;
+}
+
+/**
+ * Names for every project in a batch. A repeated name gets " 2", " 3" so one
+ * document never holds two projects Final Cut might merge or overwrite.
+ */
+export function resolveProjectNames(
+  clips: Pick<FcpClip, "id" | "label" | "projectName">[],
+  project: Pick<FcpxmlProject, "namePattern" | "campaignName" | "sourceTitle">,
+): string[] {
+  const seen = new Set<string>();
+  return clips.map((c) => {
+    const base = projectNameFor(c, project.namePattern, project);
+    let name = base;
+    for (let n = 2; seen.has(name); n++) name = `${base} ${n}`;
+    seen.add(name);
+    return name;
+  });
+}
+
+/** The frame size and rate a clip's timeline uses; never inherits unless asked to. */
+export function resolveTimeline(
+  fmt: TimelineFormat,
+  media: MediaInfo,
+): { width: number; height: number; fps: Rational } {
+  const rate = fmt.fps === "source" ? null : parseRational(fmt.fps);
+  const fps = rate ? snapFrameRate(rate) : media.fps;
+  if (fmt.kind === "source") return { width: media.width, height: media.height, fps };
+  if (fmt.kind === "custom") return { width: fmt.width, height: fmt.height, fps };
+  return { ...VERTICAL_SIZE, fps };
+}
+
+/**
+ * `location` for <library>: a .fcpbundle path or a file:// URL. Directories get
+ * a trailing slash, the way Final Cut writes its own. Relative paths throw, so
+ * a typo can never become a silent wrong-library import.
+ */
+export function libraryLocation(library: string): string {
+  const t = library.trim();
+  if (!t) return "";
+  const url = /^file:\/\//i.test(t) ? t : fileUrl(t);
+  return url.endsWith("/") ? url : url + "/";
+}
+
+// ---------------------------------------------------------------------------
 // Document
 // ---------------------------------------------------------------------------
 
 export interface FcpxmlInput {
+  /** The event that holds the raw clips. */
   eventName: string;
   clips: FcpClip[];
+  /** .fcpbundle path or file:// URL. Omitted: no `location`, Final Cut decides. */
+  library?: string;
+  /** Present: also create one project per clip in its own event. */
+  project?: FcpxmlProject;
 }
 
 /**
- * One FCPXML document: every clip becomes an asset plus an asset-clip inside a
- * single event. Importing it places that event in whichever library Final Cut
- * has open. Clips sharing a frame size and rate share one <format>.
+ * One FCPXML document. Every clip becomes ONE asset plus an asset-clip in the
+ * media event; with `project`, each clip also gets a project in the project
+ * event whose timeline references that same asset (not a copy). Clips sharing a
+ * frame size and rate share one <format>. If both events share a name they are
+ * merged into one, since two same-named events would be ambiguous.
  */
 export function buildFcpxml(input: FcpxmlInput): string {
   if (input.clips.length === 0) throw new Error("There are no clips to export");
 
   const formats: { id: string; xml: string }[] = [];
   const formatIds = new Map<string, string>();
+  const formatFor = (width: number, height: number, fps: Rational): string => {
+    const frameDuration = formatTime(1, fps);
+    const key = `${width}x${height}@${frameDuration}`;
+    let id = formatIds.get(key);
+    if (!id) {
+      id = `r${formatIds.size + 1}`;
+      formatIds.set(key, id);
+      formats.push({
+        id,
+        xml:
+          `    <format id="${id}" frameDuration="${frameDuration}" ` +
+          `width="${width}" height="${height}"/>`,
+      });
+    }
+    return id;
+  };
+
+  const projectNames = input.project ? resolveProjectNames(input.clips, input.project) : [];
   const assets: string[] = [];
-  const items: string[] = [];
+  const mediaItems: string[] = [];
+  const projectItems: string[] = [];
 
   input.clips.forEach((clip, index) => {
     const m = clip.media;
-    const frameDuration = formatTime(1, m.fps);
-    const fmtKey = `${m.width}x${m.height}@${frameDuration}`;
-    let formatId = formatIds.get(fmtKey);
-    if (!formatId) {
-      formatId = `r${formatIds.size + 1}`;
-      formatIds.set(fmtKey, formatId);
-      formats.push({
-        id: formatId,
-        xml:
-          `    <format id="${formatId}" frameDuration="${frameDuration}" ` +
-          `width="${m.width}" height="${m.height}"/>`,
-      });
-    }
-
+    const formatId = formatFor(m.width, m.height, m.fps);
     const frames = secondsToFrames(m.durationSec, m.fps);
     if (frames < 1) throw new Error(`${clip.id}: the file is shorter than one frame`);
     const duration = formatTime(frames, m.fps);
@@ -496,13 +674,54 @@ export function buildFcpxml(input: FcpxmlInput): string {
     );
 
     const notes = clipNotes(clip);
-    const noteXml = notes ? `\n      <note>${xmlEscape(noEmDash(notes))}</note>\n    ` : "";
-    items.push(
-      `    <asset-clip ref="${assetId}" name="${name}" start="0s" duration="${duration}" ` +
-        `format="${formatId}" tcFormat="NDF"${noteXml ? ">" + noteXml + "</asset-clip>" : "/>"}`,
+    const note = (pad: string) =>
+      notes ? `>\n${pad}  <note>${xmlEscape(noEmDash(notes))}</note>\n${pad}</asset-clip>` : "/>";
+    mediaItems.push(
+      `      <asset-clip ref="${assetId}" name="${name}" start="0s" duration="${duration}" ` +
+        `format="${formatId}" tcFormat="NDF"${note("      ")}`,
     );
+
+    if (input.project) {
+      const tl = resolveTimeline(input.project.timeline, m);
+      const tlFormat = formatFor(tl.width, tl.height, tl.fps);
+      // Whole timeline frames, rounded down, so the clip never overruns its media.
+      const assetSec = (frames * m.fps.den) / m.fps.num;
+      const tlFrames = secondsToFrames(assetSec, tl.fps);
+      if (tlFrames < 1) throw new Error(`${clip.id}: the file is shorter than one timeline frame`);
+      const tlDuration = formatTime(tlFrames, tl.fps);
+      const seq =
+        ` tcStart="0s" tcFormat="NDF"` +
+        (m.audioChannels ? ` audioLayout="${m.audioChannels === 1 ? "mono" : "stereo"}"` : "") +
+        (m.audioRate ? ` audioRate="${m.audioRate}"` : "");
+      projectItems.push(
+        [
+          `      <project name="${attrText(projectNames[index])}">`,
+          `        <sequence format="${tlFormat}" duration="${tlDuration}"${seq}>`,
+          `          <spine>`,
+          `            <asset-clip ref="${assetId}" offset="0s" name="${name}" start="0s" ` +
+            `duration="${tlDuration}" tcFormat="NDF"${note("            ")}`,
+          `          </spine>`,
+          `        </sequence>`,
+          `      </project>`,
+        ].join("\n"),
+      );
+    }
   });
 
+  const mediaEvent = input.eventName;
+  const projectEvent = input.project?.eventName ?? "";
+  const merged = !!input.project && projectEvent.trim() === mediaEvent.trim();
+  const events: string[] = [
+    `    <event name="${attrText(mediaEvent)}">`,
+    ...mediaItems,
+    ...(merged ? projectItems : []),
+    `    </event>`,
+  ];
+  if (input.project && !merged) {
+    events.push(`    <event name="${attrText(projectEvent)}">`, ...projectItems, `    </event>`);
+  }
+
+  const location = libraryLocation(input.library ?? "");
   // The DTD lists format and asset under one <resources>; formats first so each
   // asset's format reference resolves in document order.
   return [
@@ -514,9 +733,9 @@ export function buildFcpxml(input: FcpxmlInput): string {
     ...formats.map((f) => f.xml),
     ...assets,
     `  </resources>`,
-    `  <event name="${attrText(input.eventName)}">`,
-    ...items,
-    `  </event>`,
+    location ? `  <library location="${xmlEscape(location)}">` : `  <library>`,
+    ...events,
+    `  </library>`,
     `</fcpxml>`,
     ``,
   ].join("\n");
@@ -544,12 +763,16 @@ export interface SessionClip {
   path: string;
   segments: FcpSegment[];
   sourceUrl?: string;
+  /** Exact project name for this clip, overriding the campaign pattern. */
+  projectName?: string;
 }
 
 export interface SessionResult {
   xml: string;
   filename: string;
   included: number;
+  /** Project names in the document, in clip order; empty when none were created. */
+  projectNames: string[];
   /** Clips left out, each with the plain-words reason. Never silent. */
   skipped: { id: string; reason: string }[];
 }
@@ -563,6 +786,7 @@ export async function buildSessionFcpxml(
   clips: SessionClip[],
   eventName: string,
   probe: (path: string) => Promise<RawProbe>,
+  options: { library?: string; project?: FcpxmlProject } = {},
 ): Promise<SessionResult> {
   const ready: FcpClip[] = [];
   const skipped: SessionResult["skipped"] = [];
@@ -582,9 +806,10 @@ export async function buildSessionFcpxml(
     throw new Error(why);
   }
   return {
-    xml: buildFcpxml({ eventName, clips: ready }),
+    xml: buildFcpxml({ eventName, clips: ready, library: options.library, project: options.project }),
     filename: fcpxmlFilename(eventName),
     included: ready.length,
+    projectNames: options.project ? resolveProjectNames(ready, options.project) : [],
     skipped,
   };
 }

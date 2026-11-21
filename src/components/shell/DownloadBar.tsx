@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { useClipperContext } from "../../context/ClipperContext";
 import { formatBytes, formatTimestamp } from "../../lib/clip";
 import { useSegments } from "../../hooks/useSegments";
+import { CopyFailureDiagnostics } from "../DiagnosticsDisclosure";
 
 export default function DownloadBar() {
   const {
@@ -27,6 +28,7 @@ export default function DownloadBar() {
     downloadNote,
     cancelDownload,
     error,
+    failure,
   } = useClipperContext();
 
   const { segments, total } = useSegments();
@@ -60,8 +62,16 @@ export default function DownloadBar() {
   return (
     <div className="flex flex-col gap-2">
       {error && !failed && error !== validationError && (
-        <div role="alert" className="card-alert px-3 py-2 text-body">
-          {error}
+        <div role="alert" className="card-alert flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-body">
+          <span className="min-w-0 flex-[1_1_200px]">{error}</span>
+          {failure && failure.message === error ? (
+            <CopyFailureDiagnostics
+              code={failure.code}
+              message={failure.message}
+              attempt={failure.attempt}
+              diagnostics={failure.diagnostics}
+            />
+          ) : null}
         </div>
       )}
       <div className="surface-panel flex flex-wrap items-center gap-x-3 gap-y-2 p-3">

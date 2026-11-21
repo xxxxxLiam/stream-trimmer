@@ -4,13 +4,81 @@
  * Description: Surfaces the desktop app's local diagnostic log so a crash or a
  * rejected cookies.txt can be reported without hunting for a hidden folder.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Clipboard,
   FolderSymlink,
 } from "react-bootstrap-icons";
+import {
+  buildDiagnosticsBundle,
+  fenceForClipboard,
+  needsDeveloper,
+  type FailureAttempt,
+  type FailureDiagnostics,
+} from "../lib/diagnostics";
+import { writeClipboard } from "../lib/handoff";
+
+const CONFIRM_MS = 1200;
+
+/**
+ * The per-failure report. Shown only when the failure is the developer's to fix: for the
+ * seven failures the user can fix themselves it renders nothing, because the fix is
+ * already on screen. Separate from the whole-log disclosure below.
+ */
+export function CopyFailureDiagnostics({
+  code,
+  message,
+  attempt,
+  diagnostics,
+}: {
+  code?: string;
+  message: string;
+  attempt?: FailureAttempt;
+  diagnostics?: FailureDiagnostics;
+}) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  // New failure, fresh button.
+  useEffect(() => setState("idle"), [message, code]);
+
+  if (!needsDeveloper(code)) return null;
+
+  const copy = async () => {
+    const report = buildDiagnosticsBundle({
+      code,
+      message,
+      attempt,
+      diagnostics,
+      now: new Date(),
+    });
+    const res = await writeClipboard(fenceForClipboard(report));
+    setState(res.ok ? "copied" : "failed");
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState("idle"), res.ok ? CONFIRM_MS : 4000);
+  };
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        className="btn flex items-center gap-2"
+        onClick={() => void copy()}
+        style={state === "copied" ? { borderColor: "var(--accent)" } : undefined}
+      >
+        <Clipboard size={12} />
+        {state === "copied" ? "Copied" : "Copy diagnostics"}
+      </button>
+      {state === "failed" ? (
+        <span role="status" className="text-meta text-fg-dim">
+          Could not copy. Select the text and press Cmd+C.
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 export default function DiagnosticsDisclosure() {
   const api = typeof window === "undefined" ? undefined : window.electronAPI;

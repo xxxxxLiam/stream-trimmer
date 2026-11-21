@@ -55,7 +55,7 @@ function clip(over: Partial<FcpClip> = {}): FcpClip {
   };
 }
 
-const DTD = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "fcpxml-1.10-excerpt.dtd");
+const DTD = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "fcpxml-1.10.dtd");
 const hasXmllint = spawnSync("xmllint", ["--version"]).status === 0;
 
 /** Validate against the Apple DTD excerpt; returns xmllint's complaint or "". */

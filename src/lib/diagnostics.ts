@@ -84,7 +84,7 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
       t
         .replace(/^.*Netscape HTTP Cookie File.*$/gim, "[cookie data removed]")
         .replace(
-          /^(?:#HttpOnly_)?\.?[\w.-]+\t(?:TRUE|FALSE)\t[^\t\n]*\t(?:TRUE|FALSE)\t\d+\t.*$/gim,
+          /(?:#HttpOnly_)?\.?[\w.-]+[ \t]+(?:TRUE|FALSE)[ \t]+\S*[ \t]+(?:TRUE|FALSE)[ \t]+\d+[ \t]+.*$/gim,
           "[cookie data removed]",
         ),
   },
@@ -137,7 +137,7 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     apply: (t) =>
       t
         .replace(
-          /(po[_ -]?tokens?|visitor[_ -]?data|data[_ -]?sync[_ -]?id|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)(\s*[=:]\s*)[^\s"';,]+/gi,
+          /(po[_ -]?tokens?|visitor[_ -]?data|data[_ -]?sync[_ -]?id|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)(\s*[=:]\s*)[^\s"';,&]+/gi,
           "$1$2<redacted>",
         )
         .replace(/\bbearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer <redacted>"),

@@ -111,6 +111,106 @@ function resolveBinDir(): string | null {
 
 const BIN_DIR = resolveBinDir();
 
+// --- per-run diagnostics -----------------------------------------------------
+// Every log line that names a job (`job=<id>`) is also kept in a small in-memory
+// ring keyed by that id, so a failure can hand the renderer exactly its own
+// lines instead of the whole log. Bounded in both directions.
+const JOB_LOG_MAX_LINES = 300;
+const JOB_LOG_MAX_JOBS = 40;
+const jobLogs = new Map<string, string[]>();
+{
+  const levels = ["log", "warn", "error"] as const;
+  for (const level of levels) {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      original(...args);
+      try {
+        const text = args
+          .map((a) => (typeof a === "string" ? a : String(a)))
+          .join(" ");
+        const m = /\bjob=(job_[\w]+)/.exec(text);
+        if (!m) return;
+        let lines = jobLogs.get(m[1]);
+        if (!lines) {
+          lines = [];
+          jobLogs.set(m[1], lines);
+          if (jobLogs.size > JOB_LOG_MAX_JOBS) {
+            const oldest = jobLogs.keys().next().value;
+            if (oldest !== undefined) jobLogs.delete(oldest);
+          }
+        }
+        lines.push(`${new Date().toISOString()} [${level}] ${text.slice(0, 600)}`);
+        if (lines.length > JOB_LOG_MAX_LINES) lines.shift();
+      } catch {
+        /* capturing a line must never break logging */
+      }
+    };
+  }
+}
+
+function readAppVersion(): string {
+  const fromEnv = process.env.CLIPPER_APP_VERSION || process.env.npm_package_version;
+  if (fromEnv) return fromEnv;
+  const candidates = [
+    path.resolve(process.cwd(), "package.json"),
+    process.env.ELECTRON_RESOURCES
+      ? path.resolve(process.env.ELECTRON_RESOURCES, "..", "app.asar", "package.json")
+      : "",
+    process.env.ELECTRON_RESOURCES
+      ? path.resolve(process.env.ELECTRON_RESOURCES, "..", "package.json")
+      : "",
+  ].filter(Boolean);
+  for (const file of candidates) {
+    try {
+      const v = JSON.parse(fs.readFileSync(file, "utf8")).version;
+      if (typeof v === "string" && v) return v;
+    } catch {
+      /* try the next one */
+    }
+  }
+  return "unknown";
+}
+
+let cachedFfmpegVersion: string | null | undefined;
+function ffmpegVersionLine(): string | null {
+  if (cachedFfmpegVersion !== undefined) return cachedFfmpegVersion;
+  try {
+    const out = spawnSync(String(resolvedFfmpeg), ["-version"], {
+      encoding: "utf8",
+      timeout: 5_000,
+      windowsHide: true,
+    }).stdout;
+    cachedFfmpegVersion = out.split(/\r?\n/)[0]?.replace(/^ffmpeg version\s+/i, "").trim() || null;
+  } catch {
+    cachedFfmpegVersion = null;
+  }
+  return cachedFfmpegVersion;
+}
+
+let cachedYtDlpVersion: string | null | undefined;
+
+/**
+ * What the renderer needs to describe one failed run. Raw on purpose: the one
+ * redactor lives in src/lib/diagnostics.ts and runs over the finished report.
+ */
+function buildRunDiagnostics(jobId: string, stderrRaw: string) {
+  if (cachedYtDlpVersion === undefined) {
+    cachedYtDlpVersion = yt ? ytDlpVersion(yt.binary) : null;
+  }
+  return {
+    jobId,
+    appVersion: readAppVersion(),
+    platform: process.platform,
+    osRelease: os.release(),
+    arch: process.arch,
+    homeDir: os.homedir(),
+    ytDlpVersion: cachedYtDlpVersion,
+    ffmpegVersion: ffmpegVersionLine(),
+    stderrTail: stderrRaw.split(/\r\n|\n|\r/).filter((l) => l.trim()).slice(-400),
+    logLines: [...(jobLogs.get(jobId) ?? [])],
+  };
+}
+
 function childEnv(): NodeJS.ProcessEnv {
   const base = { ...process.env };
   if (BIN_DIR) {
@@ -1366,6 +1466,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
   };
 
 
+  // Everything the engine wrote to stderr during THIS run, for Copy diagnostics.
+  const RUN_STDERR_MAX = 60_000;
+  let runStderrRaw = "";
+
   // Spawn a child and stream its output through updateFromLine, rejecting with
   // the trimmed stderr tail on non-zero exit.
   const runStreaming = (
@@ -1374,6 +1478,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
   ): Promise<void> =>
     new Promise<void>((resolve, reject) => {
       const child = spawnChild();
+      runStderrRaw = `${runStderrRaw}# ${label}\n`.slice(-RUN_STDERR_MAX);
+      child.stderr?.on("data", (c: Buffer | string) => {
+        runStderrRaw = (runStderrRaw + c.toString()).slice(-RUN_STDERR_MAX);
+      });
       let buf = "";
       let stderrTail = "";
       const onChunk = (chunk: Buffer | string) => {
@@ -1396,7 +1504,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
           .slice(-8)
           .join("\n")
           .trim();
-        console.error(`[server] ${label} exit ${code}:\n${tail}`);
+        console.error(`[server] ${label} exit ${code} job=${jobId}:\n${tail}`);
         const err: any = new Error(tail || `${label} exited with code ${code}`);
         err.tail = tail;
         reject(err);
@@ -1472,7 +1580,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       scaleTo = win.to;
       if (!state.sectionsForbidden) {
         console.log(
-          `[server] /api/download exec url=${url} segment=${index + 1}/${segCount} options=${JSON.stringify(sectionOptions)}`,
+          `[server] /api/download exec job=${jobId} url=${url} segment=${index + 1}/${segCount} options=${JSON.stringify(sectionOptions)}`,
         );
         try {
           await runStreaming(
@@ -1484,7 +1592,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
           if (!isForbidden(sectionErr)) throw sectionErr;
           state.sectionsForbidden = true;
           console.warn(
-            "[server] sectioned download failed (403) — retrying with full download + local trim",
+            `[server] sectioned download failed (403) job=${jobId} — retrying with full download + local trim`,
           );
         }
       }
@@ -1901,11 +2009,19 @@ app.post("/api/download", async (req: Request, res: Response) => {
     if (cookiesFromBrowser && isCookieError(e)) {
       const msg = cookieErrorMessage(cookiesFromBrowser);
       publishProgress(jobId, { phase: "error", percent: 0, message: msg });
-      return res.status(400).json({ error: msg });
+      return res.status(400).json({
+        error: msg,
+        diagnostics: buildRunDiagnostics(jobId, fullErrMessage(e)),
+      });
     }
     logYtError("/api/download", url, options, e);
 
     const raw = fullErrMessage(e);
+    console.error(`[server] /api/download failed job=${jobId}: ${raw.slice(0, 400)}`);
+    // The per-run record for Copy diagnostics: this run's stderr and job id,
+    // never the whole log. A failure that never reached a child process still
+    // carries what the error itself said.
+    const diagnostics = buildRunDiagnostics(jobId, runStderrRaw || raw);
     // Keep the friendly sentence but append the real yt-dlp stderr tail so the
     // next YouTube-side change is diagnosable straight from the UI.
     const tail = ((e as { tail?: string } | null)?.tail || raw || "").trim();
@@ -1937,7 +2053,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       percent: 0,
       message: failure.error,
     });
-    sendFailure(res, failure);
+    sendFailure(res, failure, { diagnostics });
   }
 });
 
