@@ -201,9 +201,18 @@ export function isPathDelivery(
 
 // RFC 4180-ish CSV with a UTF-8 BOM so Excel handles emoji and non-Latin text.
 export function rowsToCsv(columns: string[], rows: CsvRow[]): string {
+  // Same rule as csvCell() in server/csv.ts, byte for byte: a text cell that a
+  // spreadsheet would read as a formula (leading = + - @ tab CR LF) gets a
+  // leading single quote; real numbers and plain decimal strings are left alone.
+  const FORMULA_START = /^[=+\-@\t\r\n]/;
+  const PLAIN_NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
   const escape = (v: unknown): string => {
     const s = v == null ? "" : String(v);
-    return `"${s.replace(/"/g, '""')}"`;
+    const safe =
+      typeof v !== "number" && FORMULA_START.test(s) && !PLAIN_NUMBER.test(s)
+        ? `'${s}`
+        : s;
+    return `"${safe.replace(/"/g, '""')}"`;
   };
   const lines = [columns.map(escape).join(",")];
   for (const row of rows) {

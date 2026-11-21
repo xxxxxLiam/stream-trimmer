@@ -28,6 +28,7 @@ import { hashMachineId, readMachineId } from "../electron/machineId.cjs";
 import {
   EXPORT_PREFIX,
   appendJsonl,
+  markInUse,
   readJson,
   readJsonl,
   workDir,
@@ -668,6 +669,10 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
       });
     }
     activeCheckpoints.add(ckDir);
+    // Clear cache skips a folder that is marked in use (resumeCache.ts). Our
+    // checkpoint prefix already keeps it out of that sweep; this is the shared
+    // mechanism on top, so either one alone keeps the run safe.
+    const releaseInUse = markInUse(ckDir);
 
     res.on("close", () => {
       if (!res.writableEnded) cancelChannelJob(jobId);
@@ -1172,6 +1177,7 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
       return res.status(500).json({ error: msg });
     } finally {
       activeCheckpoints.delete(ckDir);
+      releaseInUse();
     }
   }));
 
