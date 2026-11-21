@@ -82,6 +82,16 @@
   * {
     box-sizing: border-box;
   }
+  /* No visible scrollbars anywhere (CLAUDE.md). Scrolling by wheel, trackpad, keyboard and
+     script is untouched; every scroll region below is keyboard-reachable. */
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
   input::placeholder {
     color: var(--c-fg-dim);
   }
@@ -108,9 +118,12 @@
 }
 
 @layer components {
-  /* ---- Surfaces ------------------------------------------------------- */
-  .surface-ground {
-    background: var(--g-ground), var(--c-bg);
+  /* ---- Workspace columns ---------------------------------------------- */
+  /* Responds to the width of its own area (the help drawer is a 400px sibling), not the
+     window. 960 = THREE_COLUMN_MIN_PX in ThreeColumnLayout.tsx; the app opens at 1100 and
+     cannot go below 900, so the default window gets three columns and the minimum stacks. */
+  .cols-host {
+    container-type: inline-size;
   }
   .surface-panel {
     background: var(--g-panel), var(--c-panel);
@@ -342,4 +355,28 @@
     cursor: not-allowed;
   }
 
+}
+
+/* Unlayered on purpose: it must beat the max-h/max-w utilities on the same elements. */
+@container (min-width: 960px) {
+  .cols-row {
+    height: 100%;
+    flex-wrap: nowrap;
+  }
+  .cols-side {
+    max-height: none;
+    max-width: 400px;
+  }
+  .cols-clips {
+    max-width: 360px;
+  }
+  .cols-centre {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+/* ---- Surfaces ------------------------------------------------------- */
+.surface-ground {
+  background: var(--g-ground), var(--c-bg);
 }

@@ -47,22 +47,37 @@ export function defaultPrefix(name: string): string {
   return letters.toUpperCase();
 }
 
-function slug(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, "-")
-      .replace(/^-+|-+$/g, "") || "campaign"
-  );
+/**
+ * A fresh campaign id. It is deliberately NOT derived from the name: a name can be reused
+ * (delete "Acme Q4", create "Acme Q4" again) but an id must never be, or the new campaign
+ * would adopt whatever is still stored under the old one's key. Ids already in settings.json
+ * (older versions used a slug of the name) are opaque strings and keep working unchanged.
+ */
+export function newCampaignId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  const raw =
+    typeof c?.randomUUID === "function"
+      ? c.randomUUID()
+      : Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 8)).join("");
+  return `c-${raw.replace(/-/g, "").slice(0, 16)}`;
 }
 
-function uniqueId(list: readonly Campaign[], name: string): string {
-  const base = slug(name);
+function uniqueId(list: readonly Campaign[], makeId: () => string): string {
   const taken = new Set(list.map((c) => c.id));
-  if (!taken.has(base)) return base;
+  let id = makeId();
+  while (taken.has(id)) id = makeId();
+  return id;
+}
+
+/** `name` made different from every other campaign's name ("Acme Q4" -> "Acme Q4 2"). */
+export function uniqueName(list: readonly Campaign[], name: string, exceptId?: string): string {
+  const taken = new Set(
+    list.filter((c) => c.id !== exceptId).map((c) => c.name.trim().toLowerCase()),
+  );
+  if (!taken.has(name.trim().toLowerCase())) return name;
   let i = 2;
-  while (taken.has(`${base}-${i}`)) i += 1;
-  return `${base}-${i}`;
+  while (taken.has(`${name} ${i}`.toLowerCase())) i += 1;
+  return `${name} ${i}`;
 }
 
 /** Keeps the band ordered: min <= max <= hardMax, all non-negative. */
@@ -93,11 +108,17 @@ export function sameFolder(a: string, b: string): boolean {
   return a !== "" && b !== "" && normFolder(a) === normFolder(b);
 }
 
-export type CampaignProblem = "name-empty" | "folders-same" | "pattern-no-number";
+export type CampaignProblem = "name-empty" | "name-taken" | "folders-same" | "pattern-no-number";
 
-export function validateCampaign(c: Pick<Campaign, "name" | "clipsDir" | "dataDir" | "clipIdPattern">): CampaignProblem[] {
+export function validateCampaign(
+  c: Pick<Campaign, "name" | "clipsDir" | "dataDir" | "clipIdPattern">,
+  /** The other campaigns (not the one being edited); when given, a repeated name is a problem. */
+  others?: readonly Pick<Campaign, "name">[],
+): CampaignProblem[] {
   const out: CampaignProblem[] = [];
   if (!c.name.trim()) out.push("name-empty");
+  else if (others?.some((o) => o.name.trim().toLowerCase() === c.name.trim().toLowerCase()))
+    out.push("name-taken");
   if (sameFolder(c.clipsDir, c.dataDir)) out.push("folders-same");
   if (!/\{nn\}|\{n\}/.test(c.clipIdPattern)) out.push("pattern-no-number");
   return out;
@@ -107,6 +128,8 @@ export function describeCampaignProblem(p: CampaignProblem): string {
   switch (p) {
     case "name-empty":
       return "Give the campaign a name.";
+    case "name-taken":
+      return "Another campaign already has that name.";
     case "folders-same":
       return "Clips and Data need different folders.";
     case "pattern-no-number":
@@ -117,11 +140,12 @@ export function describeCampaignProblem(p: CampaignProblem): string {
 export function createCampaign(
   list: readonly Campaign[],
   input: CampaignInput,
+  makeId: () => string = newCampaignId,
 ): { campaigns: Campaign[]; campaign: Campaign } {
-  const name = input.name.trim();
+  const name = uniqueName(list, input.name.trim());
   const clipsDir = input.clipsDir ?? "";
   const campaign: Campaign = normalizeBand({
-    id: uniqueId(list, name),
+    id: uniqueId(list, makeId),
     name,
     targetMinSec: input.targetMinSec ?? DEFAULT_BAND.targetMinSec,
     targetMaxSec: input.targetMaxSec ?? DEFAULT_BAND.targetMaxSec,
@@ -150,7 +174,10 @@ export function updateCampaign(
           ...patch,
           id: c.id,
           usedRanges: c.usedRanges,
-          name: (patch.name ?? c.name).trim() || c.name,
+          name:
+            patch.name !== undefined && patch.name.trim()
+              ? uniqueName(list, patch.name.trim(), c.id)
+              : c.name,
         })
       : c,
   );

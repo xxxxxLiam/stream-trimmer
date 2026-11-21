@@ -1,7 +1,7 @@
-D-6 saveFile abs outside -> {"ok":false,"error":"The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received an instance of Object"}
-D-6 canary before: ino=1057255 size=9 sha=25718360e05d 
-    canary after:  ino=1057255 size=9 sha=25718360e05d content: "original\n"
-D-7 saveFiles folder '..' -> {"ok":true,"path":"/tmp/t2-sand-ORVTnt"}
+D-6 saveFile abs outside -> {"ok":true,"path":"/tmp/t2-sand-IxEzgZ/home-canary/.bashrc"}
+D-6 canary before: ino=902302 size=9 sha=25718360e05d 
+    canary after:  ino=902302 size=5 sha=2b848254538e content: "PWNED"
+D-7 saveFiles folder '..' -> {"ok":true,"path":"/tmp/t2-sand-IxEzgZ"}
 D-7 esc.csv in parent: true
-D-7 control folder 'ok' -> {"ok":true,"path":"/tmp/t2-sand-ORVTnt/chosen/ok"}
-D-6 control saveFile inside chosen -> {"ok":false,"error":"The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received an instance of Object"}
+D-7 control folder 'ok' -> {"ok":true,"path":"/tmp/t2-sand-IxEzgZ/chosen/ok"}
+D-6 control saveFile inside chosen -> {"ok":true,"path":"/tmp/t2-sand-IxEzgZ/chosen/c.csv"}

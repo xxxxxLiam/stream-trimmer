@@ -52,12 +52,12 @@ async function boot(label, seed, { bom = false } = {}) {
     await a.win.waitForSelector("header");
     const f = path.join(canary, ".bashrc");
     const b = snap(f);
-    console.log("D-6 saveFile abs outside ->", JSON.stringify(await call(a, "saveFile", { dirPath: canary, filename: ".bashrc", data: new TextEncoder().encode("PWNED").buffer })));
+    console.log("D-6 saveFile abs outside ->", JSON.stringify(await call(a, "saveFile", { dirPath: canary, filename: ".bashrc", data: [80,87,78,69,68] })));
     console.log("D-6 canary before:", b, "\n    canary after: ", snap(f), "content:", JSON.stringify(fs.readFileSync(f, "utf8")));
     console.log("D-7 saveFiles folder '..' ->", JSON.stringify(await call(a, "saveFiles", { dirPath: chosen, folder: "..", files: [{ name: "esc.csv", contents: "x" }] })));
     console.log("D-7 esc.csv in parent:", fs.existsSync(path.join(sand, "esc.csv")));
     console.log("D-7 control folder 'ok' ->", JSON.stringify(await call(a, "saveFiles", { dirPath: chosen, folder: "ok", files: [{ name: "a.csv", contents: "x" }] })));
-    console.log("D-6 control saveFile inside chosen ->", JSON.stringify(await call(a, "saveFile", { dirPath: chosen, filename: "c.csv", data: new TextEncoder().encode("hi").buffer })));
+    console.log("D-6 control saveFile inside chosen ->", JSON.stringify(await call(a, "saveFile", { dirPath: chosen, filename: "c.csv", data: [104,105] })));
     await a.close();
   }
   if (want("f6")) {

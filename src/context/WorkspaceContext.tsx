@@ -41,9 +41,9 @@ export type WorkspaceTab = {
 
 /** How many closed tabs Ctrl+Shift+T can bring back. */
 const CLOSED_LIMIT = 10;
-type ClosedTab = { tab: WorkspaceTab; index: number };
+export type ClosedTab = { tab: WorkspaceTab; index: number };
 
-function cleanTab(t: WorkspaceTab): WorkspaceTab {
+export function cleanTab(t: WorkspaceTab): WorkspaceTab {
   const out: WorkspaceTab = { id: t.id, name: typeof t.name === "string" ? t.name : "" };
   if (typeof t.url === "string" && t.url) out.url = t.url;
   if (Array.isArray(t.segments)) {
@@ -57,26 +57,56 @@ function cleanTab(t: WorkspaceTab): WorkspaceTab {
 
 type TabMeta = { title: string; busy: boolean };
 
-type PersistedState = { tabs: WorkspaceTab[]; activeId: string };
+export type PersistedState = { tabs: WorkspaceTab[]; activeId: string };
 
 function newId(): string {
   return `ws_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function loadState(): PersistedState {
-  const fallback = (): PersistedState => {
-    const id = newId();
-    return { tabs: [{ id, name: "" }], activeId: id };
-  };
-  const raw = readSetting<PersistedState | null>(STORE_KEY, null);
-  if (!raw || !Array.isArray(raw.tabs) || raw.tabs.length === 0)
-    return fallback();
+/** What a relaunch makes of the stored workspace record; null when nothing usable is stored. */
+export function parsePersisted(raw: PersistedState | null | undefined): PersistedState | null {
+  if (!raw || !Array.isArray(raw.tabs) || raw.tabs.length === 0) return null;
   const tabs = raw.tabs.filter((t) => t && typeof t.id === "string").map(cleanTab);
-  if (tabs.length === 0) return fallback();
-  const activeId = tabs.some((t) => t.id === raw.activeId)
-    ? raw.activeId
-    : tabs[0].id;
+  if (tabs.length === 0) return null;
+  const activeId = tabs.some((t) => t.id === raw.activeId) ? raw.activeId : tabs[0].id;
   return { tabs, activeId };
+}
+
+/** Record what tab `id` holds. Returns the same array when nothing changed. */
+export function applyTabWork(
+  tabs: WorkspaceTab[],
+  id: string,
+  work: { url: string; segments: readonly Segment[] },
+): WorkspaceTab[] {
+  let changed = false;
+  const next = tabs.map((t) => {
+    if (t.id !== id) return t;
+    const url = work.url || undefined;
+    const a = t.segments ?? [];
+    const same =
+      t.url === url &&
+      a.length === work.segments.length &&
+      a.every((s, i) => s.start === work.segments[i].start && s.end === work.segments[i].end);
+    if (same) return t;
+    changed = true;
+    return cleanTab({ id: t.id, name: t.name, url, segments: work.segments as Segment[] });
+  });
+  return changed ? next : tabs;
+}
+
+/** Put a closed tab back where it was. */
+export function reinsertTab(tabs: WorkspaceTab[], closed: ClosedTab): WorkspaceTab[] {
+  if (tabs.some((t) => t.id === closed.tab.id)) return tabs;
+  const next = [...tabs];
+  next.splice(Math.min(closed.index, next.length), 0, closed.tab);
+  return next;
+}
+
+function loadState(): PersistedState {
+  const parsed = parsePersisted(readSetting<PersistedState | null>(STORE_KEY, null));
+  if (parsed) return parsed;
+  const id = newId();
+  return { tabs: [{ id, name: "" }], activeId: id };
 }
 
 export type WorkspaceState = {
@@ -189,34 +219,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const reportTabWork = useCallback<WorkspaceState["reportTabWork"]>((id, work) => {
-    setTabs((prev) => {
-      let changed = false;
-      const next = prev.map((t) => {
-        if (t.id !== id) return t;
-        const url = work.url || undefined;
-        const a = t.segments ?? [];
-        const same =
-          t.url === url &&
-          a.length === work.segments.length &&
-          a.every((s, i) => s.start === work.segments[i].start && s.end === work.segments[i].end);
-        if (same) return t;
-        changed = true;
-        return cleanTab({ id: t.id, name: t.name, url, segments: work.segments as Segment[] });
-      });
-      return changed ? next : prev;
-    });
+    setTabs((prev) => applyTabWork(prev, id, work));
   }, []);
 
   const reopenTab = useCallback((): boolean => {
     const [last, ...rest] = closedRef.current;
     if (!last) return false;
     setClosed(rest);
-    setTabs((prev) => {
-      if (prev.some((t) => t.id === last.tab.id)) return prev;
-      const next = [...prev];
-      next.splice(Math.min(last.index, next.length), 0, last.tab);
-      return next;
-    });
+    setTabs((prev) => reinsertTab(prev, last));
     setActiveId(last.tab.id);
     return true;
   }, []);

@@ -34,3 +34,11 @@ test("B-1: cleared box (empty matches) with a stale index, and a stale index pas
   assert.equal(pickActiveMatch([{ line: 1 }], 1), null);
   assert.equal(pickActiveMatch([{ line: 1 }], -1), null);
 });
+
+import { readFileSync } from "node:fs";
+
+test("B-1 wiring: the column derives its active match through pickActiveMatch", () => {
+  const src = readFileSync(new URL("./TranscriptColumn.tsx", import.meta.url), "utf8");
+  assert.match(src, /pickActiveMatch\(w\.matches, w\.active\)/);
+  assert.doesNotMatch(src, /w\.matches\[w\.active\]/);
+});

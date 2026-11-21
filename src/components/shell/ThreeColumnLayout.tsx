@@ -7,6 +7,9 @@
  */
 import type { ReactNode } from "react";
 
+/** Keep in step with the @container rule in styles.css (a test pins them together). */
+export const THREE_COLUMN_MIN_PX = 960;
+
 export type ThreeColumnLayoutProps = {
   /** FIND. Left column. */
   transcript: ReactNode;
@@ -24,30 +27,33 @@ export default function ThreeColumnLayout({
   clips,
   drawer,
 }: ThreeColumnLayoutProps) {
-  // 520 (centre) + 320 + 280 + 2 gaps + padding. At or above this width the three
-  // columns share one row and scroll internally; below it they wrap and stack.
+  // The columns respond to the width of THEIR OWN area (a container query in styles.css),
+  // not the window: the help drawer is a sibling that takes 400px, so the viewport is the
+  // wrong thing to measure. At or above THREE_COLUMN_MIN_PX the three share one row and scroll
+  // internally; below it they wrap and stack inside one scrolling area. The window opens at
+  // 1100 and cannot go under 900, so the default must land on the three-column side.
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="flex min-w-0 flex-wrap content-start gap-2 p-2 min-[1160px]:h-full min-[1160px]:flex-nowrap">
+      <div tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="cols-row flex min-w-0 flex-wrap content-start gap-2 p-2">
           <section
             id="ui-col-transcript"
             aria-label="Transcript"
-            className="surface-panel flex max-h-[75vh] min-h-[320px] min-w-0 flex-[1_1_320px] flex-col overflow-hidden min-[1160px]:max-h-none min-[1160px]:max-w-[400px]"
+            className="cols-side cols-transcript surface-panel flex max-h-[75vh] min-h-[320px] min-w-0 flex-[1_1_280px] flex-col overflow-hidden"
           >
             {transcript}
           </section>
           <section
             id="ui-col-centre"
             aria-label="Mark a clip"
-            className="flex min-w-0 flex-[999_1_520px] flex-col gap-2 min-[1160px]:min-h-0 min-[1160px]:overflow-y-auto"
+            className="cols-centre flex min-w-0 flex-[999_1_420px] flex-col gap-2 [&>*]:shrink-0"
           >
             {centre}
           </section>
           <section
             id="ui-col-clips"
             aria-label="Clips"
-            className="surface-panel flex max-h-[75vh] min-h-[240px] min-w-0 flex-[1_1_280px] flex-col overflow-hidden min-[1160px]:max-h-none min-[1160px]:max-w-[360px]"
+            className="cols-side cols-clips surface-panel flex max-h-[75vh] min-h-[240px] min-w-0 flex-[1_1_260px] flex-col overflow-hidden"
           >
             {clips}
           </section>

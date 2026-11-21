@@ -89,6 +89,14 @@ function withClips(data: BankData, campaignId: string, videoId: string, clips: B
   return next;
 }
 
+/** Drops a campaign's whole bank, for when the campaign itself is removed. */
+export function removeCampaignBank(data: BankData, campaignId: string): BankData {
+  if (!(campaignId in data)) return data;
+  const next = { ...data };
+  delete next[campaignId];
+  return next;
+}
+
 /** Next free id of the form B01, B02 ... within a video's bank. */
 export function nextBankId(existing: readonly { id: string }[], taken: ReadonlySet<string> = new Set()): string {
   const used = new Set([...existing.map((c) => c.id.toLowerCase()), ...[...taken].map((t) => t.toLowerCase())]);
@@ -312,6 +320,8 @@ export type BankStore = {
   setStatus: (campaignId: string, videoId: string, clipId: string, status: BankStatus) => void;
   remove: (campaignId: string, videoId: string, clipId: string) => void;
   setNote: (campaignId: string, videoId: string, clipId: string, note: string) => void;
+  /** Forget everything banked under a campaign (it was removed). */
+  removeCampaign: (campaignId: string) => void;
 };
 
 export function createBankStore(io: BankIO): BankStore {
@@ -344,6 +354,7 @@ export function createBankStore(io: BankIO): BankStore {
     setStatus: (c, v, id, s) => commit(setStatus(data, c, v, id, s)),
     remove: (c, v, id) => commit(removeClip(data, c, v, id)),
     setNote: (c, v, id, n) => commit(setNote(data, c, v, id, n)),
+    removeCampaign: (c) => commit(removeCampaignBank(data, c)),
   };
 }
 

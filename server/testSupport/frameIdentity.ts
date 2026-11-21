@@ -20,7 +20,7 @@ export function thumbnails(ffmpeg: string, file: string): Buffer[] {
   const r = spawnSync(
     ffmpeg,
     [
-      "-v", "error", "-i", file, "-an",
+      "-v", "error", "-i", file, "-an", "-fps_mode", "passthrough",
       "-vf", `scale=${W}:${H}:flags=area,format=gray`,
       "-f", "rawvideo", "-",
     ],
