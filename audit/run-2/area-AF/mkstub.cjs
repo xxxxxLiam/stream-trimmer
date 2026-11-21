@@ -109,6 +109,34 @@ async function main() {
     return;
   }
 
+  // Subtitle fetch: write a real .en.vtt next to the requested output stem.
+  if (has("--write-subs") || has("--write-auto-subs")) {
+    const s = c.subs || {};
+    await sleep(s.delayMs);
+    if (s.exitCode) {
+      if (s.stderr) process.stderr.write(String(s.stderr) + "\\n");
+      process.exit(s.exitCode);
+    }
+    const out = valOf("-o") || valOf("--output");
+    if (out && s.none !== true) {
+      const cues = s.cues || [
+        [0, 4, "Welcome back to the show everybody."],
+        [4, 9, "Today we are talking about focus and attention."],
+        [9, 14, "The first thing people get wrong is the morning."],
+        [14, 20, "You cannot outwork a bad sleep schedule."],
+        [20, 26, "So here is the practical bit, write this down."],
+        [26, 30, "That is the whole method, thanks for listening."],
+      ];
+      const t = (n) => new Date(n * 1000).toISOString().substr(11, 12);
+      const body =
+        "WEBVTT\\n\\n" +
+        cues.map(([a, b, txt], i) => (i + 1) + "\\n" + t(a) + " --> " + t(b) + "\\n" + txt + "\\n").join("\\n");
+      try { fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out + ".en.vtt", body); }
+      catch (e) { process.stderr.write("stub: " + e.message + "\\n"); }
+    }
+    return;
+  }
+
   const d = c.downloadStage || {};
   await sleep(d.delayMs);
   if (d.exitCode) {
