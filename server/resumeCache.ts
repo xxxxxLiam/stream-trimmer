@@ -29,6 +29,22 @@ function keyHash(parts: unknown[]): string {
  */
 export function workDir(prefix: string, parts: unknown[]): string {
   const dir = path.join(os.tmpdir(), `${prefix}${keyHash(parts)}`);
+  return touchDir(dir);
+}
+
+/**
+ * A folder that belongs to exactly one request: the shared key's hash plus a
+ * random suffix. Two requests with identical inputs never share one, so
+ * neither can delete the other's in-flight files.
+ */
+export function jobDir(prefix: string, parts: unknown[]): string {
+  const suffix = crypto.randomBytes(5).toString("hex");
+  return touchDir(
+    path.join(os.tmpdir(), `${prefix}${keyHash(parts)}-${suffix}`),
+  );
+}
+
+function touchDir(dir: string): string {
   fs.mkdirSync(dir, { recursive: true });
   try {
     const now = new Date();
@@ -98,9 +114,79 @@ export function cacheUsage(): { folders: number; bytes: number } {
   return { folders: dirs.length, bytes };
 }
 
-export function clearCache(): { removed: number } {
+// --- in-use markers --------------------------------------------------------
+//
+// A folder is "in use" while a job is writing into it, and for a grace period
+// after a finished clip has been handed to the app (the clip's only copy lives
+// there until the main process moves it). Neither Clear cache nor the stale
+// sweep may remove such a folder: clearing is for abandoned partials.
+//
+// The registry is per process and keyed by absolute path. Anything that creates
+// a work folder it keeps writing to (the clip route, the channel exporter) must
+// call markInUse() and release in a finally block.
+
+/** How long a finished clip's folder is protected after the hand-off. */
+export const HANDOFF_HOLD_MS = 30 * 60 * 1000;
+
+const inUse = new Map<string, number>();
+const held = new Map<string, number>();
+
+/** Protects `dir` until the returned function is called. Idempotent release. */
+export function markInUse(dir: string): () => void {
+  const key = path.resolve(dir);
+  inUse.set(key, (inUse.get(key) ?? 0) + 1);
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    const n = (inUse.get(key) ?? 1) - 1;
+    if (n <= 0) inUse.delete(key);
+    else inUse.set(key, n);
+  };
+}
+
+/**
+ * Exclusive claim on a shared, resumable work folder: markInUse() unless a job
+ * already holds it, in which case null (the caller then works in a private
+ * folder rather than share `.part` files with a running download).
+ */
+export function tryClaim(dir: string): (() => void) | null {
+  if ((inUse.get(path.resolve(dir)) ?? 0) > 0) return null;
+  return markInUse(dir);
+}
+
+/** Keeps `dir` out of Clear cache for `ms` more (a finished, uncollected clip). */
+export function holdFolder(dir: string, ms: number = HANDOFF_HOLD_MS): void {
+  held.set(path.resolve(dir), Date.now() + ms);
+}
+
+/** Lets a held folder go early (the clip was collected). */
+export function releaseHold(dir: string): void {
+  held.delete(path.resolve(dir));
+}
+
+export function isProtected(dir: string): boolean {
+  const key = path.resolve(dir);
+  if ((inUse.get(key) ?? 0) > 0) return true;
+  const until = held.get(key);
+  if (until === undefined) return false;
+  if (until > Date.now()) return true;
+  held.delete(key);
+  return false;
+}
+
+/**
+ * Removes abandoned work folders. Folders a job is using, and finished clips
+ * still waiting to be collected, are skipped and counted in `skipped`.
+ */
+export function clearCache(): { removed: number; skipped: number } {
   let removed = 0;
+  let skipped = 0;
   for (const dir of cacheDirs()) {
+    if (isProtected(dir)) {
+      skipped += 1;
+      continue;
+    }
     try {
       fs.rmSync(dir, { recursive: true, force: true });
       removed += 1;
@@ -108,7 +194,7 @@ export function clearCache(): { removed: number } {
       /* in use */
     }
   }
-  return { removed };
+  return { removed, skipped };
 }
 
 /** Drop work folders untouched for a week. Runs once at server start. */
@@ -116,6 +202,7 @@ export function sweepStaleCache(): number {
   const cutoff = Date.now() - STALE_MS;
   let removed = 0;
   for (const dir of cacheDirs()) {
+    if (isProtected(dir)) continue;
     try {
       if (fs.statSync(dir).mtimeMs > cutoff) continue;
       fs.rmSync(dir, { recursive: true, force: true });

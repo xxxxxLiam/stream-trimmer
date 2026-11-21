@@ -31,6 +31,15 @@ const youtubeSession = require("./youtubeSession.cjs");
 const { createSettingsStore } = require("./settingsStore.cjs");
 const { saveExportFiles } = require("./exportSave.cjs");
 const {
+  allowedRoots,
+  dragTarget,
+  moveWithoutOverwrite,
+  resolveTarget,
+  writeWithoutOverwrite,
+} = require("./pathSafety.cjs");
+const { interpretCheckResult } = require("./updateCheck.cjs");
+const { redact } = require("./redact.cjs");
+const {
   canInstallInPlace,
   downloadUrl,
   releasesUrl,
@@ -80,6 +89,7 @@ let settings = null;
 function loadSettings() {
   settings = createSettingsStore(
     path.join(app.getPath("userData"), "settings.json"),
+    { log: (message) => logger.log("settings", message) },
   );
   settings.load();
 }
@@ -436,6 +446,13 @@ app.on("before-quit", () => {
   }
 });
 
+// Folders the user picked in the native dialog this session. Together with the
+// folders saved in settings they are the only places the save handlers write.
+const pickedDirs = new Set();
+function saveRoots() {
+  return allowedRoots(settings ? settings.all() : {}, [...pickedDirs]);
+}
+
 function registerIpc() {
   // Synchronous snapshot so the renderer can seed state before first paint.
   ipcMain.on("settings:all", (e) => {
@@ -452,6 +469,7 @@ function registerIpc() {
       properties: ["openDirectory", "createDirectory"],
     });
     if (res.canceled || res.filePaths.length === 0) return null;
+    pickedDirs.add(res.filePaths[0]);
     return res.filePaths[0];
   });
 
@@ -480,18 +498,21 @@ function registerIpc() {
         return { ok: false, error: "Unexpected clip location" };
       }
 
-      const safeName = payload.filename.replace(/[\\/]/g, "_");
-      const target = path.join(payload.dirPath, safeName);
-      try {
-        await fsp.rename(source, target);
-      } catch (err) {
-        // rename cannot cross devices, and the temp dir often is one.
-        if (!err || err.code !== "EXDEV") throw err;
-        await fsp.copyFile(source, target);
-        await fsp.rm(source, { force: true });
+      const dest = resolveTarget({
+        dirPath: payload.dirPath,
+        name: payload.filename,
+        roots: saveRoots(),
+      });
+      if (!dest.ok) {
+        logger.log("clip", "refused save outside the chosen folders");
+        return { ok: false, error: dest.error };
       }
+      // Never replace a clip that is already there: add " 2", " 3" like the
+      // CapCut copy does. A hard link fails with EEXIST instead of replacing,
+      // so this holds even if the name is taken between the check and the move.
+      const target = await moveWithoutOverwrite(source, dest.target);
       await fsp.rm(path.dirname(source), { recursive: true, force: true });
-      logger.log("clip", `saved ${safeName}`);
+      logger.log("clip", `saved ${path.basename(target)}`);
       return { ok: true, path: target };
     } catch (err) {
       logger.log("clip", `save failed: ${logger.describe(err)}`);
@@ -508,10 +529,18 @@ function registerIpc() {
       ) {
         return { ok: false, error: "Invalid save payload" };
       }
-      const safeName = payload.filename.replace(/[\\/]/g, "_");
-      const target = path.join(payload.dirPath, safeName);
+      const dest = resolveTarget({
+        dirPath: payload.dirPath,
+        name: payload.filename,
+        roots: saveRoots(),
+      });
+      if (!dest.ok) {
+        logger.log("file", "refused save outside the chosen folders");
+        return { ok: false, error: dest.error };
+      }
       const buf = Buffer.from(payload.data);
-      await fsp.writeFile(target, buf);
+      // "wx": never replace a file that is already there; " 2", " 3" instead.
+      const target = await writeWithoutOverwrite(dest.target, buf);
       return { ok: true, path: target };
     } catch (err) {
       return {
@@ -532,17 +561,28 @@ function registerIpc() {
       ) {
         return { ok: false, error: "Invalid save payload" };
       }
-      const safeFolder = payload.folder.replace(/[\\/]/g, "_");
-      const target = path.join(payload.dirPath, safeFolder);
-      await fsp.mkdir(target, { recursive: true });
+      const folder = resolveTarget({
+        dirPath: payload.dirPath,
+        name: payload.folder,
+        roots: saveRoots(),
+      });
+      if (!folder.ok) {
+        logger.log("file", "refused export folder outside the chosen folders");
+        return { ok: false, error: folder.error };
+      }
+      const target = folder.target;
+      // Check every name before creating anything, so a bad one leaves no
+      // half-written folder behind.
+      const named = [];
       for (const file of payload.files) {
         if (!file || typeof file.name !== "string") continue;
-        const safeName = file.name.replace(/[\\/]/g, "_");
-        await fsp.writeFile(
-          path.join(target, safeName),
-          String(file.contents ?? ""),
-          "utf8",
-        );
+        const dest = resolveTarget({ dirPath: target, name: file.name });
+        if (!dest.ok) return { ok: false, error: dest.error };
+        named.push([dest.target, String(file.contents ?? "")]);
+      }
+      await fsp.mkdir(target, { recursive: true });
+      for (const [dest, contents] of named) {
+        await fsp.writeFile(dest, contents, "utf8");
       }
       return { ok: true, path: target };
     } catch (err) {
@@ -566,6 +606,7 @@ function registerIpc() {
         folder: payload?.folder,
         files: payload?.files,
         tmpRoot: os.tmpdir(),
+        allowedRoots: saveRoots(),
       });
       logger.log(
         "export",
@@ -596,8 +637,17 @@ function registerIpc() {
   // synchronously inside the drag gesture or the OS drops it.
   ipcMain.on("file:startDrag", (event, targetPath) => {
     try {
-      if (typeof targetPath !== "string" || !targetPath) return;
-      if (!fs.existsSync(targetPath)) return;
+      // Only the app's own window, and only a real file inside the folders the
+      // user chose. (The preload also refuses unless a genuine dragstart just
+      // happened: calling startDrag with no gesture in progress is what wedged
+      // the main process.)
+      if (!mainWindow || event.sender !== mainWindow.webContents) return;
+      const real = dragTarget(targetPath, saveRoots());
+      if (!real) {
+        logger.log("drag", "refused drag of a path outside the chosen folders");
+        return;
+      }
+      targetPath = real;
 
       // Windows silently cancels a drag with a missing/empty icon, so always
       // hand over a real image. Per-file thumbnails are deliberately not used:
@@ -634,13 +684,21 @@ function registerIpc() {
     try {
       logger.log("updater", "manual check requested");
       const result = await autoUpdater.checkForUpdates();
-      const version = result && result.updateInfo && result.updateInfo.version;
+      const outcome = interpretCheckResult(result, app.getVersion());
+      if (outcome.kind === "error") {
+        // The check never ran (it resolved to null): say so, never "Up to date".
+        logger.log("updater", "manual check did not run");
+        sendUpdateStatus({
+          state: "error",
+          message: outcome.message,
+          url: releasesUrl(),
+        });
+        return { ok: false, error: outcome.message };
+      }
       // checkForUpdates resolves without emitting update-not-available when
       // there is nothing new, so the caller gets told either way.
-      if (!version || version === app.getVersion()) {
-        sendUpdateStatus({ state: "none" });
-      }
-      return { ok: true, version };
+      if (outcome.kind === "none") sendUpdateStatus({ state: "none" });
+      return { ok: true, version: result.updateInfo.version };
     } catch (err) {
       const error = err && err.message ? err.message : "Check failed";
       logger.log("updater", `manual check failed: ${error}`);
@@ -767,7 +825,10 @@ function registerIpc() {
 
   ipcMain.handle("diagnostics:copy", () => {
     try {
-      clipboard.writeText(logger.tail(500));
+      // The log can hold cookie rows, bearer tokens, signed URLs, the user's
+      // email and home path. Scrub it here, in the process that owns the
+      // clipboard, so no caller can put the raw text there.
+      clipboard.writeText(redact(logger.tail(500), { homeDir: os.homedir() }));
       return { ok: true };
     } catch (err) {
       return { ok: false, error: logger.describe(err) };

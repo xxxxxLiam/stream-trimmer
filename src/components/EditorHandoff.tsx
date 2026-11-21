@@ -204,13 +204,84 @@ async function exportNamed(
   };
 }
 
+// ---------------------------------------------------------------------------
+// What the automatic send did, and the session's clips
+// ---------------------------------------------------------------------------
+
+/**
+ * The outcome of the last automatic "After cutting" action. The cut flow calls
+ * `runAfterCutting` without anywhere to put its answer, so the answer is kept
+ * here and the panel shows it, the same way it shows its own buttons' results.
+ */
+let lastAuto: { outcome: HandoffOutcome } | null = null;
+const autoListeners = new Set<() => void>();
+
+export function getAfterCuttingOutcome(): { outcome: HandoffOutcome } | null {
+  return lastAuto;
+}
+
+export function subscribeAfterCutting(l: () => void): () => void {
+  autoListeners.add(l);
+  return () => {
+    autoListeners.delete(l);
+  };
+}
+
+function publishAuto(outcome: HandoffOutcome | null): void {
+  if (!outcome) return;
+  lastAuto = { outcome };
+  autoListeners.forEach((l) => l());
+}
+
+/**
+ * Every clip cut this session, per clips folder, newest version of an id wins.
+ * Each cut calls `runAfterCutting` with only its own clip; the document for the
+ * session has to hold all of them or the next send would replace the file with
+ * a one-clip version.
+ */
+const sessionBatch = new Map<string, SessionClip[]>();
+
+function rememberClips(ctx: HandoffContext): SessionClip[] {
+  const key = ctx.clipsDir ?? "";
+  const prev = sessionBatch.get(key) ?? [];
+  const fresh = new Set(ctx.clips.map((c) => c.id));
+  const next = [...prev.filter((c) => !fresh.has(c.id)), ...ctx.clips];
+  sessionBatch.set(key, next);
+  return next;
+}
+
+/** Forget the session's clips and the last automatic outcome (new session; tests). */
+export function resetSessionHandoff(): void {
+  sessionBatch.clear();
+  lastAuto = null;
+  autoListeners.forEach((l) => l());
+}
+
 /**
  * Run the campaign's "After cutting" choice for the clips just saved. Safe to
- * call when everything is off: it does nothing and returns null.
+ * call when everything is off: it does nothing and returns null. The outcome is
+ * also published (see `getAfterCuttingOutcome`) so a failure is never silent,
+ * and a thrown error becomes a failed outcome rather than an unhandled one.
  */
 export async function runAfterCutting(
   settings: EditorHandoffSettings,
   ctx: HandoffContext,
+): Promise<HandoffOutcome | null> {
+  const batch = rememberClips(ctx);
+  let outcome: HandoffOutcome | null;
+  try {
+    outcome = await runAfterCuttingInner(settings, ctx, batch);
+  } catch (err) {
+    outcome = { ok: false, message: err instanceof Error ? err.message : String(err) };
+  }
+  publishAuto(outcome);
+  return outcome;
+}
+
+async function runAfterCuttingInner(
+  settings: EditorHandoffSettings,
+  ctx: HandoffContext,
+  batch: SessionClip[],
 ): Promise<HandoffOutcome | null> {
   const api = bridge();
   const notes: string[] = [];
@@ -235,7 +306,7 @@ export async function runAfterCutting(
       campaignName: ctx.campaignName,
       sourceTitle: ctx.sourceTitle,
     });
-    outcome = await exportNamed(api, ctx, eventName, settings.afterCutting, settings);
+    outcome = await exportNamed(api, { ...ctx, clips: batch }, eventName, settings.afterCutting, settings);
   }
 
   if (api && settings.capcutDropDir && ctx.clips.length > 0) {
@@ -282,6 +353,14 @@ export default function EditorHandoff({
   const [status, setStatus] = useState<HandoffOutcome | null>(null);
   const [apps, setApps] = useState<{ finalcut: boolean; premiere: boolean; capcut: boolean } | null>(null);
   const set = (patch: Partial<EditorHandoffSettings>) => onChange({ ...settings, ...patch });
+
+  // The automatic send answers here: show it, and open the panel so a failure is seen.
+  const auto = useSyncExternalStore(subscribeAfterCutting, getAfterCuttingOutcome, getAfterCuttingOutcome);
+  useEffect(() => {
+    if (!auto) return;
+    setStatus(auto.outcome);
+    if (!auto.outcome.ok) setOpen(true);
+  }, [auto]);
 
   useEffect(() => {
     if (!open) return;

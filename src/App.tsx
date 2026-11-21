@@ -35,7 +35,7 @@ import PreviewPanel from "./components/PreviewPanel";
 import OverlayLoader from "./components/OverlayLoader";
 import DragOutHandle from "./components/DragOutHandle";
 import YouTubeConnectModal from "./components/YouTubeConnectModal";
-import { clearSegments, useSegments } from "./hooks/useSegments";
+import { useSegments } from "./hooks/useSegments";
 import type { Segment } from "./lib/segments";
 import {
   restoreConnection,
@@ -216,7 +216,7 @@ function Layout({ active }: { active: boolean }) {
     pickClipsDir,
     pickDataDir,
   } = useCampaign();
-  const { playhead } = useSegments();
+  const { playhead, clear: clearSegments } = useSegments();
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
@@ -311,7 +311,7 @@ function Layout({ active }: { active: boolean }) {
       setStartText("");
       setEndText("");
     },
-    [videoId, campaign, downloads, nextClipId, download, recordUse, afterSaved, setStartText, setEndText],
+    [videoId, campaign, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
   );
 
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
@@ -453,7 +453,7 @@ function Shell() {
             >
               <ClipperProvider>
                 <ChannelBoundary>
-                  <TabActiveProvider active={active}>
+                  <TabActiveProvider active={active} tabId={tab.id}>
                     <TabReporter id={tab.id} />
                     <Layout active={active} />
                   </TabActiveProvider>

@@ -83,6 +83,16 @@
     box-sizing: border-box;
   }
   /* No visible scrollbars anywhere (CLAUDE.md). Scrolling by wheel, trackpad, keyboard and
+     script is untouched; every scroll region is keyboard-reachable. */
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  /* No visible scrollbars anywhere (CLAUDE.md). Scrolling by wheel, trackpad, keyboard and
      script is untouched; every scroll region below is keyboard-reachable. */
   *::-webkit-scrollbar {
     width: 0;
@@ -379,4 +389,30 @@
 /* ---- Surfaces ------------------------------------------------------- */
 .surface-ground {
   background: var(--g-ground), var(--c-bg);
+}
+
+/* ---- Workspace columns ------------------------------------------------ */
+/* The columns respond to the width of their own area (the help drawer is a 400px sibling),
+   not the window. 960 = THREE_COLUMN_MIN_PX in ThreeColumnLayout.tsx. The app opens at 1100
+   and cannot go below 900: the default gets three columns, the minimum stacks. Unlayered on
+   purpose so these beat the max-h / max-w utilities on the same elements. */
+.cols-host {
+  container-type: inline-size;
+}
+@container (min-width: 960px) {
+  .cols-row {
+    height: 100%;
+    flex-wrap: nowrap;
+  }
+  .cols-side {
+    max-height: none;
+    max-width: 400px;
+  }
+  .cols-clips {
+    max-width: 360px;
+  }
+  .cols-centre {
+    min-height: 0;
+    overflow-y: auto;
+  }
 }

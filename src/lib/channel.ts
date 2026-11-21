@@ -315,9 +315,22 @@ export function buildExportFiles(data: ChannelExportRows): ExportFile[] {
 }
 
 // `<channel>-export-YYYY-MM-DD`
-export function buildExportFolderName(channelName: string): string {
-  const date = new Date().toISOString().slice(0, 10);
-  return `${sanitizeFilename(channelName || "channel")}-export-${date}`;
+/**
+ * One folder per run. The name used to be channel + date, so a second export of
+ * the same channel on the same day was moved into the first one's folder:
+ * files of the same name were overwritten, files only one run had were left
+ * behind, and the surviving summary.csv described neither. Time of day plus a
+ * short random suffix makes every run its own folder.
+ */
+export function buildExportFolderName(
+  channelName: string,
+  now: Date = new Date(),
+  runId: string = Math.random().toString(36).slice(2, 6).padEnd(4, "0"),
+): string {
+  const iso = now.toISOString();
+  const date = iso.slice(0, 10);
+  const time = iso.slice(11, 19).replace(/:/g, "");
+  return `${sanitizeFilename(channelName || "channel")}-export-${date}-${time}-${runId}`;
 }
 
 // Accepts @handle, /channel/UC…, /c/name, /user/name, and tab links under them.

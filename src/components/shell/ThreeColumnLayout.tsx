@@ -34,7 +34,7 @@ export default function ThreeColumnLayout({
   // 1100 and cannot go under 900, so the default must land on the three-column side.
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-      <div tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
+      <div role="region" tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="cols-row flex min-w-0 flex-wrap content-start gap-2 p-2">
           <section
             id="ui-col-transcript"

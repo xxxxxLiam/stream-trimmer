@@ -10,6 +10,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 
 /** "/a/b/clips" -> "/a/b/channel-data". Same rule as defaultDataDir in src/lib/campaigns.ts. */
 function siblingDataDir(clipsDir) {
@@ -47,7 +48,29 @@ function migrateSettings(input) {
   return s;
 }
 
-function createSettingsStore(filePath) {
+/**
+ * Parses the text of a settings file. Tolerant of what editors and other tools
+ * routinely add to a perfectly good file: a UTF-8 byte-order mark and
+ * surrounding whitespace. Returns { status, data }:
+ *  - "ok":      a JSON object
+ *  - "empty":   blank file (nothing to lose)
+ *  - "invalid": anything else — not JSON, or not an object
+ */
+function parseSettingsText(text) {
+  const body = String(text).replace(/^\uFEFF/, "").trim();
+  if (!body) return { status: "empty", data: {} };
+  try {
+    const raw = JSON.parse(body);
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      return { status: "ok", data: raw };
+    }
+  } catch {
+    /* fall through */
+  }
+  return { status: "invalid", data: {} };
+}
+
+function createSettingsStore(filePath, { log } = {}) {
   let cache = {};
   let loaded = false;
   // Keys the user actually removed. Tracked separately so a write can merge
@@ -55,14 +78,51 @@ function createSettingsStore(filePath) {
   // everything already saved there.
   const removed = new Set();
 
-  function readFile() {
+  /**
+   * Keeps a copy of a file we cannot read BEFORE anything replaces it, next to
+   * the original as `settings.json.corrupt-<hash>`. Named by content hash, so
+   * preserving the same bytes twice is a no-op and different bytes never
+   * collide. Returns true when a copy exists on disk afterwards.
+   */
+  function preserve(bytes) {
     try {
-      const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    } catch {
-      // Missing or corrupt file: start empty rather than throwing on launch.
-      return {};
+      const hash = crypto.createHash("sha256").update(bytes).digest("hex").slice(0, 10);
+      const dest = `${filePath}.corrupt-${hash}`;
+      if (!fs.existsSync(dest)) {
+        fs.writeFileSync(dest, bytes);
+        if (log) log(`settings.json could not be parsed; original kept at ${dest}`);
+      }
+      return true;
+    } catch (err) {
+      console.error("[electron] could not preserve unreadable settings:", err);
+      return false;
     }
+  }
+
+  /**
+   * Reads the file. A file that is present but unparseable is preserved first
+   * and reported as { ok:false } if that copy could not be made, so no caller
+   * can overwrite it unprotected.
+   */
+  function readFileChecked() {
+    let bytes;
+    try {
+      bytes = fs.readFileSync(filePath);
+    } catch (err) {
+      if (err && err.code === "ENOENT") return { ok: true, data: {} };
+      // Present but unreadable (permissions, a directory...): do not claim it
+      // is empty, and do not write over it.
+      return { ok: false, data: {} };
+    }
+    const parsed = parseSettingsText(bytes.toString("utf8"));
+    if (parsed.status === "invalid") {
+      return { ok: preserve(bytes), data: {} };
+    }
+    return { ok: true, data: parsed.data };
+  }
+
+  function readFile() {
+    return readFileChecked().data;
   }
 
   /** Reads the file into memory. Must run before the window is created. */
@@ -81,7 +141,10 @@ function createSettingsStore(filePath) {
   // never wipe keys written by another path.
   function persist() {
     try {
-      const merged = { ...readFile(), ...cache };
+      const onDisk = readFileChecked();
+      // Never replace a file we could not read and could not keep a copy of.
+      if (!onDisk.ok) return false;
+      const merged = { ...onDisk.data, ...cache };
       for (const key of removed) delete merged[key];
       cache = merged;
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -117,4 +180,9 @@ function createSettingsStore(filePath) {
   return { load, all, set, persist, path: filePath };
 }
 
-module.exports = { createSettingsStore, migrateSettings, siblingDataDir };
+module.exports = {
+  createSettingsStore,
+  migrateSettings,
+  parseSettingsText,
+  siblingDataDir,
+};

@@ -6,6 +6,25 @@ const { contextBridge, ipcRenderer } = require("electron");
 const arg = process.argv.find((a) => a.startsWith("--api-base="));
 const apiBase = arg ? arg.slice("--api-base=".length) : "";
 
+// A native drag-out may only start inside a real drag gesture. Calling
+// webContents.startDrag with no gesture in progress wedges the main process, so
+// the bridge refuses unless the browser itself (isTrusted) delivered a
+// dragstart a moment ago. Page script can dispatch synthetic events but cannot
+// make them trusted, and cannot reach this variable through the bridge.
+const DRAG_GESTURE_MS = 1000;
+let lastTrustedDragStart = -Infinity;
+try {
+  window.addEventListener(
+    "dragstart",
+    (e) => {
+      if (e && e.isTrusted) lastTrustedDragStart = Date.now();
+    },
+    true,
+  );
+} catch {
+  /* no window in this context */
+}
+
 try {
   contextBridge.exposeInMainWorld("__API_BASE__", apiBase);
   contextBridge.exposeInMainWorld("electronAPI", {
@@ -32,7 +51,10 @@ try {
     fileExists: (targetPath) => ipcRenderer.invoke("file:exists", targetPath),
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.
-    startDrag: (targetPath) => ipcRenderer.send("file:startDrag", targetPath),
+    startDrag: (targetPath) => {
+      if (Date.now() - lastTrustedDragStart > DRAG_GESTURE_MS) return;
+      ipcRenderer.send("file:startDrag", targetPath);
+    },
     // The YouTube session, which is one imported cookies.txt. Cookie values
     // never cross this bridge — the main process writes the file and only
     // yt-dlp reads it, so the renderer sees booleans and a count.

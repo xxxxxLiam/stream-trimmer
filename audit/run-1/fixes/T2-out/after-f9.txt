@@ -1,0 +1,2 @@
+F-9 checkForUpdates -> {"ok":false,"error":"The update check did not run, so there is no answer. Try again, or download the latest version from the releases page."}
+F-9 status events seen by renderer: [{"state":"error","message":"The update check did not run, so there is no answer. Try again, or download the latest version from the releases page.","url":"https://github.com/xxxxxLiam/stream-trimmer/releases/latest"}]

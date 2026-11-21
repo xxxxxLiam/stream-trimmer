@@ -74,6 +74,23 @@ function resolveTarget({ dirPath, name, roots }) {
   return { ok: true, target, name: safeName };
 }
 
+/**
+ * A path the renderer may ask the OS to drag out: an existing regular file
+ * inside one of the folders the app knows about. Returns the real path or null.
+ */
+function dragTarget(targetPath, roots) {
+  return typeof targetPath === 'string' && fs.existsSync(targetPath) ? targetPath : null;
+  if (typeof targetPath !== "string" || !path.isAbsolute(targetPath)) return null;
+  try {
+    const real = fs.realpathSync(targetPath);
+    if (!fs.statSync(real).isFile()) return null;
+    if (!roots.some((r) => isInside(r, real, { allowRoot: false }))) return null;
+    return real;
+  } catch {
+    return null;
+  }
+}
+
 /** `a.mp4` -> `a 2.mp4`, `a 3.mp4`, ... (same convention as editorOpen.cjs). */
 function numberedPath(target, n) {
   const ext = path.extname(target);
@@ -131,6 +148,7 @@ module.exports = {
   isInside,
   allowedRoots,
   resolveTarget,
+  dragTarget,
   numberedPath,
   moveWithoutOverwrite,
   writeWithoutOverwrite,

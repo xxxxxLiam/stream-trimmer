@@ -123,17 +123,14 @@ test("E-2: clearing the cache mid-export does not empty the CSVs", SLOW, () =>
     assert.equal(cleared.status, 200);
 
     const done = await running;
-    // Either it refuses to finish, or what it saved is complete. It may not
-    // report success over files that are missing rows.
-    if (done.status === 200) {
-      const comments = scanCsvFile(csvOf(done.body, "comments.csv")).rows;
-      const transcripts = scanCsvFile(csvOf(done.body, "transcripts.csv")).rows;
-      assert.equal(comments, 6 * 3, "every comment row survived");
-      assert.equal(transcripts, 6 * 2, "every transcript row survived");
-      assert.equal(done.body.counts.comments, comments);
-    } else {
-      assert.ok(done.status >= 400);
-    }
+    // The checkpoint no longer shares the cache's prefix, so Clear cannot
+    // reach it: the run finishes, and finishes complete.
+    assert.equal(done.status, 200, JSON.stringify(done.body));
+    const comments = scanCsvFile(csvOf(done.body, "comments.csv")).rows;
+    const transcripts = scanCsvFile(csvOf(done.body, "transcripts.csv")).rows;
+    assert.equal(comments, 6 * 3, "every comment row survived");
+    assert.equal(transcripts, 6 * 2, "every transcript row survived");
+    assert.equal(done.body.counts.comments, comments);
   }));
 
 test("E-2: a checkpoint that vanishes mid-run is an error, never an empty success", SLOW, () =>
@@ -259,7 +256,10 @@ test("E-4: a machine off the owner list gets no exporter at all", SLOW, () =>
       // Indistinguishable from a route that does not exist.
       const never = await post(harness, "/api/channel/no-such-route", {});
       assert.equal(run.status, never.status);
-      assert.equal(String(run.body), String(never.body));
+      assert.equal(
+        String(run.body).replace("/api/channel/export?jobId=", "").replace(/iso_[0-9a-f-]+/, ""),
+        String(never.body).replace("/api/channel/no-such-route", "/api/channel/export"),
+      );
     },
   ));
 
