@@ -10,6 +10,7 @@ import {
   clipNumber,
   countUsedRanges,
   createCampaign,
+  DATA_FOLDER_NAME,
   defaultDataDir,
   defaultPrefix,
   formatClipId,
@@ -34,12 +35,12 @@ test("first run starts with no campaigns", () => {
   assert.deepEqual(normalizeCampaigns([]), []);
 });
 
-test("create gives unique ids and defaults dataDir to a sibling channel-data", () => {
+test("create gives unique ids and defaults dataDir to a sibling data folder", () => {
   const a = createCampaign([], { name: "Daily Shorts", clipsDir: "/v/clips" });
   const b = createCampaign(a.campaigns, { name: "Daily Shorts", clipsDir: "/v/other" });
   assert.notEqual(a.campaign.id, b.campaign.id);
   assert.equal(b.campaign.name, "Daily Shorts 2");
-  assert.equal(a.campaign.dataDir, "/v/channel-data");
+  assert.equal(a.campaign.dataDir, `/v/${DATA_FOLDER_NAME}`);
   assert.equal(b.campaigns.length, 2);
 });
 
@@ -75,9 +76,9 @@ test("remove and resolveActiveId", () => {
 });
 
 test("defaultDataDir is a sibling of clipsDir, separator-aware", () => {
-  assert.equal(defaultDataDir("/Users/me/Clips/"), "/Users/me/channel-data");
-  assert.equal(defaultDataDir("C:\\Users\\me\\Clips"), "C:\\Users\\me\\channel-data");
-  assert.equal(defaultDataDir("/clips"), "/channel-data");
+  assert.equal(defaultDataDir("/Users/me/Clips/"), `/Users/me/${DATA_FOLDER_NAME}`);
+  assert.equal(defaultDataDir("C:\\Users\\me\\Clips"), `C:\\Users\\me\\${DATA_FOLDER_NAME}`);
+  assert.equal(defaultDataDir("/clips"), `/${DATA_FOLDER_NAME}`);
 });
 
 test("clips and data folders may not be the same", () => {
@@ -200,4 +201,9 @@ test("two campaigns cannot carry the same name (create, rename, validation)", ()
   const base = { clipsDir: "", dataDir: "", clipIdPattern: "{nn}" };
   assert.deepEqual(validateCampaign({ ...base, name: "Acme Q4" }, first.campaigns), ["name-taken"]);
   assert.deepEqual(validateCampaign({ ...base, name: "Acme Q4" }), []);
+});
+
+test("a build without the exporter does not name it in the suggested folder", () => {
+  assert.equal(DATA_FOLDER_NAME, "data"); // tests run in the public shape
+  assert.equal(defaultDataDir("/v/clips"), "/v/data");
 });

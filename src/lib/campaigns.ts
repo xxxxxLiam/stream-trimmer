@@ -90,14 +90,22 @@ export function normalizeBand<T extends Pick<Campaign, "targetMinSec" | "targetM
   return { ...c, targetMinSec: min, targetMaxSec: max, hardMaxSec: hard };
 }
 
-/** "/a/b/clips" -> "/a/b/channel-data". Keeps the separator style of the input. */
+import { CHANNEL_DATA_BUILT } from "./ownerGate";
+
+/**
+ * Name of the suggested data folder. The exporter's own name only exists in a build that
+ * has the exporter; a public build must not carry it, so it falls back to a plain "data".
+ */
+export const DATA_FOLDER_NAME: string = CHANNEL_DATA_BUILT ? "channel-data" : "data";
+
+/** "/a/b/clips" -> "/a/b/<data folder>". Keeps the separator style of the input. */
 export function defaultDataDir(clipsDir: string): string {
   const trimmed = clipsDir.replace(/[\\/]+$/, "");
   const sep = trimmed.includes("\\") && !trimmed.includes("/") ? "\\" : "/";
   const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  if (cut < 0) return "channel-data";
+  if (cut < 0) return DATA_FOLDER_NAME;
   const parent = trimmed.slice(0, cut);
-  return `${parent === "" ? "" : parent}${sep}channel-data`;
+  return `${parent === "" ? "" : parent}${sep}${DATA_FOLDER_NAME}`;
 }
 
 function normFolder(p: string): string {
