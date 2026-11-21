@@ -18,6 +18,7 @@ import test from "node:test";
 import {
   readCsvFile,
   runExport,
+  scanCsvFile,
   startHarness,
   type FakeChannel,
   type Harness,
@@ -390,11 +391,13 @@ test("a large export streams instead of accumulating", SLOW, async () => {
       `expected a transcripts.csv far larger than the heap allowance, got ${bytes} bytes`,
     );
     // Spot-check the far end: a stream that stopped early would still leave a
-    // plausible-looking CSV behind.
-    const rows = readCsvFile(transcripts);
-    assert.equal(rows.length, 1_200_000);
-    assert.equal(rows[rows.length - 1].video_id, "lf000100");
-    assert.match(rows[rows.length - 1].text, /Caption 11999 of lf000100/);
+    // plausible-looking CSV behind. Scanned a row at a time — reading this
+    // file whole would blow the *test* runner's heap and so defeat the point
+    // of a test about not holding the export in memory.
+    const scan = scanCsvFile(transcripts);
+    assert.equal(scan.rows, 1_200_000);
+    assert.equal(scan.last.video_id, "lf000100");
+    assert.match(scan.last.text, /Caption 11999 of lf000100/);
   });
 
   // Without this control the test above only shows that streaming works, not
