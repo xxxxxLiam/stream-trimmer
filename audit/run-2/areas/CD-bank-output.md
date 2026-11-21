@@ -10,7 +10,7 @@ Scope. **C**: `src/lib/bank.ts`, `src/lib/bankImport.ts`, `src/lib/campaigns.ts`
 `src/components/CopyBlocks.tsx`, `src/components/shell/copyBlocksInput.ts`,
 `src/hooks/useClipper.ts`, `src/App.tsx`.
 
-**Counts: 1 blocker · 2 major · 10 minor · 3 polish (16 findings, CD2-1 … CD2-16).**
+**Counts: 1 blocker · 2 major · 10 minor · 3 polish (16 findings, CD2-1 … CD2-17).**
 All 16 are `confirmed` in the running app or by driving a product module
 unchanged; none is code-reading only.
 
@@ -21,8 +21,8 @@ unchanged; none is code-reading only.
 | C-2 (deleted campaign's bank adopted by a same-named new one) | **HELD** — migration, mixed old/new ids, delete+recreate in both styles, orphans unadoptable |
 | C-5 (duplicate campaign names) | **HELD** |
 | Campaign isolation (run 1: 24 of 24) | **HELD** — 24 of 24 again, with a slug campaign and an opaque campaign side by side |
-| D-2 (a save destroying a same-named file) | **HELD** for `clip:save` and `file:save`; **the one write path it did not reach still overwrites** (CD2-3), and the message names the wrong file (CD2-4) |
-| D-6 / D-7 (writes outside the chosen folder) | **HELD** — 36 fresh hostile calls, nothing escaped; one residual, CD2-5 |
+| D-2 (a save destroying a same-named file) | **HELD** for `clip:save` and `file:save`; **the one write path it did not reach still overwrites** (CD2-4), and the message names the wrong file (CD2-5) |
+| D-6 / D-7 (writes outside the chosen folder) | **HELD** — 36 fresh hostile calls, nothing escaped; one residual, CD2-6 |
 | D-3 (Copy blocks dead) | **HELD** — all seven blocks byte-exact against a real transcript |
 | D-4 (silent automatic send) | **HELD** |
 | D-5 (a later cut shrinking the document) | **HELD** on the document, **REGRESSED into a cross-campaign leak** (CD2-1) |
@@ -140,7 +140,83 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-3  The one write path the D-2 fix did not reach still destroys a file of that name, and says `ok`
+### CD2-2  Cutting a banked clip and switching campaign while it runs records the range against the wrong client
+- **Severity**: major
+- **Status**: confirmed
+- **Steps**:
+  1. Cold start with two campaigns, each with its own clips folder and its own
+     banked row: Client A has `A01` at 00:00:02 to 00:00:08, Client B has `B01`.
+  2. With **Client A** active, open the Bank tab and press **Cut** on `A01`.
+  3. While the download is still running, switch to **Client B** in the header
+     popover (the "am I in the right campaign?" check the brief describes).
+  4. Wait for the clip to save, then read `clipper.campaigns`.
+  Control: the identical sequence with no switch, in the same run.
+- **Expected**: what the main Cut button does. `App.tsx:275-290` captures
+  `cutCampaignId` before the download and passes it to `recordUse`, so a switch
+  mid-cut cannot move the record (verified: PART B of the same script).
+- **Actual**: the no-reuse record is written against whichever campaign is
+  active when the cut **finishes**:
+  ```
+  after — used ranges per campaign:
+    [["Client A","{}"],
+     ["Client B","{\"stub0000001\":[{\"start\":2,\"end\":8,\"clipId\":\"A01\"}]}"]]
+  ```
+  Client A — whose clip it is, whose bank row flipped to `cut`, whose folder the
+  6.01 s file landed in — ends with **no record of the range at all**, so the
+  same six seconds can be cut again for that client with no warning. Client B
+  gains a used range for a clip it has never cut, which will warn on and block
+  that range for the wrong client. The control run records it against Client A
+  correctly, which isolates the switch as the cause.
+  `ClipsColumn.tsx:168-172` calls `recordUse(vid, res.ranges, clip.id)` with no
+  campaign id, so `CampaignContext.recordUse` falls back to
+  `activeIdRef.current`. The bank side of the same handler does use the id it
+  captured (`bankStore.markCut(campaignId, …)`), which is why the two records
+  end up on different clients.
+  There is no way back: `forgetUse` exists on the context but **no component
+  calls it**, and a bank row's **Remove** only calls `bankStore.remove`, so a
+  used range can never be taken out once written. The only escape is the "Use
+  it anyway" button on the next overlap warning.
+- **Proof**: `audit/run-2/area-CD/out/r2-cross-campaign.txt`, PART A switch
+  (`VERDICT: Client A's clip was recorded against CLIENT B (data crossed)`) and
+  PART A control (`[["Client A","{…A01…}"],["Client B","{}"]]`), PART B
+  (the main Cut button, correct); the clip's duration measured with ffprobe as
+  6.010998 s in both arms; script `audit/run-2/area-CD/r2-cross-campaign.cjs`
+- **Suspected file**: `src/components/ClipsColumn.tsx:162-180` (`cut`);
+  `src/context/CampaignContext.tsx:262-276` (`recordUse` default),
+  `:278-285` (`forgetUse`, uncalled)
+
+---
+
+### CD2-3  "Copy file path" and "Send all" hand the previous client's files to the next one
+- **Severity**: major
+- **Status**: confirmed
+- **Steps**:
+  1. Cold start with Client A and Client B, each with its own clips folder.
+  2. With Client A active, cut one clip.
+  3. Switch to Client B. Expand "Hand off to an editor".
+  4. Read the panel's own note, then press **Copy file path** and read the
+     clipboard.
+- **Expected**: with no clip cut for Client B, the panel has nothing to offer —
+  the buttons are disabled with `title="No clips yet"`, which is what run 1
+  recorded for a fresh session (D-PASS-9).
+- **Actual**: the panel says "Send all puts every clip from this session into
+  one file **(1)**" while Client B is active, **Copy file path** is enabled, and
+  the clipboard comes back with
+  `…/Client A clips/AAA-stub0000001-01.mp4` — the other client's delivery path.
+  `App.tsx`'s `sessionClips` is session-scoped but not campaign-scoped, and
+  nothing resets it on a switch.
+  This is the same root cause as CD2-1 and is filed separately only because it
+  is reachable with **no** automatic send configured and with the two campaigns
+  in **different** folders: CD2-1 needs the shared folder, this does not.
+- **Proof**: `audit/run-2/area-CD/out/r2-cross-campaign.txt`, PART C
+  (`with Client B active … "(1)"`, `copyPathDisabled:[false]`,
+  `Copy file path while CLIENT B is active returns: …/Client A clips/AAA-stub0000001-01.mp4`)
+- **Suspected file**: `src/App.tsx:252` (`sessionClips`), `:410-418` (passed
+  straight to `EditorHandoff`)
+
+---
+
+### CD2-4  The one write path the D-2 fix did not reach still destroys a file of that name, and says `ok`
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -175,7 +251,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-4  After a collision the app names the file it did not write
+### CD2-5  After a collision the app names the file it did not write
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -206,7 +282,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-5  The containment check is only as narrow as `clipper.saveDirs`, which keeps every folder ever picked
+### CD2-6  The containment check is only as narrow as `clipper.saveDirs`, which keeps every folder ever picked
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -229,7 +305,7 @@ script named in a finding to reproduce it.
   `clipper.saveDir`, `clipper.clipsDir`, `clipper.dataDir` and every entry of
   `clipper.saveDirs`, and `resolveTarget` only asks that the target be inside
   one of them.
-  D-6 and D-7 themselves are closed (CD2-5 is not a reopening of them: 36
+  D-6 and D-7 themselves are closed (CD2-6 is not a reopening of them: 36
   hostile calls in `d2-containment.cjs` escaped nothing). What is left is that
   the fence follows a list that grows with junk and is never pruned, so one
   ordinary pick of a parent or home folder re-opens arbitrary file creation to
@@ -243,7 +319,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-6  Deleting a campaign leaves the client's library and drop-folder paths on disk for ever
+### CD2-7  Deleting a campaign leaves the client's library and drop-folder paths on disk for ever
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -273,7 +349,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-7  Banks orphaned before the fix can never be removed, and they double the settings file
+### CD2-8  Banks orphaned before the fix can never be removed, and they double the settings file
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -308,7 +384,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-8  A folder lost mid-save still answers with a raw Node stack, now pointing inside the new save helper
+### CD2-9  A folder lost mid-save still answers with a raw Node stack, now pointing inside the new save helper
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -345,7 +421,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-9  "Export comments" cannot be reached: the function, the CSV path and the overlay all exist, and nothing calls them
+### CD2-10  "Export comments" cannot be reached: the function, the CSV path and the overlay all exist, and nothing calls them
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -366,7 +442,7 @@ script named in a finding to reproduce it.
   feature run 1 did not look for.
   Consequence for this run: the comments CSV is one of the two paths the brief
   asked to re-check for D-2, and it can only be exercised over the bridge,
-  which is how CD2-5's `file:save` checks were done — there `file:save` does add
+  which is how CD2-6's `file:save` checks were done — there `file:save` does add
   " 2" and does not destroy the earlier file.
 - **Proof**: `audit/run-2/area-CD/out/d1-overwrite.txt`, section 3
   (`comment buttons on screen: []`, the planted CSV untouched because nothing
@@ -376,7 +452,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-10  The Copy blocks panel covers the Cut button and swallows the click
+### CD2-11  The Copy blocks panel covers the Cut button and swallows the click
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -406,7 +482,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-11  Raw Node errno text reaches the UI from the save handlers for a name the filesystem will not take
+### CD2-12  Raw Node errno text reaches the UI from the save handlers for a name the filesystem will not take
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -432,7 +508,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-12  `file:saveFiles` turns a traversal attempt into a real folder called `.._..`
+### CD2-13  `file:saveFiles` turns a traversal attempt into a real folder called `.._..`
 - **Severity**: polish
 - **Status**: confirmed
 - **Steps**: `saveFiles({ dirPath: <clips>, folder: "../..", files: [...] })`,
@@ -451,7 +527,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-13  A campaign entry the loader cannot read is written out of existence by the next unrelated campaign edit
+### CD2-14  A campaign entry the loader cannot read is written out of existence by the next unrelated campaign edit
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**:
@@ -479,7 +555,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-14  When every clip in a send is unusable, only the first reason is reported
+### CD2-15  When every clip in a send is unusable, only the first reason is reported
 - **Severity**: minor
 - **Status**: confirmed
 - **Steps**: run `buildSessionFcpxml` (the product module, unchanged) with two
@@ -498,7 +574,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-15  Looking at a campaign rewrites what it had stored
+### CD2-16  Looking at a campaign rewrites what it had stored
 - **Severity**: polish
 - **Status**: confirmed
 - **Steps**:
@@ -514,11 +590,11 @@ script named in a finding to reproduce it.
   select has no `best` option while the format is MP3, so an effect
   (`useClipper.ts:400-402`) snaps the value to the first allowed one and the
   write-back effect in `App.tsx:285-295` saves it onto the campaign. The New
-  campaign form has **no Quality field** at all (its labels are Name, Target
-  length, Hard max, Clip id pattern, Prefix, Format, Clips folder, Data
-  folder), so `create` stores whatever quality the clipper happens to be on —
-  an MP3 campaign created while the clipper is on MP4 is stored with a video
-  quality until the first visit corrects it. Nothing is lost and the corrected
+  campaign form has **no Quality field** at all — its labels are exactly
+  `["Name","Target min (s)","Target max (s)","Hard cap (s)","Clip id prefix","Clip id pattern","Format"]` —
+  so `create` stores whatever quality the clipper happens to be on, and a new
+  MP3 campaign is stored as `320` only because the same snap-and-write-back
+  runs the moment it becomes active. Nothing is lost and the corrected
   value is the sensible one, hence polish; it is listed because "switch
   campaign mid-task" is a function of this area and this is a silent write
   during it.
@@ -531,7 +607,7 @@ script named in a finding to reproduce it.
 
 ---
 
-### CD2-16  The footer reads "Data data" on a fresh install, and the campaign's own data folder stays empty
+### CD2-17  The footer reads "Data data" on a fresh install, and the campaign's own data folder stays empty
 - **Severity**: polish
 - **Status**: confirmed
 - **Steps**: fresh install, create a campaign, click the footer's **Clips** chip
