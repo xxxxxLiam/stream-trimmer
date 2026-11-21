@@ -31,6 +31,7 @@ import {
 } from "react-bootstrap-icons";
 import { COOKIE_BROWSERS, type CookieBrowser } from "../lib/clip";
 import DiagnosticsDisclosure from "./DiagnosticsDisclosure";
+import BrandMark from "./shell/BrandMark";
 import {
   checkBrowserConnection,
   importCookies,
@@ -211,6 +212,8 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
         </div>
       ) : null}
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-panel border border-hairline bg-panel p-5 shadow-panel">
+        {/* First thing a new install shows, so it carries the mark. */}
+        <BrandMark size={22} className="mb-3" />
         <h2 id="youtube-connect-title" className="text-[20px] font-medium leading-tight">
           {expired ? "YouTube sign-in expired" : "Sign in to YouTube"}
         </h2>

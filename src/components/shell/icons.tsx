@@ -66,9 +66,3 @@ export const IconChannel = (p: SVGProps<SVGSVGElement>) => (
     <path d="M2 3.5h12M2 8h12M2 12.5h7" />
   </Icon>
 );
-export const IconMark = (p: SVGProps<SVGSVGElement>) => (
-  <Icon width={20} height={20} viewBox="0 0 20 20" {...p} style={{ color: "var(--accent)" }}>
-    <rect x="2.5" y="4.5" width="15" height="11" rx="2.5" />
-    <path d="M8 8l4 2-4 2z" />
-  </Icon>
-);
