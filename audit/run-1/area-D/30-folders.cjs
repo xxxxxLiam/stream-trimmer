@@ -1,4 +1,15 @@
 /**
+ * SUPERSEDED by 31-folders-real.cjs. Kept only as the record of why.
+ *
+ * This version tried to replace window.electronAPI.pickDirectory from inside
+ * the renderer. It cannot be done: contextBridge defines `electronAPI` as a
+ * non-configurable property, so the attempt fails with
+ *   "could not replace: TypeError: Cannot redefine property: electronAPI"
+ * (see out/logs/ and the first run of this script). 31-folders-real.cjs
+ * replaces Electron's own `dialog.showOpenDialog` in the MAIN process
+ * instead, which works and leaves every product code path intact.
+ */
+/**
  * Area D / "Choose clips folder and data folder separately" + the handoff
  * panel's own fields, driven with real clicks in the real app.
  *

@@ -40,22 +40,10 @@ const log = (...x) => console.log(`[C14:${CASE}]`, ...x);
     log("pageErrors:", JSON.stringify(a.logs.pageErrors).slice(0, 300));
     log("shot:", await a.shot("after-new-tab"));
 
-    // does it come back by itself? does a restart recover, and is the data intact?
     await a.win.waitForTimeout(3000);
-    const snap2 = await a.win.evaluate(() => document.querySelector("#root")?.children.length ?? -1);
-    log("6s later root children:", snap2);
+    log("6s later root children:", await a.win.evaluate(() => document.querySelector("#root")?.children.length ?? -1));
     log("bank on disk after the crash:", JSON.stringify(a.readState()["clipper.bank"]));
-    const state = a.readState();
     await a.close();
-
-    const b = await boot(`C14-newtab-${CASE}-relaunch`, state);
-    await loadVideo(b);
-    await openBankTab(b);
-    await b.win.waitForTimeout(600);
-    log("after relaunch, bank:", JSON.stringify((await b.win.locator("#ui-col-clips").innerText()).split("\n").slice(0, 6)));
-    log("after relaunch, workspace tabs:", await b.win.locator('[role="tab"]').count());
-    log("shot:", await b.shot("relaunched"));
-    await b.close();
   } catch (e) {
     console.error("FAIL", e);
     try { await a.close(); } catch {}

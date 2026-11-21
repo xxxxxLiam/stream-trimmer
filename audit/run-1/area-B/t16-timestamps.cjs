@@ -28,7 +28,7 @@ const CASES = [
   fs.mkdirSync(CLIPS, { recursive: true });
   const stub = stubRoot(STUB);
   // A video longer than four days, so nothing is rejected for being past the end.
-  stub.write({ info: { id: "longvid0001", title: "Four day stream", duration: 400000, uploader: "Ch" }, transcriptLines: 10, transcriptCueSec: 4 });
+  stub.write({ info: { id: "longvid0001", title: "Four day stream", duration: 400000, uploader: "Ch" }, transcriptLines: 10, transcriptCueSec: 4, delayMs: 0, exitCode: 0, stderr: "", writeMedia: true });
   const a = await boot({
     label: "t16-timestamps", stub: STUB, viewport: { width: 1440, height: 900 },
     seed: { "clipper.saveDir": CLIPS, "clipper.saveDirs": [CLIPS] },

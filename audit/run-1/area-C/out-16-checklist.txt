@@ -1,0 +1,6 @@
+[C16] Acme bank tab says: "3 clips"
+[C16] Acme checklist item: " data stays apart from your clips. |  | Choose folder |  | Import a clip bank | Optional |  | Paste a list of timestamps once and cut from it whenever. |  | Skip re-finding the same moments for every cut. |  | Open bank | What are you trying to do? |  | 16 tasks |  | Cut a clip | 3 steps | Pull two moments into one" /home/user/stream-trimmer/audit/out/area-C/C16-checklist/01-checklist.png
+[C16] Beta bank tab says: "0 clips"
+[C16] Beta checklist item: "(not found) Help | Setup checklist | Optional | What are you trying to do? |  | 16 tasks |  | Cut a clip | 3 steps | Pull two moments into one clip | 3 steps | Find a moment by what was said | 2 steps | Nudge an edge frame by frame | 2 step" /home/user/stream-trimmer/audit/out/area-C/C16-checklist/02-checklist.png
+[C16] footer: "Beta Launch uses | MP4 | Best | Clips | clips-beta-launch | Data | data-beta-launch | 0 saved | 0 ranges used"
+[C16] pageErrors: []

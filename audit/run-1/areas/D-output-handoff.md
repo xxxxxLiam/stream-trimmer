@@ -44,8 +44,11 @@ product:
    `server/youtubeAuth.ts` keys on. The stub lives only in the scratchpad.
 
 All captured output quoted below is kept in
-`audit/run-1/area-D/out/logs/` so the quotes can be checked without re-running
-anything.
+`audit/run-1/area-D/out/logs/`, beside the screenshots and the generated
+documents, so every quote can be checked without re-running anything. That
+`out/` tree is gitignored by `audit/.gitignore` like every other area's, so it
+is read in place; `audit/run-1/area-D/README.md` records the fixture setup each
+script needs in order to be re-run from scratch.
 
 Findings: **3 blocker, 7 major, 13 minor, 2 polish** (25 in all).
 
@@ -692,7 +695,8 @@ Findings: **3 blocker, 7 major, 13 minor, 2 polish** (25 in all).
   `does the suggested data folder exist on disk? false`,
   `confirm popover: <none>`
 - **Suspected file**: `src/context/CampaignContext.tsx:106, 204-215`;
-  `src/components/shell/AppFooter.tsx:122-131`
+  `src/components/shell/AppFooter.tsx:104-184` (`DataChip`, used at `:225`);
+  `src/components/DestinationSelector.tsx:45-54`
 
 ---
 
@@ -795,8 +799,9 @@ Findings: **3 blocker, 7 major, 13 minor, 2 polish** (25 in all).
   it grows with junk. Nothing in the UI prunes it.
 - **Proof**: `audit/run-1/area-D/out/logs/foldersreal.log`, the final
   `state at the end` block
-- **Suspected file**: `src/context/CampaignContext.tsx` (`saveDefaults`);
-  `src/lib/downloads.ts:64-71`
+- **Suspected file**: `src/hooks/useClipper.ts:143-153` (`setSaveDir` appends
+  with a plain `prev.includes(dir)` check and never stats or normalises);
+  `src/context/CampaignContext.tsx:204-215` is what feeds it
 
 ---
 
@@ -939,10 +944,10 @@ Every function the brief names, and how it was exercised.
 
 | Function | How | Verdict |
 |---|---|---|
-| Choose clips folder and data folder separately | Real clicks on `#ui-footer-clips` / `#ui-footer-data` with Electron's own dialog replaced (`31-folders-real.cjs`): choose, suggest, confirm, same folder, symlink, `/.`, `/..`, a file, a missing path, a trailing slash, cancel. Plus the product's `sameFolder` run directly. | D-15, D-21 |
+| Choose clips folder and data folder separately | Real clicks on `#ui-footer-clips` / `#ui-footer-data` with Electron's own dialog replaced (`31-folders-real.cjs`): choose, suggest, confirm, same folder, symlink, `/.`, `/..`, a file, a missing path, a trailing slash, cancel. Plus the product's `sameFolder` run directly. | D-15, D-21, D-24, D-25 |
 | Save a finished clip | Real ffmpeg cuts moved by `clip:save` into a real folder, probed with ffprobe; filename collision; folder deleted mid-download; folder is a file; parent missing. | D-2, D-10 |
 | Drag a clip out of the window | Real mouse drag on the product's grip; `file:startDrag` with hostile arguments; a control run with a path that does not exist. | D-1, D-18 |
-| Build FCPXML | 29 documents validated against Apple's real 1.10 DTD, including the full hostile matrix the brief lists. Generated both through the UI and by running `src/lib/fcpxml.ts` unchanged. | D-PASS-3, D-9, D-23 |
+| Build FCPXML | 34 documents validated against Apple's real 1.10 DTD, including the full hostile matrix the brief lists. Generated both through the UI and by running `src/lib/fcpxml.ts` unchanged. | D-PASS-3, D-9, D-23 |
 | Send to Final Cut (library + event + project in a second event) | Real clicks through the whole panel; XPath assertions on events, assets, projects, refs and the import option; `open -a` arguments checked as far as the platform guard. | D-PASS-1/2/4, D-4, D-5, D-16, D-17 |
 | Send to CapCut | Drop folder chosen and copied into, three times over; drop folder that is a file; source that is gone; Open CapCut. | D-PASS-8 |
 | Copy blocks | All seven, with and without a video, a campaign and a segment; clipboard read back; keyboard focus on open. | D-3 |

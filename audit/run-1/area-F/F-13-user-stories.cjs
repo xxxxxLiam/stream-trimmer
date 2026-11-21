@@ -17,7 +17,7 @@ function record(id, story, verdict, got, proof) {
 }
 
 const drawerState = () => {
-  const d = document.getElementById("ui-help-drawer");
+  const d = [...document.querySelectorAll('[id="ui-help-drawer"]')].find((x) => x.getBoundingClientRect().width > 0) ?? null;
   if (!d) return { open: false };
   return {
     open: true,
@@ -39,19 +39,37 @@ async function openHelp(win) {
   await win.waitForTimeout(450);
 }
 
+/** Duplicate ids exist once a second tab is open, so always use the VISIBLE drawer. */
+const visibleDrawer = () =>
+  [...document.querySelectorAll('[id="ui-help-drawer"]')].find((d) => d.getBoundingClientRect().width > 0) ?? null;
+
 async function search(win, q) {
-  await win.evaluate(() => {
-    const d = document.getElementById("ui-help-drawer");
-    [...d.querySelectorAll("button")].find((x) => x.textContent.trim() === "All tasks")?.click();
-  });
+  await win.evaluate(
+    (fn) => {
+      const d = new Function(`return (${fn})()`)();
+      [...(d?.querySelectorAll("button") ?? [])].find((x) => x.textContent.trim() === "All tasks")?.click();
+    },
+    visibleDrawer.toString(),
+  );
   await win.waitForTimeout(150);
-  await win.locator("#help-search").fill(q);
-  await win.waitForTimeout(300);
+  await win.evaluate(
+    ({ fn, q: query }) => {
+      const d = new Function(`return (${fn})()`)();
+      const input = d?.querySelector("input[type=search]");
+      if (!input) return;
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(input, query);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    },
+    { fn: visibleDrawer.toString(), q },
+  );
+  await win.waitForTimeout(350);
 }
 
 async function pick(win, startsWith) {
   const ok = await win.evaluate((t) => {
-    const b = [...document.querySelectorAll("[data-help-result]")].find((n) => n.textContent.startsWith(t));
+    const d = [...document.querySelectorAll('[id="ui-help-drawer"]')].find((x) => x.getBoundingClientRect().width > 0);
+    const b = [...(d ?? document).querySelectorAll("[data-help-result]")].find((n) => n.textContent.startsWith(t));
     if (!b) return false;
     b.click();
     return true;
@@ -65,8 +83,8 @@ async function stepThrough(win, n) {
   for (let i = 0; i < n; i++) {
     seen.push(await win.evaluate(drawerState));
     await win.evaluate(() => {
-      const d = document.getElementById("ui-help-drawer");
-      [...d.querySelectorAll("button")].find((x) => x.textContent.trim() === "Next step")?.click();
+      const d = [...document.querySelectorAll('[id="ui-help-drawer"]')].find((x) => x.getBoundingClientRect().width > 0);
+      [...(d?.querySelectorAll("button") ?? [])].find((x) => x.textContent.trim() === "Next step")?.click();
     });
     await win.waitForTimeout(350);
   }
@@ -158,27 +176,6 @@ async function stepThrough(win, n) {
       await a.shot("s05"),
     );
 
-    // ---------- Story 6: help on a second tab ----------
-    await a.win.click('button[aria-label="New tab"]');
-    await a.win.waitForTimeout(1600);
-    await openHelp(a.win);
-    await search(a.win, "folder");
-    await pick(a.win, "Change where clips save");
-    st = await a.win.evaluate(drawerState);
-    record(
-      "S6",
-      "A clipper has two videos open in tabs, is working in the second, and asks help where clips save.",
-      st.spotlight ? "PASS" : "FAIL",
-      `spotlight=${st.spotlight}, drawer says "not on screen"=${st.notice}; the Clips chip is plainly visible — getElementById returns the hidden first tab's duplicate id`,
-      await a.shot("s06"),
-    );
-    // back to one tab
-    await a.win.evaluate(() => {
-      const closers = [...document.querySelectorAll('button[aria-label^="Close "]')];
-      closers[closers.length - 1]?.click();
-    });
-    await a.win.waitForTimeout(1200);
-
     // ---------- Story 7: copy blocks tutorial ----------
     await openHelp(a.win);
     await search(a.win, "copy transcript");
@@ -187,7 +184,7 @@ async function stepThrough(win, n) {
     await a.win.click("#ui-copy-blocks");
     await a.win.waitForTimeout(700);
     const covered = await a.win.evaluate(() => {
-      const d = document.getElementById("ui-help-drawer");
+      const d = [...document.querySelectorAll('[id="ui-help-drawer"]')].find((x) => x.getBoundingClientRect().width > 0);
       const r = d?.getBoundingClientRect();
       const t = r ? document.elementFromPoint(r.left + 40, r.top + 60) : null;
       let helpClickable = true;
@@ -407,6 +404,34 @@ async function stepThrough(win, n) {
       );
     } finally {
       await b.close();
+    }
+  }
+
+
+  // ---------- Story 6: help on a second workspace tab (own instance) ----------
+  {
+    L.stub({ exitCode: 0, writeMedia: false, authStderr: SIGNED_IN, authExitCode: 1, info: SHORT });
+    const c = await L.boot("F-13-s06-tabs", { noStub: true });
+    try {
+      await c.win.setViewportSize({ width: 1440, height: 900 });
+      await c.win.click('button[aria-label="New tab"]');
+      await c.win.waitForTimeout(1800);
+      await openHelp(c.win);
+      await search(c.win, "folder");
+      await pick(c.win, "Change where clips save");
+      const st6 = await c.win.evaluate(drawerState);
+      const visibleChip = await c.win.evaluate(() =>
+        [...document.querySelectorAll('[id="ui-footer-clips"]')].some((e) => e.getBoundingClientRect().width > 0),
+      );
+      record(
+        "S6",
+        "A clipper has two videos open in tabs, is working in the second, and asks help where clips save.",
+        st6.spotlight ? "PASS" : "FAIL",
+        `task="${st6.task}" spotlight=${st6.spotlight} drawer says "not on screen"=${st6.notice}; the Clips chip IS on screen (${visibleChip}) but document.getElementById returns the hidden first tab's duplicate id`,
+        await c.shot("s06"),
+      );
+    } finally {
+      await c.close();
     }
   }
 
