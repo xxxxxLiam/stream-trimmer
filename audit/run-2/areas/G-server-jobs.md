@@ -734,6 +734,32 @@ two regexes, so the gap T1 flagged as blocked is closed.
 **F-5 — diagnostics. HELD** (with G2-11): all five pre-flight failures carry
 `diagnostics` with the job id and the engine's stderr.
 
+### Also cleared this run
+
+- **`deliver:"stream"`, the browser path, still works and still cleans up**:
+  `200`, `content-type: video/mp4`, `content-length: 109953` matching the log's
+  `sent job=job_stream bytes=109953`, the `X-Segments` / `X-Auth-Mode` headers
+  present, and the work folder gone afterwards (`usage: 0 folders, 0 bytes`).
+  (My harness decodes the body as text, so its own byte count is not evidence;
+  the content-length and the server's sent-byte line are.)
+- **Segment validation is intact**: 21 ranges → `400 "A clip can join at most
+  20 segments"`; an out point past the real duration → `400 out_point_past_end`
+  with `00:01:30` / `00:00:30` in the sentence; `Infinity`, a string start, a
+  string `segments` → `400` with a readable message and no child spawned.
+  A sub-frame range (0.02 s, and even 0.001 s) does **not** fail the job — it
+  delivers one frame, 0.04 s.
+- **Unknown body fields are still stripped**: `output`, `cookies` and
+  `ffmpegLocation` sent in the body never appear in any child's argv.
+- **Prototype pollution is still harmless**: `__proto__` and
+  `constructor.prototype` payloads are accepted as ordinary requests and the
+  next request behaves identically.
+- **Nothing reaches a shell, for any input** — see G2-3's canary result.
+- **The boot-time stale sweep still works**: an 8-day-old folder removed
+  (`swept 1 stale work folder(s)`), a fresh one kept.
+- **A finished `clip.mp4` left in a work folder is still never reused**: a
+  planted text marker stayed untouched in the keyed folder and a fresh,
+  playable 4.00 s clip was produced in the per-request folder.
+
 ---
 
 ## The cost of the G-4 fix, measured
