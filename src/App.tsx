@@ -437,7 +437,7 @@ function Layout({ active }: { active: boolean }) {
             drawer={<HelpDrawer open={helpOpen} onClose={closeHelp} />}
           />
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2">
               <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
                 {/* Channel exporter: only in a VITE_ENABLE_CHANNEL_DATA build, on an owner machine. */}

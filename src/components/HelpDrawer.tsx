@@ -88,7 +88,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
       ref={asideRef}
       id="ui-help-drawer"
       aria-label="Help"
-      className="surface-panel relative z-[55] flex min-h-0 w-full shrink-0 flex-col border-l border-hairline shadow-drawer md:w-[400px]"
+      className="surface-panel absolute inset-y-0 right-0 z-[55] flex min-h-0 w-full flex-col border-l border-hairline shadow-drawer md:w-[400px]"
     >
       <header className="flex items-center gap-2 px-4 pb-2 pt-4">
         <h2 className="flex-1 text-section">Help</h2>

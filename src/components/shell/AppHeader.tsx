@@ -160,32 +160,38 @@ export default function AppHeader(p: AppHeaderProps) {
       <YouTubeStatusChip />
       <UpdateStatus />
 
-      <div ref={settingsRef} className="relative">
-        <button
-          type="button"
-          id="ui-settings"
-          className="icon-btn"
-          aria-label="Settings"
-          aria-expanded={p.settingsOpen}
-          aria-haspopup="dialog"
-          onClick={p.onToggleSettings}
-          title="Settings (⌘,)"
-        >
-          <IconSettings />
-        </button>
-        {p.settingsOpen && (
-          <div
-            role="dialog"
+      {/* No settings button until there is something behind it. It previously
+          rendered unconditionally and opened a popover reading "No app settings
+          yet" — a control that never does anything teaches people to distrust
+          the rest of the header. The per-session things it would have held
+          (quality, clips folder, data folder) already live in the footer, by
+          the rule that once-a-session settings stay out of the loop. Pass
+          settingsBody to bring the button back. */}
+      {p.settingsBody && (
+        <div ref={settingsRef} className="relative">
+          <button
+            type="button"
+            id="ui-settings"
+            className="icon-btn"
             aria-label="Settings"
-            className="popover absolute right-0 top-full z-40 mt-1 w-[280px]"
+            aria-expanded={p.settingsOpen}
+            aria-haspopup="dialog"
+            onClick={p.onToggleSettings}
+            title="Settings (⌘,)"
           >
-            {p.settingsBody ?? (
-              // TODO(Phase C): settings content (campaign editing lives in B4).
-              <p className="text-meta text-fg-dim">No app settings yet.</p>
-            )}
-          </div>
-        )}
-      </div>
+            <IconSettings />
+          </button>
+          {p.settingsOpen && (
+            <div
+              role="dialog"
+              aria-label="Settings"
+              className="popover absolute right-0 top-full z-40 mt-1 w-[280px]"
+            >
+              {p.settingsBody}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* HELP: always the last item, top right, on every screen. */}
       <HelpButton open={p.helpOpen} onToggle={p.onToggleHelp} />

@@ -28,13 +28,15 @@ export default function ThreeColumnLayout({
   drawer,
 }: ThreeColumnLayoutProps) {
   // The columns respond to the width of THEIR OWN area (a container query in styles.css),
-  // not the window: the help drawer is a sibling that takes 400px, so the viewport is the
-  // wrong thing to measure. At or above THREE_COLUMN_MIN_PX the three share one row and scroll
+  // not the window. At or above THREE_COLUMN_MIN_PX the three share one row and scroll
   // internally; below it they wrap and stack inside one scrolling area, mark column first.
-  // The window opens at 1100 and cannot go under 900; 840 keeps three columns through one
-  // zoom step at the default (1100 / 1.25 = 880) and at the minimum window.
+  // The window opens at 1280 and cannot go under 1160.
+  //
+  // `relative` anchors the help drawer, which is absolutely positioned over this area
+  // rather than being a flex sibling. As a sibling it took 400px out of the row and
+  // reflowed all three columns on open, which is not what a side panel should do.
   return (
-    <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+    <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
       <div role="region" tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="cols-row flex min-w-0 flex-wrap content-start gap-2 p-2">
           <section
