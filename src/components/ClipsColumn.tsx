@@ -340,7 +340,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
   );
 
   const bankView = (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <input
           type="search"
@@ -495,7 +495,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
           </button>
         ))}
       </div>
-      <div id="clips-panel" role="tabpanel" aria-labelledby={`clips-tab-${tab}`} className="flex min-h-0 flex-1 flex-col">
+      <div id="clips-panel" role="tabpanel" aria-labelledby={`clips-tab-${tab}`} className="flex flex-col">
         {body}
       </div>
     </div>
