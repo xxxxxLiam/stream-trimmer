@@ -7,7 +7,10 @@
  */
 
 const OWNER = "xxxxxLiam";
-const REPO = "stream-trimmer";
+// Installers are published to the public releases repo, not the source
+// repo, which is private. This builds the manual-download link macOS users
+// are sent to, so pointing it at the source repo would 404 for every one.
+const REPO = "clipr";
 
 // The installer each platform downloads. These must match the artifactName
 // entries in package.json's `build` config; updater.test.ts asserts they do,
