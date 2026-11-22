@@ -1561,11 +1561,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
     );
   }
   const outputPath = path.join(clipDir, `clip.${ext}`);
-  // Per-segment files and the join's inputs. A single segment writes straight
-  // to outputPath and none of these exist.
-  const segFiles = segs.map((_, i) =>
-    multi ? path.join(tempDir, segmentFileName(i, ext)) : outputPath,
-  );
+  // Per-segment files and the join's inputs. Every segment, a lone one too,
+  // is written into the resumable folder, never straight into the per-request
+  // clip folder: a failure deletes that whole folder, and with it the `.part`
+  // a retry would continue from. A lone segment is moved to outputPath once
+  // it is complete (see buildClip).
+  const segFiles = segs.map((_, i) => path.join(tempDir, segmentFileName(i, ext)));
   const listPath = path.join(clipDir, "list.txt");
   // A finished clip left from a previous run is never reused — only partials.
   for (const f of [outputPath, listPath, ...segFiles]) {
@@ -1883,7 +1884,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
   // concat list and the whole-file source. Partials (`.part`) are never
   // touched, they are what a retry resumes from.
   const dropIntermediates = (keepSource: boolean) => {
-    const doomed = [...segFiles.filter((f) => f !== outputPath), listPath];
+    const doomed = [...segFiles, listPath];
     if (!keepSource) {
       try {
         for (const f of fs.readdirSync(tempDir)) {
@@ -2092,13 +2093,23 @@ app.post("/api/download", async (req: Request, res: Response) => {
           totalSec,
           { isAudio, audioKbps: quality },
           {
+            // The join ffmpeg is a child of the job like any other: a cancel
+            // kills it, and once cancelled no further join attempt starts.
             run: (args) =>
-              runProcess(resolvedFfmpeg as string, args, childEnv()),
+              job.cancelled
+                ? Promise.resolve({ code: -1, stderr: "cancelled" })
+                : runProcess(
+                    resolvedFfmpeg as string,
+                    args,
+                    childEnv(),
+                    trackChild,
+                  ),
             probeDuration: (file) =>
               probeDurationSec(resolvedFfmpeg as string, file),
             log: (m) => console.log(`[server] /api/download job=${jobId} ${m}`),
           },
         );
+        throwIfCancelled();
         joinMethod = join.method;
         if (!join.durationOk) {
           // The server's own check says this is not the clip that was marked.
@@ -2122,6 +2133,11 @@ app.post("/api/download", async (req: Request, res: Response) => {
           err.joinFailed = true;
           throw err;
         }
+      }
+      if (!multi && fs.existsSync(segFiles[0])) {
+        // The finished segment is the clip. A rename within the temp root is
+        // atomic and leaves no `.part` behind it.
+        fs.renameSync(segFiles[0], outputPath);
       }
       built = true;
     } finally {
