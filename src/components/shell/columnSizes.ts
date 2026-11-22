@@ -6,14 +6,26 @@
  *   touches the DOM or settings, so it is all testable on its own.
  */
 
-/** Settings key. Value: { transcript?: number, clips?: number } in CSS px; absent = default. */
+/**
+ * Settings key. Value: { transcript?: number, clips?: number, collapsed?: { transcript?: true,
+ * clips?: true } }. Widths are CSS px; absent = default. `collapsed` was added later: a file
+ * written before it existed has none, and loads as "nothing collapsed".
+ */
 export const COLUMN_WIDTHS_KEY = "clipper.columnWidths";
 
 export type ColumnKind = "transcript" | "clips";
 
+export type Collapsed = { transcript: boolean; clips: boolean };
+
 /** null = never dragged: the stylesheet's own width for that column applies. */
-export type StoredWidths = { transcript: number | null; clips: number | null };
-export type Widths = { transcript: number; clips: number };
+export type StoredWidths = { transcript: number | null; clips: number | null; collapsed: Collapsed };
+/** Effective widths. A collapsed column keeps its width here so expanding restores it. */
+export type Widths = { transcript: number; clips: number; collapsed: Collapsed };
+
+export const NONE_COLLAPSED: Collapsed = { transcript: false, clips: false };
+
+/** Width of the slim rail that stands in for a collapsed column (keep in step with styles.css). */
+export const RAIL_PX = 32;
 
 /** No side column goes below this. Wide enough for a timestamp plus a few words. */
 export const MIN_SIDE_PX = 200;
@@ -35,7 +47,21 @@ export function defaultWidth(kind: ColumnKind, containerPx: number): number {
 }
 
 export function defaultWidths(containerPx: number): Widths {
-  return { transcript: defaultWidth("transcript", containerPx), clips: defaultWidth("clips", containerPx) };
+  return {
+    transcript: defaultWidth("transcript", containerPx),
+    clips: defaultWidth("clips", containerPx),
+    collapsed: { ...NONE_COLLAPSED },
+  };
+}
+
+/** What a side column takes out of the row: its width, or the rail's when collapsed. */
+export function occupied(kind: ColumnKind, w: Widths): number {
+  return w.collapsed[kind] ? RAIL_PX : w[kind];
+}
+
+/** What the OTHER side column takes out of the row. */
+export function otherOccupied(kind: ColumnKind, w: Widths): number {
+  return occupied(kind === "transcript" ? "clips" : "transcript", w);
 }
 
 /** The allowed range for one side column given the container and the other side's width. */
@@ -66,10 +92,17 @@ export function clampWidth(kind: ColumnKind, requested: number, containerPx: num
  */
 export function resolveWidths(stored: StoredWidths, containerPx: number): Widths {
   const d = defaultWidths(containerPx);
-  const clips0 = clampWidth("clips", stored.clips ?? d.clips, containerPx, MIN_SIDE_PX);
-  const transcript = clampWidth("transcript", stored.transcript ?? d.transcript, containerPx, clips0);
-  const clips = clampWidth("clips", stored.clips ?? d.clips, containerPx, transcript);
-  return { transcript, clips };
+  const c = stored.collapsed;
+  const railOr = (kind: ColumnKind, px: number) => (c[kind] ? RAIL_PX : px);
+  const clips0 = clampWidth("clips", stored.clips ?? d.clips, containerPx, railOr("transcript", MIN_SIDE_PX));
+  const transcript = clampWidth("transcript", stored.transcript ?? d.transcript, containerPx, railOr("clips", clips0));
+  const clips = clampWidth("clips", stored.clips ?? d.clips, containerPx, railOr("transcript", transcript));
+  return { transcript, clips, collapsed: { ...c } };
+}
+
+/** Flip one side column between shown and collapsed. Its stored width is left alone. */
+export function toggleCollapsed(stored: StoredWidths, kind: ColumnKind): StoredWidths {
+  return { ...stored, collapsed: { ...stored.collapsed, [kind]: !stored.collapsed[kind] } };
 }
 
 export type KeyMove = "grow" | "shrink" | "min" | "max";
@@ -95,7 +128,7 @@ export function applyMove(
   containerPx: number,
   large = false,
 ): number {
-  const other = kind === "transcript" ? current.clips : current.transcript;
+  const other = otherOccupied(kind, current);
   const { min, max } = boundsFor(kind, containerPx, other);
   const step = large ? STEP_LARGE_PX : STEP_PX;
   const from = current[kind];
@@ -111,7 +144,7 @@ export function dragWidth(
   current: Widths,
   containerPx: number,
 ): number {
-  const other = kind === "transcript" ? current.clips : current.transcript;
+  const other = otherOccupied(kind, current);
   return clampWidth(kind, kind === "transcript" ? startWidth + dx : startWidth - dx, containerPx, other);
 }
 
@@ -119,15 +152,25 @@ export function dragWidth(
 export function parseStored(raw: unknown): StoredWidths {
   const pick = (v: unknown): number | null =>
     typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : null;
-  if (!raw || typeof raw !== "object") return { transcript: null, clips: null };
+  const none: StoredWidths = { transcript: null, clips: null, collapsed: { ...NONE_COLLAPSED } };
+  if (!raw || typeof raw !== "object") return none;
   const r = raw as Record<string, unknown>;
-  return { transcript: pick(r.transcript), clips: pick(r.clips) };
+  const col = r.collapsed && typeof r.collapsed === "object" ? (r.collapsed as Record<string, unknown>) : {};
+  return {
+    transcript: pick(r.transcript),
+    clips: pick(r.clips),
+    collapsed: { transcript: col.transcript === true, clips: col.clips === true },
+  };
 }
 
 /** What to write back: null (removes the key) when nothing is customised. */
-export function serializeStored(s: StoredWidths): Record<string, number> | null {
-  const out: Record<string, number> = {};
+export function serializeStored(s: StoredWidths): Record<string, unknown> | null {
+  const out: Record<string, unknown> = {};
   if (s.transcript !== null) out.transcript = s.transcript;
   if (s.clips !== null) out.clips = s.clips;
+  const collapsed: Record<string, true> = {};
+  if (s.collapsed.transcript) collapsed.transcript = true;
+  if (s.collapsed.clips) collapsed.clips = true;
+  if (Object.keys(collapsed).length) out.collapsed = collapsed;
   return Object.keys(out).length ? out : null;
 }

@@ -9,10 +9,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { readSetting, writeSetting } from "../../lib/persist";
 import ColumnHandle from "./ColumnHandle";
+import ColumnToggle, { toggleId } from "./ColumnToggle";
 import {
   COLUMN_WIDTHS_KEY,
   applyMove,
   boundsFor,
+  otherOccupied,
+  toggleCollapsed,
   dragWidth,
   parseStored,
   resolveWidths,
@@ -61,6 +64,8 @@ export default function ThreeColumnLayout({
   const storedRef = useRef(stored);
   storedRef.current = stored;
   const dragStart = useRef(0);
+  /** After a toggle the clicked button is replaced by its other form; focus follows it. */
+  const refocus = useRef<ColumnKind | null>(null);
 
   useIsoLayoutEffect(() => {
     const el = hostRef.current;
@@ -76,6 +81,16 @@ export default function ThreeColumnLayout({
   const wide = containerPx >= THREE_COLUMN_MIN_PX;
   const widths = resolveWidths(stored, containerPx || THREE_COLUMN_MIN_PX);
   const customised = stored.transcript !== null || stored.clips !== null;
+  // Collapsing only exists in the wide row. Stacked, every panel shows, so nothing a
+  // collapsed panel holds can be stranded below the fold.
+  const hide = { transcript: wide && widths.collapsed.transcript, clips: wide && widths.collapsed.clips };
+
+  useEffect(() => {
+    const k = refocus.current;
+    if (!k) return;
+    refocus.current = null;
+    document.getElementById(toggleId(k))?.focus();
+  });
 
   const commit = useCallback((next: StoredWidths, persist: boolean) => {
     storedRef.current = next;
@@ -85,14 +100,19 @@ export default function ThreeColumnLayout({
 
   /** Set one column from a width; the other keeps what it is showing now. */
   const setWidth = (kind: ColumnKind, px: number, persist: boolean) => {
-    commit({ transcript: widths.transcript, clips: widths.clips, [kind]: px }, persist);
+    commit({ transcript: widths.transcript, clips: widths.clips, collapsed: widths.collapsed, [kind]: px }, persist);
+  };
+  const toggle = (kind: ColumnKind) => {
+    refocus.current = kind;
+    commit(toggleCollapsed(storedRef.current, kind), true);
   };
   const reset = (kind: ColumnKind) => commit({ ...storedRef.current, [kind]: null }, true);
 
   const handleFor = (kind: ColumnKind) => {
-    const other = kind === "transcript" ? widths.clips : widths.transcript;
-    const { min, max } = boundsFor(kind, containerPx, other);
+    const { min, max } = boundsFor(kind, containerPx, otherOccupied(kind, widths));
     return (
+      <>
+      <ColumnToggle kind={kind} collapsed={false} onToggle={() => toggle(kind)} />
       <ColumnHandle
         kind={kind}
         value={widths[kind]}
@@ -106,6 +126,7 @@ export default function ThreeColumnLayout({
         onDragEnd={() => writeSetting(COLUMN_WIDTHS_KEY, serializeStored(storedRef.current))}
         onReset={() => reset(kind)}
       />
+      </>
     );
   };
 
@@ -121,6 +142,8 @@ export default function ThreeColumnLayout({
           className="cols-row relative flex min-w-0 flex-wrap content-start gap-2 p-2"
           style={wide ? rowVars : undefined}
           data-sized={wide && customised ? "" : undefined}
+          data-hide-transcript={hide.transcript ? "" : undefined}
+          data-hide-clips={hide.clips ? "" : undefined}
         >
           <section
             id="ui-col-transcript"
@@ -129,6 +152,7 @@ export default function ThreeColumnLayout({
           >
             {transcript}
           </section>
+          {hide.transcript ? <ColumnToggle kind="transcript" collapsed onToggle={() => toggle("transcript")} /> : null}
           <section
             id="ui-col-centre"
             aria-label="Mark a clip"
@@ -143,8 +167,9 @@ export default function ThreeColumnLayout({
           >
             {clips}
           </section>
-          {wide ? handleFor("transcript") : null}
-          {wide ? handleFor("clips") : null}
+          {hide.clips ? <ColumnToggle kind="clips" collapsed onToggle={() => toggle("clips")} /> : null}
+          {wide && !hide.transcript ? handleFor("transcript") : null}
+          {wide && !hide.clips ? handleFor("clips") : null}
         </div>
       </div>
       {drawer}

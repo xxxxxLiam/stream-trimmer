@@ -369,17 +369,16 @@
   order: -1;
 }
 
-/* The video never takes more height than leaves room for the controls under it. In/Out,
-   Add and Cut sit directly below the timeline, so a player that grows to the full column
-   width pushes them off the screen at the heights real laptops have (600-760). The cap
-   is on the box's WIDTH because its height follows from the 16:9 ratio. 440px is the
-   Timeline + the mark bar's fixed rows + the player's own controls; with a segment list
-   open the list takes a further 100px. The floor keeps a player on screen at 200% zoom. */
+/* The player fills the centre column.
+   It used to be capped by height — max-width: min(80vh, (100vh - 440px) * 16/9) — so that
+   In/Out, Add and Cut stayed below the fold without scrolling. The cost was a letterboxed
+   video with dead bars either side of it on any normal desktop: at 1280x820 the cap worked
+   out at about 656px inside a column over 1100px wide. The owner would rather scroll a
+   little and watch a bigger picture, which is the right trade for the one thing you stare
+   at all session. The workspace area scrolls and is focusable, so the controls stay
+   reachable by wheel, trackpad and keyboard with the bar hidden. */
 .cols-centre .aspect-video {
-  max-width: max(150px, min(80vh, calc((100vh - 440px) * 16 / 9)));
-}
-.cols-centre:has(#ui-segment-list) .aspect-video {
-  max-width: max(150px, min(80vh, calc((100vh - 540px) * 16 / 9)));
+  max-width: 100%;
 }
 
 /* The segment list scrolls inside itself. It is the LAST thing in the mark bar, so growing
@@ -396,7 +395,9 @@
 /* ThreeColumnLayout sets --col-t / --col-c on .cols-row and data-sized once a width has
    been dragged. They are read ONLY inside the wide container query, so stacked columns
    never carry a width, and the handles do not exist (or show) below it either. */
-.col-handle {
+.col-handle,
+.col-pill,
+.col-rail {
   display: none;
 }
 
@@ -468,6 +469,65 @@
   }
   .col-handle-clips {
     right: calc(8px + var(--col-c) + 4px - 6px);
+  }
+  /* Hide / show. A hidden column is display:none (out of the tab order too) and a slim
+     labelled rail takes its place, so the way back is always visible and says what it
+     reopens. 32px = RAIL_PX in columnSizes.ts. The centre grows into the freed width. */
+  .cols-row[data-hide-transcript] .cols-transcript,
+  .cols-row[data-hide-clips] .cols-clips {
+    display: none;
+  }
+  .col-rail {
+    display: flex;
+    flex: 0 0 32px;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+    min-height: 0;
+    color: var(--c-fg-dim);
+    cursor: pointer;
+  }
+  .col-rail:hover {
+    background: var(--c-hover);
+    color: var(--c-fg);
+  }
+  .col-rail:focus-visible,
+  .col-pill:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 0;
+    color: var(--c-fg);
+  }
+  .col-rail-label {
+    writing-mode: vertical-rl;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+  .col-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 16px;
+    width: 16px;
+    height: 32px;
+    padding: 0;
+    z-index: 2;
+    cursor: pointer;
+    color: var(--c-fg-dim);
+    background: var(--c-raised);
+    border: 1px solid var(--c-hairline-strong);
+    border-radius: 5px;
+  }
+  .col-pill:hover {
+    background: var(--c-hover);
+    color: var(--c-fg);
+  }
+  .col-pill-transcript {
+    left: calc(8px + var(--col-t) + 4px - 8px);
+  }
+  .col-pill-clips {
+    right: calc(8px + var(--col-c) + 4px - 8px);
   }
 }
 @container (min-width: 1040px) {

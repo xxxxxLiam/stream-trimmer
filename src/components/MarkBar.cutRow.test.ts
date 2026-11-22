@@ -50,11 +50,25 @@ test("the segment list scrolls inside itself and stays keyboard-reachable", () =
   assert.match(list, /aria-label=\{`Remove segment/);
 });
 
-test("the player never takes more height than leaves room for the mark bar", () => {
+test("the player fills the column, and the controls under it stay reachable", () => {
+  // The player used to be capped by viewport height so In, Out, Add and Cut always sat
+  // above the fold. That cost a letterboxed video with dead bars either side on any normal
+  // desktop — about 656px inside a column over 1100px wide — and the owner would rather
+  // scroll for a bigger picture. The cap is gone deliberately.
+  //
+  // What still has to hold is the reason the cap existed: the controls must remain
+  // reachable. They are, because the workspace scrolls and is focusable, which is also
+  // what the hidden-scrollbar rule requires of anything scrollable.
   const rule = /\.cols-centre \.aspect-video\s*\{([^}]*)\}/.exec(css);
-  assert.ok(rule, "a height-aware cap on the player box");
-  assert.match(rule![1], /100vh/);
-  assert.match(css, /\.cols-centre:has\(#ui-segment-list\) \.aspect-video/);
+  assert.ok(rule, "the player box still has a rule");
+  assert.match(rule![1], /max-width:\s*100%/, "the player fills the centre column");
+  assert.doesNotMatch(rule![1], /100vh/, "no viewport-height cap: that is what letterboxed it");
+
+  const layout = readFileSync(new URL("./shell/ThreeColumnLayout.tsx", import.meta.url), "utf8");
+  const host = /className="cols-host[^"]*"/.exec(layout);
+  assert.ok(host, "the workspace host is present");
+  assert.match(host![0], /overflow-y-auto/, "the workspace scrolls, so a tall player is not a trap");
+  assert.match(layout, /tabIndex=\{0\}[\s\S]{0,120}cols-host|cols-host[\s\S]{0,120}tabIndex=\{0\}/, "and it is focusable, so the keyboard reaches the controls");
 });
 
 test("no visible scrollbar is introduced, and the rule is stated once", () => {
