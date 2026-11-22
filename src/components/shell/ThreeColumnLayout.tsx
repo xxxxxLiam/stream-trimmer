@@ -30,8 +30,9 @@ export default function ThreeColumnLayout({
   // The columns respond to the width of THEIR OWN area (a container query in styles.css),
   // not the window: the help drawer is a sibling that takes 400px, so the viewport is the
   // wrong thing to measure. At or above THREE_COLUMN_MIN_PX the three share one row and scroll
-  // internally; below it they wrap and stack inside one scrolling area. The window opens at
-  // 1100 and cannot go under 900, so the default must land on the three-column side.
+  // internally; below it they wrap and stack inside one scrolling area, mark column first.
+  // The window opens at 1100 and cannot go under 900; 840 keeps three columns through one
+  // zoom step at the default (1100 / 1.25 = 880) and at the minimum window.
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       <div role="region" tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
