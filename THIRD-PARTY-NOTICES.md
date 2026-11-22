@@ -1,17 +1,26 @@
 # Third-party notices
 
-YouTube Clipper is distributed under its own licence (see `LICENSE`), but it
-ships alongside independent programs that carry their own terms. Those terms
-govern those programs, and nothing in `LICENSE` overrides them.
+Clipr is published by IDK Solutions (Pty) Ltd and distributed under its own
+licence (see `LICENSE`), but it ships alongside independent programs that
+carry their own terms. Those terms govern those programs, and nothing in
+`LICENSE` overrides them.
+
+Clipr was previously released as **YouTube Clipper**; these notices cover the
+binaries shipped with Clipr.
 
 Each of the three bundled binaries runs as a **separate process**, invoked
 with command-line arguments. None of them is linked into the application.
+They are installed under `resources/bin/` (with a `.exe` suffix on Windows).
 
 ## ffmpeg — GNU General Public License v3.0 or later
 
-Bundled via [`ffmpeg-static`](https://github.com/eugeneware/ffmpeg-static) and
-placed at `resources/bin/ffmpeg` in the installed application. Used to cut
-segments and join them into one file.
+Used to cut segments and join them into one file.
+
+The exact binary is downloaded at build time from the
+[`eugeneware/ffmpeg-static`](https://github.com/eugeneware/ffmpeg-static)
+GitHub releases — **release tag `b6.0`**, asset
+`ffmpeg-<platform>-<arch>.gz`. (The `ffmpeg-static` npm package is not used to
+supply the shipped binary.)
 
 The binary reports its own licence when run with `ffmpeg -L`:
 
@@ -22,24 +31,24 @@ The binary reports its own licence when run with `ffmpeg -L`:
 
 **Your rights to ffmpeg come from the GPL, not from this project's licence.**
 You may redistribute and modify ffmpeg itself under the GPL's terms, entirely
-independently of YouTube Clipper.
+independently of Clipr.
 
 ### Corresponding source
 
 GPL-3.0 section 6 requires that anyone distributing these binaries makes the
-corresponding source available. The exact builds shipped here come from
-`ffmpeg-static`'s releases, which publish both the binaries and the source
-they were built from:
+corresponding source available. The exact build shipped here comes from
+`ffmpeg-static` release `b6.0`, which publishes both the binaries and the
+build scripts they were produced with:
 
-- Binaries and build scripts: https://github.com/eugeneware/ffmpeg-static
+- Binaries and build scripts, tag `b6.0`:
+  https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.0
 - ffmpeg upstream source: https://git.ffmpeg.org/ffmpeg.git and
   https://ffmpeg.org/download.html
 - Licence text: https://www.gnu.org/licenses/gpl-3.0.txt
 
 If you want the corresponding source for the exact binary in a particular
-release of this application and cannot obtain it from the links above, open
-an issue at https://github.com/xxxxxLiam/stream-trimmer and it will be
-provided.
+release of Clipr and cannot obtain it from the links above, open an issue at
+https://github.com/xxxxxLiam/clipr/issues and it will be provided.
 
 Note that this build includes GPL-licensed components such as **libx264**,
 which the re-encode path uses. That is why the bundled ffmpeg is GPL rather
@@ -47,36 +56,46 @@ than LGPL.
 
 ## yt-dlp — The Unlicense (public domain)
 
-Bundled from the [yt-dlp nightly
-releases](https://github.com/yt-dlp/yt-dlp-nightly-builds) and placed at
-`resources/bin/yt-dlp`. Used to read video metadata, subtitles and comments,
-and to download media.
+Downloaded at build time from the [yt-dlp nightly
+builds](https://github.com/yt-dlp/yt-dlp-nightly-builds) (latest release at
+build time). Used to read video metadata, subtitles and comments, and to
+download media.
+
+The nightly channel is deliberate: extractor breakages are fixed there first,
+and yt-dlp's stable tags can trail a fix by weeks. The version that actually
+shipped is recorded at build time from the binary's own `--version`.
 
 yt-dlp is released into the public domain under The Unlicense:
 https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE
 
 ## Deno — MIT License
 
-Bundled from the [Deno releases](https://github.com/denoland/deno) and placed
-at `resources/bin/deno`. Present only because yt-dlp's JavaScript-challenge
-step needs a JavaScript runtime.
+Downloaded at build time from the [Deno
+releases](https://github.com/denoland/deno) (latest release at build time).
+Present only because yt-dlp's JavaScript-challenge step needs a JavaScript
+runtime.
 
 Licence: https://github.com/denoland/deno/blob/main/LICENSE.md
 
 ## Electron — MIT License
 
-The application runs on [Electron](https://github.com/electron/electron),
-which is MIT licensed and itself embeds Chromium and Node.js. Chromium is
-distributed under the BSD-3-Clause licence with a number of additional
-component licences; the full set is viewable from the application via
-Chromium's `chrome://credits` equivalent, and at
+Clipr runs on [Electron](https://github.com/electron/electron), which is MIT
+licensed and itself embeds Chromium and Node.js. Chromium is distributed
+under the BSD-3-Clause licence with a number of additional component
+licences; the full set is viewable from the application via Chromium's
+`chrome://credits` equivalent, and at
 https://github.com/electron/electron/blob/main/LICENSE
 
 ## npm dependencies
 
-The application's JavaScript dependencies are listed in `package.json` and
-pinned in `package-lock.json`, and are predominantly MIT, ISC or
-BSD licensed. A full machine-readable inventory can be produced with:
+Clipr's JavaScript dependencies are predominantly MIT, ISC or BSD licensed.
+They are declared in `package.json` and pinned in `package-lock.json` in the
+source repository, which is not distributed with the installer, so a full
+inventory cannot be produced from an installed copy.
+
+If you need the complete dependency-and-licence inventory, open an issue at
+https://github.com/xxxxxLiam/clipr/issues and it will be provided. From a
+source checkout it is:
 
 ```
 npx license-checker --production --summary

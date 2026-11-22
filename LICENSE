@@ -1,12 +1,26 @@
-YouTube Clipper — Software Licence
-Copyright (c) 2025–2026 Liam. All rights reserved.
+Clipr — Software Licence
+Copyright (c) 2025–2026 IDK Solutions (Pty) Ltd. All rights reserved.
 
-This is not an open source licence. The source code is published so that it
-can be read and audited, not so that it can be reused.
+IDK Solutions (Pty) Ltd is a company registered in South Africa with the
+Companies and Intellectual Property Commission, registration number
+2022/757534/07. In this licence, "the copyright holder" means that company.
 
-Earlier releases: versions up to and including 4.0.1 were published under the
-MIT Licence. That grant cannot be withdrawn and continues to apply to those
-versions. This licence applies to every version released after 4.0.1.
+This is not an open source licence.
+
+
+0. WHICH VERSIONS THIS COVERS
+
+This application was previously released under the name "YouTube Clipper".
+Versions of YouTube Clipper up to and including 4.0.1 were published under
+the MIT Licence. That grant cannot be withdrawn and continues to apply to
+those versions, forever.
+
+This licence applies to Clipr, from version 1.0.0 onwards.
+
+Clipr's version numbering restarted at 1.0.0 when the name changed, so a
+Clipr version number that is lower than 4.0.1 does not mean an earlier
+release. Every release named Clipr is covered by this licence, whatever its
+number; every release named YouTube Clipper up to 4.0.1 is MIT.
 
 
 1. PERMISSION GRANTED
@@ -18,8 +32,11 @@ work and any other commercial use of the clips you produce.
 Clips, exports and other output you create with the application are yours.
 This licence claims nothing over them.
 
-You may read the published source code, and you may quote short excerpts when
-reporting a bug or a security issue.
+Where the source code is published, you may read it, and you may quote short
+excerpts when reporting a bug or a security issue. The copyright holder is
+under no obligation to publish the source, and may stop publishing it at any
+time; doing so does not change your rights under this licence to a version
+you already have.
 
 
 2. PERMISSION NOT GRANTED
@@ -37,7 +54,10 @@ Without prior written permission from the copyright holder, you may not:
 
   e. reverse engineer, decompile or disassemble the application, except to
      the extent that this restriction cannot lawfully be excluded, or as
-     clause 3 permits.
+     clause 3 permits;
+
+  f. use the name "Clipr", the Clipr logo, or any confusingly similar name or
+     mark, other than to refer to this application as it is distributed.
 
 Nothing here restricts what the law gives you regardless, including fair
 dealing and any rights that cannot be excluded by contract.
@@ -83,4 +103,4 @@ version you already have under the licence it was released with.
 
 
 Permission beyond this licence: open an issue at
-https://github.com/xxxxxLiam/stream-trimmer
+https://github.com/xxxxxLiam/clipr/issues
