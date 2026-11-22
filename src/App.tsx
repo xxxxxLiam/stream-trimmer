@@ -17,7 +17,7 @@ import {
   TabActiveProvider,
   useWorkspace,
 } from "./context/WorkspaceContext";
-import { CampaignProvider, useCampaign } from "./context/CampaignContext";
+import { CampaignProvider, CampaignTabScope, useCampaign } from "./context/CampaignContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
@@ -226,6 +226,7 @@ function Layout({ active }: { active: boolean }) {
   // nobody is nagged: someone who just wants to paste a link and cut once never set a
   // campaign up, and that is a legitimate way to use the app.
   const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
+
   // Live input for the Copy blocks panel (D-3). The transcript loads on demand, so opening
   // the panel asks for it rather than showing "No transcript loaded" for a video that has one.
   useEffect(() => {
@@ -246,8 +247,10 @@ function Layout({ active }: { active: boolean }) {
       }),
     [sourceUrl, videoId, transcript, tabSegments, campaign, nextClipId, downloads],
   );
+
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
+
   const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
   // Clips cut this session, kept per campaign: the panel's Export / Send all / Copy file path read
   // only the ACTIVE campaign's list, so another client's clips are never offered, or sent.
@@ -258,13 +261,16 @@ function Layout({ active }: { active: boolean }) {
   );
   const editorRef = useRef(editorSettings);
   editorRef.current = editorSettings;
+
   // Loading video info renders inline; the overlay is reserved for the
   // blocking comment export.
   const overlayVisible = active && exportingComments;
+
   const closeHelp = useCallback(() => setHelpOpen(false), []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeCopy = useCallback(() => setCopyOpen(false), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
   // Switching campaign re-points the saving folder, format and quality at once. The clips
   // folder lives on the campaign; the clipper still saves to its own saveDir, so mirror it.
   useEffect(() => {
@@ -272,6 +278,7 @@ function Layout({ active }: { active: boolean }) {
       setSaveDir(folders.clipsDir);
     }
   }, [isElectron, folders.clipsDir, saveDir, setSaveDir]);
+
   const campaignId = campaign?.id ?? null;
   // True from the moment a switch asks the clipper to change format/quality until it has.
   // Without it the write-back below would copy the OLD values over the new campaign.
@@ -295,6 +302,7 @@ function Layout({ active }: { active: boolean }) {
     if (!same) update(campaign.id, { format, quality });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [format, quality]);
+
   // Once a clip is saved: remember it for the session batch and run the campaign's
   // "After cutting" choice. Never blocks or fails the cut itself.
   // `settings` are the ones in force when the cut STARTED: a switch while it runs must not apply
@@ -323,6 +331,7 @@ function Layout({ active }: { active: boolean }) {
     },
     [videoId, sourceUrl, campaign?.id, campaign?.name, info?.title, folders.clipsDir, saveDir],
   );
+
   // Cut: name the clip from the campaign pattern, then record its ranges as used so the
   // no-reuse check and the bank stay in agreement with no bookkeeping.
   const cutClip = useCallback(
@@ -342,6 +351,7 @@ function Layout({ active }: { active: boolean }) {
     },
     [videoId, campaign, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
   );
+
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
   // The column marks it cut and records the used ranges itself once this resolves true.
   const cutBanked = useCallback(
@@ -354,6 +364,7 @@ function Layout({ active }: { active: boolean }) {
     },
     [download, afterSaved],
   );
+
   // Shell-level shortcuts (BUILD-SPEC section 12). Active tab only.
   const revealRef = useRef(revealLastSaved);
   revealRef.current = revealLastSaved;
@@ -382,6 +393,7 @@ function Layout({ active }: { active: boolean }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
+
   return (
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
@@ -453,13 +465,15 @@ function Layout({ active }: { active: boolean }) {
 }
 
 function Shell() {
-  const { tabs, activeId } = useWorkspace();
+  const { tabs, activeId, setTabCampaign } = useWorkspace();
   const connection = useYouTubeConnection();
+
   // No background polling. On launch we read the imported cookies.txt once
   // and verify it silently; after that the user checks when they choose.
   useEffect(() => {
     void restoreConnection();
   }, []);
+
   return (
     <div className="surface-ground flex h-screen w-full flex-col overflow-hidden">
       {/* Workspace tabs (multiple videos). Kept from v3; the header below is per tab. */}
@@ -482,7 +496,13 @@ function Shell() {
                 <ChannelBoundary>
                   <TabActiveProvider active={active} tabId={tab.id}>
                     <TabReporter id={tab.id} />
-                    <Layout active={active} />
+                    {/* Each tab keeps its own campaign, so changing it here leaves the others alone. */}
+                    <CampaignTabScope
+                      campaignId={tab.campaignId}
+                      onChange={(cid) => setTabCampaign(tab.id, cid)}
+                    >
+                      <Layout active={active} />
+                    </CampaignTabScope>
                   </TabActiveProvider>
                 </ChannelBoundary>
               </ClipperProvider>
