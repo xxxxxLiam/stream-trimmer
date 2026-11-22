@@ -525,9 +525,9 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  if (cookieRefreshTimer) {
-    clearInterval(cookieRefreshTimer);
-    cookieRefreshTimer = null;
+  if (cookieCheckTimer) {
+    clearInterval(cookieCheckTimer);
+    cookieCheckTimer = null;
   }
   if (serverHandle && typeof serverHandle.close === "function") {
     try {
