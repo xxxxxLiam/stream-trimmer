@@ -690,7 +690,10 @@ export function buildFcpxml(input: FcpxmlInput): string {
       notes ? `>\n${pad}  <note>${xmlEscape(noEmDash(notes))}</note>\n${pad}</asset-clip>` : "/>";
     mediaItems.push(
       `      <asset-clip ref="${assetId}" name="${name}" start="0s" duration="${duration}" ` +
-        `format="${formatId}" tcFormat="NDF"${note("      ")}`,
+        `format="${formatId}" tcFormat="NDF">` + (notes ? `
+        <note>${xmlEscape(noEmDash(notes))}</note>` : "") + `
+        <keyword start="0s" duration="${duration}" value="Raw"/>
+      </asset-clip>`,
     );
 
     if (input.project) {
