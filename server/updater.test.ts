@@ -85,15 +85,15 @@ test("a version becomes the tag the release workflow creates", () => {
 test("each platform gets a direct link to its own installer", () => {
   assert.equal(
     downloadUrl("darwin", "3.2.0"),
-    "https://github.com/xxxxxLiam/clipr/releases/download/v3.2.0/YouTube-Clipper-macOS-AppleSilicon.dmg",
+    "https://github.com/xxxxxLiam/clipr/releases/download/v3.2.0/Clipr-macOS-AppleSilicon.dmg",
   );
   assert.equal(
     downloadUrl("win32", "3.2.0"),
-    "https://github.com/xxxxxLiam/clipr/releases/download/v3.2.0/YouTube-Clipper-Windows-x64-Setup.exe",
+    "https://github.com/xxxxxLiam/clipr/releases/download/v3.2.0/Clipr-Windows-x64-Setup.exe",
   );
   assert.equal(
     downloadUrl("linux", "3.2.0"),
-    "https://github.com/xxxxxLiam/clipr/releases/download/v3.2.0/YouTube-Clipper-Linux-x64.AppImage",
+    "https://github.com/xxxxxLiam/clipr/releases/download/v3.2.0/Clipr-Linux-x64.AppImage",
   );
 });
 

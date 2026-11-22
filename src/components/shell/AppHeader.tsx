@@ -106,7 +106,7 @@ export default function AppHeader(p: AppHeaderProps) {
   return (
     <header className="relative z-30 flex min-h-header flex-wrap items-center gap-x-2 gap-y-1 border-b border-hairline px-3 py-1">
       {/* Mark only, no wordmark. role+label so it still has an accessible name. */}
-      <div className="flex items-center pr-1" role="img" aria-label="Clipper">
+      <div className="flex items-center pr-1" role="img" aria-label="Clipr">
         <BrandMark size={18} />
       </div>
 

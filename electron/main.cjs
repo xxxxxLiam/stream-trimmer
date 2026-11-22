@@ -76,6 +76,47 @@ function getDragIcon() {
   return dragIcon;
 }
 
+// The app was renamed from "YouTube Clipper" to "Clipr" in 4.0.2. Electron
+// derives userData from the product name, so the new build looks in a new,
+// empty directory and every existing user would silently lose their
+// campaigns, clip bank, folder choices and YouTube sign-in.
+//
+// This copies the old directory's contents across, once, before anything
+// reads them. It never overwrites: if a file already exists under the new
+// name it is left alone, so a user who has started fresh is not clobbered,
+// and a second run is a no-op. The old directory is left in place — if this
+// goes wrong, the data is still where it was.
+function migrateLegacyUserData() {
+  try {
+    const current = app.getPath("userData");
+    const legacy = path.join(path.dirname(current), "YouTube Clipper");
+    if (legacy === current || !fs.existsSync(legacy)) return;
+    // Only a first run: if settings are already here, the move has happened
+    // (or the user has real data under the new name) and we must not touch it.
+    if (fs.existsSync(path.join(current, "settings.json"))) return;
+
+    fs.mkdirSync(current, { recursive: true });
+    let moved = 0;
+    for (const entry of fs.readdirSync(legacy, { withFileTypes: true })) {
+      const from = path.join(legacy, entry.name);
+      const to = path.join(current, entry.name);
+      if (fs.existsSync(to)) continue;
+      try {
+        fs.cpSync(from, to, { recursive: true, errorOnExist: false });
+        moved += 1;
+      } catch (err) {
+        console.error(`[electron] could not carry over ${entry.name}:`, err);
+      }
+    }
+    if (moved) console.log(`[electron] carried ${moved} item(s) over from "YouTube Clipper"`);
+  } catch (err) {
+    // Never let this stop the app starting: a fresh profile is recoverable,
+    // a boot loop is not.
+    console.error("[electron] user data migration skipped:", err);
+  }
+}
+migrateLegacyUserData();
+
 // Single-instance lock — no duplicate backend, no duplicate window.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -287,10 +328,16 @@ function closeSplash() {
 
 async function createWindow(port) {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 760,
-    minWidth: 900,
-    minHeight: 600,
+    // The window may not be smaller than the clipping loop needs. At the old
+    // 900x600 floor the mark bar and the Cut button could never be on screen
+    // together, so every single clip cost a scroll; the old 1100 default was
+    // also narrower than the three-column breakpoint, so a first launch got
+    // the stacked fallback. Both are the same mistake — advertising a size
+    // the app does not actually work at.
+    width: 1280,
+    height: 820,
+    minWidth: 1160,
+    minHeight: 760,
     backgroundColor: "#0B0B0C",
     autoHideMenuBar: true,
     show: false,

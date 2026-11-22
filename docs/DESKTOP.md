@@ -1,4 +1,4 @@
-# YouTube Clipper — Desktop app
+# Clipr — Desktop app
 
 A packaged Electron build of the app. Ships the entire stack — front-end,
 backend, `yt-dlp`, and `ffmpeg` — in one installer. Users double-click to
@@ -16,8 +16,8 @@ npm install
 npm run dev:electron
 
 # Produce installers for the current OS
-npm run dist:mac    # -> dist-electron/YouTube Clipper-<version>.dmg
-npm run dist:win    # -> dist-electron/YouTube Clipper Setup <version>.exe
+npm run dist:mac    # -> dist-electron/Clipr-<version>.dmg
+npm run dist:win    # -> dist-electron/Clipr Setup <version>.exe
 ```
 
 `npm run dev` (browser-only workflow) still works and is unchanged.

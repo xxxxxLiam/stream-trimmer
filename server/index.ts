@@ -21,7 +21,7 @@ import {
 } from "node:child_process";
 import { z } from "zod";
 // We don't use youtube-dl-exec's runner: its underlying `tinyspawn` splits the
-// binary path on spaces (breaks `/Applications/YouTube Clipper.app/...`). We
+// binary path on spaces (breaks `/Applications/Clipr.app/...`). We
 // spawn yt-dlp directly with node's child_process, and use `dargs` (already a
 // transitive dep) to convert the same option-object shape into CLI flags.
 import dargs from "dargs";

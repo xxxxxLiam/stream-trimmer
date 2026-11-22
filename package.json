@@ -1,5 +1,5 @@
 {
-  "name": "youtube-clipper",
+  "name": "clipr",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "version": "4.0.0",
@@ -61,8 +61,8 @@
   },
   "build": {
     "appId": "app.youtubeclipper.local",
-    "productName": "YouTube Clipper",
-    "artifactName": "YouTube-Clipper-${version}-${os}-${arch}.${ext}",
+    "productName": "Clipr",
+    "artifactName": "Clipr-${version}-${os}-${arch}.${ext}",
     "publish": {
       "provider": "github",
       "owner": "xxxxxLiam",
@@ -107,7 +107,7 @@
           ]
         }
       ],
-      "artifactName": "YouTube-Clipper-macOS-AppleSilicon.${ext}",
+      "artifactName": "Clipr-macOS-AppleSilicon.${ext}",
       "category": "public.app-category.utilities",
       "identity": null,
       "icon": "build/icon.icns",
@@ -122,7 +122,7 @@
           ]
         }
       ],
-      "artifactName": "YouTube-Clipper-Windows-x64-Setup.${ext}",
+      "artifactName": "Clipr-Windows-x64-Setup.${ext}",
       "icon": "build/icon.ico",
       "sign": null
     },
@@ -135,9 +135,10 @@
           ]
         }
       ],
-      "artifactName": "YouTube-Clipper-Linux-x64.${ext}",
+      "artifactName": "Clipr-Linux-x64.${ext}",
       "category": "AudioVideo",
       "icon": "build/icon.png"
     }
-  }
+  },
+  "productName": "Clipr"
 }
