@@ -4,7 +4,7 @@
   "description": "Cut short vertical clips out of long podcasts and interviews.",
   "author": "IDK Solutions (Pty) Ltd",
   "license": "SEE LICENSE IN LICENSE",
-  "version": "10.0.0",
+  "version": "11.0.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
