@@ -16,7 +16,13 @@
  *   output. No em dash is emitted (user style rule).
  */
 
-/** The FCPXML version this generator writes. */
+import type { Look } from "./look";
+
+/**
+ * The FCPXML version this generator writes. When a project carries the user's
+ * own look, the version of the export that look came from is written instead,
+ * because that is the version the user's Final Cut is known to accept.
+ */
 export const FCPXML_VERSION = "1.10";
 
 // ---------------------------------------------------------------------------
@@ -90,6 +96,10 @@ export interface EditorHandoffSettings {
   projectEvent: string;
   /** Off by default: also create a project with the clip on its timeline. */
   createProject: boolean;
+  /** Copy the user's own look (see look.ts) onto every project clip. */
+  applyLook?: boolean;
+  /** Text of a Final Cut XML export of one clip that already has the look on it. */
+  lookXml?: string;
   /** Tokens: {clipId} {label} {campaign} {source}. */
   projectNamePattern: string;
   timelineFormat: TimelineFormat;
@@ -104,6 +114,8 @@ export const DEFAULT_EDITOR_SETTINGS: EditorHandoffSettings = {
   mediaEvent: "",
   projectEvent: "",
   createProject: false,
+  applyLook: false,
+  lookXml: "",
   projectNamePattern: DEFAULT_PROJECT_PATTERN,
   timelineFormat: DEFAULT_TIMELINE,
 };
@@ -144,6 +156,8 @@ export function normalizeEditorSettings(raw: unknown): EditorHandoffSettings {
     mediaEvent: typeof r.mediaEvent === "string" ? r.mediaEvent : "",
     projectEvent: typeof r.projectEvent === "string" ? r.projectEvent : "",
     createProject: r.createProject === true,
+    applyLook: r.applyLook === true,
+    lookXml: typeof r.lookXml === "string" ? r.lookXml : "",
     // A blank pattern is kept as typed (so the field can be edited); naming falls back to the default.
     projectNamePattern:
       typeof r.projectNamePattern === "string" ? r.projectNamePattern : DEFAULT_PROJECT_PATTERN,
@@ -418,7 +432,7 @@ export function parseProbe(raw: RawProbe): MediaInfo {
 /** Remove characters XML 1.0 cannot carry (control chars, lone surrogates). */
 function stripInvalidXml(text: string): string {
   return text
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
     .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 }
 
@@ -533,6 +547,8 @@ export function clipNotes(clip: Pick<FcpClip, "sourceUrl" | "segments">): string
 // ---------------------------------------------------------------------------
 
 export interface FcpxmlProject {
+  /** The user's own Final Cut look, copied onto every project clip. */
+  look?: Look;
   /** Event that will hold the projects. */
   eventName: string;
   namePattern: string;
@@ -653,7 +669,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
         id,
         xml:
           `    <format id="${id}" frameDuration="${frameDuration}" ` +
-          `width="${width}" height="${height}"/>`,
+          `width="${width}" height="${height}" colorSpace="1-1-1 (Rec. 709)"/>`,
       });
     }
     return id;
@@ -704,6 +720,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
       const tlFrames = secondsToFrames(assetSec, tl.fps);
       if (tlFrames < 1) throw new Error(`${clip.id}: the file is shorter than one timeline frame`);
       const tlDuration = formatTime(tlFrames, tl.fps);
+      const lookClip = input.project.look?.clip;
       const seq =
         ` tcStart="0s" tcFormat="NDF"` +
         (m.audioChannels ? ` audioLayout="${m.audioChannels === 1 ? "mono" : "stereo"}"` : "") +
@@ -714,7 +731,10 @@ export function buildFcpxml(input: FcpxmlInput): string {
           `        <sequence format="${tlFormat}" duration="${tlDuration}"${seq}>`,
           `          <spine>`,
           `            <asset-clip ref="${assetId}" offset="0s" name="${name}" start="0s" ` +
-            `duration="${tlDuration}" tcFormat="NDF"${note("            ")}`,
+            `duration="${tlDuration}" tcFormat="NDF"` +
+            (lookClip
+              ? `>${notes ? `\n              <note>${xmlEscape(noEmDash(notes))}</note>` : ""}\n${lookClip}\n            </asset-clip>`
+              : note("            ")),
           `          </spine>`,
           `        </sequence>`,
           `      </project>`,
@@ -746,7 +766,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<!DOCTYPE fcpxml>`,
     ``,
-    `<fcpxml version="${FCPXML_VERSION}">`,
+    `<fcpxml version="${input.project?.look?.version ?? FCPXML_VERSION}">`,
     ...(location
       ? [
           `  <import-options>`,
@@ -757,6 +777,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
     `  <resources>`,
     ...formats.map((f) => f.xml),
     ...assets,
+    ...(input.project?.look?.effects ?? []),
     `  </resources>`,
     ...events.map((l) => l.slice(2)),
     `</fcpxml>`,
