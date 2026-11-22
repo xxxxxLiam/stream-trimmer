@@ -357,7 +357,7 @@ export default function EditorHandoff({
   clipsDir,
   clips,
 }: EditorHandoffProps) {
-  const [open, setOpen] = useState(settings.afterCutting !== "nothing" || !!settings.capcutDropDir);
+  const [open, setOpen] = useState(false); const titleId = useId(); useEffect(() => { if (!open) return; const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } }; window.addEventListener("keydown", onKey, true); return () => window.removeEventListener("keydown", onKey, true); }, [open]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<HandoffOutcome | null>(null);
   const [apps, setApps] = useState<{ finalcut: boolean; premiere: boolean; capcut: boolean } | null>(null);
@@ -469,7 +469,7 @@ export default function EditorHandoff({
       </button>
 
       {open && (
-        <div className="surface-raised flex flex-col gap-3 rounded-control border border-hairline p-3">
+        <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="surface-panel fixed left-1/2 top-1/2 z-[60] flex max-h-[calc(100%_-_32px)] w-[min(640px,calc(100%_-_32px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto rounded-panel border border-hairline p-5 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"><div className="flex items-baseline gap-3"><h2 id={titleId} className="text-section font-medium text-fg">Hand off to an editor</h2><span className="min-w-0 flex-1 truncate text-meta text-fg-dim">After cutting: {summary}</span><button type="button" className="chip shrink-0" onClick={() => setOpen(false)}>Done</button></div>
           <label className="flex flex-col gap-1">
             <span className="text-body">After cutting</span>
             <select
@@ -523,7 +523,7 @@ export default function EditorHandoff({
                   type="button"
                   className="btn"
                   onClick={async () => {
-                    const dir = await window.electronAPI?.pickDirectory?.();
+                    const dir = await window.electronAPI?.pickFcpLibrary?.();
                     if (dir) set({ fcpLibrary: dir });
                   }}
                 >
