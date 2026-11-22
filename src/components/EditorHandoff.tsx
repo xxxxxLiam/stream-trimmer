@@ -16,7 +16,7 @@
  *   `runAfterCutting` is exported for the cut flow to call once a clip is saved.
  *   No filled-accent button here: the primary action belongs to the screen.
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import {
   FRAME_RATE_CHOICES,
   buildSessionFcpxml,
@@ -94,8 +94,8 @@ export function projectOptions(
   settings: EditorHandoffSettings,
   ctx: { campaignName?: string; sourceTitle?: string },
 ): FcpxmlProject | undefined {
-  const eventName = settings.projectEvent.trim();
-  if (!settings.createProject || !eventName) return undefined;
+  const eventName = resolveEventName({ from: "source", campaignName: ctx.campaignName, sourceTitle: ctx.sourceTitle });
+  if (!eventName) return undefined;
   return {
     eventName,
     namePattern: settings.projectNamePattern,
@@ -141,7 +141,7 @@ export async function exportFcpxml(
     return { ok: false, message: "No clips yet. Cut one, then send it." };
   }
   const eventName = resolveEventName({
-    from: "campaign",
+    from: "source",
     campaignName: ctx.campaignName,
     sourceTitle: ctx.sourceTitle,
   });
@@ -170,7 +170,7 @@ async function exportNamed(
     };
     built = await buildSessionFcpxml(
       clips,
-      structured?.mediaEvent.trim() || eventName,
+      eventName,
       async (file) => {
         const r = await api.probe(file);
         if (!r.ok) throw new Error(r.error);
@@ -308,7 +308,7 @@ async function runAfterCuttingInner(
   } else if (settings.afterCutting === "finalcut") {
     if (!api) return { ok: false, message: NEEDS_DESKTOP };
     const eventName = resolveEventName({
-      from: settings.eventName,
+      from: "source",
       campaignName: ctx.campaignName,
       sourceTitle: ctx.sourceTitle,
     });
@@ -387,9 +387,9 @@ export default function EditorHandoff({
   }, [open]);
 
   const ctx: HandoffContext = { campaignId, campaignName, sourceTitle, clipsDir, clips };
-  const eventName = resolveEventName({ from: settings.eventName, campaignName, sourceTitle });
+  const eventName = resolveEventName({ from: "source", campaignName, sourceTitle });
   const nextName = useNextProjectName();
-  const projectOn = settings.createProject && settings.projectEvent.trim() !== "";
+  const projectOn = true;
   const libraryText = settings.fcpLibrary.trim();
   let libraryProblem = "";
   if (libraryText) {
@@ -494,21 +494,10 @@ export default function EditorHandoff({
             </p>
           )}
 
-          <label className="flex flex-col gap-1">
-            <span className="text-body">Event name</span>
-            <select
-              className="field"
-              value={settings.eventName}
-              onChange={(e) => set({ eventName: e.target.value === "source" ? "source" : "campaign" })}
-            >
-              <option value="campaign">Campaign name</option>
-              <option value="source">Source title</option>
-            </select>
-            <span className="t-meta" dir="auto">{eventName}</span>
-          </label>
+          <p className="t-meta m-0" dir="auto">Event: {eventName}. Raw clips are tagged Raw and projects go in the same event.</p>
 
           <div className="flex flex-col gap-2 border-t border-hairline pt-3">
-            <h3 className="text-body m-0">Final Cut Pro library and events</h3>
+            <h3 className="text-body m-0">Final Cut Pro library</h3>
             <label className="flex flex-col gap-1">
               <span className="text-body">Library</span>
               <div className="flex items-center gap-2">
@@ -537,38 +526,8 @@ export default function EditorHandoff({
                     : "Blank means Final Cut picks the library. Set this if you keep several open.")}
               </span>
             </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-body">Event for the raw clip</span>
-              <input
-                className="field"
-                dir="auto"
-                placeholder={eventName}
-                value={settings.mediaEvent}
-                onChange={(e) => set({ mediaEvent: e.target.value })}
-              />
-            </label>
-            <label className="flex items-center gap-2 text-body">
-              <input
-                type="checkbox"
-                checked={settings.createProject}
-                onChange={(e) => set({ createProject: e.target.checked })}
-              />
-              Also create a project with the clip on its timeline
-            </label>
-            {settings.createProject && (
+            {(
               <>
-                <label className="flex flex-col gap-1">
-                  <span className="text-body">Event for the projects</span>
-                  <input
-                    className="field"
-                    dir="auto"
-                    value={settings.projectEvent}
-                    onChange={(e) => set({ projectEvent: e.target.value })}
-                  />
-                  {!settings.projectEvent.trim() && (
-                    <span className="t-meta">Blank means no project is created.</span>
-                  )}
-                </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-body">Project name</span>
                   <input
