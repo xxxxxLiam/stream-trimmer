@@ -24,7 +24,6 @@ function openExternal(id: string) {
 
 export default function PreviewPanel() {
   const { info, videoId, start, end, seekRequest } = useClipperContext();
-
   // YouTube IFrame API player — drives scrubbing and in/out points.
   const player = useYouTubePlayer(videoId);
   const embedBlocked = player.blocked;
@@ -70,41 +69,31 @@ export default function PreviewPanel() {
           {videoId && !embedBlocked && (
             <div ref={player.containerRef} className="absolute inset-0" />
           )}
-
           {videoId && embedBlocked && (
             <div className="absolute inset-0">
               <img
                 src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
-                alt={
-                  info?.title ? `Thumbnail for ${info.title}` : "Source thumbnail"
-                }
+                alt={info?.title ? `Thumbnail for ${info.title}` : "Source thumbnail"}
                 className="h-full w-full object-cover opacity-40"
                 loading="lazy"
               />
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
                 <ExclamationTriangle size={22} className="text-accent" />
-                <span className="text-[13px] text-fg">
-                  The owner blocks playback here
-                </span>
-                <span className="max-w-sm text-[12px] text-fg-dim">
+                <span className="text-body text-fg">The owner blocks playback here</span>
+                <span className="max-w-sm text-meta text-fg-dim">
                   Cutting and downloading still work.
                 </span>
-                <button
-                  type="button"
-                  onClick={() => openExternal(videoId)}
-                  className="btn mt-1 text-[12px]"
-                >
+                <button type="button" onClick={() => openExternal(videoId)} className="btn mt-1">
                   <BoxArrowUpRight size={12} />
                   <span>Watch on YouTube</span>
                 </button>
               </div>
             </div>
           )}
-
           {!videoId && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg">
               <CameraVideo size={22} />
-              <span className="text-[12px]">Paste a link to preview it</span>
+              <span className="text-meta">Paste a link to preview it</span>
             </div>
           )}
         </div>
