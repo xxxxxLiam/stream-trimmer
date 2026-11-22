@@ -95,12 +95,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      # No tag is created here. Releases live in the public releases repo, and
+      # electron-builder creates the release there — and its tag with it — over
+      # the REST API, which is not a git ref push. This repo only needs the
+      # version commit.
+      #
+      # It also cannot create one: a ref-creation rule on this repository
+      # rejects `refs/tags/*` with GH013, which is what broke the first v1.0.0
+      # attempt after the version commit had already landed.
       - id: bump
         run: |
           set -euo pipefail
-          NEW=$(npm version "${{ steps.detect.outputs.bump }}" -m "Release v%s")
+          NEW=$(npm version "${{ steps.detect.outputs.bump }}" --no-git-tag-version)
+          git commit -aqm "Release $NEW"
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
-          git push --follow-tags
+          git push
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
@@ -172,16 +181,20 @@ jobs:
           TAG: ${{ needs.version.outputs.new_version }}
         run: |
           set -euo pipefail
-          git fetch --tags --force
+          git fetch -q origin main
 
-          # Notes: everything since the previous release tag.
-          PREV="$(git tag --sort=-creatordate | grep -vFx "$TAG" | head -n1 || true)"
+          # Notes: everything since the previous release. This repo carries no
+          # release tags (the tag lives in the releases repo), so the boundary
+          # is the previous "Release v..." commit rather than a tag. HEAD is
+          # the current one, hence --skip=1.
+          PREV="$(git log origin/main --format='%H %s' --skip=1 \
+                  | grep -m1 -E '^[0-9a-f]+ Release v' | cut -d' ' -f1 || true)"
           if [ -n "$PREV" ]; then
-            NOTES="$(git log --no-merges --format='- %s' "$PREV..$TAG")"
+            NOTES="$(git log --no-merges --format='- %s' "$PREV..origin/main")"
           else
-            # No previous tag (first release): cap it rather than dumping
-            # the project's entire history into the release notes.
-            NOTES="$(git log --no-merges --format='- %s' -n 50 "$TAG")"
+            # First release under this scheme: cap it rather than dumping the
+            # project's entire history into the release notes.
+            NOTES="$(git log --no-merges --format='- %s' -n 50 origin/main)"
           fi
           [ -n "$NOTES" ] || NOTES="Maintenance release."
 
