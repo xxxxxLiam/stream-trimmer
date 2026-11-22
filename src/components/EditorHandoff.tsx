@@ -67,24 +67,19 @@ const NEEDS_DESKTOP = "This needs the desktop app.";
 // from the user's own notes, so it is a draft kept outside the settings: it is
 // used once by the next saved clip and then cleared.
 // ---------------------------------------------------------------------------
-
 let nextProjectName = "";
 const nameListeners = new Set<() => void>();
-
 export function setNextProjectName(name: string): void {
   nextProjectName = name;
   nameListeners.forEach((l) => l());
 }
-
 /** Project names typed for clips already cut, by clip id (this session only). */
 const typedProjectNames = new Map<string, string>();
-
 function takeNextProjectName(): string {
   const n = nextProjectName.trim();
   if (nextProjectName) setNextProjectName("");
   return n;
 }
-
 function useNextProjectName(): string {
   return useSyncExternalStore(
     (cb) => {
@@ -166,7 +161,7 @@ async function exportNamed(
 ): Promise<HandoffOutcome> {
   const structured = settings;
   const clips = ctx.clips.map((c) =>
-    !c.projectName && typedProjectNames.has(c.id) ? { ...c, projectName: typedProjectNames.get(c.id) } : c,
+    typedProjectNames.has(c.id) ? { ...c, projectName: typedProjectNames.get(c.id) } : c,
   );
   let built;
   try {
@@ -221,7 +216,6 @@ async function exportNamed(
 // ---------------------------------------------------------------------------
 // What the automatic send did, and the session's clips
 // ---------------------------------------------------------------------------
-
 /**
  * The outcome of the last automatic "After cutting" action. The cut flow calls
  * `runAfterCutting` without anywhere to put its answer, so the answer is kept
@@ -229,18 +223,15 @@ async function exportNamed(
  */
 let lastAuto: { outcome: HandoffOutcome; campaignId: string | null } | null = null;
 const autoListeners = new Set<() => void>();
-
 export function getAfterCuttingOutcome(): { outcome: HandoffOutcome; campaignId: string | null } | null {
   return lastAuto;
 }
-
 export function subscribeAfterCutting(l: () => void): () => void {
   autoListeners.add(l);
   return () => {
     autoListeners.delete(l);
   };
 }
-
 function publishAuto(outcome: HandoffOutcome | null, campaignId: string | null): void {
   if (!outcome) return;
   lastAuto = { outcome, campaignId };
@@ -257,7 +248,6 @@ function publishAuto(outcome: HandoffOutcome | null, campaignId: string | null):
  * by folder carried one client's clips into another client's Final Cut document.
  */
 const sessionBatch = new Map<string, SessionClip[]>();
-
 function rememberClips(ctx: HandoffContext): SessionClip[] {
   const key = `${sessionCampaignKey(ctx.campaignId)}\u0001${ctx.clipsDir ?? ""}`;
   const next = mergeSessionClips(sessionBatch.get(key) ?? [], ctx.clips);
@@ -301,13 +291,11 @@ async function runAfterCuttingInner(
   const api = bridge();
   const notes: string[] = [];
   let outcome: HandoffOutcome | null = null;
-
   // The name typed before this cut belongs to the clip just saved, once. It is
   // remembered by clip id so a later "Send all" still uses it.
   const typed = takeNextProjectName();
   const justSaved = ctx.clips[ctx.clips.length - 1];
   if (typed && justSaved) typedProjectNames.set(justSaved.id, typed);
-
   if (settings.afterCutting === "reveal") {
     const last = ctx.clips[ctx.clips.length - 1];
     if (api && last) {
@@ -323,7 +311,6 @@ async function runAfterCuttingInner(
     });
     outcome = await exportNamed(api, { ...ctx, clips: batch }, eventName, settings.afterCutting, settings);
   }
-
   if (api && settings.capcutDropDir && ctx.clips.length > 0) {
     const r = await api.copyFiles({ dirPath: settings.capcutDropDir, files: ctx.clips.map((c) => c.path) });
     notes.push(r.ok ? "Copied to the CapCut folder." : r.error ?? "Could not copy to the CapCut folder.");
@@ -340,7 +327,6 @@ async function runAfterCuttingInner(
 // ---------------------------------------------------------------------------
 // Panel
 // ---------------------------------------------------------------------------
-
 export type EditorHandoffProps = {
   settings: EditorHandoffSettings;
   onChange: (next: EditorHandoffSettings) => void;
@@ -440,7 +426,6 @@ export default function EditorHandoff({
   const [apps, setApps] = useState<{ finalcut: boolean; premiere: boolean; capcut: boolean } | null>(null);
   const set = (patch: Partial<EditorHandoffSettings>) => onChange({ ...settings, ...patch });
   const toggle = (id: SectionId) => setSection((s) => (s === id ? null : id));
-
   // Escape closes the dialog before anything behind it sees the key.
   useEffect(() => {
     if (!open) return;
@@ -453,7 +438,6 @@ export default function EditorHandoff({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open]);
-
   // The automatic send answers here: show it, and open the panel so a failure is seen.
   // It is shown only under the campaign it ran for: another client's "Saved X.fcpxml with 2 clips"
   // is not this campaign's status, and neither is a button result left from before the switch.
@@ -467,7 +451,6 @@ export default function EditorHandoff({
     setStatus(auto.outcome);
     if (!auto.outcome.ok) setOpen(true);
   }, [auto]);
-
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -476,7 +459,6 @@ export default function EditorHandoff({
       alive = false;
     };
   }, [open]);
-
   const ctx: HandoffContext = { campaignId, campaignName, sourceTitle, clipsDir, clips };
   const eventName = resolveEventName({ from: "source", campaignName, sourceTitle });
   const nextName = useNextProjectName();
@@ -498,7 +480,6 @@ export default function EditorHandoff({
     sourceTitle,
   });
   const hasClips = clips.length > 0;
-
   // A send that finishes after the campaign changed answers for the old campaign: drop its message.
   const liveCampaign = useRef(campaignId);
   liveCampaign.current = campaignId;
@@ -517,7 +498,6 @@ export default function EditorHandoff({
       setBusy(false);
     }
   };
-
   const copyPaths = async () => {
     const startedFor = campaignId;
     const r = await writeClipboard(clips.map((c) => c.path).join("\n"));
@@ -528,7 +508,6 @@ export default function EditorHandoff({
         : { ok: false, message: r.error },
     );
   };
-
   const reveal = (target: string | undefined, what: string) =>
     run(async () => {
       const api = bridge();
@@ -537,14 +516,11 @@ export default function EditorHandoff({
       const r = await api.reveal(target);
       return { ok: r.ok, message: r.ok ? "" : r.error ?? "Could not open that folder." };
     });
-
   const pickDrop = async () => {
     const dir = await window.electronAPI?.pickDirectory?.();
     if (dir) set({ capcutDropDir: dir });
   };
-
   const summary = OPTIONS.find((o) => o.value === settings.afterCutting)?.label ?? "Nothing";
-
   const modeNote =
     settings.afterCutting === "finalcut"
       ? libraryText
@@ -553,7 +529,6 @@ export default function EditorHandoff({
       : settings.afterCutting === "reveal"
         ? "Finder shows each clip as soon as it is cut."
         : "Clips stay in the clips folder until you send them.";
-
   const projectsSummary = `${settings.projectNamePattern.trim() || "{clipId} {label}"} \u00B7 ${
     settings.timelineFormat.kind === "vertical"
       ? "Vertical 1080 x 1920"
@@ -561,10 +536,8 @@ export default function EditorHandoff({
         ? "Match source"
         : `${settings.timelineFormat.width} x ${settings.timelineFormat.height}`
   } \u00B7 ${settings.timelineFormat.fps === "source" ? "source fps" : `${settings.timelineFormat.fps} fps`}`;
-
   const showStatus = !busy && !!status && (!!status.message || (status.skipped?.length ?? 0) > 0);
   const savedPath = status?.ok ? status.path : undefined;
-
   return (
     <section className="flex flex-col gap-2" aria-label="Editor handoff">
       <button
@@ -576,7 +549,6 @@ export default function EditorHandoff({
         <span>Hand off to an editor</span>
         <span className="text-meta text-fg-dim">After cutting: {summary}</span>
       </button>
-
       {open && (
         <div
           role="dialog"
@@ -592,7 +564,6 @@ export default function EditorHandoff({
               Done
             </button>
           </div>
-
           {/* The one choice that matters, all options visible at once. */}
           <div className="flex flex-col gap-2">
             <span className="text-body text-fg">After cutting</span>
@@ -614,7 +585,6 @@ export default function EditorHandoff({
             </div>
             <p className="t-meta m-0">{modeNote}</p>
           </div>
-
           {/* What is ready, then what to do with it. */}
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
@@ -628,13 +598,11 @@ export default function EditorHandoff({
                 Event: {eventName}. Raw clips are tagged Raw and each project sits next to them.
               </p>
             </div>
-
             {problems.map((p) => (
               <div key={p} role="alert" className="card-alert px-3 py-2 text-body">
                 {p}
               </div>
             ))}
-
             <div className="flex flex-col gap-2">
               <button
                 type="button"
@@ -675,14 +643,12 @@ export default function EditorHandoff({
                 </button>
               </div>
             </div>
-
             {busy && (
               <p role="status" className="t-meta m-0 flex items-center gap-2">
                 <span className="dot dot-cutting" aria-hidden="true" />
                 Working on it. This can take a few seconds.
               </p>
             )}
-
             {showStatus && status && (
               <div role={status.ok ? "status" : "alert"} className={status.ok ? "flex flex-col gap-2" : "card-alert flex flex-col gap-2 px-3 py-2 text-body"}>
                 {status.message && <p className={status.ok ? "t-meta m-0" : "m-0"}>{status.message}</p>}
@@ -705,7 +671,6 @@ export default function EditorHandoff({
               </div>
             )}
           </div>
-
           {/* Everything else: closed by default, current value always visible. */}
           <div className="flex flex-col">
             <Section
@@ -744,7 +709,6 @@ export default function EditorHandoff({
                 </span>
               </label>
             </Section>
-
             <Section
               panelId={`${titleId}-projects`}
               title="Projects"
@@ -835,7 +799,6 @@ export default function EditorHandoff({
                 </label>
               </div>
             </Section>
-
             <Section
               panelId={`${titleId}-look`}
               title="My look"
@@ -845,7 +808,6 @@ export default function EditorHandoff({
             >
               <LookEditor settings={settings} onChange={set} />
             </Section>
-
             <Section
               panelId={`${titleId}-capcut`}
               title="CapCut"
@@ -900,7 +862,6 @@ export default function EditorHandoff({
               </label>
             </Section>
           </div>
-
           <p className="t-meta m-0">Premiere Pro cannot open this file without a third-party converter.</p>
         </div>
       )}
