@@ -1,0 +1,2 @@
+F-9 checkForUpdates -> {"ok":true,"version":null}
+F-9 status events seen by renderer: [{"state":"none"}]

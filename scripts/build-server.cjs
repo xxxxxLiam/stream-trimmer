@@ -10,7 +10,26 @@ const channelData = /^(1|true|yes|on)$/i.test(
   String(process.env.VITE_ENABLE_CHANNEL_DATA || "").trim(),
 );
 
-const outFile = path.join(__dirname, "..", "electron", "dist", "server.cjs");
+// The owner gate's list and salt. Read like Vite reads them (process env first,
+// then .env) and baked into the bundle ONLY when the channel exporter is built
+// in. A public build defines nothing, so the values (and even their names) are
+// absent from it no matter what is in the shell or .env.
+function ownerSetting(name) {
+  const fromEnv = String(process.env[name] || "").trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, "..", ".env"), "utf8");
+    const line = raw.split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
+    return (line ? line.split("=").slice(1).join("=") : "").trim();
+  } catch {
+    return "";
+  }
+}
+
+// BUILD_SERVER_OUT lets a test build into a scratch folder instead of electron/dist.
+const outFile = process.env.BUILD_SERVER_OUT
+  ? path.resolve(process.env.BUILD_SERVER_OUT)
+  : path.join(__dirname, "..", "electron", "dist", "server.cjs");
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 
 // Wrap the server so main.cjs can grab the http.Server handle for clean
@@ -29,7 +48,26 @@ require(${JSON.stringify(path.resolve(__dirname, "..", "server", "index.ts"))});
 module.exports = capture;
 `;
 
-const shimFile = path.join(__dirname, "..", "electron", "dist", "_entry.cjs");
+// The main process cannot see Vite's defines, so an owner build also writes what
+// it was baked with to a sidecar next to the server bundle (electron/ownerCheck.cjs
+// reads it; its keys are deliberately plain, that file ships in every build). A public build writes nothing and removes any stale one a previous
+// owner build left behind, so "no sidecar" means "no exporter". The folder name
+// is the same one src/lib/campaigns.ts uses when the exporter is built.
+const shapeFile = path.join(path.dirname(outFile), "build-shape.json");
+if (channelData) {
+  fs.writeFileSync(
+    shapeFile,
+    JSON.stringify({
+      list: ownerSetting("VITE_OWNER_MACHINES"),
+      salt: ownerSetting("VITE_OWNER_SALT"),
+      dataFolderName: "channel-data",
+    }),
+  );
+} else {
+  fs.rmSync(shapeFile, { force: true });
+}
+
+const shimFile = path.join(path.dirname(outFile), "_entry.cjs");
 fs.writeFileSync(shimFile, shim);
 
 esbuild
@@ -70,6 +108,12 @@ esbuild
       "process.env.VITE_ENABLE_CHANNEL_DATA": JSON.stringify(
         channelData ? "1" : "",
       ),
+      ...(channelData
+        ? {
+            "process.env.VITE_OWNER_MACHINES": JSON.stringify(ownerSetting("VITE_OWNER_MACHINES")),
+            "process.env.VITE_OWNER_SALT": JSON.stringify(ownerSetting("VITE_OWNER_SALT")),
+          }
+        : {}),
     },
     logLevel: "info",
   })

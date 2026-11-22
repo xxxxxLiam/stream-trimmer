@@ -1,0 +1,13 @@
+[C12] tab 1 import: Imported: 1 added.
+FAIL locator.waitFor: Timeout 20000ms exceeded.
+Call log:
+[2m  - waiting for locator('#ui-source-chip input[type="url"]') to be visible[22m
+
+    at loadVideo (/home/user/stream-trimmer/audit/run-1/area-C/lib.cjs:70:15)
+    at /home/user/stream-trimmer/audit/run-1/area-C/12-tabs-counts.cjs:42:11 {
+  log: [
+    `  - waiting for locator('#ui-source-chip input[type="url"]') to be visible`
+  ],
+  name: 'TimeoutError'
+}
+[C12] shot fail: /home/user/stream-trimmer/audit/out/area-C/C12-tabs/01-fail.png

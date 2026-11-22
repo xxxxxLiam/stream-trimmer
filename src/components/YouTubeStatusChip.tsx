@@ -19,6 +19,7 @@ import {
   formatExpiryDay,
   importCookies,
   refreshSessionStatus,
+  resumeSignIn,
   signOut,
   useYouTubeConnection,
   type SessionStatus,
@@ -128,6 +129,7 @@ export default function YouTubeStatusChip() {
   return (
     <div ref={wrapRef} className="relative">
       <button
+        id="help-anchor-youtube-status"
         type="button"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
@@ -161,6 +163,20 @@ export default function YouTubeStatusChip() {
           <p className="px-3 py-2 text-[12px] leading-snug text-fg-dim">
             {describe(status, conn.expiresAt, conn.source, undefined)}
           </p>
+          {/* The way back for someone who skipped the sign-in screen. */}
+          {!conn.connected ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="block h-row w-full px-3 text-left text-[13px] text-fg hover:bg-hover"
+              onClick={() => {
+                setMenuOpen(false);
+                resumeSignIn();
+              }}
+            >
+              Sign in…
+            </button>
+          ) : null}
           <button
             type="button"
             role="menuitem"

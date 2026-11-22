@@ -1,0 +1,8 @@
+[C18] count line with exactly one clip: "1 clips"
+[C18] shot: /home/user/stream-trimmer/audit/out/area-C/C18-a11y/01-one-clip-count.png
+[C18] bank row: {"role":"button","tabindex":"0","ariaLabel":null,"nestedInteractive":["Cut","Remove A01 from the bank"],"text":"00:01:00 - 00:01:30 | 0:30 | A01 A01 label | hook | T1 | In band | banked | Cut | Remove"}
+[C18] tab order from the search box: ["BUTTON:Import timestamps","BUTTON:hook","BUTTON:Tier 1","BUTTON:Sort by tier","DIV[button]:00:01:00 - 00:01:300:30A01 A01","BUTTON:Cut"]
+[C18] focus right after opening the importer: BODY:
+[C18] textarea has a label: Timestamps, one clip per line
+[C18] focus after Cancel: BODY:Stub videoCampaignAcme Q4Stub 
+[C18] pageErrors: []

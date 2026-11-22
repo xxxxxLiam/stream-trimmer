@@ -4,11 +4,13 @@
  * Description: Copy-blocks handoff panel (opened with Cmd+Shift+C by the shell).
  *   One row per block: label, one-line note, monospace preview, Copy button.
  *   Blocks are never concatenated, each goes somewhere different.
- * Contract: self-positioned (fixed) panel, null when closed. Owns its own Escape.
+ * Contract: self-positioned (fixed) panel at z-20, UNDER the header (z-30) so it can never cover
+ *   the header's own controls or the "?" (F-3). Null when closed. Owns its own Escape.
  *   `input` carries the live video, transcript and segments; Phase C passes it
  *   from App. Without it the panel says there is nothing to copy yet.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDrawerClearance } from "./useDrawerClearance";
 import { buildHandoffBlocks, writeClipboard, type HandoffInput } from "../lib/handoff";
 
 export type CopyBlocksProps = {
@@ -33,6 +35,8 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const right = useDrawerClearance(open);
 
   const blocks = useMemo(() => buildHandoffBlocks(input ?? EMPTY), [input]);
 
@@ -76,7 +80,8 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
       ref={panelRef}
       role="dialog"
       aria-label="Copy blocks"
-      className="surface-panel fixed right-4 top-14 z-50 flex max-h-[calc(100vh-72px)] w-[560px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
+      className="surface-panel fixed top-14 z-20 flex max-h-[calc(100vh-72px)] w-[560px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
+      style={{ right }}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
@@ -119,6 +124,9 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
               </div>
               <button
                 type="button"
+                // A stable id per block: `ui-copy-block-transcript`, `ui-copy-block-script`, ... The
+                // help tutorials point their spotlight at these.
+                id={`ui-copy-block-${b.id}`}
                 data-copy
                 className="btn min-w-[84px] shrink-0"
                 disabled={!b.available}

@@ -1,0 +1,30 @@
+=== B-2 cross-tab segments ===
+ROOT=/home/user/stream-trimmer
+TAG=LIVE
+
+TAB1 (Video AAA) after two segments: {"rows":["1 00:00:10 to 00:00:13 0:03 line 2 charlie says something","2 00:00:20 to 00:00:24 0:04 line 5 foxtrot says something"],"total":"00:00:07","source":"Video AAA 00:00:30 Change","markIn":"","markOut":"","timelineSegments":4,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b02-LIVE/01-tab1-two-segments.png
+
+AFTER OPENING TAB 2 — ALL PANES: [{"i":0,"shown":false,"source":"Video AAA00:00:30Change","total":"00:00:07","rows":["100:00:10 to 00:00:130:03line 2 charlie says something","200:00:20 to 00:00:240:04line 5 foxtrot says something"]},{"i":1,"shown":true,"source":"Reload","total":"00:00:00","rows":[]}]
+after loading BBB in tab 2 — ALL PANES: [{"i":0,"shown":false,"source":"Video AAA00:00:30Change","total":"00:00:07","rows":["100:00:10 to 00:00:130:03line 2 charlie says something","200:00:20 to 00:00:240:04line 5 foxtrot says something"]},{"i":1,"shown":true,"source":"Video BBB 00:00:30 Change","total":"00:00:30","rows":[]}]
+
+after adding 00:00:02-00:00:05 in TAB 2 — ALL PANES: [{"i":0,"shown":false,"source":"Video AAA00:00:30Change","total":"00:00:07","rows":["100:00:10 to 00:00:130:03line 2 charlie says something","200:00:20 to 00:00:240:04line 5 foxtrot says something"]},{"i":1,"shown":true,"source":"Video BBB 00:00:30 Change","total":"00:00:03","rows":["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something"]}]
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b02-LIVE/02-tab2-one-segment.png
+
+*** SWITCHED BACK TO TAB 1: {"rows":["1 00:00:10 to 00:00:13 0:03 line 2 charlie says something","2 00:00:20 to 00:00:24 0:04 line 5 foxtrot says something"],"total":"00:00:07","source":"Video AAA 00:00:30 Change","markIn":"","markOut":"","timelineSegments":4,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b02-LIVE/03-tab1-after-switch-back.png
+*** tab 1 shows BBB's range 00:00:02-00:00:05: no
+*** tab 1 still has its own two segments: yes
+
+files after cutting in TAB 1: ["Video AAA [00-00-10-00-00-24].mp4"]
+  Video AAA [00-00-10-00-00-24].mp4: decoded=7.01s container=7.02s  (tab 1 expects 7.0s of Video AAA)
+  sections the engine was given: ["https://www.youtube.com/watch?v=jNQXAC9IVRw","https://www.youtube.com/watch?v=aaaaaaaaaaa","*10.00-13.00","*20.00-24.00","*10.00-13.00","*20.00-24.00"]
+
+TAB 2 before its cut: {"rows":["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something"],"total":"00:00:03","source":"Video BBB 00:00:30 Change","markIn":"","markOut":"","timelineSegments":2,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+files tab 2's cut added: ["Video BBB [00-00-02-00-00-05].mp4"]
+  Video BBB [00-00-02-00-00-05].mp4: decoded=2.99s  (tab 2 expects 3.0s of Video BBB)
+  sections the engine was given: ["https://www.youtube.com/watch?v=jNQXAC9IVRw","https://www.youtube.com/watch?v=bbbbbbbbbbb","*2.00-5.00","*2.00-5.00"]
+
+all files: ["Video AAA [00-00-10-00-00-24].mp4","Video BBB [00-00-02-00-00-05].mp4"]
+crash state: {"rootChildren":1,"bodyLen":1199,"boundary":false,"boundaryMessage":null,"panes":2,"answering":true,"reactErrors":[],"reactErrorCount":0,"crashed":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b02-LIVE/04-end.png

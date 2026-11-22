@@ -1,0 +1,32 @@
+[C14:A] bank view: ["This video","Bank","All saved","Import timestamps","0 clips","Sort by tier"]
+[C14:A] before New tab: shot /home/user/stream-trimmer/audit/out/area-C/C14-newtab-A/01-before-new-tab.png
+[C14:A] after New tab: {"rootChildren":1,"header":true,"text":"Stub video\nNew tab\nCampaign\nAcme Q4\nReload\nCopy blocks\nSymbols\nChannel data\nNot signed in\nCheck\nTranscript\nFollow\nSearch"}
+[C14:A] pageErrors: []
+[C14:A] shot: /home/user/stream-trimmer/audit/out/area-C/C14-newtab-A/02-after-new-tab.png
+[C14:A] 6s later root children: 1
+[C14:A] bank on disk after the crash: {}
+FAIL page.waitForSelector: Timeout 30000ms exceeded.
+[C14:B] bank view: ["This video","Bank","All saved","Import timestamps","2 clips","Sort by tier"]
+[C14:B] before New tab: shot /home/user/stream-trimmer/audit/out/area-C/C14-newtab-B/01-before-new-tab.png
+[C14:B] after New tab: {"rootChildren":0,"header":false,"text":""}
+[C14:B] pageErrors: ["Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."]
+[C14:B] shot: /home/user/stream-trimmer/audit/out/area-C/C14-newtab-B/02-after-new-tab.png
+[C14:B] 6s later root children: 0
+[C14:B] bank on disk after the crash: {"acme-q4":{"stub0000001":[{"id":"A01","label":"A01 label","segments":[{"start":60,"end":90}],"status":"banked"},{"id":"A02","label":"A02 label","segments":[{"start":120,"end":150}],"status":"banked"}]}}
+FAIL page.waitForSelector: Timeout 30000ms exceeded.
+[C14:C] on 'This video' tab instead of Bank
+[C14:C] before New tab: shot /home/user/stream-trimmer/audit/out/area-C/C14-newtab-C/01-before-new-tab.png
+FAIL page.waitForTimeout: Application exited
+[C14:B] bank view: ["This video","Bank","All saved","Import timestamps","2 clips","Sort by tier"]
+[C14:B] before New tab: shot /home/user/stream-trimmer/audit/out/area-C/C14-newtab-B/01-before-new-tab.png
+[C14:B] after New tab: {"rootChildren":0,"header":false,"text":""}
+[C14:B] pageErrors: ["Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."]
+[C14:B] shot: /home/user/stream-trimmer/audit/out/area-C/C14-newtab-B/02-after-new-tab.png
+[C14:B] 6s later root children: 0
+[C14:B] bank on disk after the crash: {"acme-q4":{"stub0000001":[{"id":"A01","label":"A01 label","segments":[{"start":60,"end":90}],"status":"banked"},{"id":"A02","label":"A02 label","segments":[{"start":120,"end":150}],"status":"banked"}]}}
+[C14:C] on 'This video' tab instead of Bank
+[C14:C] before New tab: shot /home/user/stream-trimmer/audit/out/area-C/C14-newtab-C/01-before-new-tab.png
+[C14:C] after New tab: {"rootChildren":0,"header":false,"text":""}
+[C14:C] pageErrors: ["Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."]
+[C14:C] shot: /home/user/stream-trimmer/audit/out/area-C/C14-newtab-C/02-after-new-tab.png
+FAIL page.waitForTimeout: Target page, context or browser has been closed

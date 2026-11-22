@@ -1,0 +1,3 @@
+G-12 after boot: {"keys":7,"bank":3}
+G-12 after a user write: {"keys":8,"bank":3}
+G-12 userData files: [ 'settings.json' ]

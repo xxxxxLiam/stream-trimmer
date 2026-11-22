@@ -1,0 +1,62 @@
+=== re-check and hunt ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+--- 1. B-4 bad marks on a 30-minute video ---
+  [sub-second decimals] in="10.5" out="20.25" -> {"in":"10.5","out":"20.25","inInvalid":"false","outInvalid":"false","total":"00:30:00","addDisabled":false,"problem":null}
+     Add was enabled; rows now: ["1 00:00:00 to 00:30:00 30:00 line 0 alpha says something"]
+  [letters] in="abc" out="def" -> {"in":"abc","out":"def","inInvalid":"true","outInvalid":"true","total":"00:30:00","addDisabled":false,"problem":null}
+     Add was enabled; rows now: ["1 00:00:00 to 00:30:00 30:00 line 0 alpha says something"]
+  [negative in] in="-5" out="00:00:20" -> {"in":"-5","out":"00:00:20","inInvalid":"true","outInvalid":"false","total":"00:00:20","addDisabled":false,"problem":null}
+     Add was enabled; rows now: ["1 00:00:00 to 00:00:20 0:20 line 0 alpha says something"]
+  [out before in] in="00:02:00" out="00:01:00" -> {"in":"00:02:00","out":"00:01:00","inInvalid":"false","outInvalid":"false","total":"00:00:00","addDisabled":true,"problem":null}
+  [out past the end] in="00:00:10" out="99:00:00" -> {"in":"00:00:10","out":"99:00:00","inInvalid":"false","outInvalid":"false","total":"00:00:00","addDisabled":true,"problem":null}
+  [empty in] in="" out="00:00:20" -> {"in":"","out":"00:00:20","inInvalid":"false","outInvalid":"false","total":"00:00:20","addDisabled":false,"problem":null}
+     Add was enabled; rows now: ["1 00:00:00 to 00:00:20 0:20 line 0 alpha says something"]
+  [zero length] in="00:00:10" out="00:00:10" -> {"in":"00:00:10","out":"00:00:10","inInvalid":"false","outInvalid":"false","total":"00:00:00","addDisabled":true,"problem":null}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b13-LIVE/01-bad-marks.png
+
+--- 2. B-13 the I and O keys with the player unavailable ---
+  before I/O: in=00:00:10 out=00:00:10
+  after  I/O: in=00:00:10 out=00:00:10
+  what the pane offers: {"setStartButton":false,"playButton":false,"markInKbd":"In I","previewMessage":"The owner blocks playback here"}
+
+--- 3. B-15 Alt+arrow reordering and the focus ---
+  focused: Segment 3, 00:00:10 to 00:00:13. Jump to it. Alt and the arr
+  after 1st Alt+Up: ["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something","2 00:00:10 to 00:00:13 0:03 line 2 charlie says something","3 00:00:20 to 00:00:24 0:04 line 5 foxtrot says something"]
+  focus now: BODY
+  after 2nd Alt+Up: ["1 00:00:02 to 00:00:05 0:03 line 0 alpha says something","2 00:00:10 to 00:00:13 0:03 line 2 charlie says something","3 00:00:20 to 00:00:24 0:04 line 5 foxtrot says something"]
+  focus now: BODY
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b13-LIVE/02-keyboard-reorder.png
+
+--- 4. B-11 the same range cut twice ---
+  pass 1: files = ["Recheck [00-00-01-00-00-04].mp4"]
+  pass 2: files = ["Recheck [00-00-01-00-00-04] 2.mp4","Recheck [00-00-01-00-00-04].mp4"]
+  saved-files rows: [
+ {
+  "label": "Recheck [00-00-01-00-00-04].mp4",
+  "path": "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/clips-b13-LIVE/Recheck [00-00-01-00-00-04] 2.mp4",
+  "detail": "Downloaded at 360p."
+ },
+ {
+  "label": "Recheck [00-00-01-00-00-04].mp4",
+  "path": "/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/clips-b13-LIVE/Recheck [00-00-01-00-00-04].mp4",
+  "detail": "Downloaded at 360p."
+ }
+]
+    Recheck [00-00-01-00-00-04].mp4: path on disk? true -> Recheck [00-00-01-00-00-04] 2.mp4
+    Recheck [00-00-01-00-00-04].mp4: path on disk? true -> Recheck [00-00-01-00-00-04].mp4
+    Recheck [00-00-01-00-00-04] 2.mp4: 2.99s
+    Recheck [00-00-01-00-00-04].mp4: 2.99s
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b13-LIVE/03-same-range-twice.png
+
+--- 5. B-20 a timestamped link ---
+  marks after loading ?t=90s: {"in":"","out":"00:10:00","inInvalid":"false","outInvalid":"false","total":"00:10:00","addDisabled":false,"problem":null}
+
+--- 6. transcript click-to-seek and shift-click range ---
+  after clicking line 3: {"in":"","out":"00:10:00","inInvalid":"false","outInvalid":"false","total":"00:10:00","addDisabled":false,"problem":null}
+  after shift-clicking lines 2..5: {"in":"00:00:04","out":"00:00:20","inInvalid":"false","outInvalid":"false","total":"00:00:16","addDisabled":false,"problem":null}
+
+--- 7. Clear + Cmd+Z, and the two chords ---
+  no Clear button on screen
+  rows after Ctrl+Shift+Enter: ["1 00:00:06 to 00:00:09 0:03 line 1 bravo says something"]
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b13-LIVE/04-end.png

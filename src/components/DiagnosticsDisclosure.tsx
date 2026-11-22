@@ -14,7 +14,8 @@ import {
 import {
   buildDiagnosticsBundle,
   fenceForClipboard,
-  needsDeveloper,
+  offersDeveloperDiagnostics,
+  redact,
   type FailureAttempt,
   type FailureDiagnostics,
 } from "../lib/diagnostics";
@@ -24,8 +25,8 @@ const CONFIRM_MS = 1200;
 
 /**
  * The per-failure report. Shown only when the failure is the developer's to fix: for the
- * seven failures the user can fix themselves it renders nothing, because the fix is
- * already on screen. Separate from the whole-log disclosure below.
+ * failures the user can fix themselves, and for a response that carries no `code` at all
+ * (F-8), it renders nothing, because the fix is already on screen. Separate from the whole-log disclosure below.
  */
 export function CopyFailureDiagnostics({
   code,
@@ -44,7 +45,7 @@ export function CopyFailureDiagnostics({
   // New failure, fresh button.
   useEffect(() => setState("idle"), [message, code]);
 
-  if (!needsDeveloper(code)) return null;
+  if (!offersDeveloperDiagnostics(code, message)) return null;
 
   const copy = async () => {
     const report = buildDiagnosticsBundle({
@@ -91,8 +92,10 @@ export default function DiagnosticsDisclosure() {
     if (!api?.readDiagnostics) return;
     try {
       const result = await api.readDiagnostics();
-      setLogPath(result.path);
-      setText(result.text || "The log is empty.");
+      // Main already scrubs both. This second pass is for the day a new reader forgets: whatever
+      // reaches this <pre> sits under a sentence promising no cookies, tokens or personal data.
+      setLogPath(result.path ? redact(result.path) : result.path);
+      setText(redact(result.text) || "The log is empty.");
     } catch {
       setText("Could not read the log. Try Refresh.");
     }

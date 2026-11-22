@@ -1,0 +1,60 @@
+=== bank plan per tab ===
+ROOT=/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/ctrlB  TAG=ctrlB
+tab 1 (AAA) alone: [{"i":0,"shown":true,"source":"Video AAA 00:00:30 Change","banked":["Banked: hook 00:00:02 to 00:00:06","Banked: payoff 00:00:12 to 00:00:16"]}]
+tab 2 (BBB) active, tab 1 hidden: [
+ {
+  "i": 0,
+  "shown": false,
+  "source": "Video AAA00:00:30Change",
+  "banked": [
+   "Banked: hook 00:00:02 to 00:00:06",
+   "Banked: payoff 00:00:12 to 00:00:16"
+  ]
+ },
+ {
+  "i": 1,
+  "shown": true,
+  "source": "Video BBB 00:00:30 Change",
+  "banked": []
+ }
+]
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b12-ctrlB/01-bbb-active.png
+back on tab 1 (AAA): [
+ {
+  "i": 0,
+  "shown": true,
+  "source": "Video AAA 00:00:30 Change",
+  "banked": [
+   "Banked: hook 00:00:02 to 00:00:06",
+   "Banked: payoff 00:00:12 to 00:00:16"
+  ]
+ },
+ {
+  "i": 1,
+  "shown": false,
+  "source": "Video BBB00:00:30Change",
+  "banked": []
+ }
+]
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b12-ctrlB/02-aaa-active.png
+crash: {"rootChildren":1,"bodyLen":1254,"boundary":false,"boundaryMessage":null,"panes":2,"answering":true,"reactErrors":[],"reactErrorCount":0,"crashed":false}
+
+=== phase 2: relaunch with both tabs restored, BBB active ===
+(the tab record the first phase left behind was: {"tabs":[{"id":"ws_mwqyfi5c_dwadg","name":"","url":"https://www.youtube.com/watch?v=aaaaaaaaaaa"},{"id":"ws_mwqyfka9_6n5dk","name":"","url":"https://www.youtube.com/watch?v=bbbbbbbbbbb"}],"activeId":"ws_mwqyfi5c_dwadg"} )
+after relaunch (BBB on screen): [
+ {
+  "i": 0,
+  "shown": false,
+  "source": "Video AAA00:00:30Change",
+  "banked": []
+ },
+ {
+  "i": 1,
+  "shown": true,
+  "source": "Video BBB 00:00:30 Change",
+  "banked": []
+ }
+]
+  BBB must carry NO banked span: a span there is AAA's plan painted on the wrong video
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b12-ctrlB-restored/01-restored-bbb-active.png
+crash: {"rootChildren":1,"bodyLen":1193,"boundary":false,"boundaryMessage":null,"panes":2,"answering":true,"reactErrors":[],"reactErrorCount":0,"crashed":false}

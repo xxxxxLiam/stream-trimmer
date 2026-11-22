@@ -3,11 +3,13 @@
  * Path: src/components/SymbolPalette.tsx
  * Description: Searchable click-to-copy symbols palette overlay (opened with
  *   Cmd+; by the shell). Data lives in src/lib/symbols.ts. Owns its own Escape.
- * Contract: self-positioned (fixed) panel, null when closed.
+ * Contract: self-positioned (fixed) panel at z-20, under the header (z-30) and moved left of the
+ *   help drawer when that is open (same as CopyBlocks), null when closed.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SYMBOL_GROUPS, allEntries, matchesQuery, type SymbolEntry } from "../lib/symbols";
 import { writeClipboard } from "../lib/handoff";
+import { useDrawerClearance } from "./useDrawerClearance";
 
 export type SymbolPaletteProps = { open: boolean; onClose: () => void };
 
@@ -57,6 +59,7 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const timer = useRef<number | undefined>(undefined);
+  const right = useDrawerClearance(open);
 
   const byId = useMemo(() => new Map(allEntries().map((e) => [e.id, e])), []);
 
@@ -185,7 +188,8 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
       ref={panelRef}
       role="dialog"
       aria-label="Symbols and phrases"
-      className="surface-panel fixed right-4 top-14 z-50 flex max-h-[calc(100vh-72px)] w-[440px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
+      className="surface-panel fixed top-14 z-20 flex max-h-[calc(100vh-72px)] w-[440px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
+      style={{ right }}
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="t-section">Symbols</h2>
@@ -224,7 +228,7 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto" onKeyDown={undefined}>
+      <div id="ui-symbol-list" className="flex min-h-0 flex-col gap-4 overflow-y-auto" onKeyDown={undefined}>
         {sections.length === 0 && <p className="t-meta">Nothing matches "{query}".</p>}
         {sections.map((s) => (
           <section key={s.id} aria-label={s.label} className="flex flex-col gap-2">

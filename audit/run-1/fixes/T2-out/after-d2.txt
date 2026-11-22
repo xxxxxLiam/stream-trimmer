@@ -1,0 +1,4 @@
+D-2 result: {"ok":true,"path":"/tmp/t2-chosen-dEmSXK/clip 2.mp4"}
+D-2 original before: ino=1089944 size=120 sha=af92b8166acf
+D-2 original after:  ino=1089944 size=120 sha=af92b8166acf
+D-2 dir listing: [ 'clip 2.mp4', 'clip.mp4' ]

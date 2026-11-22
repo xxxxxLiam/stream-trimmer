@@ -13,6 +13,7 @@ import {
 } from "react-bootstrap-icons";
 import { useChannelExportContext } from "../context/ChannelExportContext";
 import { useClipperContext } from "../context/ClipperContext";
+import { redact } from "../lib/diagnostics";
 import DestinationSelector from "./DestinationSelector";
 import {
   CHANNEL_LIMIT_MAX,
@@ -48,6 +49,7 @@ function ProgressPanel() {
       <div className="flex items-center gap-2 text-[12px] text-fg">
         <span className="truncate">{phaseLabel}</span>
         <button
+          id="ui-channel-stop"
           type="button"
           onClick={cancelExport}
           className="btn ml-auto shrink-0 px-2 py-1 text-meta"
@@ -80,6 +82,19 @@ function ProgressPanel() {
       <p className="text-meta text-fg-dim">
         Stop keeps everything collected so far and still writes the CSVs.
       </p>
+    </div>
+  );
+}
+
+/** The export's failure line. Server and yt-dlp text can carry cookies, tokens, signed URLs, the
+ *  user's email and home path, so it is redacted exactly like the download failure (F-7). */
+export function ExportErrorAlert({ error }: { error: string }) {
+  return (
+    <div
+      className="rounded-control border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-accent"
+      role="alert"
+    >
+      {redact(error)}
     </div>
   );
 }
@@ -269,19 +284,13 @@ export default function ChannelExportPanel() {
 
       <DestinationSelector />
 
-      {error && (
-        <div
-          className="rounded-control border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-accent"
-          role="alert"
-        >
-          {error}
-        </div>
-      )}
+      {error && <ExportErrorAlert error={error} />}
 
       {exporting ? (
         <ProgressPanel />
       ) : (
         <button
+          id="ui-channel-start"
           type="button"
           onClick={startExport}
           disabled={blocked}

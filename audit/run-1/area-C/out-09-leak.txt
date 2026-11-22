@@ -1,0 +1,40 @@
+[C09] import into Acme: Imported: 2 added.
+[C09] import into Beta: Imported: 1 added.
+[C09] state: {"acme-q4":{"stub0000001":[{"id":"A01","label":"acme hook","segments":[{"start":60,"end":90}],"status":"banked","category":"hook","tier":"1"},{"id":"A02","label":"acme payoff","segments":[{"start":120,"end":160}],"status":"banked","category":"payoff","tier":"2"}]},"beta-launch":{"stub0000001":[{"id":"B91","label":"beta hook","segments":[{"start":300,"end":330}],"status":"banked","category":"promo","tier":"3"}]}}
+[C09] PASS round 1: Acme view shows only Acme rows (["2 clips","A01 acme hook","A02 acme payoff"])
+[C09] PASS round 1: Acme count line says 2 clips
+[C09] PASS round 1: Acme filter chips carry no Beta category (["hook","payoff","Tier 1","Tier 2"])
+[C09] PASS round 1: Beta view shows only Beta rows
+[C09] PASS round 1: Beta count line says 1 clip(s)
+[C09] PASS round 1: Beta filter chips carry no Acme category (["promo","Tier 3"])
+[C09] PASS round 2: Acme view shows only Acme rows (["2 clips","A01 acme hook","A02 acme payoff"])
+[C09] PASS round 2: Acme count line says 2 clips
+[C09] PASS round 2: Acme filter chips carry no Beta category (["hook","payoff","Tier 1","Tier 2"])
+[C09] PASS round 2: Beta view shows only Beta rows
+[C09] PASS round 2: Beta count line says 1 clip(s)
+[C09] PASS round 2: Beta filter chips carry no Acme category (["promo","Tier 3"])
+[C09] PASS round 3: Acme view shows only Acme rows (["2 clips","A01 acme hook","A02 acme payoff"])
+[C09] PASS round 3: Acme count line says 2 clips
+[C09] PASS round 3: Acme filter chips carry no Beta category (["hook","payoff","Tier 1","Tier 2"])
+[C09] PASS round 3: Beta view shows only Beta rows
+[C09] PASS round 3: Beta count line says 1 clip(s)
+[C09] PASS round 3: Beta filter chips carry no Acme category (["promo","Tier 3"])
+[C09] PASS round 4: Acme view shows only Acme rows (["2 clips","A01 acme hook","A02 acme payoff"])
+[C09] PASS round 4: Acme count line says 2 clips
+[C09] PASS round 4: Acme filter chips carry no Beta category (["hook","payoff","Tier 1","Tier 2"])
+[C09] PASS round 4: Beta view shows only Beta rows
+[C09] PASS round 4: Beta count line says 1 clip(s)
+[C09] PASS round 4: Beta filter chips carry no Acme category (["promo","Tier 3"])
+[C09] shot: /home/user/stream-trimmer/audit/out/area-C/C09-leak/01-beta-view.png
+[C09] shot: /home/user/stream-trimmer/audit/out/area-C/C09-leak/02-acme-view.png
+[C09] bank before delete: {"acme-q4":{"stub0000001":[{"id":"A01","label":"acme hook","segments":[{"start":60,"end":90}],"status":"banked","category":"hook","tier":"1"},{"id":"A02","label":"acme payoff","segments":[{"start":120,"end":160}],"status":"banked","category":"payoff","tier":"2"}]},"beta-launch":{"stub0000001":[{"id":"B91","label":"beta hook","segments":[{"start":300,"end":330}],"status":"banked","category":"promo","tier":"3"}]}}
+[C09] campaigns after delete: [["beta-launch","Beta Launch"]]
+[C09] bank after delete: {"acme-q4":{"stub0000001":[{"id":"A01","label":"acme hook","segments":[{"start":60,"end":90}],"status":"banked","category":"hook","tier":"1"},{"id":"A02","label":"acme payoff","segments":[{"start":120,"end":160}],"status":"banked","category":"payoff","tier":"2"}]},"beta-launch":{"stub0000001":[{"id":"B91","label":"beta hook","segments":[{"start":300,"end":330}],"status":"banked","category":"promo","tier":"3"}]}}
+[C09] **FAIL** deleting the campaign also removed its bank rows from clipper.bank
+[C09] shot: /home/user/stream-trimmer/audit/out/area-C/C09-leak/03-after-delete-acme.png
+[C09] recreated id: [["beta-launch","Beta Launch"],["acme-q4","Acme Q4"]]
+[C09] recreated bank view: ["This video","Bank","All saved","Import timestamps","hook","payoff","Tier 1","Tier 2","2 clips","Sort by tier"]
+[C09] **FAIL** recreating a campaign with the same name does NOT bring the deleted rows back
+[C09] shot: /home/user/stream-trimmer/audit/out/area-C/C09-leak/04-recreated-acme.png
+[C09] 2 CHECK(S) FAILED
+[C09] pageErrors: []

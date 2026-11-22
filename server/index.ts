@@ -4,7 +4,11 @@
  * Description: Local Express backend — /api/info, /api/download, /api/transcript.
  * Uses bundled yt-dlp (with PATH fallback) and ffmpeg-static. Runs via `tsx`.
  */
-import express, { type Request, type Response } from "express";
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 import cors from "cors";
 import fs from "node:fs";
 import os from "node:os";
@@ -17,7 +21,7 @@ import {
 } from "node:child_process";
 import { z } from "zod";
 // We don't use youtube-dl-exec's runner: its underlying `tinyspawn` splits the
-// binary path on spaces (breaks `/Applications/YouTube Clipper.app/...`). We
+// binary path on spaces (breaks `/Applications/Clipr.app/...`). We
 // spawn yt-dlp directly with node's child_process, and use `dargs` (already a
 // transitive dep) to convert the same option-object shape into CLI flags.
 import dargs from "dargs";
@@ -64,8 +68,12 @@ import {
   CLIP_PREFIX,
   cacheUsage,
   clearCache,
+  holdFolder,
+  jobDir,
+  markInUse,
   partialBytes,
   sweepStaleCache,
+  tryClaim,
   workDir,
 } from "./resumeCache";
 
@@ -268,12 +276,17 @@ function makeRunner(binary: string, source: string): YtResolved {
   const exec: YtExec = (url, opts, execaOpts) => {
     const args = toArgs(url, opts);
     const env = (execaOpts?.env as NodeJS.ProcessEnv | undefined) ?? childEnv();
-    return spawn(binary, args, {
+    const child = spawn(binary, args, {
       env,
       windowsHide: true,
       // shell:false is the default — explicit for clarity.
       shell: false,
+      // Download jobs run in their own process group so a cancel can kill
+      // yt-dlp AND the ffmpeg it started, not just the parent.
+      detached: Boolean(execaOpts?.detached),
     });
+    (execaOpts?.onSpawn as ((c: ChildProcess) => void) | undefined)?.(child);
+    return child;
   };
   const run: YtRunner = (url, opts, execaOpts) =>
     new Promise((resolve, reject) => {
@@ -448,10 +461,58 @@ function preflight(): boolean {
 
 const binariesOk = preflight();
 
+/**
+ * True only for a real YouTube address: http(s), no embedded credentials, and a
+ * host that IS youtube.com (or a subdomain of it) or youtu.be.
+ *
+ * The check and its consumer must agree about where the host ends. Node's WHATWG
+ * `new URL` and Python's `urlsplit` (yt-dlp's own parser) do not: WHATWG treats
+ * `\` like `/`, strips tab/newline, accepts `https:host` with no slashes and
+ * IDNA-maps non-ASCII, so `https://www.youtube.com\@evil.example/` is
+ * `www.youtube.com` to one and `evil.example` to the other. Rather than
+ * normalise, anything the two could read differently is refused: a backslash, a
+ * raw or percent-encoded control character, whitespace, a scheme not followed by
+ * `//`, and an authority that is not plain ASCII `host[:port]` (which rules out
+ * userinfo, brackets, `%`-escapes, non-ASCII and IP-literal tricks in one rule).
+ * What is left is then read by BOTH parsers and must give the same host.
+ */
+export function isYouTubeUrl(value: string): boolean {
+  if (typeof value !== "string" || value.length > 4096) return false;
+  // Control characters, DEL, whitespace, backslash, anything non-ASCII-printable.
+  if (/[^\x21-\x7e]/.test(value) || value.includes("\\")) return false;
+  // Percent-encoded control characters (%00-%1f, %7f) and an encoded backslash.
+  if (/%(?:[01][0-9a-f]|7f|5c)/i.test(value)) return false;
+  // The scheme must be followed by exactly `//`, as RFC 3986 requires.
+  const m = /^(https?):\/\/([^/?#]*)/i.exec(value);
+  if (!m) return false;
+  const authority = m[2];
+  // Plain `host` or `host:port`: no `@` (userinfo), `[` (IP literal), `%`, ...
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.?(?::\d{1,5})?$/.test(authority)) {
+    return false;
+  }
+  const rawHost = authority.replace(/:\d+$/, "").toLowerCase().replace(/\.$/, "");
+  let u: URL;
+  try {
+    u = new URL(value);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+  if (u.username || u.password) return false;
+  const host = u.hostname.toLowerCase().replace(/\.$/, "");
+  // Both readings of the host must be the same string, and that string YouTube.
+  if (host !== rawHost) return false;
+  return (
+    host === "youtube.com" ||
+    host.endsWith(".youtube.com") ||
+    host === "youtu.be"
+  );
+}
+
 const urlSchema = z
   .string()
   .url()
-  .refine((v) => /youtube\.com|youtu\.be/.test(v), "URL must be a YouTube link");
+  .refine(isYouTubeUrl, "URL must be a YouTube link");
 
 // Browsers yt-dlp can read a logged-in YouTube session from. Only the browser
 // name ever crosses the API; cookie contents never touch this process.
@@ -539,6 +600,11 @@ async function withRunCookies<T>(
   }
 }
 
+/** Which kind of session a request asked for; only "app" has a jar to protect. */
+function cookieModeFor(source: string | undefined): "app" | "browser" | "none" {
+  return !source ? "none" : source === "app" ? "app" : "browser";
+}
+
 const downloadSchema = z.object({
   url: urlSchema,
   // A clip is a list of ranges, joined in order into one file. The older
@@ -568,8 +634,51 @@ type DownloadInput = z.infer<typeof downloadSchema>;
 
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// This server is the app's own backend, not a public API. It binds loopback
+// only (see app.listen), and on top of that it answers only the app's own
+// origin: the packaged window loads from http://127.0.0.1:<PORT>, and the dev
+// renderer from the Vite server on :8080. A no-preflight cross-origin POST
+// (text/plain) is still SENT by the browser, and CORS headers do not stop it
+// being processed, so a foreign Origin is refused outright rather than merely
+// left without Access-Control-Allow-Origin. A Host that is not a loopback name
+// is refused too, which is what stops DNS rebinding.
+const ALLOWED_ORIGINS = new Set(
+  [PORT, 8080].flatMap((port) => [
+    `http://127.0.0.1:${port}`,
+    `http://localhost:${port}`,
+  ]),
+);
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+export function requestAllowed(
+  origin: string | undefined,
+  hostHeader: string | undefined,
+): boolean {
+  if (origin !== undefined && !ALLOWED_ORIGINS.has(origin)) return false;
+  const host = String(hostHeader ?? "")
+    .toLowerCase()
+    .replace(/:\d+$/, "");
+  return LOOPBACK_HOSTS.has(host);
+}
+
+app.use((req: Request, res: Response, next) => {
+  if (!requestAllowed(req.headers.origin, req.headers.host)) {
+    return res.status(403).json({ error: "Forbidden origin" });
+  }
+  next();
+});
+app.use(
+  cors({
+    origin: (origin, cb) => cb(null, !origin || ALLOWED_ORIGINS.has(origin)),
+  }),
+);
+// Request bodies are small JSON (a URL, a few ranges), so the cap is the
+// body-parser default made explicit: 100 KB, measured after any gzip inflation.
+// Anything larger, and any body that is not JSON, is answered by the error
+// handler registered after the routes, as JSON, never as an HTML stack trace.
+const JSON_BODY_LIMIT = "100kb";
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 // When packaged inside Electron, this same server also serves the built UI so
 // the window loads over http://127.0.0.1 instead of file://. A real origin is
@@ -794,19 +903,30 @@ app.post("/api/info", async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const options: Record<string, unknown> = {
-    dumpSingleJson: true,
-    noWarnings: true,
-    noPlaylist: true,
-    ...resolveCookieOptions(parsed.data.cookiesFromBrowser),
-  };
+  // Every yt-dlp run gets a private copy of the jar (see withRunCookies):
+  // yt-dlp writes its cookie file back, so handing it the canonical path lets
+  // a bad run wipe the saved sign-in.
+  let options: Record<string, unknown> = {};
   try {
-    console.log(
-      `[server] /api/info url=${parsed.data.url} options=${JSON.stringify(options)}`,
+    const info = await withRunCookies(
+      cookieModeFor(parsed.data.cookiesFromBrowser),
+      resolveCookieOptions(parsed.data.cookiesFromBrowser),
+      false,
+      (cookies) => {
+        options = {
+          dumpSingleJson: true,
+          noWarnings: true,
+          noPlaylist: true,
+          ...cookies,
+        };
+        console.log(
+          `[server] /api/info url=${parsed.data.url} options=${JSON.stringify(options)}`,
+        );
+        return yt!.run(parsed.data.url, options, {
+          env: childEnv(),
+        } as any);
+      },
     );
-    const info = await yt!.run(parsed.data.url, options, {
-      env: childEnv(),
-    } as any);
     res.json({
       id: info.id,
       title: info.title,
@@ -835,23 +955,31 @@ app.post("/api/transcript", async (req: Request, res: Response) => {
     }
   };
 
-  const options: Record<string, unknown> = {
-    skipDownload: true,
-    writeAutoSubs: true,
-    writeSubs: true,
-    subLangs: "en",
-    subFormat: "vtt",
-    noPlaylist: true,
-    noWarnings: true,
-    output: path.join(tempDir, "sub"),
-    ffmpegLocation: resolvedFfmpeg,
-    ...resolveCookieOptions(parsed.data.cookiesFromBrowser),
-  };
+  let options: Record<string, unknown> = {};
   try {
-    console.log(
-      `[server] /api/transcript url=${parsed.data.url} options=${JSON.stringify(options)}`,
+    await withRunCookies(
+      cookieModeFor(parsed.data.cookiesFromBrowser),
+      resolveCookieOptions(parsed.data.cookiesFromBrowser),
+      false,
+      (cookies) => {
+        options = {
+          skipDownload: true,
+          writeAutoSubs: true,
+          writeSubs: true,
+          subLangs: "en",
+          subFormat: "vtt",
+          noPlaylist: true,
+          noWarnings: true,
+          output: path.join(tempDir, "sub"),
+          ffmpegLocation: resolvedFfmpeg,
+          ...cookies,
+        };
+        console.log(
+          `[server] /api/transcript url=${parsed.data.url} options=${JSON.stringify(options)}`,
+        );
+        return yt!.run(parsed.data.url, options, { env: childEnv() } as any);
+      },
     );
-    await yt!.run(parsed.data.url, options, { env: childEnv() } as any);
 
     const files = fs.readdirSync(tempDir);
     console.log("[server] transcript files:", files);
@@ -1000,12 +1128,15 @@ function probeOnce(
 async function probeYouTubeAuth(
   cookieOptions: Record<string, unknown>,
   onChild: (child: ChildProcess | null) => void,
+  shouldStop: () => boolean = () => false,
 ): Promise<AuthProbeResult> {
   let last: AuthProbeResult = {
     status: "probe_unavailable",
     reason: "No probe video could be reached.",
   };
   for (const url of AUTH_PROBE_URLS) {
+    // Nobody is waiting any more: do not start the next probe child.
+    if (shouldStop()) return last;
     last = await probeOnce(url, cookieOptions, onChild);
     // A dead probe target says nothing about the session, and neither does a
     // run whose output carried no recognisable marker — try the next video
@@ -1044,12 +1175,26 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
   }
   const cookieOptions = resolveCookieOptions(source);
   let activeChild: ChildProcess | null = null;
+  let clientGone = false;
   res.on("close", () => {
-    if (!res.writableEnded && activeChild) activeChild.kill("SIGKILL");
+    if (res.writableEnded) return;
+    clientGone = true;
+    if (activeChild) activeChild.kill("SIGKILL");
   });
-  const { status, reason } = await probeYouTubeAuth(cookieOptions, (child) => {
-    activeChild = child;
-  });
+  // One private copy of the jar covers the whole probe loop (up to three runs).
+  const { status, reason } = await withRunCookies(
+    cookieModeFor(source),
+    cookieOptions,
+    false,
+    (cookies) =>
+      probeYouTubeAuth(
+        cookies,
+        (child) => {
+          activeChild = child;
+        },
+        () => clientGone,
+      ),
+  );
   if (res.writableEnded || res.destroyed) return;
   return res.json({
     status,
@@ -1058,6 +1203,154 @@ app.post("/api/auth/youtube/status", async (req: Request, res: Response) => {
     message: authProbeMessage(source, status),
     reason,
   });
+});
+
+/**
+ * ffmpeg arguments for cutting one range out of a whole downloaded video.
+ *
+ * Not `-c copy`: with `-ss` before `-i` a stream copy cannot start on a
+ * non-keyframe, so ffmpeg keeps the packets back to the previous keyframe and
+ * hides them behind an mp4 edit list. Players honour that list, but the concat
+ * demuxer that joins the pieces ignores it, and the pre-roll comes back: a
+ * clip marked at 4.00 s arrived with 14 frames from before an in-point. The
+ * video is therefore decoded and re-encoded from the exact in-point (seek is
+ * frame-accurate when transcoding), so the frames before it are discarded, not
+ * hidden. The length is `-t`, an output limit, so nothing after the out point
+ * leaks either; `passthrough` stops ffmpeg duplicating or dropping frames to
+ * pad the cut onto a constant frame rate. yuv420p keeps the result playable
+ * everywhere whatever the source was.
+ */
+export function localTrimArgs(
+  source: string,
+  seg: { start: number; end: number },
+  out: string,
+): string[] {
+  return [
+    "-hide_banner",
+    "-y",
+    "-ss",
+    String(seg.start),
+    "-i",
+    source,
+    "-t",
+    String(seg.end - seg.start),
+    "-fps_mode",
+    "passthrough",
+    "-c:v",
+    "libx264",
+    "-crf",
+    "18",
+    "-preset",
+    "veryfast",
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-movflags",
+    "+faststart",
+    out,
+  ];
+}
+
+// --- cancellable download jobs ----------------------------------------------
+//
+// Every /api/download request registers here under its jobId for as long as it
+// is being built. POST /api/download/cancel?jobId=… (or the client simply
+// hanging up) kills every child the job has started and makes the job stop
+// before it starts the next one.
+
+class CancelledError extends Error {
+  constructor() {
+    super("Cancelled");
+    this.name = "CancelledError";
+  }
+}
+
+interface ActiveJob {
+  cancelled: boolean;
+  /** True while the clip is being built; false once it is finished or failed. */
+  building: boolean;
+  children: Set<ChildProcess>;
+}
+
+const activeJobs = new Map<string, Set<ActiveJob>>();
+
+function registerJob(id: string): ActiveJob {
+  const job: ActiveJob = { cancelled: false, building: true, children: new Set() };
+  let set = activeJobs.get(id);
+  if (!set) {
+    set = new Set();
+    activeJobs.set(id, set);
+  }
+  set.add(job);
+  return job;
+}
+
+function unregisterJob(id: string, job: ActiveJob) {
+  job.building = false;
+  const set = activeJobs.get(id);
+  if (!set) return;
+  set.delete(job);
+  if (set.size === 0) activeJobs.delete(id);
+}
+
+/** Kills a child and, where it leads its own process group, everything under it. */
+function killTree(child: ChildProcess) {
+  const pid = child.pid;
+  if (!pid || child.exitCode !== null || child.signalCode !== null) return;
+  try {
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        windowsHide: true,
+        stdio: "ignore",
+      });
+    } else {
+      process.kill(-pid, "SIGKILL");
+    }
+  } catch {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+function cancelJobRun(job: ActiveJob) {
+  job.cancelled = true;
+  for (const child of job.children) killTree(child);
+}
+
+/** Cancels every live job with this id. Returns how many were still building. */
+function cancelJob(id: string): number {
+  let n = 0;
+  for (const job of activeJobs.get(id) ?? []) {
+    if (!job.building) continue;
+    cancelJobRun(job);
+    n += 1;
+  }
+  return n;
+}
+
+// Contract for the renderer (B-6): POST /api/download/cancel?jobId=<id> (or a
+// JSON body {jobId}) -> 200 {ok:true, found:boolean}. `found` is false when no
+// job with that id is being built any more (already finished, or never
+// existed); that is not an error. The cancelled /api/download request itself
+// answers 499 {code:"cancelled", cancelled:true}, and its progress channel
+// publishes phase "error" with message "Cancelled". Hanging up the download
+// request (AbortController) cancels it the same way.
+app.post("/api/download/cancel", (req: Request, res: Response) => {
+  const fromQuery =
+    typeof req.query.jobId === "string" ? req.query.jobId : "";
+  const fromBody =
+    req.body && typeof req.body.jobId === "string" ? req.body.jobId : "";
+  const id = fromQuery || fromBody;
+  if (!id) return res.status(400).json({ error: "jobId is required" });
+  const n = cancelJob(id);
+  console.log(`[server] /api/download/cancel job=${id} cancelled=${n}`);
+  return res.json({ ok: true, found: n > 0 });
 });
 
 /** Sends a failure in the table shape: cause, the one fix, the work kept. */
@@ -1097,14 +1390,53 @@ app.post("/api/download", async (req: Request, res: Response) => {
   const lastEnd = Math.max(...segs.map((s) => s.end));
 
   const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
-  const cookieMode: "app" | "browser" | "none" = !cookiesFromBrowser
-    ? "none"
-    : cookiesFromBrowser === "app"
-      ? "app"
-      : "browser";
+  const cookieMode = cookieModeFor(cookiesFromBrowser);
   console.log(
     `[server] /api/download auth mode=${cookieMode} segments=${segCount}`,
   );
+
+  const jobId =
+    typeof req.query.jobId === "string" && req.query.jobId
+      ? req.query.jobId
+      : `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // Anything that fails from here on, including the pre-flight, carries the
+  // per-run diagnostics Copy diagnostics needs (job id, versions, log lines).
+  const diag = (raw: string) => ({ diagnostics: buildRunDiagnostics(jobId, raw) });
+
+  // Cancellable from here until the clip is built or has failed. Hanging up
+  // the request cancels it too.
+  const job = registerJob(jobId);
+  const throwIfCancelled = () => {
+    if (job.cancelled) throw new CancelledError();
+  };
+  res.on("close", () => {
+    if (!res.writableEnded && job.building) {
+      console.log(`[server] /api/download client went away job=${jobId} — cancelling`);
+      cancelJobRun(job);
+    }
+    unregisterJob(jobId, job);
+  });
+  const trackChild = (child: ChildProcess) => {
+    job.children.add(child);
+    child.once("close", () => job.children.delete(child));
+    // Cancelled between the spawn decision and the spawn: do not let it run.
+    if (job.cancelled) killTree(child);
+  };
+  const ytOpts = () =>
+    ({
+      env: childEnv(),
+      detached: process.platform !== "win32",
+      onSpawn: trackChild,
+    }) as any;
+  const sendCancelled = () => {
+    publishProgress(jobId, { phase: "error", percent: 0, message: "Cancelled" });
+    if (res.headersSent || res.writableEnded) return;
+    return res.status(499).json({
+      error: "Cancelled",
+      code: "cancelled",
+      cancelled: true,
+    });
+  };
 
   // True only when the probe confirmed a signed-in session. A clip that lands
   // at 360p without one is reported as an expired or missing sign-in.
@@ -1123,13 +1455,21 @@ app.post("/api/download", async (req: Request, res: Response) => {
         cause,
         action: { id: "import_cookies", label: "Connect YouTube" },
         preserved,
+        ...diag(cause),
       });
     }
     // A private copy: this is one of possibly many runs in flight, and yt-dlp
     // writes its jar back on every run.
     const auth = await withRunCookies(cookieMode, cookieOptions, false, (c) =>
-      probeYouTubeAuth(c, () => undefined),
+      probeYouTubeAuth(
+        c,
+        (child) => {
+          if (child) trackChild(child);
+        },
+        () => job.cancelled,
+      ),
     );
+    if (job.cancelled) return sendCancelled();
     const verdict = authProbeVerdict(auth.status);
     if (verdict === "rate_limited") {
       return res.status(429).json({
@@ -1137,6 +1477,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
         error:
           "YouTube is rate-limiting this network. Wait a few minutes and try again — your sign-in is fine, re-importing cookies won't help.",
         reason: auth.reason,
+        ...diag(auth.reason ?? "rate limited"),
       });
     }
     if (verdict === "blocked") {
@@ -1148,6 +1489,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
         action: f.action,
         preserved: f.preserved,
         reason: auth.reason,
+        ...diag(auth.reason ?? f.cause),
       });
     }
     if (auth.status !== "signed_in") {
@@ -1160,11 +1502,6 @@ app.post("/api/download", async (req: Request, res: Response) => {
       sessionConfirmed = true;
     }
   }
-
-  const jobId =
-    typeof req.query.jobId === "string" && req.query.jobId
-      ? req.query.jobId
-      : `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   // Re-probe duration so the cap can't be bypassed by a crafted request.
   // Doubles as the source of truth for which heights YouTube actually offers.
@@ -1183,17 +1520,18 @@ app.post("/api/download", async (req: Request, res: Response) => {
       console.log(
         `[server] /api/download probe url=${url} options=${JSON.stringify(withCookies)}`,
       );
-      return yt!.run(url, withCookies, { env: childEnv() } as any);
+      return yt!.run(url, withCookies, ytOpts());
     });
   try {
-    let info: any;
-    try {
-      info = await runProbe(cookieOptions);
-    } catch (first) {
-      throw first;
-    }
+    const info: any = await runProbe(cookieOptions);
+    throwIfCancelled();
     if (typeof info.duration === "number" && lastEnd > info.duration + 1) {
-      return sendFailure(res, outPointFailure(lastEnd, info.duration));
+      const f = outPointFailure(lastEnd, info.duration);
+      return sendFailure(
+        res,
+        f,
+        diag(`${f.cause} (requested out point ${lastEnd}s, video ${info.duration}s)`),
+      );
     }
     availableHeights = Array.from(
       new Set(
@@ -1206,13 +1544,16 @@ app.post("/api/download", async (req: Request, res: Response) => {
       `[server] /api/download available heights=${availableHeights.join(",") || "unknown"}`,
     );
   } catch (e) {
+    if (job.cancelled || e instanceof CancelledError) return sendCancelled();
     if (cookiesFromBrowser && isCookieError(e)) {
-      return res
-        .status(400)
-        .json({ error: cookieErrorMessage(cookiesFromBrowser) });
+      return res.status(400).json({
+        error: cookieErrorMessage(cookiesFromBrowser),
+        ...diag(fullErrMessage(e)),
+      });
     }
     logYtError("/api/download probe", url, probeOptions, e);
-    return sendFailure(res, classifyFailure(fullErrMessage(e)));
+    const raw = fullErrMessage(e);
+    return sendFailure(res, classifyFailure(raw), diag(raw));
   }
   publishProgress(jobId, {
     phase: "downloading",
@@ -1222,29 +1563,45 @@ app.post("/api/download", async (req: Request, res: Response) => {
 
   const isAudio = format === "mp3";
   const ext = isAudio ? "mp3" : "mp4";
-  // Keyed work folder: the same video at the same format/quality/ranges reuses
-  // the same folder, so yt-dlp's `.part` files survive a failure and the retry
-  // continues from where it stopped. Any other combination gets its own folder.
-  // One segment keeps exactly the key it always had.
-  const tempDir = workDir(
-    CLIP_PREFIX,
-    multi
-      ? [
-          url,
-          format,
-          quality,
-          "segments",
-          ...segs.map((s) => `${s.start.toFixed(2)}-${s.end.toFixed(2)}`),
-        ]
-      : [url, format, quality, segs[0].start.toFixed(2), segs[0].end.toFixed(2)],
-  );
-  const outputPath = path.join(tempDir, `clip.${ext}`);
-  // Per-segment files and the join's inputs. A single segment writes straight
-  // to outputPath and none of these exist.
-  const segFiles = segs.map((_, i) =>
-    multi ? path.join(tempDir, segmentFileName(i, ext)) : outputPath,
-  );
-  const listPath = path.join(tempDir, "list.txt");
+  // Two folders, because two different things have to survive:
+  //  - the SHARED folder is keyed by video+format+quality+ranges, so yt-dlp's
+  //    `.part` files and a whole-file source outlive a failure and the retry
+  //    continues from where it stopped. Only one live job may use it at a time
+  //    (a second one with the same key works privately, with no resume), since
+  //    two yt-dlp runs must never write the same `.part`.
+  //  - the CLIP folder belongs to this request alone (key + random suffix). The
+  //    finished clip, the concat list and the join output live there, so a
+  //    second download of the same clip, however it arrives, can neither delete
+  //    them nor have its own deleted. The app's main process moves the clip out
+  //    and removes this folder.
+  const keyParts = multi
+    ? [
+        url,
+        format,
+        quality,
+        "segments",
+        ...segs.map((s) => `${s.start.toFixed(2)}-${s.end.toFixed(2)}`),
+      ]
+    : [url, format, quality, segs[0].start.toFixed(2), segs[0].end.toFixed(2)];
+  const sharedDir = workDir(CLIP_PREFIX, keyParts);
+  const releaseShared = tryClaim(sharedDir);
+  const clipDir = jobDir(CLIP_PREFIX, keyParts);
+  const releaseClipDir = markInUse(clipDir);
+  // Where segment files, `.part` files and the whole-file source go.
+  const tempDir = releaseShared ? sharedDir : clipDir;
+  if (!releaseShared) {
+    console.log(
+      `[server] /api/download job=${jobId} same clip already downloading — working in a private folder`,
+    );
+  }
+  const outputPath = path.join(clipDir, `clip.${ext}`);
+  // Per-segment files and the join's inputs. Every segment, a lone one too,
+  // is written into the resumable folder, never straight into the per-request
+  // clip folder: a failure deletes that whole folder, and with it the `.part`
+  // a retry would continue from. A lone segment is moved to outputPath once
+  // it is complete (see buildClip).
+  const segFiles = segs.map((_, i) => path.join(tempDir, segmentFileName(i, ext)));
+  const listPath = path.join(clipDir, "list.txt");
   // A finished clip left from a previous run is never reused — only partials.
   for (const f of [outputPath, listPath, ...segFiles]) {
     try {
@@ -1259,13 +1616,29 @@ app.post("/api/download", async (req: Request, res: Response) => {
       `[server] /api/download resuming with ${resumeBytes} cached byte(s) in ${tempDir}`,
     );
   }
-  const cleanup = () => {
+  // Ends this job's claim on both folders. `keepClip` leaves the clip folder in
+  // place (the finished clip is being handed over); otherwise it is removed.
+  let workReleased = false;
+  const releaseWork = (keepClip: boolean) => {
+    if (workReleased) return;
+    workReleased = true;
+    if (!keepClip) {
+      try {
+        fs.rmSync(clipDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+    releaseClipDir();
+    releaseShared?.();
+    // The shared folder is dropped once nothing resumable is left in it.
     try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmdirSync(sharedDir);
     } catch {
-      /* ignore */
+      /* not empty: partials a retry will resume from */
     }
   };
+  const cleanup = () => releaseWork(false);
 
 
   // Every tier here used to lead with `protocol*=m3u8`. That was written when
@@ -1477,7 +1850,9 @@ app.post("/api/download", async (req: Request, res: Response) => {
     label: string,
   ): Promise<void> =>
     new Promise<void>((resolve, reject) => {
+      if (job.cancelled) return reject(new CancelledError());
       const child = spawnChild();
+      trackChild(child);
       runStderrRaw = `${runStderrRaw}# ${label}\n`.slice(-RUN_STDERR_MAX);
       child.stderr?.on("data", (c: Buffer | string) => {
         runStderrRaw = (runStderrRaw + c.toString()).slice(-RUN_STDERR_MAX);
@@ -1497,6 +1872,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       child.on("error", reject);
       child.on("close", (code) => {
         if (buf) updateFromLine(buf);
+        if (job.cancelled) return reject(new CancelledError());
         if (code === 0) return resolve();
         const tail = stderrTail
           .split(/\r?\n/)
@@ -1532,11 +1908,17 @@ app.post("/api/download", async (req: Request, res: Response) => {
     return match ?? null;
   };
 
+  // ffmpeg can find a duration in it. A file that was renamed into place
+  // part-way (no moov atom) or is otherwise not media has none.
+  let verifiedSource: string | null = null;
+  const isReadableMedia = (file: string): boolean =>
+    probeDurationSec(resolvedFfmpeg as string, file) !== undefined;
+
   // Everything a build leaves beside the finished clip: segment files, the
   // concat list and the whole-file source. Partials (`.part`) are never
   // touched, they are what a retry resumes from.
   const dropIntermediates = (keepSource: boolean) => {
-    const doomed = [...segFiles.filter((f) => f !== outputPath), listPath];
+    const doomed = [...segFiles, listPath];
     if (!keepSource) {
       try {
         for (const f of fs.readdirSync(tempDir)) {
@@ -1566,6 +1948,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
     index: number,
     state: { sectionsForbidden: boolean },
   ): Promise<void> => {
+    throwIfCancelled();
     const seg = segs[index];
     const out = segFiles[index];
     const win = segmentWindow(index, segCount);
@@ -1584,11 +1967,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
         );
         try {
           await runStreaming(
-            () => yt!.exec(url, sectionOptions, { env: childEnv() } as any),
+            () => yt!.exec(url, sectionOptions, ytOpts()),
             "yt-dlp",
           );
           return;
         } catch (sectionErr) {
+          if (job.cancelled || sectionErr instanceof CancelledError) throw sectionErr;
           if (!isForbidden(sectionErr)) throw sectionErr;
           state.sectionsForbidden = true;
           console.warn(
@@ -1613,22 +1997,49 @@ app.post("/api/download", async (req: Request, res: Response) => {
         message: currentStage,
         stage: currentStage,
       });
-      // The whole file is the same for every segment, so fetch it once.
+      // The whole file is the same for every segment, so fetch it once. A
+      // copy left by an earlier run is only trusted once ffmpeg can read it:
+      // a truncated one used to be kept and re-used forever.
       let source = findDownloaded();
+      if (source && source !== verifiedSource && !isReadableMedia(source)) {
+        console.warn(
+          `[server] job=${jobId} cached download ${source} is not readable media — discarding and fetching it again`,
+        );
+        try {
+          fs.rmSync(source, { force: true });
+        } catch {
+          /* ignore */
+        }
+        source = null;
+      }
       if (!source) {
         await runStreaming(
-          () => yt!.exec(url, fullOptions, { env: childEnv() } as any),
+          () => yt!.exec(url, fullOptions, ytOpts()),
           "yt-dlp (full)",
         );
         source = findDownloaded();
       }
       if (!source) throw new Error("yt-dlp produced no output");
+      if (source !== verifiedSource) {
+        if (!isReadableMedia(source)) {
+          try {
+            fs.rmSync(source, { force: true });
+          } catch {
+            /* ignore */
+          }
+          throw new Error(
+            "The downloaded video file is damaged and was discarded, so nothing could be cut from it",
+          );
+        }
+        verifiedSource = source;
+      }
 
       scaleFrom = mid;
       scaleTo = win.to;
       lastReported = mid;
       const trimArgs = isAudio
         ? [
+            "-hide_banner",
             "-y",
             "-ss",
             String(seg.start),
@@ -1643,26 +2054,14 @@ app.post("/api/download", async (req: Request, res: Response) => {
             `${quality}k`,
             out,
           ]
-        : [
-            "-y",
-            "-ss",
-            String(seg.start),
-            "-to",
-            String(seg.end),
-            "-i",
-            source,
-            "-c",
-            "copy",
-            "-movflags",
-            "+faststart",
-            out,
-          ];
+        : localTrimArgs(source, seg, out);
       await runStreaming(
         () =>
           spawn(resolvedFfmpeg as string, trimArgs, {
             env: childEnv(),
             windowsHide: true,
             shell: false,
+            detached: process.platform !== "win32",
           }),
         "ffmpeg (trim)",
       );
@@ -1713,6 +2112,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       }
 
       if (multi) {
+        throwIfCancelled();
         currentStage = stageJoining(segCount);
         publishProgress(jobId, {
           phase: "processing",
@@ -1727,19 +2127,51 @@ app.post("/api/download", async (req: Request, res: Response) => {
           totalSec,
           { isAudio, audioKbps: quality },
           {
+            // The join ffmpeg is a child of the job like any other: a cancel
+            // kills it, and once cancelled no further join attempt starts.
             run: (args) =>
-              runProcess(resolvedFfmpeg as string, args, childEnv()),
+              job.cancelled
+                ? Promise.resolve({ code: -1, stderr: "cancelled" })
+                : runProcess(
+                    resolvedFfmpeg as string,
+                    args,
+                    childEnv(),
+                    trackChild,
+                  ),
             probeDuration: (file) =>
               probeDurationSec(resolvedFfmpeg as string, file),
             log: (m) => console.log(`[server] /api/download job=${jobId} ${m}`),
           },
         );
+        throwIfCancelled();
         joinMethod = join.method;
         if (!join.durationOk) {
+          // The server's own check says this is not the clip that was marked.
+          // Delivering it as a success is how a wrong clip got silently saved;
+          // fail instead, with the pieces' measurements in the message.
+          const got =
+            join.duration === undefined
+              ? "of unreadable length"
+              : `${join.duration.toFixed(2)}s long`;
+          const msg = `The joined clip came out ${got} but the marked ranges total ${totalSec.toFixed(2)}s`;
           console.warn(
-            `[server] /api/download job=${jobId} joined clip is ${join.duration?.toFixed(2) ?? "?"}s, expected ${totalSec.toFixed(2)}s even after ${join.method}`,
+            `[server] /api/download job=${jobId} ${msg} even after ${join.method} — failing the job`,
           );
+          try {
+            fs.rmSync(outputPath, { force: true });
+          } catch {
+            /* ignore */
+          }
+          const err: any = new Error(msg);
+          err.tail = msg;
+          err.joinFailed = true;
+          throw err;
         }
+      }
+      if (!multi && fs.existsSync(segFiles[0])) {
+        // The finished segment is the clip. A rename within the temp root is
+        // atomic and leaves no `.part` behind it.
+        fs.renameSync(segFiles[0], outputPath);
       }
       built = true;
     } finally {
@@ -1764,17 +2196,19 @@ app.post("/api/download", async (req: Request, res: Response) => {
       `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
     );
     await buildClip(PLAYER_CLIENTS_PRIMARY);
+    throwIfCancelled();
 
     if (!fs.existsSync(outputPath)) {
-      // Work folder deliberately kept so the next attempt can resume.
+      // Resumable partials deliberately kept so the next attempt can resume.
       pruneWorkDir(tempDir);
+      releaseWork(false);
       const f = classifyFailure("yt-dlp produced no output");
       publishProgress(jobId, {
         phase: "error",
         percent: 0,
         message: "no output",
       });
-      return sendFailure(res, f);
+      return sendFailure(res, f, diag("yt-dlp produced no output"));
     }
 
     publishProgress(jobId, { phase: "processing", percent: 99 });
@@ -1812,7 +2246,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
       // The degraded clip is moved aside rather than deleted: if the retry
       // fails outright the user still gets a watchable clip instead of an
       // error, which is what they had before this check existed.
-      const keptPath = path.join(tempDir, `degraded.${ext}`);
+      const keptPath = path.join(clipDir, `degraded.${ext}`);
       const keptFormat = chosenFormat;
       try {
         fs.rmSync(keptPath, { force: true });
@@ -1827,6 +2261,7 @@ app.post("/api/download", async (req: Request, res: Response) => {
           throw new Error("yt-dlp produced no output");
         }
       } catch (retryErr) {
+        if (job.cancelled || retryErr instanceof CancelledError) throw retryErr;
         const why =
           retryErr instanceof Error ? retryErr.message : String(retryErr);
         console.warn(
@@ -1906,6 +2341,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
     );
 
 
+    // The clip is built: from here on it is a transfer, not a build.
+    job.building = false;
     const stat = fs.statSync(outputPath);
     publishProgress(jobId, {
       phase: "processing",
@@ -1930,6 +2367,10 @@ app.post("/api/download", async (req: Request, res: Response) => {
         percent: 100,
         ...(lowQuality ? { message: lowQuality.error } : {}),
       });
+      // The clip's only copy is in clipDir until the main process moves it, so
+      // Clear cache must leave it alone for a while after this response.
+      holdFolder(clipDir);
+      releaseWork(true);
       return res.json({
         path: outputPath,
         size: stat.size,
@@ -1988,8 +2429,12 @@ app.post("/api/download", async (req: Request, res: Response) => {
       }
       stream.destroy();
       // Only a completed transfer clears the work folder; a broken one keeps
-      // the finished clip so the retry is instant.
+      // the finished clip (held, so Clear cache leaves it for a while).
       if (ok) cleanup();
+      else {
+        holdFolder(clipDir);
+        releaseWork(true);
+      }
     };
 
 
@@ -2006,6 +2451,8 @@ app.post("/api/download", async (req: Request, res: Response) => {
     // finished segment files, the concat list and half-written joins go.
     const partial = partialBytes(tempDir);
     pruneWorkDir(tempDir);
+    releaseWork(false);
+    if (job.cancelled || e instanceof CancelledError) return sendCancelled();
     if (cookiesFromBrowser && isCookieError(e)) {
       const msg = cookieErrorMessage(cookiesFromBrowser);
       publishProgress(jobId, { phase: "error", percent: 0, message: msg });
@@ -2081,23 +2528,32 @@ app.post("/api/comments", async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   if (!binariesOk) return binaryError(res);
 
-  const options: Record<string, unknown> = {
-    dumpSingleJson: true,
-    writeComments: true,
-    noPlaylist: true,
-    noWarnings: true,
-    // Fetch every top-level comment and every reply. `all` avoids yt-dlp's
-    // default cap so nothing is truncated on large videos.
-    extractorArgs: "youtube:comment_sort=top;max_comments=all,all,all,all",
-    ...resolveCookieOptions(parsed.data.cookiesFromBrowser),
-  };
+  let options: Record<string, unknown> = {};
   try {
-    console.log(
-      `[server] /api/comments url=${parsed.data.url} options=${JSON.stringify(options)}`,
+    const info = await withRunCookies(
+      cookieModeFor(parsed.data.cookiesFromBrowser),
+      resolveCookieOptions(parsed.data.cookiesFromBrowser),
+      false,
+      (cookies) => {
+        options = {
+          dumpSingleJson: true,
+          writeComments: true,
+          noPlaylist: true,
+          noWarnings: true,
+          // Fetch every top-level comment and every reply. `all` avoids
+          // yt-dlp's default cap so nothing is truncated on large videos.
+          extractorArgs:
+            "youtube:comment_sort=top;max_comments=all,all,all,all",
+          ...cookies,
+        };
+        console.log(
+          `[server] /api/comments url=${parsed.data.url} options=${JSON.stringify(options)}`,
+        );
+        return yt!.run(parsed.data.url, options, {
+          env: childEnv(),
+        } as any);
+      },
     );
-    const info = await yt!.run(parsed.data.url, options, {
-      env: childEnv(),
-    } as any);
     const raw: RawComment[] = Array.isArray(info?.comments) ? info.comments : [];
     if (raw.length === 0 && info?.comment_count === 0) {
       return res.json({
@@ -2283,9 +2739,13 @@ app.get("/api/cache/usage", (_req: Request, res: Response) => {
 });
 
 app.post("/api/cache/clear", (_req: Request, res: Response) => {
-  const { removed } = clearCache();
-  console.log(`[server] cleared ${removed} unfinished work folder(s)`);
-  return res.json({ ok: true, removed, ...cacheUsage() });
+  // Folders a running job is writing to, and finished clips still waiting to be
+  // collected, are skipped: this clears abandoned work, nothing in flight.
+  const { removed, skipped } = clearCache();
+  console.log(
+    `[server] cleared ${removed} unfinished work folder(s), left ${skipped} in use`,
+  );
+  return res.json({ ok: true, removed, skipped, ...cacheUsage() });
 });
 
 // SPA fallback for the packaged UI — must be registered after all API routes.
@@ -2295,8 +2755,90 @@ if (uiDir && fs.existsSync(uiDir)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`[server] listening on http://localhost:${PORT}`);
+// --- Errors ---------------------------------------------------------------
+//
+// Express's default handler answers with an HTML page holding the stack trace,
+// and so the absolute install path (and the user's name in it). Every failure
+// that reaches here is answered as {error, code}, with nothing from the stack.
+// The full error goes to the server log only.
+
+app.use("/api", (req: Request, res: Response) => {
+  res
+    .status(404)
+    .json({ error: `No such endpoint: ${req.method} ${req.path.slice(0, 120)}`, code: "not_found" });
+});
+
+export function errorResponseFor(err: unknown): {
+  status: number;
+  body: { error: string; code: string };
+} {
+  const e = (err ?? {}) as { type?: string; status?: number; statusCode?: number };
+  switch (e.type) {
+    case "entity.parse.failed":
+      return {
+        status: 400,
+        body: {
+          error:
+            "The request body is not valid JSON (an object is expected).",
+          code: "invalid_json",
+        },
+      };
+    case "entity.too.large":
+      return {
+        status: 413,
+        body: {
+          error: `The request body is larger than the ${JSON_BODY_LIMIT} this server accepts.`,
+          code: "body_too_large",
+        },
+      };
+    case "encoding.unsupported":
+    case "charset.unsupported":
+      return {
+        status: 415,
+        body: {
+          error: "The request body uses an encoding this server does not accept.",
+          code: "unsupported_encoding",
+        },
+      };
+    case "request.aborted":
+    case "request.size.invalid":
+    case "stream.encoding.set":
+      return {
+        status: 400,
+        body: { error: "The request body could not be read.", code: "bad_body" },
+      };
+  }
+  const status = e.status ?? e.statusCode;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    return {
+      status,
+      body: { error: "The request could not be processed.", code: "bad_request" },
+    };
+  }
+  return {
+    status: 500,
+    body: {
+      error: "The server hit an unexpected error. Try again.",
+      code: "server_error",
+    },
+  };
+}
+
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  const { status, body } = errorResponseFor(err);
+  console.error(
+    `[server] ${req.method} ${req.path} -> ${status} ${body.code}: ${
+      err instanceof Error ? err.message : String(err)
+    }`,
+  );
+  if (res.headersSent) return next(err);
+  res.status(status).json(body);
+});
+
+// Loopback only: with no host Node binds every interface, which put the whole
+// API on the user's LAN.
+app.listen(PORT, "127.0.0.1", () => {
+  console.log(`[server] listening on http://127.0.0.1:${PORT}`);
   const swept = sweepStaleCache();
   if (swept) console.log(`[server] swept ${swept} stale work folder(s)`);
 });

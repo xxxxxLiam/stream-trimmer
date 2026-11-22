@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCampaign } from "../context/CampaignContext";
 import { useClipperContext } from "../context/ClipperContext";
-import { setBankedRanges, useSegments } from "../hooks/useSegments";
+import { useSegments } from "../hooks/useSegments";
 import {
   bankStore,
   bankedRanges,
@@ -97,6 +97,28 @@ function tierText(tier: string): string {
   return /^\d+$/.test(tier) ? `T${tier}` : tier;
 }
 
+/**
+ * What a finished cut of a banked row records: the row flips to `cut` and its ranges join the
+ * used-ranges record. Both are written against `campaignId`, the campaign the cut STARTED in. The
+ * download takes a while and the user may switch client meanwhile; `recordUse` without an id falls
+ * back to whichever campaign is active NOW, which wrote client A's range onto client B.
+ */
+export function finishBankedCut(args: {
+  campaignId: string;
+  videoId: string;
+  clipId: string;
+  markCut: (campaignId: string, videoId: string, clipId: string) => { ranges: { start: number; end: number }[] } | null;
+  recordUse: (
+    videoId: string,
+    ranges: ReadonlyArray<{ start: number; end: number }>,
+    clipId: string,
+    campaignId?: string,
+  ) => void;
+}): void {
+  const res = args.markCut(args.campaignId, args.videoId, args.clipId);
+  if (res) args.recordUse(args.videoId, res.ranges, args.clipId, args.campaignId);
+}
+
 export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps) {
   const { videoId, duration } = useClipperContext();
   const { active, recordUse, usedFor } = useCampaign();
@@ -137,9 +159,10 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
     const key = JSON.stringify(planned);
     if (appliedKey.current !== key || seg.banked.length !== planned.length) {
       appliedKey.current = key;
-      setBankedRanges(planned);
+      // The per-tab setter: a hidden tab must write to its own store, not the active tab's.
+      seg.setBanked(planned);
     }
-  }, [planned, seg.banked.length, vid]);
+  }, [planned, seg.banked.length, seg.setBanked, vid]);
 
   const visible = useMemo(
     () => sortClips(filterClips(clips, { text, categories: cats, tiers }), sort),
@@ -167,8 +190,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
       try {
         const ok = await onCutBanked(clip);
         if (ok) {
-          const res = bankStore.markCut(campaignId, vid, clip.id);
-          if (res) recordUse(vid, res.ranges, clip.id);
+          finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
         } else {
           setNotice(`${clip.id} was not cut. It stays in the bank.`);
         }
@@ -441,7 +463,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
 
   return (
     <div className={`flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 ${className ?? ""}`}>
-      <div role="tablist" aria-label="Clips" className="flex gap-1">
+      <div id="help-anchor-clips-tabs" role="tablist" aria-label="Clips" className="flex gap-1">
         {TABS.map((t, i) => (
           <button
             key={t.id}

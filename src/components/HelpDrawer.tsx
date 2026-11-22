@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CHANNEL_HELP_TASKS, HELP_TASKS, searchTasks, type HelpTask } from "../lib/helpTasks";
 import SetupChecklist from "./SetupChecklist";
 import Spotlight from "./Spotlight";
+import { isSignInGateUp, useYouTubeConnection } from "../lib/youtubeConnection";
 
 export type HelpDrawerProps = { open: boolean; onClose: () => void };
 
@@ -25,6 +26,12 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
   const [step, setStep] = useState(0);
   const [present, setPresent] = useState(true);
   const [setupOpen, setSetupOpen] = useState(false);
+  // AF2-3: the sign-in gate makes the app inert, this drawer with it. A drawer that stays drawn
+  // over the gate is visible, dead and click-through, so it is closed while the gate is up.
+  const gateUp = isSignInGateUp(useYouTubeConnection());
+  useEffect(() => {
+    if (open && gateUp) onClose();
+  }, [open, gateUp, onClose]);
   const searchRef = useRef<HTMLInputElement>(null);
   const asideRef = useRef<HTMLElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
@@ -63,7 +70,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || gateUp) return null;
 
   const pick = (id: string) => {
     setTaskId(id);
@@ -81,7 +88,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
       ref={asideRef}
       id="ui-help-drawer"
       aria-label="Help"
-      className="surface-panel flex min-h-0 w-full shrink-0 flex-col border-l border-hairline shadow-drawer md:w-[400px]"
+      className="surface-panel relative z-[55] flex min-h-0 w-full shrink-0 flex-col border-l border-hairline shadow-drawer md:w-[400px]"
     >
       <header className="flex items-center gap-2 px-4 pb-2 pt-4">
         <h2 className="flex-1 text-section">Help</h2>
@@ -209,7 +216,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
               })}
             </ol>
 
-            {!present && current && (
+            {!present && current && current.anchorId && (
               <p role="status" className="rounded-control border border-accent bg-accent-soft p-3 text-meta text-accent">
                 That control is not on screen right now. It may be on another screen or tab, or it
                 appears once a video is loaded.

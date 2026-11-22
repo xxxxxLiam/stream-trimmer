@@ -142,7 +142,11 @@ jobs:
       # The publish job below flips it public once all three have succeeded.
       - name: Build & upload installer
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Installers go to the public xxxxxLiam/clipr repo, not this one, so
+          # the source can stay private. GITHUB_TOKEN is scoped to this
+          # repository and cannot write there; RELEASES_TOKEN is a
+          # fine-grained PAT with Contents: read and write on clipr only.
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           # Public release: the channel-data tool is compiled out. Never set
           # these here; the owner's private build is made locally (see README).
           VITE_ENABLE_CHANNEL_DATA: ""
@@ -161,7 +165,10 @@ jobs:
           fetch-depth: 0
       - name: Publish the release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The draft lives in the public releases repo, so both the token and
+          # every gh call must target clipr rather than this repository.
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GH_REPO: ${{ vars.RELEASES_REPO || 'xxxxxLiam/clipr' }}
           TAG: ${{ needs.version.outputs.new_version }}
         run: |
           set -euo pipefail
@@ -184,4 +191,6 @@ jobs:
             --notes "$NOTES"
 
           echo "Published $TAG (${{ needs.version.outputs.level }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+          # $GITHUB_REPOSITORY is this (private) source repo; the release
+          # itself lives in the public one, so link that instead.
+          echo "$GITHUB_SERVER_URL/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

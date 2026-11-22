@@ -35,6 +35,7 @@ import {
   type CampaignInput,
   type UsedRange,
 } from "../lib/campaigns";
+import { bankStore } from "../lib/bank";
 import { readSetting, writeSetting } from "../lib/persist";
 
 export type { Campaign, UsedRange } from "../lib/campaigns";
@@ -183,7 +184,11 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   );
 
   const remove = useCallback(
-    (id: string) => commit(removeCampaign(campaignsRef.current, id)),
+    (id: string) => {
+      commit(removeCampaign(campaignsRef.current, id));
+      // The bank is keyed by campaign id; leaving it would keep a deleted client's list forever.
+      bankStore.removeCampaign(id);
+    },
     [commit],
   );
 

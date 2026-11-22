@@ -1,0 +1,27 @@
+=== B-5 / B-17 URL shapes ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+[channel @handle] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":""}
+[channel /c/] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":""}
+[channel /channel/] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":""}
+[playlist] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":""}
+[watch + list] {"source":"Stub video 00:00:30 Change","urlBarStillOpen":false,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[shorts] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[youtu.be] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[live/] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":"8 lines · 8 drawn"}
+[embed/] {"source":"Stub video 00:00:30 Change","urlBarStillOpen":false,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[results search] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":"8 lines · 8 drawn"}
+[bare word] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":"8 lines · 8 drawn"}
+[whitespace] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"Invalid url","status":null,"transcript":"8 lines · 8 drawn"}
+[non-youtube] {"source":"Reload","urlBarStillOpen":true,"markDisabled":true,"inValue":"","alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","status":null,"transcript":"8 lines · 8 drawn"}
+[timestamped + tracking] {"source":"Stub video 00:00:30 Change","urlBarStillOpen":false,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+[10k chars] {"source":"Reload","urlBarStillOpen":true,"markDisabled":false,"inValue":"","alert":null,"status":"00:00:30 clip · MP4","transcript":"8 lines · 8 drawn"}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b04-LIVE/01-url-last-case.png
+
+--- channel URL -> mark -> Cut as one file ---
+pane: {"rows":[],"total":"00:00:30","source":"Reload","markIn":"","markOut":"00:00:30","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":null,"alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":true,"addDisabled":true,"cancelVisible":false}
+the app refused the channel URL as a source; nothing to mark or cut
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b04-LIVE/02-channel-cut-attempt.png
+
+--- playlist URL -> mark -> Cut ---
+pane: {"rows":[],"total":"00:00:30","source":"Reload","markIn":"","markOut":"00:00:30","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":null,"alert":"That link is not a single video (a channel, playlist or other page). Paste a link to one video.","transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":true,"addDisabled":true,"cancelVisible":false}

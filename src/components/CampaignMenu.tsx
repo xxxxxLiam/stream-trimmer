@@ -61,6 +61,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** What stops this form being saved. The OTHER campaigns (not the one being edited) are passed so a
+ *  clashing name is caught (C-5). Exported for tests. */
+export function campaignFormProblems(
+  d: Pick<Draft, "name" | "clipsDir" | "dataDir" | "pattern">,
+  campaigns: readonly Pick<Campaign, "id" | "name">[],
+  editingId?: string,
+): string[] {
+  return validateCampaign(
+    { name: d.name, clipsDir: d.clipsDir, dataDir: d.dataDir, clipIdPattern: d.pattern },
+    campaigns.filter((c) => c.id !== editingId),
+  ).map(describeCampaignProblem);
+}
+
 function CampaignForm({
   editing,
   onDone,
@@ -68,7 +81,7 @@ function CampaignForm({
   editing: Campaign | null;
   onDone: (id?: string) => void;
 }) {
-  const { create, update, folders } = useCampaign();
+  const { create, update, folders, campaigns } = useCampaign();
   const { isElectron, format, quality } = useClipperContext();
   const [d, setD] = useState<Draft>(() => toDraft(editing, folders));
   const [problems, setProblems] = useState<string[]>([]);
@@ -87,12 +100,7 @@ function CampaignForm({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const found = validateCampaign({
-      name: d.name,
-      clipsDir: d.clipsDir,
-      dataDir: d.dataDir,
-      clipIdPattern: d.pattern,
-    }).map(describeCampaignProblem);
+    const found = campaignFormProblems(d, campaigns, editing?.id);
     if (found.length) {
       setProblems(found);
       return;
@@ -235,7 +243,7 @@ export default function CampaignMenu({ onClose }: { onClose?: () => void }) {
           quality, and two save folders.
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-1 p-0" role="listbox" aria-label="Campaigns">
+        <ul id="ui-campaign-list" className="m-0 flex list-none flex-col gap-1 p-0" role="listbox" aria-label="Campaigns">
           {campaigns.map((c) => {
             const selected = c.id === activeId;
             return (

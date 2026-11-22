@@ -351,7 +351,16 @@ npm run release:linux   # on Linux (x64)
 
 ## License
 
-[MIT](./LICENSE).
+Source-available, not open source. See [LICENSE](./LICENSE).
+
+Free to download and use, including for paid client work — the clips you make
+are yours. Copying, redistributing, forking or reselling the application is
+not permitted. Versions up to and including 4.0.1 were released under the MIT
+Licence and stay MIT; this applies from 4.0.2 onward.
+
+The bundled ffmpeg is GPL-3.0 and carries its own terms, which this licence
+does not override. See [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md) for
+the full component list and for how to obtain corresponding source.
 
 ## Channel data tool (private builds only)
 

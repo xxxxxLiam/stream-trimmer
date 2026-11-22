@@ -10,6 +10,8 @@ import {
   failureId,
   fenceForClipboard,
   needsDeveloper,
+  offersDeveloperDiagnostics,
+  TRANSFER_BROKEN_PREFIX,
   redact,
 } from "./diagnostics";
 
@@ -222,10 +224,11 @@ test("redactor: leaves ordinary text alone", () => {
 test("mutation: disabling any single rule makes the fixture leak", () => {
   const needed: Record<string, readonly string[]> = {
     "cookie-file-contents": ["SECRETCOOKIEVALUE"],
-    "auth-headers": ["SID=SECRETCOOKIEVALUE"],
+    "auth-headers": [], // overlaps cookie-assignment on a SID cookie; focused case below
     "cookies-flag": [],
     "cookies-option": [],
     "cookie-file-path": [],
+    "cookie-assignment": [],
     "url-secrets": [SIG, "ALsigsecret77", "203.0.113.7"],
     "po-token": [],
     "home-dir": ["/Users/samantha"],
@@ -256,6 +259,10 @@ test("mutation: rules that overlap are each load-bearing on a focused input", ()
     ["cookies-option", `{"cookies":"/tmp/z/jar-two.dat"}`, "jar-two.dat"],
     ["cookie-file-path", `read /tmp/z/my-cookies.txt ok`, "my-cookies.txt"],
     ["po-token", `po_token=${PO}`, PO],
+    ["auth-headers", `Authorization: Basic ZZAUTHVALUE77`, "ZZAUTHVALUE77"],
+    ["po-token", `{"access_token": "JSONQUOTEDTOKEN77"}`, "JSONQUOTEDTOKEN77"],
+    ["cookie-assignment", `sent __Secure-3PAPISID=BARECOOKIEVALUE77 ok`, "BARECOOKIEVALUE77"],
+    ["url-secrets", `https://rr1.googlevideo.com/videoplayback/id/PATHSTREAMID77/sig/PATHSIGVALUE77/file/v.mp4`, "PATHSIGVALUE77"],
   ];
   for (const [id, input, needle] of cases) {
     assert.ok(!redact(input, {}).includes(needle), `${id}: enabled should hide it`);
@@ -400,4 +407,47 @@ test("fence: wraps in a code block, and outgrows any fence inside the text", () 
 
 test("no em dashes in anything the module writes itself", () => {
   assert.ok(!bundle({ message: "plain", diagnostics: {} }).includes("\u2014"));
+});
+
+// --- F-19 / F-7: the pattern that let one planted marker through ------------------------------
+
+test("redactor: the googlevideo stream id parameter is stripped, the watch id is not", () => {
+  const url = "https://rr3---sn-abc.googlevideo.com/videoplayback?expire=1&ip=203.0.113.9&id=o-STREAMIDvalue99&itag=137";
+  const out = redact(url);
+  assert.ok(!out.includes("STREAMIDvalue99"), out);
+  assert.match(out, /id=REDACTED/);
+  assert.equal(redact("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123");
+});
+
+test("redactor: /root is a home directory even when it is not told so", () => {
+  const out = redact("writing /root/Videos/clips/out.mp4 and /root");
+  assert.ok(!out.includes("/root"), out);
+  assert.match(out, /~\/Videos\/clips\/out\.mp4/);
+  // A path that merely starts with the letters is left alone.
+  assert.equal(redact("/rootfs/x"), "/rootfs/x");
+});
+
+test("redactor: all nine planted markers are gone in one pass (0 of 9)", () => {
+  const planted = [
+    "Cookie: SID=SECRETsid123; HSID=SECREThsid456",
+    ".youtube.com\tTRUE\t/\tTRUE\t2000000000\tSID\tSECRETsidrowvalue999",
+    "Authorization: Bearer SECRETbearertoken_abcdefghijklmnop",
+    "access_token=SECRETaccesstoken_qrstuvwx",
+    "po_token=SECRETpotoken_0123456789",
+    "https://rr3---sn-abc.googlevideo.com/videoplayback?expire=1&ip=203.0.113.9&id=o-SECRETSTREAMID&sig=SECRETSIGVALUE",
+    "sam.clipper@example.com",
+    "/root/Videos/clips/out.mp4",
+    "--cookies /root/.config/youtube-clipper/yt-cookies.txt",
+  ].join("\n");
+  const out = redact(planted);
+  const needles = ["SECRETsid123", "SECRETsidrowvalue999", "SECRETbearertoken", "SECRETaccesstoken", "SECRETpotoken", "SECRETSTREAMID", "sam.clipper@example.com", "/root", "yt-cookies.txt"];
+  assert.deepEqual(needles.filter((n) => out.includes(n)), []);
+});
+
+test("F-8: offersDeveloperDiagnostics needs a code the engine does not list as user-fixable", () => {
+  assert.equal(offersDeveloperDiagnostics(undefined, "could not find chrome cookies database"), false);
+  assert.equal(offersDeveloperDiagnostics("unknown", "x"), true);
+  assert.equal(offersDeveloperDiagnostics("join_failed", "x"), true);
+  for (const code of USER_FIXABLE_CODES) assert.equal(offersDeveloperDiagnostics(code, "x"), false, code);
+  assert.equal(offersDeveloperDiagnostics(undefined, `${TRANSFER_BROKEN_PREFIX} before it finished.`), true);
 });

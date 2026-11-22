@@ -628,3 +628,29 @@ test("the default project name pattern includes the clip id, so names do not col
   const names = resolveProjectNames([{ id: "A", label: "same" }, { id: "B", label: "same" }], { namePattern: DEFAULT_PROJECT_PATTERN });
   assert.notEqual(names[0], names[1]);
 });
+
+// ---- D-9: one unusable clip must not take the batch down --------------------
+
+test("session batch: a clip shorter than a timeline frame is left out with a reason, the rest are exported", { skip: !hasXmllint }, async () => {
+  const probe = async (p: string) =>
+    p.includes("tiny")
+      ? { kind: "ffprobe" as const, json: { streams: [{ codec_type: "video", width: 1080, height: 1920, avg_frame_rate: "1000/1" }], format: { duration: "0.001" } } }
+      : { kind: "ffprobe" as const, json: { streams: [{ codec_type: "video", width: 1080, height: 1920, avg_frame_rate: "30/1" }], format: { duration: "5" } } };
+  const clips = [
+    { id: "G-01", path: "/c/g1.mp4", segments: [{ start: 0, end: 5 }] },
+    { id: "T-SUBFRAME", path: "/c/tiny.mp4", segments: [{ start: 0, end: 1 }] },
+    { id: "G-02", path: "/c/g2.mp4", segments: [{ start: 0, end: 5 }] },
+  ];
+  for (const project of [PROJECT, undefined]) {
+    const r = await buildSessionFcpxml(clips, "Raw", probe, { project });
+    const sub = project ? 1 : 0; // without a project the same clip is a valid one-frame asset
+    assert.equal(r.included, 2 + (1 - sub));
+    assert.equal(r.skipped.length, sub);
+    if (project) {
+      assert.equal(r.skipped[0].id, "T-SUBFRAME");
+      assert.match(r.skipped[0].reason, /shorter than one timeline frame/);
+      assert.equal(r.projectNames.length, 2);
+    }
+    assert.equal(validate(r.xml), "");
+  }
+});

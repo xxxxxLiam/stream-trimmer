@@ -1,21 +1,86 @@
-MIT License
+YouTube Clipper — Software Licence
+Copyright (c) 2025–2026 Liam. All rights reserved.
 
-Copyright (c) 2025 YouTube Clipper contributors
+This is not an open source licence. The source code is published so that it
+can be read and audited, not so that it can be reused.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Earlier releases: versions up to and including 4.0.1 were published under the
+MIT Licence. That grant cannot be withdrawn and continues to apply to those
+versions. This licence applies to every version released after 4.0.1.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+
+1. PERMISSION GRANTED
+
+You may download, install and run the compiled application, free of charge,
+on any computer you own or control, for any purpose — including paid client
+work and any other commercial use of the clips you produce.
+
+Clips, exports and other output you create with the application are yours.
+This licence claims nothing over them.
+
+You may read the published source code, and you may quote short excerpts when
+reporting a bug or a security issue.
+
+
+2. PERMISSION NOT GRANTED
+
+Without prior written permission from the copyright holder, you may not:
+
+  a. copy, publish, mirror or redistribute the application or its source,
+     whether modified or not, and whether or not you charge for it;
+
+  b. create derivative works, forks, ports or rebrandings;
+
+  c. sell, rent, lease, sublicense or offer the application as a service;
+
+  d. remove or alter any copyright, licence or attribution notice;
+
+  e. reverse engineer, decompile or disassemble the application, except to
+     the extent that this restriction cannot lawfully be excluded, or as
+     clause 3 permits.
+
+Nothing here restricts what the law gives you regardless, including fair
+dealing and any rights that cannot be excluded by contract.
+
+
+3. SECURITY RESEARCH
+
+Examining the application to find security or privacy problems is permitted,
+including taking it apart to do so. Publishing a description of what you
+found is permitted. Publishing a working copy of the application, modified or
+otherwise, is not.
+
+
+4. THIRD-PARTY COMPONENTS
+
+The application ships alongside independent programs that carry their own
+licences, which this licence does not and cannot override. In particular
+ffmpeg is distributed under the GNU General Public License v3, and your
+rights to ffmpeg come from that licence, not this one. See
+THIRD-PARTY-NOTICES.md for the full list and for how to obtain the
+corresponding source.
+
+
+5. NO WARRANTY
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+The application downloads material from third-party services. You are
+responsible for holding the rights to anything you download, and for
+complying with those services' terms.
+
+
+6. FUTURE VERSIONS
+
+The copyright holder may release future versions under different terms,
+including paid terms. Doing so does not affect your right to keep using a
+version you already have under the licence it was released with.
+
+
+Permission beyond this licence: open an issue at
+https://github.com/xxxxxLiam/stream-trimmer

@@ -16,13 +16,15 @@ import CampaignChip from "./CampaignChip";
 import HelpButton from "./HelpButton";
 import { IconChannel, IconCopy, IconSettings, IconSymbol } from "./icons";
 import { useDismiss } from "./useDismiss";
+import { CHANNEL_DATA_BUILT } from "../../lib/ownerGate";
 
 export type AppHeaderProps = {
-  screen: "workspace" | "channel";
+  /** Only ever passed in a channel-data build (App spreads it behind the compile-time flag). */
+  screen?: "workspace" | "channel";
   /** Switch screens. The channel exporter is its own screen, not a peer tab. */
-  onScreen: (s: "workspace" | "channel") => void;
-  /** Show the Channel data link. False when the feature is compiled/locked out. */
-  channelAvailable: boolean;
+  onScreen?: (s: "workspace" | "channel") => void;
+  /** Show the Channel data link. Unset when the feature is compiled out; false when locked. */
+  channelAvailable?: boolean;
   copyOpen: boolean;
   onToggleCopy: () => void;
   symbolsOpen: boolean;
@@ -97,22 +99,26 @@ export default function AppHeader(p: AppHeaderProps) {
   const settingsRef = useRef<HTMLDivElement>(null);
   useDismiss(settingsRef, p.settingsOpen, p.onCloseSettings);
 
+  // Every channel reference is behind the COMPILE-TIME flag, so a public build drops the
+  // strings entirely; testing a runtime prop here is what used to leave them in the bundle.
+  const onChannel = CHANNEL_DATA_BUILT && p.screen === "channel";
+
   return (
     <header className="relative z-30 flex min-h-header flex-wrap items-center gap-x-2 gap-y-1 border-b border-hairline px-3 py-1">
       {/* Mark only, no wordmark. role+label so it still has an accessible name. */}
-      <div className="flex items-center pr-1" role="img" aria-label="Clipper">
+      <div className="flex items-center pr-1" role="img" aria-label="Clipr">
         <BrandMark size={18} />
       </div>
 
       <CampaignChip menu={p.campaignMenu} />
-      {p.screen === "workspace" ? <SourceChip /> : <div className="flex-[1_1_0]" />}
+      {!onChannel ? <SourceChip /> : <div className="flex-[1_1_0]" />}
 
       {/* spacer */}
       <div className="flex-1" />
 
       <nav aria-label="Tools" className="flex flex-wrap items-center gap-1">
-        {p.screen === "channel" && (
-          <button type="button" className="link-quiet" onClick={() => p.onScreen("workspace")}>
+        {onChannel && (
+          <button type="button" className="link-quiet" onClick={() => p.onScreen?.("workspace")}>
             Back to clipping
           </button>
         )}
@@ -138,12 +144,12 @@ export default function AppHeader(p: AppHeaderProps) {
           <IconSymbol />
           <span>Symbols</span>
         </button>
-        {p.channelAvailable && p.screen === "workspace" && (
+        {CHANNEL_DATA_BUILT && p.channelAvailable && !onChannel && (
           <button
             type="button"
             id="ui-channel-link"
             className="link-quiet"
-            onClick={() => p.onScreen("channel")}
+            onClick={() => p.onScreen?.("channel")}
           >
             <IconChannel />
             <span>Channel data</span>

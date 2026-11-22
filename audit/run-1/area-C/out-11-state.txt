@@ -1,0 +1,24 @@
+[C11] campaigns that survived the load: 7
+[C11] campaign menu: "Acme Q4 | 0:30 to 1:00 | Edit | Remove | Beta Launch | 0:30 to 1:00 | Edit | Remove | New campaign"
+[C11] shot: /home/user/stream-trimmer/audit/out/area-C/C11-state/01-malformed-campaigns.png
+[C11] bank view with an older/malformed bank: ["This video","Bank","All saved","Import timestamps","hook","Tier 2","3 clips","Sort by tier","00:00:10 - 00:00:20","0:10","OLD1 from an older version","0:20 under","banked","Cut","Remove","00:00:30 - 00:00:40","0:10","OLD2","0:20 under","banked","Cut","Remove","00:01:40 - 00:02:10","0:30","GOOD1 GOOD1 label","hook","T2","In band","banked","Cut","Remove"]
+[C11] pageErrors so far: []
+[C11] shot: /home/user/stream-trimmer/audit/out/area-C/C11-state/02-old-shape-bank.png
+[C11] controls on a bank row: {"buttons":["Cut","Remove OLD1 from the bank"],"inputs":[],"editable":0}
+[C11] every control in the clips column: ["This video","Bank","All saved","Search the bank","Import timestamps","hook","Tier 2","Sort by tier","Cut","Remove OLD1 from the bank","Cut","Remove OLD2 from the bank","Cut","Remove GOOD1 from the bank"]
+[C11] checklist under Acme (has rows): ""
+[C11] checklist under Beta (empty bank): ""
+[C11] after removing GOOD1: "2 clips" was "3 clips"
+[C11] rows on disk: ["OLD1","OLD2"]
+[C11] re-import the same clip: Imported: 1 added.
+[C11] rows on disk after re-import: ["OLD1","OLD2","GOOD1"]
+[C11] shot: /home/user/stream-trimmer/audit/out/area-C/C11-state/03-removed-then-reimported.png
+[C11] keyboard: reached Import timestamps in 2 tabs? true
+[C11] keyboard: focus path ["INPUT:Search the bank","BUTTON:Import timestamps"]
+[C11] keyboard: focus after opening the importer is on BODY
+[C11] keyboard: landed on TEXTAREA
+[C11] keyboard: confirm button reached? "Import 1 clip"
+[C11] keyboard: imported -> ["OLD1","OLD2","GOOD1","K01"]
+[C11] shot: /home/user/stream-trimmer/audit/out/area-C/C11-state/04-keyboard-import.png
+[C11] final bank keys on disk: ["acme-q4","a-campaign-that-no-longer-exists"]
+[C11] pageErrors: []

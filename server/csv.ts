@@ -16,9 +16,24 @@ const EOL = "\r\n";
 
 // Every field is quoted, so nothing in the data needs escaping beyond the
 // quote character itself. This matches rowsToCsv() in src/lib/channel.ts.
+//
+// A spreadsheet reads a cell that starts with = + - @ (or a tab / CR / LF) as a
+// formula, and the text here is written by strangers (comments, captions). Such
+// a cell is prefixed with a single quote, the conventional neutraliser: the
+// spreadsheet shows the text, and the field is still plain RFC 4180. Numbers
+// (typeof number, or a string that is just a decimal) are left alone, so a
+// negative like_count is not turned into text.
+const FORMULA_START = /^[=+\-@\t\r\n]/;
+const PLAIN_NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
+
+export function neutraliseFormula(s: string): string {
+  return FORMULA_START.test(s) && !PLAIN_NUMBER.test(s) ? `'${s}` : s;
+}
+
 export function csvCell(value: unknown): string {
   const s = value == null ? "" : String(value);
-  return `"${s.replace(/"/g, '""')}"`;
+  const safe = typeof value === "number" ? s : neutraliseFormula(s);
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 export function csvLine(columns: string[], row: Record<string, unknown>): string {

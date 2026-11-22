@@ -201,9 +201,18 @@ export function isPathDelivery(
 
 // RFC 4180-ish CSV with a UTF-8 BOM so Excel handles emoji and non-Latin text.
 export function rowsToCsv(columns: string[], rows: CsvRow[]): string {
+  // Same rule as csvCell() in server/csv.ts, byte for byte: a text cell that a
+  // spreadsheet would read as a formula (leading = + - @ tab CR LF) gets a
+  // leading single quote; real numbers and plain decimal strings are left alone.
+  const FORMULA_START = /^[=+\-@\t\r\n]/;
+  const PLAIN_NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
   const escape = (v: unknown): string => {
     const s = v == null ? "" : String(v);
-    return `"${s.replace(/"/g, '""')}"`;
+    const safe =
+      typeof v !== "number" && FORMULA_START.test(s) && !PLAIN_NUMBER.test(s)
+        ? `'${s}`
+        : s;
+    return `"${safe.replace(/"/g, '""')}"`;
   };
   const lines = [columns.map(escape).join(",")];
   for (const row of rows) {
@@ -315,9 +324,22 @@ export function buildExportFiles(data: ChannelExportRows): ExportFile[] {
 }
 
 // `<channel>-export-YYYY-MM-DD`
-export function buildExportFolderName(channelName: string): string {
-  const date = new Date().toISOString().slice(0, 10);
-  return `${sanitizeFilename(channelName || "channel")}-export-${date}`;
+/**
+ * One folder per run. The name used to be channel + date, so a second export of
+ * the same channel on the same day was moved into the first one's folder:
+ * files of the same name were overwritten, files only one run had were left
+ * behind, and the surviving summary.csv described neither. Time of day plus a
+ * short random suffix makes every run its own folder.
+ */
+export function buildExportFolderName(
+  channelName: string,
+  now: Date = new Date(),
+  runId: string = Math.random().toString(36).slice(2, 6).padEnd(4, "0"),
+): string {
+  const iso = now.toISOString();
+  const date = iso.slice(0, 10);
+  const time = iso.slice(11, 19).replace(/:/g, "");
+  return `${sanitizeFilename(channelName || "channel")}-export-${date}-${time}-${runId}`;
 }
 
 // Accepts @handle, /channel/UC…, /c/name, /user/name, and tab links under them.

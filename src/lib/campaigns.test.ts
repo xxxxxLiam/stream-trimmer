@@ -10,6 +10,7 @@ import {
   clipNumber,
   countUsedRanges,
   createCampaign,
+  DATA_FOLDER_NAME,
   defaultDataDir,
   defaultPrefix,
   formatClipId,
@@ -34,12 +35,12 @@ test("first run starts with no campaigns", () => {
   assert.deepEqual(normalizeCampaigns([]), []);
 });
 
-test("create gives unique ids and defaults dataDir to a sibling channel-data", () => {
+test("create gives unique ids and defaults dataDir to a sibling data folder", () => {
   const a = createCampaign([], { name: "Daily Shorts", clipsDir: "/v/clips" });
   const b = createCampaign(a.campaigns, { name: "Daily Shorts", clipsDir: "/v/other" });
-  assert.equal(a.campaign.id, "daily-shorts");
-  assert.equal(b.campaign.id, "daily-shorts-2");
-  assert.equal(a.campaign.dataDir, "/v/channel-data");
+  assert.notEqual(a.campaign.id, b.campaign.id);
+  assert.equal(b.campaign.name, "Daily Shorts 2");
+  assert.equal(a.campaign.dataDir, `/v/${DATA_FOLDER_NAME}`);
   assert.equal(b.campaigns.length, 2);
 });
 
@@ -53,31 +54,31 @@ test("create keeps the band ordered", () => {
 test("update patches one campaign and never the id or used ranges", () => {
   const a = make("A");
   const b = createCampaign([a], { name: "B", clipsDir: "/b" });
-  const next = updateCampaign(b.campaigns, "a", {
+  const next = updateCampaign(b.campaigns, a.id, {
     name: "  Renamed ",
     id: "hack",
     usedRanges: { v: [] },
   } as never);
   assert.equal(next[0].name, "Renamed");
-  assert.equal(next[0].id, "a");
+  assert.equal(next[0].id, a.id);
   assert.deepEqual(next[0].usedRanges, {});
   assert.equal(next[1], b.campaigns[1]);
 });
 
 test("remove and resolveActiveId", () => {
   const a = make("A");
-  const both = createCampaign([a], { name: "B", clipsDir: "/b" }).campaigns;
-  const left = removeCampaign(both, "a");
-  assert.deepEqual(left.map((c) => c.id), ["b"]);
-  assert.equal(resolveActiveId(left, "a"), "b");
-  assert.equal(resolveActiveId(left, "b"), "b");
-  assert.equal(resolveActiveId([], "a"), null);
+  const b = createCampaign([a], { name: "B", clipsDir: "/b" });
+  const left = removeCampaign(b.campaigns, a.id);
+  assert.deepEqual(left.map((c) => c.id), [b.campaign.id]);
+  assert.equal(resolveActiveId(left, a.id), b.campaign.id);
+  assert.equal(resolveActiveId(left, b.campaign.id), b.campaign.id);
+  assert.equal(resolveActiveId([], a.id), null);
 });
 
 test("defaultDataDir is a sibling of clipsDir, separator-aware", () => {
-  assert.equal(defaultDataDir("/Users/me/Clips/"), "/Users/me/channel-data");
-  assert.equal(defaultDataDir("C:\\Users\\me\\Clips"), "C:\\Users\\me\\channel-data");
-  assert.equal(defaultDataDir("/clips"), "/channel-data");
+  assert.equal(defaultDataDir("/Users/me/Clips/"), `/Users/me/${DATA_FOLDER_NAME}`);
+  assert.equal(defaultDataDir("C:\\Users\\me\\Clips"), `C:\\Users\\me\\${DATA_FOLDER_NAME}`);
+  assert.equal(defaultDataDir("/clips"), `/${DATA_FOLDER_NAME}`);
 });
 
 test("clips and data folders may not be the same", () => {
@@ -170,4 +171,39 @@ test("normalizeCampaigns drops junk, dedupes ids and repairs fields", () => {
   assert.equal(out[0].targetMaxSec, 90);
   assert.deepEqual(out[0].usedRanges.v, [{ start: 1, end: 2, clipId: "x" }]);
   assert.equal(out[1].format, "mp4");
+});
+
+test("a new campaign's id is not a function of its name, so a reused name never reuses an id", () => {
+  const a = createCampaign([], { name: "Acme Q4" }).campaign;
+  const { campaign: b } = createCampaign([], { name: "Acme Q4" });
+  assert.notEqual(a.id, "acme-q4");
+  assert.notEqual(a.id, b.id);
+  // Collisions with a taken id are skipped.
+  const seq = ["x", "x", "y"];
+  const { campaign: c } = createCampaign([{ ...a, id: "x" }], { name: "Other" }, () => seq.shift()!);
+  assert.equal(c.id, "y");
+});
+
+test("ids already stored (slugs from older versions) load and update unchanged", () => {
+  const old = normalizeCampaigns([{ id: "acme-q4", name: "Acme Q4", usedRanges: {} }]);
+  assert.equal(old[0].id, "acme-q4");
+  assert.equal(updateCampaign(old, "acme-q4", { clipsDir: "/z" })[0].id, "acme-q4");
+});
+
+test("two campaigns cannot carry the same name (create, rename, validation)", () => {
+  const first = createCampaign([], { name: "Acme Q4" });
+  const second = createCampaign(first.campaigns, { name: "acme q4" });
+  assert.equal(second.campaign.name, "acme q4 2");
+  const beta = createCampaign(first.campaigns, { name: "Beta" });
+  const renamed = updateCampaign(beta.campaigns, beta.campaign.id, { name: "Acme Q4" });
+  assert.equal(renamed[1].name, "Acme Q4 2");
+  assert.equal(updateCampaign(first.campaigns, first.campaign.id, { name: "Acme Q4" })[0].name, "Acme Q4", "own name is fine");
+  const base = { clipsDir: "", dataDir: "", clipIdPattern: "{nn}" };
+  assert.deepEqual(validateCampaign({ ...base, name: "Acme Q4" }, first.campaigns), ["name-taken"]);
+  assert.deepEqual(validateCampaign({ ...base, name: "Acme Q4" }), []);
+});
+
+test("a build without the exporter does not name it in the suggested folder", () => {
+  assert.equal(DATA_FOLDER_NAME, "data"); // tests run in the public shape
+  assert.equal(defaultDataDir("/v/clips"), "/v/data");
 });

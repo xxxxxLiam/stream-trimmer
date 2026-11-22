@@ -1,0 +1,36 @@
+=== B-6 cancel ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+
+--- 1. Cancel in the UI during a stalled cut ---
+yt-dlp before: 0
+during the cut: 1 yt-dlp process(es)
+    31043       4 node /tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/
+UI: {"rows":["1 00:00:02 to 00:00:12 0:10 line 0 alpha says something"],"total":"00:00:10","source":"Cancel video 00:00:30 Change","markIn":"","markOut":"","timelineSegments":2,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":true,"addDisabled":true,"cancelVisible":true}
+Cancel button present: 1
+  +2000ms after Cancel: 0 yt-dlp process(es) still running
+  +6000ms after Cancel: 0 yt-dlp process(es) still running
+  +7000ms after Cancel: 0 yt-dlp process(es) still running
+UI after Cancel: {"rows":["1 00:00:02 to 00:00:12 0:10 line 0 alpha says something"],"total":"00:00:10","source":"Cancel video 00:00:30 Change","markIn":"","markOut":"","timelineSegments":2,"bankedOnTimeline":0,"bankRows":3,"status":"","alert":null,"transcriptHeader":"8 lines · 8 drawn","transcriptRows":8,"cutDisabled":false,"addDisabled":true,"cancelVisible":false}
+shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b07-LIVE/01-after-cancel.png
+clips dir: []
+
+--- 2. the published contract: POST /api/download/cancel and a 499 ---
+{
+  "cancelStatus": 200,
+  "cancelBody": "{\"ok\":true,\"found\":true}",
+  "downloadStatus": 499,
+  "downloadBody": "{\"error\":\"Cancelled\",\"code\":\"cancelled\",\"cancelled\":true}",
+  "unknownJob": {
+    "status": 200,
+    "body": "{\"ok\":true,\"found\":false}"
+  },
+  "noJobId": {
+    "status": 400,
+    "body": "{\"error\":\"jobId is required\"}"
+  }
+}
+yt-dlp after the direct cancel: 0
+
+--- 3. SIGKILL the app mid-cut ---
+before SIGKILL: 1 yt-dlp process(es)
+6s after the app was killed: 0 yt-dlp process(es) still running

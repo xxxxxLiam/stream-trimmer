@@ -8,6 +8,7 @@
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
+const { resolveTarget } = require("./pathSafety.cjs");
 
 // The engine writes every export into a folder named with this prefix, under
 // the OS temp dir. Anything else is not something this app produced.
@@ -23,9 +24,14 @@ const EXPORT_PREFIX = "ytchan-";
  *
  * The paths come back from the local engine, but are never trusted blindly —
  * a move is only performed for a file sitting directly inside a `ytchan-`
- * folder in the temp dir. Returns { ok, path } or { ok:false, error }.
+ * folder in the temp dir.
+ *
+ * The DESTINATION is checked too, on the resolved path: the export folder must
+ * sit strictly inside `dirPath` (so `folder: ".."` cannot climb out), and when
+ * `allowedRoots` is given `dirPath` must be inside one of them. Returns
+ * { ok, path } or { ok:false, error }.
  */
-async function saveExportFiles({ dirPath, folder, files, tmpRoot }) {
+async function saveExportFiles({ dirPath, folder, files, tmpRoot, allowedRoots }) {
   if (
     typeof dirPath !== "string" ||
     typeof folder !== "string" ||
@@ -38,8 +44,9 @@ async function saveExportFiles({ dirPath, folder, files, tmpRoot }) {
   }
 
   const root = fs.realpathSync(tmpRoot);
-  const safeFolder = folder.replace(/[\\/]/g, "_");
-  const target = path.join(dirPath, safeFolder);
+  const resolved = resolveTarget({ dirPath, name: folder, roots: allowedRoots });
+  if (!resolved.ok) return { ok: false, error: resolved.error };
+  const target = resolved.target;
   await fsp.mkdir(target, { recursive: true });
 
   const sourceDirs = new Set();
@@ -68,8 +75,9 @@ async function saveExportFiles({ dirPath, folder, files, tmpRoot }) {
     }
     sourceDirs.add(parent);
 
-    const safeName = file.name.replace(/[\\/]/g, "_");
-    const dest = path.join(target, safeName);
+    const named = resolveTarget({ dirPath: target, name: file.name });
+    if (!named.ok) return { ok: false, error: "Invalid save payload" };
+    const dest = named.target;
     try {
       await fsp.rename(source, dest);
     } catch (err) {

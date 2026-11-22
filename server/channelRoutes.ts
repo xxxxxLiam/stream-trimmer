@@ -6,7 +6,7 @@
  * to channelRoutes.stub.ts in a public build: the code then never enters the
  * packaged bundle at all, rather than sitting in it unreachable.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,9 +23,12 @@ import {
   writeCsvFromJsonl,
 } from "./csv";
 import { CookieJarMissingError, acquireCookiePath, type CookieLease } from "./cookieJar";
+// @ts-ignore -- plain CommonJS shared with the main process; no type file.
+import { hashMachineId, readMachineId } from "../electron/machineId.cjs";
 import {
   EXPORT_PREFIX,
   appendJsonl,
+  markInUse,
   readJson,
   readJsonl,
   workDir,
@@ -50,6 +53,11 @@ export interface ChannelDeps {
   childEnv: () => NodeJS.ProcessEnv;
   appCookieFile: () => string | null;
   resolveCookieOptions: (source: string | undefined) => Record<string, unknown>;
+  /**
+   * Optional owner check supplied by the host. When absent the server decides
+   * from the same VITE_OWNER_MACHINES / VITE_OWNER_SALT the UI is built with.
+   */
+  isOwnerMachine?: () => boolean | Promise<boolean>;
   parseVtt: (raw: string) => Array<{ start: number; end: number; text: string }>;
   fullErrMessage: (e: unknown) => string;
   logYtError: (
@@ -62,6 +70,147 @@ export interface ChannelDeps {
 
 // Set by registerChannelRoutes before any handler can run.
 let D!: ChannelDeps;
+
+// ---------------------------------------------------------------------------
+// Owner gate, server half. The renderer hides the tool from anyone not on the
+// build's owner list; that alone leaves the routes live for any local caller.
+// This is the same decision made where it cannot be skipped. The machine id is
+// read here, in the main process (the server runs inside it), and compared
+// against the same salted-hash list the UI uses; nothing but the yes/no ever
+// leaves. Fails closed: no list, no salt, or an unreadable id all mean no.
+// ---------------------------------------------------------------------------
+const ANY_MACHINE = "*";
+
+export function parseOwnerList(raw: string | undefined | null): string[] {
+  return String(raw ?? "")
+    .split(",")
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** Pure decision, mirroring src/lib/ownerGate.ts decideAccess. */
+export function decideOwnerAccess(input: {
+  list: string[];
+  salt: string;
+  machineId: string | null;
+}): boolean {
+  if (input.list.includes(ANY_MACHINE)) return true;
+  if (input.list.length === 0 || !input.salt || !input.machineId) return false;
+  return input.list.includes(hashMachineId(input.machineId, input.salt));
+}
+
+// Literal `process.env.X` reads, so scripts/build-server.cjs can bake the values
+// into an owner build (esbuild `define` only matches the literal form). In a
+// public build this whole module is replaced by a stub.
+function bakedSetting(name: string): string {
+  if (name === "VITE_OWNER_MACHINES") return String(process.env.VITE_OWNER_MACHINES ?? "");
+  if (name === "VITE_OWNER_SALT") return String(process.env.VITE_OWNER_SALT ?? "");
+  return "";
+}
+
+function ownerSetting(name: string): string {
+  const fromEnv = bakedSetting(name).trim();
+  if (fromEnv) return fromEnv;
+  // `npm run dev:server` does not load .env. Never in the packaged app.
+  if (process.env.ELECTRON_RESOURCES) return "";
+  try {
+    const raw = fs.readFileSync(path.join(process.cwd(), ".env"), "utf8");
+    const line = raw.split(/\r?\n/).find((l) => l.startsWith(`${name}=`));
+    return (line ? line.split("=").slice(1).join("=") : "").trim();
+  } catch {
+    return "";
+  }
+}
+
+let ownerVerdict: Promise<boolean> | null = null;
+function isOwnerMachine(): Promise<boolean> {
+  if (D.isOwnerMachine) return Promise.resolve(D.isOwnerMachine()).catch(() => false);
+  if (!ownerVerdict) {
+    ownerVerdict = (async () => {
+      try {
+        const list = parseOwnerList(ownerSetting("VITE_OWNER_MACHINES"));
+        const salt = ownerSetting("VITE_OWNER_SALT");
+        const machineId = list.includes(ANY_MACHINE) ? null : await readMachineId();
+        return decideOwnerAccess({ list, salt, machineId });
+      } catch {
+        return false;
+      }
+    })();
+  }
+  return ownerVerdict;
+}
+
+/**
+ * Wraps a handler so a non-owner machine sees exactly what an unregistered
+ * route gives: Express's own 404, via next(). No message, no hint it exists.
+ */
+function ownerOnly(
+  handler: (req: Request, res: Response) => unknown,
+): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    void isOwnerMachine().then((ok) => {
+      if (!ok) return next();
+      return Promise.resolve(handler(req, res)).catch((e) => {
+        if (!res.headersSent) res.status(500).json({ error: D.fullErrMessage(e) });
+      });
+    });
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Live checkpoints. They get their own prefix, deliberately NOT EXPORT_PREFIX:
+// "ytchan-" is what the resume cache's Clear button sweeps, and that sweep
+// used to delete a running export's files out from under it. "ytchan-" stays
+// for the finished CSV folders, which is what export:save expects.
+// ---------------------------------------------------------------------------
+const CHECKPOINT_PREFIX = "ytchanwip-";
+const CHECKPOINT_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Checkpoint folders owned by a request that is running right now. */
+const activeCheckpoints = new Set<string>();
+
+class CheckpointLostError extends Error {
+  constructor(file: string) {
+    super(
+      `The export's working folder disappeared mid-run (${path.basename(file)}), so the result would be incomplete. Nothing was saved. Run it again.`,
+    );
+  }
+}
+
+/**
+ * Append to a live checkpoint, loudly. The file is created up front, so one
+ * that is missing now has been deleted, and appending would quietly start a
+ * new file that holds only what came after.
+ */
+function appendCheckpoint(file: string, rows: unknown[]): void {
+  if (rows.length === 0) return;
+  if (!fs.existsSync(file)) throw new CheckpointLostError(file);
+  try {
+    fs.appendFileSync(file, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException)?.code === "ENOENT")
+      throw new CheckpointLostError(file);
+    throw e;
+  }
+}
+
+function sweepStaleCheckpoints(): void {
+  const root = os.tmpdir();
+  try {
+    for (const n of fs.readdirSync(root)) {
+      if (!n.startsWith(CHECKPOINT_PREFIX)) continue;
+      const dir = path.join(root, n);
+      try {
+        if (fs.statSync(dir).mtimeMs < Date.now() - CHECKPOINT_STALE_MS)
+          fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* in use or already gone */
+      }
+    }
+  } catch {
+    /* no temp dir to read */
+  }
+}
 
 interface RawComment {
   id?: string;
@@ -470,8 +619,9 @@ function cancelChannelJob(jobId: string) {
 
 export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
   D = deps;
+  sweepStaleCheckpoints();
 
-  app.post("/api/channel/export", async (req: Request, res: Response) => {
+  app.post("/api/channel/export", ownerOnly(async (req: Request, res: Response) => {
     const parsed = buildChannelExportSchema().safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -506,14 +656,10 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
     );
 
 
-    res.on("close", () => {
-      if (!res.writableEnded) cancelChannelJob(jobId);
-    });
-
     // Checkpoint folder keyed on everything that changes what gets exported.
     // Rows are flushed to disk per video, so a failure, a cancel or a quit only
     // costs the video in flight — the rerun continues from the next one.
-    const ckDir = workDir(EXPORT_PREFIX, [
+    const ckDir = workDir(CHECKPOINT_PREFIX, [
       base,
       input.contentType,
       input.limit,
@@ -521,6 +667,25 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
       input.includeComments,
       input.includeTranscripts,
     ]);
+    // Two runs of the same request share one checkpoint folder: both append
+    // to it (doubled rows), and whichever finishes first deletes it from under
+    // the other (header-only CSVs). The second is refused, before it can touch
+    // the folder. Different requests have different folders and run freely.
+    if (activeCheckpoints.has(ckDir)) {
+      return res.status(409).json({
+        error:
+          "This export is already running. Wait for it to finish, or cancel it, before starting it again.",
+      });
+    }
+    activeCheckpoints.add(ckDir);
+    // Clear cache skips a folder that is marked in use (resumeCache.ts). Our
+    // checkpoint prefix already keeps it out of that sweep; this is the shared
+    // mechanism on top, so either one alone keeps the run safe.
+    const releaseInUse = markInUse(ckDir);
+
+    res.on("close", () => {
+      if (!res.writableEnded) cancelChannelJob(jobId);
+    });
     const ckSelection = path.join(ckDir, "selection.json");
     const ckMetadata = path.join(ckDir, "metadata.jsonl");
     const ckComments = path.join(ckDir, "comments.jsonl");
@@ -551,7 +716,28 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
       videos: Record<string, unknown>[];
       selected: { id: string; title: string }[];
     }
-    const saved = readJson<Checkpoint>(ckSelection);
+    let saved = readJson<Checkpoint>(ckSelection);
+
+    // Which live files this run depends on. Created empty up front so that a
+    // file missing later means "deleted", never "nothing was collected".
+    const liveFiles = [
+      ckStatuses,
+      ...(input.includeComments ? [ckComments] : []),
+      ...(input.includeTranscripts ? [ckTranscripts] : []),
+    ];
+    // A resumed run whose rows have gone missing cannot be trusted: the
+    // statuses say those videos were collected, so they would be skipped and
+    // their comments silently absent. Start over rather than resume into a hole.
+    if (saved && liveFiles.some((f) => !fs.existsSync(f))) {
+      clearCheckpoint();
+      saved = null;
+    }
+    try {
+      fs.mkdirSync(ckDir, { recursive: true });
+      for (const f of liveFiles) fs.closeSync(fs.openSync(f, "a"));
+    } catch {
+      /* the first append reports it if the folder really is unusable */
+    }
 
     // In "path" mode comments and transcripts are never accumulated: they go to
     // the JSONL checkpoint as they are collected and are streamed from there
@@ -606,6 +792,12 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
         };
       }
 
+      // The CSVs are streamed out of the live files. A missing one has been
+      // deleted (it was created empty at the start), and streaming "nothing"
+      // from it would write an empty CSV and call the run a success.
+      for (const f of liveFiles.filter((x) => x !== ckStatuses)) {
+        if (!fs.existsSync(f)) throw new CheckpointLostError(f);
+      }
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), EXPORT_PREFIX));
       const at = (name: string) => path.join(outDir, name);
       // Only the requested CSVs are written. An unasked-for part yields no file
@@ -946,9 +1138,11 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
           statuses.push(statusRow);
           // Flush this video to the checkpoint before moving on, so an
           // interruption never costs more than the video in flight.
-          appendJsonl(ckComments, videoComments);
-          appendJsonl(ckTranscripts, videoTranscripts);
-          appendJsonl(ckStatuses, [statusRow]);
+          // Strict: a checkpoint deleted under us must stop the run, not turn
+          // the rest of the export into an empty file reported as a success.
+          appendCheckpoint(ckComments, videoComments);
+          appendCheckpoint(ckTranscripts, videoTranscripts);
+          appendCheckpoint(ckStatuses, [statusRow]);
         }
       }
 
@@ -973,10 +1167,15 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
           total: videos.length,
         });
         if (res.writableEnded || res.destroyed) return;
-        return res.json(buildResponse(true));
+        try {
+          return res.json(buildResponse(true));
+        } catch (err) {
+          return res.status(500).json({ error: D.fullErrMessage(err) });
+        }
       }
       D.logYtError("/api/channel/export", input.url, { base }, e);
-      const msg = D.fullErrMessage(e);
+      const msg =
+        e instanceof CheckpointLostError ? e.message : D.fullErrMessage(e);
       publishChannel(jobId, {
         phase: "error",
         current: 0,
@@ -985,17 +1184,20 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
       });
       if (res.writableEnded || res.destroyed) return;
       return res.status(500).json({ error: msg });
+    } finally {
+      activeCheckpoints.delete(ckDir);
+      releaseInUse();
     }
-  });
+  }));
 
-  app.post("/api/channel/export/cancel", (req: Request, res: Response) => {
+  app.post("/api/channel/export/cancel", ownerOnly((req: Request, res: Response) => {
     const jobId = String((req.body ?? {}).jobId || "");
     if (!jobId) return res.status(400).json({ error: "Missing jobId" });
     cancelChannelJob(jobId);
     res.json({ ok: true });
-  });
+  }));
 
-  app.get("/api/channel/export/progress", (req: Request, res: Response) => {
+  app.get("/api/channel/export/progress", ownerOnly((req: Request, res: Response) => {
     const jobId = String(req.query.jobId || "");
     if (!jobId) return res.status(400).end();
     res.setHeader("Content-Type", "text/event-stream");
@@ -1020,5 +1222,5 @@ export function registerChannelRoutes(app: Express, deps: ChannelDeps): void {
       clearInterval(ping);
       job.clients.delete(res);
     });
-  });
+  }));
 }

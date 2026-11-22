@@ -51,7 +51,7 @@ export default function DownloadsPanel() {
 
   // Unfinished downloads and exports are kept so a failed run can pick up
   // where it stopped; this shows how much room they take and offers to clear.
-  const [cache, setCache] = useState<{ folders: number; bytes: number } | null>(
+  const [cache, setCache] = useState<{ folders: number; bytes: number; protectedFolders?: number } | null>(
     null,
   );
   const [clearing, setClearing] = useState(false);
@@ -60,7 +60,7 @@ export default function DownloadsPanel() {
     try {
       const res = await fetch(apiUrl("/api/cache/usage"));
       if (!res.ok) return;
-      setCache((await res.json()) as { folders: number; bytes: number });
+      setCache((await res.json()) as { folders: number; bytes: number; protectedFolders?: number });
     } catch {
       setCache(null);
     }
@@ -136,8 +136,9 @@ export default function DownloadsPanel() {
       {cache && cache.bytes > 0 && (
         <div className="flex items-center justify-between gap-3 rounded-control border border-hairline bg-panel-raised px-3 py-2">
           <span className="min-w-0 text-meta text-fg-dim">
-            {formatBytes(cache.bytes)} of partial downloads kept so a failed
-            cut or export can resume.
+            {formatBytes(cache.bytes)} of unfinished downloads kept so a failed
+            cut or export can resume. Clearing leaves anything still running,
+            and clips waiting to be saved, alone.
           </span>
           <button
             type="button"
@@ -146,7 +147,7 @@ export default function DownloadsPanel() {
             className="btn shrink-0 text-[12px]"
           >
             <Trash size={12} />
-            <span>{clearing ? "Clearing…" : "Clear partials"}</span>
+            <span>{clearing ? "Clearing…" : "Clear unfinished"}</span>
           </button>
         </div>
       )}
@@ -158,9 +159,10 @@ export default function DownloadsPanel() {
       ) : (
         <ul className="flex flex-col gap-1.5">
           <AnimatePresence initial={false}>
-            {downloads.map((entry) => (
+            {downloads.map((entry, rowIndex) => (
               <motion.li
                 key={entry.id}
+                id={rowIndex === 0 ? "ui-saved-clip" : undefined}
                 layout
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}

@@ -65,7 +65,7 @@ symbol palette, help drawer. Plus two modals: YouTube sign-in and setup.
 | GET | `/api/comments` | Top comments |
 | POST | `/api/download` | Starts a clip download (one or many segments) |
 | GET | `/api/download/progress` | Progress stream for a download |
-| GET | `/api/auth/youtube/status` | Whether a usable session is on disk |
+| POST | `/api/auth/youtube/status` | Whether a usable session is on disk |
 | GET | `/api/cache/usage` | Disk used by the temp cache |
 | POST | `/api/cache/clear` | Empties the temp cache |
 | POST | `/api/channel/export` | Owner only. Whole-channel CSV export |

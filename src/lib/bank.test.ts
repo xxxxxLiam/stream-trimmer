@@ -16,6 +16,7 @@ import {
   facets,
   filterClips,
   importClips,
+  removeCampaignBank,
   markCut,
   nextBankId,
   normalizeBank,
@@ -212,4 +213,13 @@ test("persistence: a new store over the same storage sees the same bank", () => 
   assert.equal(clip.segments.length, 2);
   a.remove(C, V, "nope");
   assert.equal(notified, 2, "a no-op does not notify or save");
+});
+
+test("removeCampaignBank drops one campaign's whole bank and leaves the rest", () => {
+  const d: BankData = { ...seeded(), other: { [V]: [{ id: "Z", label: "", segments: [{ start: 1, end: 2 }], status: "banked" as const }] } };
+  const next = removeCampaignBank(d, C);
+  assert.equal(C in next, false);
+  assert.equal(next.other[V].length, 1);
+  assert.ok(C in d, "input not mutated");
+  assert.equal(removeCampaignBank(d, "absent"), d);
 });

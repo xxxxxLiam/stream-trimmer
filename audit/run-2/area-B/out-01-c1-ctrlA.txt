@@ -1,0 +1,30 @@
+=== C-1 negative control ===
+ROOT=/tmp/claude-0/-home-user-stream-trimmer/fbb59225-b5c7-558d-a212-aff901156a0b/scratchpad/b2/ctrlA
+TAG=ctrlA-prefix
+
+[booted] alive rootChildren=1 bodyLen=664 panes=1 boundary=false answering=true reactErrors=0
+bank seeded as: {"auditc":{"aaaaaaaaaaa":[{"id":"A01","label":"hook","segments":[{"start":60,"end":90}],"status":"banked"}]}}
+[tab1 loaded AAA] alive rootChildren=1 bodyLen=774 panes=1 boundary=false answering=true reactErrors=0
+    pane: {"rows":[],"total":"00:00:00","source":"Loading","markIn":"","markOut":"","timelineSegments":0,"bankedOnTimeline":0,"bankRows":3,"status":"Loading the video","alert":null,"transcriptHeader":"","transcriptRows":0,"cutDisabled":true,"addDisabled":true,"cancelVisible":false}
+    clips column: This video Bank All saved Import timestamps 1 clips Sort by tier 00:01:00 - 00:01:30 0:30 A01 hook In band banked Cut Remove
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b01-c1-ctrlA-prefix/01-tab1-aaa-with-bank.png
+[second tab opened (no video yet)] *** CRASHED *** rootChildren=0 bodyLen=0 panes=0 boundary=false answering=true reactErrors=2
+      [error] Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional he
+      Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful wa
+    shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b01-c1-ctrlA-prefix/02-two-tabs-second-empty.png
+
+VERDICT[ctrlA-prefix]: crashed at "second tab opened (no video yet)"
+console errors:
+  [error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED
+  [error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED
+  [error] Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at Yt (http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:40:33787)
+    at G0 (http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:38:19839)
+    at http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:38:19702
+    at http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:64:14698
+    at Set.forEach (<anonymous>)
+    at tr (http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:64:14687)
+    at G3 (http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:64:15196)
+    at http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:74:5643
+    at $a (http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:40:24263)
+    at ns (http://127.0.0.1:40633/assets/index-CQ1UlzNM.js:40:42318)

@@ -271,6 +271,10 @@ function main() {
 
   if (has("--write-comments")) {
     record("comments");
+    // FAKE_COMMENT_DELAY_MS holds each comment scrape open, so a test can act
+    // on the server while an export is demonstrably mid-run.
+    const delay = num("FAKE_COMMENT_DELAY_MS", 0);
+    if (delay > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
     if (NO_COMMENTS.has(id)) {
       return fail("ERROR: Comments are disabled for this video\n");
     }

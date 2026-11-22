@@ -10,6 +10,34 @@ import { useClipperContext } from "../../context/ClipperContext";
 import { formatBytes, formatTimestamp } from "../../lib/clip";
 import { useSegments } from "../../hooks/useSegments";
 import { CopyFailureDiagnostics } from "../DiagnosticsDisclosure";
+import { redact } from "../../lib/diagnostics";
+import type { DownloadFailureInfo } from "../../hooks/useClipper";
+
+/**
+ * The engine's text can carry its raw stderr: cookie rows, bearer tokens, the user's email, home
+ * paths (F-7). Everything the bar prints from an error goes through here, so the screen shows what
+ * the copied report shows: redacted.
+ */
+export function displayError(error: string, failure: DownloadFailureInfo | null): string {
+  return redact(error, { homeDir: failure?.diagnostics?.homeDir });
+}
+
+/** The alert above the status strip: the failure sentence and, when it is the developer's, Copy diagnostics. */
+export function FailureAlert({ error, failure }: { error: string; failure: DownloadFailureInfo | null }) {
+  return (
+    <div role="alert" className="card-alert flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-body">
+      <span className="min-w-0 flex-[1_1_200px]">{displayError(error, failure)}</span>
+      {failure && failure.message === error ? (
+        <CopyFailureDiagnostics
+          code={failure.code}
+          message={failure.message}
+          attempt={failure.attempt}
+          diagnostics={failure.diagnostics}
+        />
+      ) : null}
+    </div>
+  );
+}
 
 export default function DownloadBar() {
   const {
@@ -38,8 +66,9 @@ export default function DownloadBar() {
   // Fixes the old bug where a failed /api/info still read "Ready": when there is
   // no video and an error, say the error.
   const failed = !info && !loadingInfo && Boolean(error);
+  const shownError = displayError(error, failure);
   const status = failed
-    ? error
+    ? shownError
     : loadingInfo
       ? "Loading the video"
       : !info
@@ -61,19 +90,7 @@ export default function DownloadBar() {
 
   return (
     <div className="flex flex-col gap-2">
-      {error && !failed && error !== validationError && (
-        <div role="alert" className="card-alert flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-body">
-          <span className="min-w-0 flex-[1_1_200px]">{error}</span>
-          {failure && failure.message === error ? (
-            <CopyFailureDiagnostics
-              code={failure.code}
-              message={failure.message}
-              attempt={failure.attempt}
-              diagnostics={failure.diagnostics}
-            />
-          ) : null}
-        </div>
-      )}
+      {error && !failed && error !== validationError && <FailureAlert error={error} failure={failure} />}
       <div className="surface-panel flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
         <div
           className={`min-w-0 flex-[1_1_160px] text-body ${failed ? "card-alert px-3 py-2" : "text-fg-dim"}`}

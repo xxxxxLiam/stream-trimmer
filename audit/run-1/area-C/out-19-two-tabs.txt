@@ -1,0 +1,14 @@
+[C19] tab1 loaded, empty bank: {"root":1,"header":true}
+[C19] after New tab (both banks empty): {"root":1,"header":true}
+[C19] tab2 video loaded: {"root":1,"header":true}
+[C19] shot pre-bank: /home/user/stream-trimmer/audit/out/area-C/C19-two-tabs/01-pre-bank.png
+[C19] body text: "Stub video\nStub video\nCampaign\nAcme Q4\nStub video\n01:00:00\nChange\nCopy blocks\nSymbols\nChannel data\nNot signed in\nCheck\nTranscript\nloading…\nFollow\nSearch the transcript\n\nLoading transcript…\n\nThe owner blocks playback here\nCutting and downloading still work.\nWatch on YouTube\n00:00:00\n01:00:00\nIn\nI\nOut\nO\nWhole video\nAdd segment\n⌘⇧↵\n\nNo segments yet. Mark an in and out, then Add segment. Add as many a"
+[C19] intercepting overlay: DIV.flex items-center border-b border-hairline px-3 py-1
+[C19] how many #clips-tab-bank elements are in the DOM: 2
+[C19] importing into tab 2...
+[C19] import threw: TimeoutError: locator.innerText: Timeout 30000ms exceeded.
+[C19] summary: (threw)
+[C19] after importing with two tabs open: {"root":0,"header":false}
+[C19] pageErrors: ["Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."]
+[C19] shot: /home/user/stream-trimmer/audit/out/area-C/C19-two-tabs/02-after-import-two-tabs.png
+[C19] bank on disk: {"acme-q4":{"stub0000002":[{"id":"A01","label":"tab two hook","segments":[{"start":60,"end":90}],"status":"banked"}]}}

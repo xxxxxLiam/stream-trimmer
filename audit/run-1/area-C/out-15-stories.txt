@@ -1,0 +1,36 @@
+[C15] 1. first import: Imported: 4 added.
+[C15] 1. count line: 4 clips | chips: ["Hook moments","objection","Payoff","Tier 1","Tier 2","Tier 3"]
+[C15] 1. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/01-story1-first-import.png
+[C15] 2. imported Southbay's list while Northwind was active: Imported: 2 added.
+[C15] 2. Northwind now shows: 6 clips
+[C15] 2. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/02-story2-wrong-campaign.png
+[C15] 2. ways to undo the whole import: [] | per-row Remove buttons to click: 2
+[C15] 2. after cleaning up by hand: 4 clips
+[C15] 2. re-imported into the right campaign: Imported: 2 added.
+[C15] 2. Southbay now shows: 2 clips
+[C15] 2. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/03-story2-fixed.png
+[C15] 3. same list again: Imported: 0 added, 2 updated. -> 2 clips
+[C15] 4. chapter list from a description -> ["0 clips, 0 segments, 0:00 in total","","0 with a category, 0 without",""]
+[C15] 4. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/04-story4-chapter-list.png
+[C15] 5. messy doc paste: Imported: 2 added.
+[C15] 5. count: 4 clips
+[C15] 5. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/05-story5-messy.png
+[C15] 6. order after Sort by tier: ["T1-M01 the apology","T2-M02 the laugh","S01 southbay hook","S02 southbay payoff"]
+[C15] 6. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/06-story6-sorted.png
+[C15] 7. search 'laugh': 1 of 4 clips | rows: 1
+[C15] 8. chips: ["Notes for the editor","Tier 1","Tier 2"]
+[C15] 8. filtered by "Notes for the editor" -> 2 of 4 clips | rows on screen: 2 | agree: true
+[C15] 8. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/07-story8-filter.png
+[C15] 9. controls offered to re-categorise a row: ["Cut","Remove T1-M01 from the bank"]
+[C15] 9. fixed by re-pasting the line instead: Imported: 1 added.
+[C15] 9. row now: ["repentance","T1-M01 the apology","M01 the apology","repentance"]
+[C15] 10. after deleting M02: 4 clips
+[C15] 10. rows now: ["S01","S02","T1-M01","M01"]
+[C15] 10. re-importing the same block: Imported: 1 added, 1 updated.
+[C15] 10. M02 is back: true
+[C15] 11. after renaming, chip: Campaign Southbay Spring | bank: 5 clips | id kept: [["northwind-q1","Northwind Q1"],["southbay-launch","Southbay Spring"]]
+[C15] 11. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/08-story11-renamed.png
+[C15] 12. after a there-and-back switch, the paste is GONE
+[C15] 12. shot: /home/user/stream-trimmer/audit/out/area-C/C15-stories/09-story12-paste-gone.png
+[C15] final banks: {"northwind-q1":{"stub0000001":["T1-A01","T1-A02","T2-A03","A04"]},"southbay-launch":{"stub0000001":["S01","S02","T1-M01","M01","T2-M02"]}}
+[C15] pageErrors: []

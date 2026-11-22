@@ -6,6 +6,7 @@
  *   Each row shows its range, its length and the transcript text at its start.
  */
 import { useState } from "react";
+import { useSegments } from "../hooks/useSegments";
 import {
   formatLength,
   formatTimecode,
@@ -74,6 +75,9 @@ export default function SegmentList({
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [announce, setAnnounce] = useState("");
+  // While a cut runs the list is frozen: the cut was launched with a snapshot, so a row
+  // removed now would still be in the file (B-7). The store refuses the edit as well.
+  const { locked } = useSegments();
 
   if (segments.length === 0) return null;
 
@@ -84,7 +88,10 @@ export default function SegmentList({
 
   return (
     <div className={className}>
-      <ol className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Segments, in the order they are joined">
+      {/* The list scrolls inside itself (styles.css .seg-scroll) so a long clip cannot push
+          Cut or the fields above it around. Every row is a button, so Tab reaches them all. */}
+      <div className="seg-scroll">
+      <ol id="ui-segment-list" className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Segments, in the order they are joined">
         {segments.map((seg, i) => {
           const line = lineAtTime(lines, seg.start);
           const used = usedIndexes?.has(i) ?? false;
@@ -93,8 +100,12 @@ export default function SegmentList({
           return (
             <li
               key={`${i}-${seg.start}-${seg.end}`}
-              draggable
+              draggable={!locked}
               onDragStart={(e) => {
+                if (locked) {
+                  e.preventDefault();
+                  return;
+                }
                 setDragFrom(i);
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", String(i));
@@ -107,7 +118,7 @@ export default function SegmentList({
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                if (dragFrom !== null && dragFrom !== i) {
+                if (!locked && dragFrom !== null && dragFrom !== i) {
                   onMove(dragFrom, i);
                   setAnnounce(`Segment moved to position ${i + 1} of ${segments.length}`);
                 }
@@ -137,6 +148,7 @@ export default function SegmentList({
                 aria-label={`Segment ${i + 1}, ${formatTimecode(seg.start)} to ${formatTimecode(seg.end)}. Jump to it. Alt and the arrow keys reorder, Delete removes.`}
                 onClick={() => onSeek?.(seg.start)}
                 onKeyDown={(e) => {
+                  if (locked && (e.key === "Delete" || e.altKey)) return;
                   if (e.altKey && e.key === "ArrowUp" && i > 0) {
                     e.preventDefault();
                     onMove(i, i - 1);
@@ -171,7 +183,10 @@ export default function SegmentList({
                 type="button"
                 className="icon-btn"
                 aria-label={`Remove segment ${i + 1}`}
+                disabled={locked}
+                title={locked ? "Segments are locked while the cut runs" : undefined}
                 onClick={() => {
+                  if (locked) return;
                   onRemove(i);
                   setAnnounce(`Segment ${i + 1} removed`);
                 }}
@@ -182,6 +197,7 @@ export default function SegmentList({
           );
         })}
       </ol>
+      </div>
       <span className="sr-only" role="status" aria-live="polite">
         {announce}
       </span>

@@ -58,7 +58,7 @@ export default function PreviewPanel() {
   }, [videoId]);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+    <div className="flex min-w-0 shrink-0 flex-col gap-4">
       <motion.div
         key="video"
         initial={{ opacity: 0, scale: 0.98 }}
@@ -66,7 +66,7 @@ export default function PreviewPanel() {
         transition={{ duration: 0.16, ease: "easeOut" }}
         className="flex shrink-0 flex-col gap-3"
       >
-        <div className="relative aspect-video w-full overflow-hidden rounded-panel border border-hairline bg-panel-raised">
+        <div className="relative mx-auto aspect-video w-full max-w-[80vh] overflow-hidden rounded-panel border border-hairline bg-panel-raised">
           {videoId && !embedBlocked && (
             <div ref={player.containerRef} className="absolute inset-0" />
           )}

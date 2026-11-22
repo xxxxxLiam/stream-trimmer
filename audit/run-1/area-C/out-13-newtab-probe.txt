@@ -1,0 +1,9 @@
+[C13] import: Imported: 1 added.
+[C13] before: tabs 4 | body len 856
+[C13] +300ms {"bodyText":"","html":591,"tabs":0,"urlInputs":0,"header":false,"root":0}
+[C13] +1000ms {"bodyText":"","html":591,"tabs":0,"urlInputs":0,"header":false,"root":0}
+[C13] +3000ms {"bodyText":"","html":591,"tabs":0,"urlInputs":0,"header":false,"root":0}
+[C13] +8000ms {"bodyText":"","html":591,"tabs":0,"urlInputs":0,"header":false,"root":0}
+[C13] shot: /home/user/stream-trimmer/audit/out/area-C/C13-newtab/01-after-new-tab.png
+[C13] pageErrors: ["Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."]
+[C13] console tail: ["[warning] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security\n  Policy set or a policy with \"unsafe-eval\" enabled. This exposes users of\n  this app to unnecessary security risks.\n\nFor more information and help, consult\nhttps://electronjs.org/docs/tutorial/security.\nThis warning will not show up\nonce the app is packaged.","[error] Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED","[error] Error: Minified React error #185; visit https://reactjs.org/docs/error-decoder.html?invariant=185 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\n    at Xt (http://127.0.0.1:43845/assets/index-CKLZWySC.js:40:33787)\n    at ly (http://127.0.0.1:43845/assets/index-CKLZWySC.js:38:19839)\n    at http://127.0.0.1:43845/assets/index-CKLZWySC.js:38:19702\n    at http://127.0.0.1:43845/assets/index-CKLZWySC.js:66:14698\n    at Set.forEach (<anonymous>)\n    at nr (http://127.0.0.1:43845/assets/index-CKLZWySC.js:66:14687)\n    at IP (http://127.0.0.1:43845/assets/index-CKLZWySC.js:66:15196)\n    at http://127.0.0.1:43845/assets/index-CKLZWySC.

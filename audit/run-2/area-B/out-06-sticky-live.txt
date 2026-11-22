@@ -1,0 +1,34 @@
+=== sticky cut row vs the segment list ===
+ROOT=/home/user/stream-trimmer  TAG=LIVE
+viewport 1100x760 = the app's own default window size (electron/main.cjs)
+
+1 segment(s): cutRow={"top":631,"bottom":722,"position":"sticky","zIndex":"10","background":"rgb(22, 22, 24)"} scroll={"scrollTop":0,"scrollHeight":772,"clientHeight":636}
+   row 1: box=[606,658] removeX_at=[793,632] behindCutRow=27px topElementThere=DIV#ui-cut-row.cut-row z-10 -mx-4 -mb-4 flex flex-wrap 
+
+2 segment(s): cutRow={"top":631,"bottom":722,"position":"sticky","zIndex":"10","background":"rgb(22, 22, 24)"} scroll={"scrollTop":0,"scrollHeight":831,"clientHeight":636}
+   row 1: box=[606,658] removeX_at=[793,632] behindCutRow=27px topElementThere=DIV#ui-cut-row.cut-row z-10 -mx-4 -mb-4 flex flex-wrap 
+   row 2: box=[664,717] removeX_at=[793,690] behindCutRow=52px topElementThere=SPAN.font-mono text-meta
+
+3 segment(s): cutRow={"top":631,"bottom":722,"position":"sticky","zIndex":"10","background":"rgb(22, 22, 24)"} scroll={"scrollTop":0,"scrollHeight":889,"clientHeight":636}
+   row 1: box=[606,658] removeX_at=[793,632] behindCutRow=27px topElementThere=DIV#ui-cut-row.cut-row z-10 -mx-4 -mb-4 flex flex-wrap 
+   row 2: box=[664,717] removeX_at=[793,690] behindCutRow=52px topElementThere=SPAN.font-mono text-meta
+   row 3: box=[723,775] removeX_at=[793,749] behindCutRow=0px topElementThere=FOOTER.flex min-h-footer flex-wrap items-center
+
+4 segment(s): cutRow={"top":631,"bottom":722,"position":"sticky","zIndex":"10","background":"rgb(22, 22, 24)"} scroll={"scrollTop":0,"scrollHeight":948,"clientHeight":636}
+   row 1: box=[606,658] removeX_at=[793,632] behindCutRow=27px topElementThere=DIV#ui-cut-row.cut-row z-10 -mx-4 -mb-4 flex flex-wrap 
+   row 2: box=[664,717] removeX_at=[793,690] behindCutRow=52px topElementThere=SPAN.font-mono text-meta
+   row 3: box=[723,775] removeX_at=[793,749] behindCutRow=0px topElementThere=FOOTER.flex min-h-footer flex-wrap items-center
+   row 4: box=[782,834] removeX_at=[793,808] behindCutRow=0px topElementThere=null
+
+shot (4 segments at the default window): /home/user/stream-trimmer/audit/run-2/area-B/out/b06-LIVE/01-default-window-4-segments.png
+
+real mouse click at segment 1's x: (793, 632)
+  segment rows 4 -> 4: *** THE CLICK DID NOT REACH THE ROW ***
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b06-LIVE/02-after-real-mouse-click-on-remove.png
+  Playwright click (auto-scrolls first): clicked after auto-scroll
+
+--- help drawer (Cmd+/) at 1100x760 ---
+  before: {"markIn":"OK","add":"OK","cut":"OK","transcriptSearch":"OK","drawerOpen":true,"docScrollW":1100,"vw":1100,"colsHostWidth":1100,"wrapped":"nowrap"}
+  after : {"markIn":"OFFSCREEN (824)","add":"OFFSCREEN (869)","cut":"OFFSCREEN (1142)","transcriptSearch":"OK","drawerOpen":true,"docScrollW":1100,"vw":1100,"colsHostWidth":700,"wrapped":"wrap"}
+  shot: /home/user/stream-trimmer/audit/run-2/area-B/out/b06-LIVE/03-help-drawer-open-default-window.png
+  closed again: {"markIn":"OK","add":"OK","cut":"OK","transcriptSearch":"OK","drawerOpen":true,"docScrollW":1100,"vw":1100,"colsHostWidth":1100,"wrapped":"nowrap"}

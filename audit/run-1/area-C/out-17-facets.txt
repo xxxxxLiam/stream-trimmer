@@ -1,0 +1,5 @@
+[C17] video 1 is loaded; its bank holds 1 clip categorised 'hook'
+[C17] filter chips offered: ["hook","promo-for-the-other-video","Tier 1","Tier 9"]
+[C17] a chip for a category that belongs to another video is offered: true
+[C17] after clicking it: ["0 of 1 clips","No clips match those filters."]
+[C17] shot: /home/user/stream-trimmer/audit/out/area-C/C17-facets/01-dead-filter-chip.png

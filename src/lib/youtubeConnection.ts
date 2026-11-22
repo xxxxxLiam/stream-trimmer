@@ -18,6 +18,8 @@ import { readSetting, writeSetting } from "./persist";
 
 const SOURCE_KEY = "clipper.authSource";
 const BROWSER_KEY = "clipper.cookieBrowser";
+/** The user chose to continue without signing in. Survives restarts; the header chip still says "Not signed in". */
+const SKIPPED_KEY = "clipper.signInSkipped";
 
 export interface YouTubeConnectionState {
   connected: boolean;
@@ -47,6 +49,12 @@ export interface YouTubeConnectionState {
    * `message`, which the connect screen treats as "your sign-in failed".
    */
   notice?: string;
+  /**
+   * The user chose to carry on signed out (360p). Only hides the connect
+   * screen; it is not a connection and never feeds `cookiePayload`. Lasts for
+   * this app session, and clears on any successful sign-in.
+   */
+  skipped: boolean;
 }
 
 /** The four states the user is ever shown. `checking` is transient. */
@@ -112,6 +120,42 @@ export function lowQualityExplanation(
         : "Only 360p was offered because you are not signed in to YouTube. YouTube serves higher formats to signed-in requests.",
     action: "Re-import cookies.txt",
   };
+}
+
+/**
+ * AF2-2. The engine refuses an MP4 request above 360p when there is no sign-in, so "Continue
+ * without signing in (360p)" only works if the quality the app asks for is 360p. A fresh install
+ * defaults to Best, which made a skipped user's first Cut fail. While signed out the quality is
+ * held at 360p and the user's own choice is remembered, then put back on sign-in. Pure so the
+ * rule is testable; useClipper owns the state it is applied to.
+ */
+export function signedOutQuality(input: {
+  signedOut: boolean;
+  format: string;
+  quality: string;
+  /** What the user had chosen before it was held down, if anything. */
+  held: string | null;
+}): { quality: string; held: string | null } {
+  const { signedOut, format, quality, held } = input;
+  if (format !== "mp4") return { quality, held };
+  if (signedOut) {
+    const above = quality === "best" || Number(quality) > 360;
+    return above ? { quality: "360", held: quality } : { quality, held };
+  }
+  if (held !== null) return { quality: quality === "360" ? held : quality, held: null };
+  return { quality, held };
+}
+
+/** No session and none being restored: every request goes out signed out. */
+export function isSignedOut(s: Pick<YouTubeConnectionState, "connected" | "restoring">): boolean {
+  return !s.connected && !s.restoring;
+}
+
+/** True while the first-run sign-in dialog is the thing on screen (not the launch placeholder, not skipped). */
+export function isSignInGateUp(
+  s: Pick<YouTubeConnectionState, "connected" | "restoring" | "skipped">,
+): boolean {
+  return !s.connected && !s.restoring && !s.skipped;
 }
 
 export interface CookiePayload {
@@ -181,7 +225,16 @@ let state: YouTubeConnectionState = {
   canImport: hasCookieFile(),
   expiresAt: null,
   expired: false,
+  skipped: readSetting<boolean>(SKIPPED_KEY, false) === true,
 };
+
+/**
+ * Bumped whenever the user establishes a sign-in (or starts verifying an
+ * imported file). A background sweep remembers the value it started under and
+ * abandons itself, writing nothing, if it has moved on by the time a browser
+ * check returns: a late sweep must never overwrite a sign-in made meanwhile.
+ */
+let signInEpoch = 0;
 
 const listeners = new Set<() => void>();
 let activeCheck: Promise<boolean> | null = null;
@@ -275,8 +328,11 @@ function failureMessage(result: ProbeResult, source: AuthSource): string {
 }
 
 function markConnected(source: AuthSource) {
+  signInEpoch += 1;
   writeSetting(SOURCE_KEY, source);
+  writeSetting(SKIPPED_KEY, null);
   set({
+    skipped: false,
     connected: true,
     source,
     browserStatus: "signed_in",
@@ -458,6 +514,7 @@ export async function importCookies(): Promise<boolean> {
 async function verifyImported(): Promise<boolean> {
   // The check runs yt-dlp against YouTube for real, so it is slow enough
   // that the button must stop saying "Reading the cookies file…".
+  signInEpoch += 1; // an in-flight browser sweep must now stand down
   set({ step: "Checking those cookies with YouTube…", expired: false });
   await readStoredExpiry();
   const verified = await checkSource("app");
@@ -596,8 +653,10 @@ export async function sweepBrowsers(): Promise<boolean> {
     /* fall back to the full list in its default order */
   }
 
+  const epoch = signInEpoch;
   const failures: string[] = [];
   for (const browser of order) {
+    if (signInEpoch !== epoch) return state.connected;
     set({
       busy: true,
       browser,
@@ -607,6 +666,9 @@ export async function sweepBrowsers(): Promise<boolean> {
       reason: undefined,
     });
     const result = await checkSource(browser);
+    // The user signed in (dropped a cookies.txt, say) while this was running.
+    // Whatever this browser said, it must not touch that sign-in.
+    if (signInEpoch !== epoch) return state.connected;
     if (result.status === "signed_in") {
       writeSetting(BROWSER_KEY, browser);
       markConnected(browser);
@@ -643,6 +705,22 @@ export async function sweepBrowsers(): Promise<boolean> {
     reason: failures.join("\n") || undefined,
   });
   return false;
+}
+
+/**
+ * Lets the user past the connect screen without signing in. The engine serves
+ * signed-out requests at 360p, so this is honest, not a bypass.
+ */
+export function continueSignedOut(): void {
+  if (state.connected) return;
+  writeSetting(SKIPPED_KEY, true);
+  set({ skipped: true });
+}
+
+/** Brings the connect screen back after `continueSignedOut`. */
+export function resumeSignIn(): void {
+  writeSetting(SKIPPED_KEY, null);
+  set({ skipped: false });
 }
 
 /** Secondary path: check one specific browser, when the user picks it. */

@@ -1,0 +1,19 @@
+F-6 sidRow       clean
+F-6 bearer       clean
+F-6 accessToken  clean
+F-6 sig          clean
+F-6 email        clean
+F-6 rootPath     clean
+F-6 cookieHdr    clean
+F-6 cookiesFlag  clean
+F-6 poToken      clean
+F-6 result={"ok":true} leaked 0 of 9; clipboard bytes=1925
+F-6 clipboard (post-redaction view, first 400 chars):
+01T00:00:02Z [yt] request access_token=<redacted> done
+2026-01-01T00:00:03Z [yt] GET https://rr1.googlevideo.com/videoplayback?id=1&sig=REDACTED&expire=1
+2026-01-01T00:00:04Z [yt] user <email> signed in
+2026-01-01T00:00:05Z [yt] wrote ~/clips/campaign-x/out.mp4
+2026-01-01T00:00:06Z [yt] Cookie: <redacted>
+2026-01-01T00:00:07Z [yt] --cookies <redacted>
+2026-01-01T00:00:08Z [yt] po_token=<redacted>
+

@@ -8,7 +8,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -105,6 +104,16 @@ function highlight(text: string, q: string): ReactNode {
   if (out.length === 0) return text;
   if (at < text.length) out.push(text.slice(at));
   return out;
+}
+
+/**
+ * The match the search is on, or null. `active` is reset in an effect, so for one render
+ * after the result set shrinks (typing one more character, clearing the box, Escape) it can
+ * point past the end of `matches`. Reading `.line` off that undefined threw, and with no
+ * error boundary React unmounted the whole app (B-1).
+ */
+export function pickActiveMatch<T>(matches: readonly T[], active: number): T | null {
+  return active >= 0 && active < matches.length ? matches[active] : null;
 }
 
 export default function TranscriptColumn({
@@ -302,14 +311,13 @@ export default function TranscriptColumn({
 
   // ---- derived view state ----------------------------------------------------------------
   const selected = drag ? snapRangeByIndex(w.all, drag.a, drag.b) : null;
-  const activeMatch = w.active >= 0 ? w.matches[w.active] : null;
+  const activeMatch = pickActiveMatch(w.matches, w.active);
   const matchLines = useMemo(() => {
     const s = new Set<number>();
     for (const m of w.matches) if (m.line >= w.win.from && m.line < w.win.to) s.add(m.line);
     return s;
   }, [w.matches, w.win.from, w.win.to]);
 
-  const searchId = useId();
   const hasTranscript = w.total > 0;
   const noMatches = w.query.trim() !== "" && w.matches.length === 0;
 
@@ -336,13 +344,13 @@ export default function TranscriptColumn({
       </header>
 
       <div className="flex shrink-0 items-center gap-1 px-4 pb-2">
-        <label htmlFor={searchId} className="relative min-w-0 flex-1">
+        <label htmlFor="ui-transcript-search" className="relative min-w-0 flex-1">
           <span className="sr-only">Search the transcript</span>
           <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-fg-dim">
             <IconSearch />
           </span>
           <input
-            id={searchId}
+            id="ui-transcript-search"
             ref={searchRef}
             type="text"
             value={w.query}
@@ -385,6 +393,7 @@ export default function TranscriptColumn({
       </div>
 
       <div
+        id="ui-transcript-lines"
         ref={scrollRef}
         className="relative min-h-0 flex-1 overflow-y-auto border-t border-hairline px-2 py-2"
       >

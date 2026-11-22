@@ -10,7 +10,7 @@
  * yt-dlp, the concat list, the copy-versus-re-encode decision, the named
  * progress stages, and the failure table (cause, the one fix, the work kept).
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -276,17 +276,29 @@ export async function joinSegments(
   return { method: "reencode", duration: actual, reason, durationOk: ok };
 }
 
-/** Runs a binary to completion. Never rejects: a spawn error is a status. */
+/**
+ * Runs a binary to completion. Never rejects: a spawn error is a status.
+ * `onSpawn` hands the child to whoever may need to stop it (a cancelled job
+ * kills its join ffmpeg through this); with it the child leads its own process
+ * group so the whole tree can be killed, not just the direct child.
+ */
 export function runProcess(
   bin: string,
   args: string[],
   env?: NodeJS.ProcessEnv,
+  onSpawn?: (child: ChildProcess) => void,
 ): Promise<{ code: number | null; stderr: string }> {
   return new Promise((resolve) => {
     let stderr = "";
-    let child;
+    let child: ChildProcess;
     try {
-      child = spawn(bin, args, { env, windowsHide: true, shell: false });
+      child = spawn(bin, args, {
+        env,
+        windowsHide: true,
+        shell: false,
+        detached: !!onSpawn && process.platform !== "win32",
+      });
+      onSpawn?.(child);
     } catch (e) {
       return resolve({ code: -1, stderr: String(e) });
     }

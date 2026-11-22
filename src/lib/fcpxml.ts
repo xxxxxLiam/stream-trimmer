@@ -834,7 +834,11 @@ export async function buildSessionFcpxml(
   for (const clip of clips) {
     try {
       const media = parseProbe(await probe(clip.path));
-      ready.push({ ...clip, media });
+      const candidate: FcpClip = { ...clip, media };
+      // Building the clip alone surfaces anything that makes it unusable (shorter than a
+      // frame of the file or of the timeline). That is this clip's problem, not the batch's.
+      buildFcpxml({ eventName, clips: [candidate], project: options.project });
+      ready.push(candidate);
     } catch (err) {
       skipped.push({
         id: clip.id,

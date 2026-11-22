@@ -31,12 +31,25 @@ const youtubeSession = require("./youtubeSession.cjs");
 const { createSettingsStore } = require("./settingsStore.cjs");
 const { saveExportFiles } = require("./exportSave.cjs");
 const {
+  allowedRoots,
+  dragTarget,
+  moveWithoutOverwrite,
+  resolveTarget,
+  writeWithoutOverwrite,
+} = require("./pathSafety.cjs");
+const { interpretCheckResult } = require("./updateCheck.cjs");
+const { redact } = require("./redact.cjs");
+const {
   canInstallInPlace,
   downloadUrl,
   releasesUrl,
 } = require("./updater.cjs");
 const logger = require("./logger.cjs");
 const { readMachineId, hashMachineId } = require("./machineId.cjs");
+const { createOwnerCheck, readBakedShape } = require("./ownerCheck.cjs");
+// Read once, at start: what this build was baked with. Absent in a public build.
+const bakedShape = readBakedShape(path.join(__dirname, "dist"));
+const ownerGate = createOwnerCheck({ readMachineId, hashMachineId, getBaked: () => bakedShape });
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
@@ -63,6 +76,47 @@ function getDragIcon() {
   return dragIcon;
 }
 
+// The app was renamed from "YouTube Clipper" to "Clipr" in 4.0.2. Electron
+// derives userData from the product name, so the new build looks in a new,
+// empty directory and every existing user would silently lose their
+// campaigns, clip bank, folder choices and YouTube sign-in.
+//
+// This copies the old directory's contents across, once, before anything
+// reads them. It never overwrites: if a file already exists under the new
+// name it is left alone, so a user who has started fresh is not clobbered,
+// and a second run is a no-op. The old directory is left in place — if this
+// goes wrong, the data is still where it was.
+function migrateLegacyUserData() {
+  try {
+    const current = app.getPath("userData");
+    const legacy = path.join(path.dirname(current), "YouTube Clipper");
+    if (legacy === current || !fs.existsSync(legacy)) return;
+    // Only a first run: if settings are already here, the move has happened
+    // (or the user has real data under the new name) and we must not touch it.
+    if (fs.existsSync(path.join(current, "settings.json"))) return;
+
+    fs.mkdirSync(current, { recursive: true });
+    let moved = 0;
+    for (const entry of fs.readdirSync(legacy, { withFileTypes: true })) {
+      const from = path.join(legacy, entry.name);
+      const to = path.join(current, entry.name);
+      if (fs.existsSync(to)) continue;
+      try {
+        fs.cpSync(from, to, { recursive: true, errorOnExist: false });
+        moved += 1;
+      } catch (err) {
+        console.error(`[electron] could not carry over ${entry.name}:`, err);
+      }
+    }
+    if (moved) console.log(`[electron] carried ${moved} item(s) over from "YouTube Clipper"`);
+  } catch (err) {
+    // Never let this stop the app starting: a fresh profile is recoverable,
+    // a boot loop is not.
+    console.error("[electron] user data migration skipped:", err);
+  }
+}
+migrateLegacyUserData();
+
 // Single-instance lock — no duplicate backend, no duplicate window.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -80,8 +134,24 @@ let settings = null;
 function loadSettings() {
   settings = createSettingsStore(
     path.join(app.getPath("userData"), "settings.json"),
+    {
+      log: (message) => logger.log("settings", message),
+      // Null in a public build, so the migration never names the exporter's folder.
+      dataFolderName: bakedShape ? bakedShape.dataFolderName || null : null,
+    },
   );
   settings.load();
+}
+
+// Every reader of the log goes through here. The log can hold cookie rows,
+// bearer tokens, signed URLs, an email and the home path, so no handler reads
+// the raw file text (logger.tail) itself; electron/diagnosticsPath.test.ts
+// fails if one does. A new reader calls readLogScrubbed() and is safe by default.
+function scrubForDisplay(text) {
+  return redact(String(text ?? ""), { homeDir: os.homedir() });
+}
+function readLogScrubbed(lines = 500) {
+  return scrubForDisplay(logger.tail(lines));
 }
 
 let serverHandle = null; // { close(cb) } returned by the bundled server
@@ -258,10 +328,16 @@ function closeSplash() {
 
 async function createWindow(port) {
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 760,
-    minWidth: 900,
-    minHeight: 600,
+    // The window may not be smaller than the clipping loop needs. At the old
+    // 900x600 floor the mark bar and the Cut button could never be on screen
+    // together, so every single clip cost a scroll; the old 1100 default was
+    // also narrower than the three-column breakpoint, so a first launch got
+    // the stacked fallback. Both are the same mistake — advertising a size
+    // the app does not actually work at.
+    width: 1280,
+    height: 820,
+    minWidth: 1160,
+    minHeight: 760,
     backgroundColor: "#0B0B0C",
     autoHideMenuBar: true,
     show: false,
@@ -436,6 +512,13 @@ app.on("before-quit", () => {
   }
 });
 
+// Folders the user picked in the native dialog this session. Together with the
+// folders saved in settings they are the only places the save handlers write.
+const pickedDirs = new Set();
+function saveRoots() {
+  return allowedRoots(settings ? settings.all() : {}, [...pickedDirs]);
+}
+
 function registerIpc() {
   // Synchronous snapshot so the renderer can seed state before first paint.
   ipcMain.on("settings:all", (e) => {
@@ -452,6 +535,7 @@ function registerIpc() {
       properties: ["openDirectory", "createDirectory"],
     });
     if (res.canceled || res.filePaths.length === 0) return null;
+    pickedDirs.add(res.filePaths[0]);
     return res.filePaths[0];
   });
 
@@ -480,18 +564,21 @@ function registerIpc() {
         return { ok: false, error: "Unexpected clip location" };
       }
 
-      const safeName = payload.filename.replace(/[\\/]/g, "_");
-      const target = path.join(payload.dirPath, safeName);
-      try {
-        await fsp.rename(source, target);
-      } catch (err) {
-        // rename cannot cross devices, and the temp dir often is one.
-        if (!err || err.code !== "EXDEV") throw err;
-        await fsp.copyFile(source, target);
-        await fsp.rm(source, { force: true });
+      const dest = resolveTarget({
+        dirPath: payload.dirPath,
+        name: payload.filename,
+        roots: saveRoots(),
+      });
+      if (!dest.ok) {
+        logger.log("clip", "refused save outside the chosen folders");
+        return { ok: false, error: dest.error };
       }
+      // Never replace a clip that is already there: add " 2", " 3" like the
+      // CapCut copy does. A hard link fails with EEXIST instead of replacing,
+      // so this holds even if the name is taken between the check and the move.
+      const target = await moveWithoutOverwrite(source, dest.target);
       await fsp.rm(path.dirname(source), { recursive: true, force: true });
-      logger.log("clip", `saved ${safeName}`);
+      logger.log("clip", `saved ${path.basename(target)}`);
       return { ok: true, path: target };
     } catch (err) {
       logger.log("clip", `save failed: ${logger.describe(err)}`);
@@ -508,10 +595,18 @@ function registerIpc() {
       ) {
         return { ok: false, error: "Invalid save payload" };
       }
-      const safeName = payload.filename.replace(/[\\/]/g, "_");
-      const target = path.join(payload.dirPath, safeName);
+      const dest = resolveTarget({
+        dirPath: payload.dirPath,
+        name: payload.filename,
+        roots: saveRoots(),
+      });
+      if (!dest.ok) {
+        logger.log("file", "refused save outside the chosen folders");
+        return { ok: false, error: dest.error };
+      }
       const buf = Buffer.from(payload.data);
-      await fsp.writeFile(target, buf);
+      // "wx": never replace a file that is already there; " 2", " 3" instead.
+      const target = await writeWithoutOverwrite(dest.target, buf);
       return { ok: true, path: target };
     } catch (err) {
       return {
@@ -532,17 +627,28 @@ function registerIpc() {
       ) {
         return { ok: false, error: "Invalid save payload" };
       }
-      const safeFolder = payload.folder.replace(/[\\/]/g, "_");
-      const target = path.join(payload.dirPath, safeFolder);
-      await fsp.mkdir(target, { recursive: true });
+      const folder = resolveTarget({
+        dirPath: payload.dirPath,
+        name: payload.folder,
+        roots: saveRoots(),
+      });
+      if (!folder.ok) {
+        logger.log("file", "refused export folder outside the chosen folders");
+        return { ok: false, error: folder.error };
+      }
+      const target = folder.target;
+      // Check every name before creating anything, so a bad one leaves no
+      // half-written folder behind.
+      const named = [];
       for (const file of payload.files) {
         if (!file || typeof file.name !== "string") continue;
-        const safeName = file.name.replace(/[\\/]/g, "_");
-        await fsp.writeFile(
-          path.join(target, safeName),
-          String(file.contents ?? ""),
-          "utf8",
-        );
+        const dest = resolveTarget({ dirPath: target, name: file.name });
+        if (!dest.ok) return { ok: false, error: dest.error };
+        named.push([dest.target, String(file.contents ?? "")]);
+      }
+      await fsp.mkdir(target, { recursive: true });
+      for (const [dest, contents] of named) {
+        await fsp.writeFile(dest, contents, "utf8");
       }
       return { ok: true, path: target };
     } catch (err) {
@@ -561,11 +667,15 @@ function registerIpc() {
   // run the app out of memory.
   ipcMain.handle("export:save", async (_e, payload) => {
     try {
+      // Owner-only, like the exporter that produces these folders. A refusal
+      // carries no hint the feature exists.
+      if (!(await ownerGate.isOwner())) return { ok: false, error: "Could not save." };
       const result = await saveExportFiles({
         dirPath: payload?.dirPath,
         folder: payload?.folder,
         files: payload?.files,
         tmpRoot: os.tmpdir(),
+        allowedRoots: saveRoots(),
       });
       logger.log(
         "export",
@@ -596,8 +706,17 @@ function registerIpc() {
   // synchronously inside the drag gesture or the OS drops it.
   ipcMain.on("file:startDrag", (event, targetPath) => {
     try {
-      if (typeof targetPath !== "string" || !targetPath) return;
-      if (!fs.existsSync(targetPath)) return;
+      // Only the app's own window, and only a real file inside the folders the
+      // user chose. (The preload also refuses unless a genuine dragstart just
+      // happened: calling startDrag with no gesture in progress is what wedged
+      // the main process.)
+      if (!mainWindow || event.sender !== mainWindow.webContents) return;
+      const real = dragTarget(targetPath, saveRoots());
+      if (!real) {
+        logger.log("drag", "refused drag of a path outside the chosen folders");
+        return;
+      }
+      targetPath = real;
 
       // Windows silently cancels a drag with a missing/empty icon, so always
       // hand over a real image. Per-file thumbnails are deliberately not used:
@@ -634,13 +753,21 @@ function registerIpc() {
     try {
       logger.log("updater", "manual check requested");
       const result = await autoUpdater.checkForUpdates();
-      const version = result && result.updateInfo && result.updateInfo.version;
+      const outcome = interpretCheckResult(result, app.getVersion());
+      if (outcome.kind === "error") {
+        // The check never ran (it resolved to null): say so, never "Up to date".
+        logger.log("updater", "manual check did not run");
+        sendUpdateStatus({
+          state: "error",
+          message: outcome.message,
+          url: releasesUrl(),
+        });
+        return { ok: false, error: outcome.message };
+      }
       // checkForUpdates resolves without emitting update-not-available when
       // there is nothing new, so the caller gets told either way.
-      if (!version || version === app.getVersion()) {
-        sendUpdateStatus({ state: "none" });
-      }
-      return { ok: true, version };
+      if (outcome.kind === "none") sendUpdateStatus({ state: "none" });
+      return { ok: true, version: result.updateInfo.version };
     } catch (err) {
       const error = err && err.message ? err.message : "Check failed";
       logger.log("updater", `manual check failed: ${error}`);
@@ -716,18 +843,9 @@ function registerIpc() {
   // Owner gate: is this computer on the build's allowlist? Answers a boolean
   // and nothing else. The list and salt come from the renderer bundle because
   // this file is not bundled by Vite. Never logs or returns the id or hash.
-  let localMachineId;
-  ipcMain.handle("owner:check", async (_e, list, salt) => {
-    try {
-      if (!Array.isArray(list) || typeof salt !== "string" || !salt) return false;
-      if (localMachineId === undefined) localMachineId = await readMachineId();
-      if (!localMachineId) return false;
-      const mine = hashMachineId(localMachineId, salt);
-      return list.some((h) => typeof h === "string" && h.trim().toLowerCase() === mine);
-    } catch {
-      return false;
-    }
-  });
+  // The arguments are ignored: main answers from what this build was baked with,
+  // so a page cannot choose its own answer. export:save asks the same gate.
+  ipcMain.handle("owner:check", () => ownerGate.check());
 
   // Editor handoff (BUILD-SPEC 11c): editor:installed / probe / writeFcpxml /
   // openWith / reveal / copyFiles. Failures come back as { ok:false, error }.
@@ -748,8 +866,8 @@ function registerIpc() {
   // Surfaces the local log so a crash can be reported without hunting for a
   // hidden folder. Only event names and error messages are ever recorded.
   ipcMain.handle("diagnostics:read", () => ({
-    path: logger.logFilePath(),
-    text: logger.tail(500),
+    path: scrubForDisplay(logger.logFilePath() || ""),
+    text: readLogScrubbed(),
   }));
 
   ipcMain.handle("diagnostics:reveal", () => {
@@ -767,7 +885,10 @@ function registerIpc() {
 
   ipcMain.handle("diagnostics:copy", () => {
     try {
-      clipboard.writeText(logger.tail(500));
+      // The log can hold cookie rows, bearer tokens, signed URLs, the user's
+      // email and home path. Scrub it here, in the process that owns the
+      // clipboard, so no caller can put the raw text there.
+      clipboard.writeText(readLogScrubbed());
       return { ok: true };
     } catch (err) {
       return { ok: false, error: logger.describe(err) };

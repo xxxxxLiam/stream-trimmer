@@ -39,6 +39,8 @@ const repoRoot = findRepoRoot();
 const here = path.join(repoRoot, "server", "testSupport");
 
 export interface FakeChannel {
+  /** Extra environment for the server process (and so the fake yt-dlp). */
+  env?: Record<string, string>;
   longform?: number;
   shorts?: number;
   commentsPerVideo?: number;
@@ -175,6 +177,10 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
       FAKE_HEIGHT_PRIMARY: String(channel.deliveredHeights?.primary ?? 0),
       FAKE_HEIGHT_FALLBACK: String(channel.deliveredHeights?.fallback ?? 0),
       FAKE_CALL_LOG: callLog,
+      // The exporter's owner gate. "*" is the private-build setting that
+      // admits any machine; a test that wants the gate closed overrides it.
+      VITE_OWNER_MACHINES: "*",
+      ...(channel.env ?? {}),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

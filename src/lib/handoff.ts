@@ -334,3 +334,46 @@ export async function writeClipboard(text: string): Promise<{ ok: true } | { ok:
   }
   return { ok: false, error: "The clipboard is not available. Select the text and press Cmd+C." };
 }
+
+// ---------------------------------------------------------------------------
+// The session's clips, one list per campaign
+// ---------------------------------------------------------------------------
+
+/**
+ * A session's finished clips belong to exactly ONE campaign. The editor file, "Send all"
+ * and "Copy file path" are all built from this list, so a clip cut for one client must never
+ * be readable under another: the key is the campaign, never a folder (campaigns routinely
+ * share one). A clip cut with no campaign selected lives under `null`, apart from all of them.
+ */
+export type SessionClipsByCampaign<T extends { id: string }> = Readonly<Record<string, readonly T[]>>;
+
+const NO_CAMPAIGN_KEY = "\u0000none";
+const EMPTY: readonly never[] = [];
+
+export function sessionCampaignKey(campaignId: string | null | undefined): string {
+  return campaignId ? campaignId : NO_CAMPAIGN_KEY;
+}
+
+/** Add clips to `list`; a clip with an id already present replaces it (a re-cut), the rest keep their order. */
+export function mergeSessionClips<T extends { id: string }>(list: readonly T[], fresh: readonly T[]): T[] {
+  const ids = new Set(fresh.map((c) => c.id));
+  return [...list.filter((c) => !ids.has(c.id)), ...fresh];
+}
+
+/** The clips cut under `campaignId`, and no other campaign's. */
+export function sessionClipsFor<T extends { id: string }>(
+  all: SessionClipsByCampaign<T>,
+  campaignId: string | null | undefined,
+): readonly T[] {
+  return all[sessionCampaignKey(campaignId)] ?? EMPTY;
+}
+
+/** A new map with `clip` recorded under `campaignId` only. */
+export function addSessionClip<T extends { id: string }>(
+  all: SessionClipsByCampaign<T>,
+  campaignId: string | null | undefined,
+  clip: T,
+): SessionClipsByCampaign<T> {
+  const key = sessionCampaignKey(campaignId);
+  return { ...all, [key]: mergeSessionClips(all[key] ?? [], [clip]) };
+}
