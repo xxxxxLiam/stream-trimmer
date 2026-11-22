@@ -37,7 +37,7 @@ try {
       }
     })(),
     setSetting: (key, value) => ipcRenderer.invoke("settings:set", key, value),
-    pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"),
+    pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"), pickFcpLibrary: () => ipcRenderer.invoke("dialog:pickFcpLibrary"),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.
     getDefaultFolders: () => ipcRenderer.invoke("system:defaultFolders"),
