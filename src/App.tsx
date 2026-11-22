@@ -57,6 +57,8 @@ import MarkBar from "./components/MarkBar"; // B2, centre under Timeline
 import ClipsColumn from "./components/ClipsColumn"; // B2/B4, right column
 import HelpDrawer from "./components/HelpDrawer"; // B6, right drawer
 import SymbolPalette from "./components/SymbolPalette"; // B5, overlay
+import CampaignStart from "./components/CampaignStart";
+import { tabDomId, tabPanelDomId } from "./components/WorkspaceTabs";
 import CopyBlocks from "./components/CopyBlocks"; // B5, overlay
 
 const EDITOR_KEY = "clipper.editorHandoff";
@@ -227,6 +229,10 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
+  // nobody is nagged: someone who just wants to paste a link and cut once never set a
+  // campaign up, and that is a legitimate way to use the app.
+  const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
   // Live input for the Copy blocks panel (D-3). The transcript loads on demand, so opening
   // the panel asks for it rather than showing "No transcript loaded" for a video that has one.
   useEffect(() => {
@@ -454,6 +460,11 @@ function Layout({ active }: { active: boolean }) {
         />
       </main>
 
+      <CampaignStart
+        open={active && !campaign && !campaignPromptDismissed}
+        onClose={() => setCampaignPromptDismissed(true)}
+        onChosen={() => setCampaignPromptDismissed(true)}
+      />
       <SymbolPalette open={symbolsOpen} onClose={closeSymbols} />
       <CopyBlocks open={copyOpen} onClose={closeCopy} input={copyInput} />
       {active && <SavedToast />}
@@ -484,6 +495,9 @@ function Shell() {
           return (
             <div
               key={tab.id}
+              role="tabpanel"
+              id={tabPanelDomId(tab.id)}
+              aria-labelledby={tabDomId(tab.id)}
               className="absolute inset-0"
               style={{ display: active ? undefined : "none" }}
             >

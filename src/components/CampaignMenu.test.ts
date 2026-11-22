@@ -26,5 +26,5 @@ test("editing a campaign may keep its own name, but not take another's", () => {
 
 test("the form passes the other campaigns to the check", () => {
   const src = readFileSync(new URL("./CampaignMenu.tsx", import.meta.url), "utf8");
-  assert.match(src, /campaignFormProblems\(d, campaigns, editing\?\.id\)/);
+  assert.match(src, /campaignFormProblems\(\{ \.\.\.d, dataDir \}, campaigns, editing\?\.id\)/);
 });

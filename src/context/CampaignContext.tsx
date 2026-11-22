@@ -20,9 +20,11 @@ import {
 } from "react";
 import {
   addUsedRanges,
+  applyDefaultFolders,
   countUsedRanges,
   createCampaign,
   defaultDataDir,
+  needsDefaultFolders,
   nextClipId as nextId,
   normalizeCampaigns,
   removeCampaign,
@@ -283,6 +285,28 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     },
     [commit],
   );
+
+  // First run: no clips folder chosen yet. Ask the desktop app for its ready-made folders
+  // (see the getDefaultFolders bridge) so cuts go to disk instead of streaming through the UI
+  // into Downloads. Never replaces a folder the person already chose, even if they chose one
+  // while this was still waiting.
+  useEffect(() => {
+    const api = window.electronAPI as
+      | { getDefaultFolders?: () => Promise<{ clipsDir?: string; dataDir?: string } | null> }
+      | undefined;
+    if (!api?.getDefaultFolders || !needsDefaultFolders(defaultsRef.current)) return;
+    let live = true;
+    void api.getDefaultFolders()
+      .then((offered) => {
+        if (!live) return;
+        const next = applyDefaultFolders(defaultsRef.current, offered);
+        if (next) saveDefaults({ ...next, dataDirConfirmed: true });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [saveDefaults]);
 
   // Another tab or window may have written the settings; nothing to do on the desktop app
   // (one renderer state), and the browser fallback re-reads on focus.

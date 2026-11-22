@@ -12,6 +12,7 @@ import FormatQualityFields from "../FormatQualityFields";
 import { IconChevronDown, IconFolder } from "./icons";
 import { useDismiss } from "./useDismiss";
 import { CHANNEL_DATA_BUILT } from "../../lib/ownerGate";
+import { useDataFolderVisible } from "../useDataFolderVisible";
 
 const QUALITY_LABEL: Record<string, string> = {
   best: "Best",
@@ -202,6 +203,8 @@ export default function AppFooter({ onPickClipsDir, onPickDataDir }: AppFooterPr
   const { active, folders, confirmDataDir, usedCount } = useCampaign();
   const { saveDir, downloads } = useClipperContext();
   const [problem, setProblem] = useState("");
+  // Only the channel exporter uses the Data folder; without it the chip would ask for nothing.
+  const showData = useDataFolderVisible();
 
   const wrap = (pick?: Pick): Pick | undefined =>
     pick
@@ -225,17 +228,19 @@ export default function AppFooter({ onPickClipsDir, onPickDataDir }: AppFooterPr
         onPick={wrap(onPickClipsDir)}
         disabledReason="Browser downloads go to your Downloads folder. Use the desktop app to choose a folder."
       />
-      <DataChip
-        dir={folders.dataDir}
-        confirmed={folders.dataDirConfirmed}
-        onPick={wrap(onPickDataDir)}
-        onConfirm={confirmDataDir}
-        disabledReason={
-          CHANNEL_DATA_BUILT
-            ? "Exported channel data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
-            : "Data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
-        }
-      />
+      {showData && (
+        <DataChip
+          dir={folders.dataDir}
+          confirmed={folders.dataDirConfirmed}
+          onPick={wrap(onPickDataDir)}
+          onConfirm={confirmDataDir}
+          disabledReason={
+            CHANNEL_DATA_BUILT
+              ? "Exported channel data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
+              : "Data saves to your Downloads folder in the browser. Use the desktop app to choose a folder."
+          }
+        />
+      )}
       {problem && (
         <span role="alert" className="text-meta text-accent">
           {problem}

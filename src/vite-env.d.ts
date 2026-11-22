@@ -37,6 +37,8 @@ interface ElectronAPI {
   settingsSnapshot?: Record<string, unknown>;
   setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean }>;
   pickDirectory: () => Promise<string | null>;
+  /** Folders to fall back to on a fresh install; null if they could not be made. */
+  getDefaultFolders?: () => Promise<{ clipsDir: string; dataDir: string } | null>;
   saveFile: (payload: {
     dirPath: string;
     filename: string;

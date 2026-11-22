@@ -355,6 +355,32 @@ async function createWindow(port) {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
   });
 
+  // Cmd+W must close the TAB, not the window.
+  //
+  // No application menu is set, so Electron keeps its default one, and on macOS a menu
+  // accelerator wins before the page ever sees the key: Cmd+W would close the whole
+  // window with every tab in it, which is not what any browser does and not what the
+  // shortcut in the tab strip promises. preventDefault here stops the menu accelerator
+  // firing while still delivering the key to the renderer, which closes the tab.
+  //
+  // Only this one chord, and only on macOS, where the conflict exists; Windows and Linux
+  // already let the page handle it first. Cmd+Shift+W is left alone as the way to close
+  // the window, matching browsers.
+  if (process.platform === "darwin") {
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+      if (
+        input.type === "keyDown" &&
+        input.meta &&
+        !input.shift &&
+        !input.control &&
+        !input.alt &&
+        input.key.toLowerCase() === "w"
+      ) {
+        event.preventDefault();
+      }
+    });
+  }
+
   // Open external links in the user's browser, not inside the app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -914,6 +940,30 @@ function registerIpc() {
   ipcMain.handle("system:defaultBrowser", () => ({
     browser: detectDefaultBrowser(app),
   }));
+
+  // Somewhere to put clips on a fresh install, so nobody has to decide before
+  // their first cut. With no clips folder set, useClipper's deliverPath gate is
+  // false and the whole finished file streams through the renderer into
+  // ~/Downloads instead of the main process moving it — slower, and the clips
+  // scatter. The folders are created here because clip:save does not create its
+  // target, and they become allowed save roots once the renderer stores them
+  // (allowedRoots reads them back out of settings).
+  //
+  // This never overwrites a choice: the renderer only asks when nothing is set.
+  ipcMain.handle("system:defaultFolders", async () => {
+    try {
+      const base = path.join(app.getPath("videos"), "Clipr");
+      const clipsDir = path.join(base, "Clips");
+      const dataDir = path.join(base, "Data");
+      await fsp.mkdir(clipsDir, { recursive: true });
+      await fsp.mkdir(dataDir, { recursive: true });
+      return { clipsDir, dataDir };
+    } catch {
+      // A read-only or missing Videos folder is not worth failing a launch over;
+      // the app simply carries on with nothing set, exactly as it does today.
+      return null;
+    }
+  });
 
   // The order to try browsers in when sweeping them all: the system default
   // first, then whichever one last worked, then the rest. Returning the order

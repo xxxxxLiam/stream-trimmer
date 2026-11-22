@@ -4,6 +4,8 @@
  * Description: Loads the YouTube IFrame API and exposes playhead + transport controls.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useIsTabActive } from "../context/WorkspaceContext";
+import { SUSPEND_UNLOAD_MS, resumeStart } from "./tabOps";
 
 const API_SRC = "https://www.youtube.com/iframe_api";
 const POLL_MS = 200;
@@ -106,6 +108,31 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
   // Set while a seek is in flight; see acceptPolledTime.
   const pendingSeek = useRef<PendingSeek>(null);
 
+  // A tab that is not on screen does not need a live player. The moment it is hidden the video
+  // is paused and the poll stops; after SUSPEND_UNLOAD_MS the iframe is destroyed too, and the
+  // position is kept so coming back re-creates the player at the same second. `tabActive` is
+  // true when no tab provider is above (tests, a stray mount), so nothing changes there.
+  const tabActive = useIsTabActive();
+  // A tab that mounts hidden (every saved tab on launch but one) never builds a player at all.
+  const [unloaded, setUnloaded] = useState(!tabActive);
+  const lastTime = useRef<{ videoId: string; time: number } | null>(null);
+  const readyRef = useRef(false);
+  readyRef.current = ready;
+
+  useEffect(() => {
+    if (tabActive) {
+      setUnloaded(false);
+      return;
+    }
+    try {
+      playerRef.current?.pauseVideo();
+    } catch {
+      /* not ready, or already gone */
+    }
+    const t = window.setTimeout(() => setUnloaded(true), SUSPEND_UNLOAD_MS);
+    return () => window.clearTimeout(t);
+  }, [tabActive]);
+
   const containerRef = useCallback((el: HTMLDivElement | null) => {
     nodeRef.current = el;
     setMountKey((k) => k + 1);
@@ -114,12 +141,19 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
   useEffect(() => {
     const node = nodeRef.current;
     if (!videoId || !node) return;
+    if (unloaded) {
+      // Suspended: leave the last position showing, but nothing is live.
+      setReady(false);
+      setPlaying(false);
+      return;
+    }
     let cancelled = false;
+    const startAt = resumeStart(lastTime.current, videoId);
 
     setReady(false);
     setBlocked(false);
     setPlaying(false);
-    setCurrentTime(0);
+    setCurrentTime(startAt);
 
     loadApi()
       .then((YT) => {
@@ -136,6 +170,7 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
             modestbranding: 1,
             playsinline: 1,
             origin: window.location.origin,
+            ...(startAt > 0 ? { start: startAt } : null),
           },
           events: {
             onReady: () => !cancelled && setReady(true),
@@ -156,22 +191,31 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
     return () => {
       cancelled = true;
       try {
+        // Remember where this video was, for a resume. Only trust a live reading.
+        const t = readyRef.current ? playerRef.current?.getCurrentTime() : undefined;
+        if (typeof t === "number" && Number.isFinite(t) && videoId)
+          lastTime.current = { videoId, time: t };
+      } catch {
+        /* player not readable */
+      }
+      try {
         playerRef.current?.destroy();
       } catch {
         /* player already gone */
       }
       playerRef.current = null;
     };
-  }, [videoId, mountKey]);
+  }, [videoId, mountKey, unloaded]);
 
   // Poll the playhead — the IFrame API has no time-update event.
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !tabActive) return;
     const id = window.setInterval(() => {
       try {
         const t = playerRef.current?.getCurrentTime();
         if (typeof t === "number" && acceptPolledTime(t, pendingSeek.current, Date.now())) {
           pendingSeek.current = null;
+          if (videoId) lastTime.current = { videoId, time: t };
           setCurrentTime(t);
         }
       } catch {
@@ -179,7 +223,7 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
       }
     }, POLL_MS);
     return () => window.clearInterval(id);
-  }, [ready]);
+  }, [ready, tabActive, videoId]);
 
   const seekTo = useCallback((seconds: number, autoplay = false) => {
     try {

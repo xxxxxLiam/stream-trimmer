@@ -38,6 +38,9 @@ try {
     })(),
     setSetting: (key, value) => ipcRenderer.invoke("settings:set", key, value),
     pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"),
+    // Ready-made folders for a fresh install; the renderer only asks when the
+    // user has not chosen any. Returns null if they could not be created.
+    getDefaultFolders: () => ipcRenderer.invoke("system:defaultFolders"),
     saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
     // Moves a finished clip out of the engine's temp dir. Only the path
     // crosses the bridge — never the media itself.

@@ -25,6 +25,7 @@ import {
   useSegments,
   type SegmentStore,
 } from "../hooks/useSegments";
+import { activeAfterClose, indexForDigit, moveItem, stepIndex } from "../hooks/tabOps";
 
 const STORE_KEY = "clipper.workspaces";
 const DEFAULT_TAB_NAME = "New tab";
@@ -116,7 +117,10 @@ export type WorkspaceState = {
   labelFor: (id: string) => string;
   selectTab: (id: string) => void;
   addTab: () => void;
-  closeTab: (id: string) => void;
+  /** Close a tab. False when the user backed out of the confirmation and nothing closed. */
+  closeTab: (id: string) => boolean;
+  /** Put tab `id` at `toIndex` (drag, or the keyboard move). */
+  moveTab: (id: string, toIndex: number) => void;
   renameTab: (id: string, name: string) => void;
   /** Bring back the most recently closed tab (Ctrl/Cmd+Shift+T). Returns false when none. */
   reopenTab: () => boolean;
@@ -145,6 +149,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [closed, setClosed] = useState<ClosedTab[]>([]);
   const closedRef = useRef(closed);
   closedRef.current = closed;
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
+  const activeRef = useRef(activeId);
+  activeRef.current = activeId;
 
   useEffect(() => {
     writeSetting(STORE_KEY, { tabs, activeId });
@@ -159,20 +167,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const closeTab = useCallback(
-    (id: string) => {
-      const busy = meta[id]?.busy;
+    (id: string): boolean => {
+      const busy = metaRef.current[id]?.busy;
       if (busy) {
         const ok =
           typeof window === "undefined" ||
           window.confirm(
             "This tab has a job running. Closing it will cancel that job. Continue?",
           );
-        if (!ok) return;
+        if (!ok) return false;
         cancels.current.get(id)?.();
       }
-      const closingIndex = tabsRef.current.findIndex((t) => t.id === id);
-      const closing = tabsRef.current[closingIndex];
-      if (closing && !busy) {
+      const current = tabsRef.current;
+      const closingIndex = current.findIndex((t) => t.id === id);
+      const closing = current[closingIndex];
+      if (!closing) return false;
+      if (!busy) {
         const work = closing.segments?.length ?? 0;
         if (
           work > 0 &&
@@ -181,9 +191,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             `This tab has ${work} marked segment${work === 1 ? "" : "s"} that have not been cut. Close it anyway? Ctrl+Shift+T brings it back.`,
           )
         )
-          return;
+          return false;
       }
-      if (closing && (closing.url || closing.segments?.length)) {
+      if (closing.url || closing.segments?.length || closing.name) {
         setClosed((prev) =>
           [{ tab: closing, index: closingIndex }, ...prev].slice(0, CLOSED_LIMIT),
         );
@@ -194,23 +204,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         delete next[id];
         return next;
       });
-      setTabs((prev) => {
-        const remaining = prev.filter((t) => t.id !== id);
-        if (remaining.length === 0) {
-          const fresh = { id: newId(), name: "" };
-          setActiveId(fresh.id);
-          return [fresh];
-        }
-        setActiveId((current) => {
-          if (current !== id) return current;
-          const index = prev.findIndex((t) => t.id === id);
-          return (remaining[index] ?? remaining[remaining.length - 1]).id;
-        });
-        return remaining;
-      });
+      // Decided from the list as it is now, outside any state updater, so it is not
+      // run twice or order-dependent.
+      const nextActive = activeAfterClose(
+        current.map((t) => t.id),
+        id,
+      );
+      if (nextActive === null) {
+        const fresh = { id: newId(), name: "" };
+        setTabs([fresh]);
+        setActiveId(fresh.id);
+      } else {
+        setTabs((prev) => prev.filter((t) => t.id !== id));
+        setActiveId((cur) => (cur === id ? nextActive : cur));
+      }
+      return true;
     },
-    [meta],
+    [],
   );
+
+  const moveTab = useCallback((id: string, toIndex: number) => {
+    setTabs((prev) => moveItem(prev, id, toIndex));
+  }, []);
 
   const renameTab = useCallback((id: string, name: string) => {
     setTabs((prev) =>
@@ -231,17 +246,49 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
+  const addTabRef = useRef(addTab);
+  addTabRef.current = addTab;
+  const closeTabRef = useRef(closeTab);
+  closeTabRef.current = closeTab;
+
+  // Browser tab shortcuts. Cmd on macOS, Ctrl elsewhere; Alt-modified chords are left alone.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "t") {
-        if (closedRef.current.length === 0) return;
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const ids = tabsRef.current.map((t) => t.id);
+      const k = e.key.toLowerCase();
+      if (k === "t") {
+        if (e.shiftKey) {
+          if (closedRef.current.length === 0) return;
+          e.preventDefault();
+          reopenTab();
+        } else {
+          e.preventDefault();
+          if (!e.repeat) addTabRef.current();
+        }
+      } else if (k === "w" && !e.shiftKey) {
         e.preventDefault();
-        reopenTab();
+        if (!e.repeat) closeTabRef.current(activeRef.current);
+      } else if (!e.shiftKey && /^[1-9]$/.test(k)) {
+        const i = indexForDigit(Number(k), ids.length);
+        if (i === null) return;
+        e.preventDefault();
+        setActiveId(ids[i]);
+      } else if (k === "tab" || (!e.shiftKey && (k === "pagedown" || k === "pageup"))) {
+        const back = k === "pageup" || (k === "tab" && e.shiftKey);
+        e.preventDefault();
+        const at = ids.indexOf(activeRef.current);
+        setActiveId(ids[stepIndex(at, back ? -1 : 1, ids.length)]);
+      } else if (e.shiftKey && (k === "pagedown" || k === "pageup")) {
+        // Chrome's chord for moving the current tab along the strip.
+        e.preventDefault();
+        const at = ids.indexOf(activeRef.current);
+        moveTab(activeRef.current, at + (k === "pageup" ? -1 : 1));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [reopenTab]);
+  }, [reopenTab, moveTab]);
 
   const reportTab = useCallback<WorkspaceState["reportTab"]>(
     (id, next) => {
@@ -274,6 +321,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       selectTab,
       addTab,
       closeTab,
+      moveTab,
       renameTab,
       reopenTab,
       closedCount: closed.length,
@@ -288,6 +336,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       selectTab,
       addTab,
       closeTab,
+      moveTab,
       renameTab,
       reopenTab,
       closed.length,

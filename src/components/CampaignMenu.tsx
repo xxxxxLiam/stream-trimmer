@@ -7,11 +7,15 @@
  *   screen's one primary action is Cut.
  */
 import { useState } from "react";
+import ClipIdPatternField from "./ClipIdPatternField";
+import CampaignWizard from "./CampaignWizard";
+import { useDataFolderVisible } from "./useDataFolderVisible";
 import { useClipperContext } from "../context/ClipperContext";
 import { useCampaign } from "../context/CampaignContext";
 import {
+  DEFAULT_PATTERN,
   describeCampaignProblem,
-  formatClipId,
+  reconcileDataDir,
   validateCampaign,
   type Campaign,
 } from "../lib/campaigns";
@@ -35,7 +39,7 @@ function toDraft(c: Campaign | null, fallback: { clipsDir: string; dataDir: stri
     min: String(c?.targetMinSec ?? 30),
     max: String(c?.targetMaxSec ?? 60),
     hard: String(c?.hardMaxSec ?? 90),
-    pattern: c?.clipIdPattern ?? "{prefix}-{videoId}-{nn}",
+    pattern: c?.clipIdPattern ?? DEFAULT_PATTERN,
     prefix: c?.prefix ?? "",
     format: c?.format ?? "mp4",
     clipsDir: c?.clipsDir ?? fallback.clipsDir,
@@ -83,6 +87,7 @@ function CampaignForm({
 }) {
   const { create, update, folders, campaigns } = useCampaign();
   const { isElectron, format, quality } = useClipperContext();
+  const dataVisible = useDataFolderVisible();
   const [d, setD] = useState<Draft>(() => toDraft(editing, folders));
   const [problems, setProblems] = useState<string[]>([]);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
@@ -92,15 +97,10 @@ function CampaignForm({
     if (dir) set(k, dir);
   };
 
-  const preview = formatClipId(
-    { clipIdPattern: d.pattern || "{prefix}-{videoId}-{nn}", prefix: d.prefix || "XX" },
-    "VIDEOID",
-    1,
-  );
-
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const found = campaignFormProblems(d, campaigns, editing?.id);
+    const dataDir = reconcileDataDir(d.clipsDir, d.dataDir, dataVisible);
+    const found = campaignFormProblems({ ...d, dataDir }, campaigns, editing?.id);
     if (found.length) {
       setProblems(found);
       return;
@@ -114,7 +114,7 @@ function CampaignForm({
       prefix: d.prefix.trim() || undefined,
       format: d.format,
       clipsDir: d.clipsDir,
-      dataDir: d.dataDir,
+      dataDir,
     };
     if (editing) {
       update(editing.id, { ...fields, prefix: fields.prefix ?? editing.prefix });
@@ -138,32 +138,32 @@ function CampaignForm({
         />
       </Field>
       <div className="flex gap-2">
-        <Field label="Target min (s)">
+        <Field label="Aim for at least (seconds)">
           <input className="field font-mono" inputMode="numeric" value={d.min} onChange={(e) => set("min", e.target.value)} />
         </Field>
-        <Field label="Target max (s)">
+        <Field label="Aim for at most (seconds)">
           <input className="field font-mono" inputMode="numeric" value={d.max} onChange={(e) => set("max", e.target.value)} />
         </Field>
-        <Field label="Hard cap (s)">
+        <Field label="Never longer than (seconds)">
           <input className="field font-mono" inputMode="numeric" value={d.hard} onChange={(e) => set("hard", e.target.value)} />
         </Field>
       </div>
       <div className="flex gap-2">
-        <Field label="Clip id prefix">
+        <Field label="Short code for this client">
           <input
             className="field font-mono"
             value={d.prefix}
-            placeholder="Auto"
+            placeholder="Made from the name"
             onChange={(e) => set("prefix", e.target.value)}
           />
         </Field>
-        <Field label="Clip id pattern">
-          <input className="field font-mono" value={d.pattern} onChange={(e) => set("pattern", e.target.value)} />
-        </Field>
       </div>
-      <p className="m-0 text-meta text-fg-dim">
-        Next clip id looks like <span className="font-mono text-fg">{preview}</span>
-      </p>
+      <ClipIdPatternField
+        pattern={d.pattern}
+        prefix={d.prefix}
+        campaignName={d.name}
+        onChange={(v) => set("pattern", v)}
+      />
       <Field label="Format">
         <select
           className="field"
@@ -179,7 +179,7 @@ function CampaignForm({
           {(
             [
               ["clipsDir", "Clips folder"],
-              ["dataDir", "Data folder"],
+              ...(dataVisible ? ([["dataDir", "Data folder"]] as const) : []),
             ] as const
           ).map(([k, label]) => (
             <div key={k} className="flex items-center gap-2">
@@ -221,6 +221,7 @@ export default function CampaignMenu({ onClose }: { onClose?: () => void }) {
     kind: "list",
   });
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [wizard, setWizard] = useState(false);
 
   if (mode.kind === "form") {
     const editing = mode.id ? (campaigns.find((c) => c.id === mode.id) ?? null) : null;
@@ -239,8 +240,8 @@ export default function CampaignMenu({ onClose }: { onClose?: () => void }) {
     <div className="flex flex-col gap-2">
       {campaigns.length === 0 ? (
         <p className="m-0 text-meta text-fg-dim">
-          No campaigns yet. A campaign sets a clip length band, a clip id pattern, format and
-          quality, and two save folders.
+          No campaigns yet. A campaign remembers, for one client, how long clips should be, how
+          they are named, the format, and the folder they are saved in.
         </p>
       ) : (
         <ul id="ui-campaign-list" className="m-0 flex list-none flex-col gap-1 p-0" role="listbox" aria-label="Campaigns">
@@ -290,9 +291,14 @@ export default function CampaignMenu({ onClose }: { onClose?: () => void }) {
           })}
         </ul>
       )}
-      <button type="button" className="btn" onClick={() => setMode({ kind: "form", id: null })}>
+      <button type="button" className="btn" onClick={() => setWizard(true)}>
         New campaign
       </button>
+      <CampaignWizard
+        open={wizard}
+        onClose={() => setWizard(false)}
+        onCreated={() => onClose?.()}
+      />
     </div>
   );
 }

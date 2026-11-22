@@ -263,6 +263,78 @@ export function nextClipId(
   return formatClipId(c, videoId, max + 1);
 }
 
+// --- Ready-made clip id patterns ----------------------------------------------
+
+/** The sample video code shown in pattern examples. Looks like a real one. */
+export const SAMPLE_VIDEO_ID = "9xK2mQ";
+
+export type ClipIdPreset = {
+  id: string;
+  pattern: string;
+  /** Plain words for what the example is made of. */
+  parts: string;
+  /** Extra plain-language caution shown under the choice, when there is one. */
+  note?: string;
+};
+
+/**
+ * Only tokens formatClipId can expand: {prefix}, {videoId}, {nn}, {n}. There is NO date token,
+ * so no date preset exists; add one here only after formatClipId and clipNumber learn it.
+ */
+export const CLIP_ID_PRESETS: readonly ClipIdPreset[] = [
+  { id: "prefix-video-number", pattern: "{prefix}-{videoId}-{nn}", parts: "client code, video, number" },
+  {
+    id: "prefix-number",
+    pattern: "{prefix}-{nn}",
+    parts: "client code and number",
+    note: "Numbers start again at 01 for every video, so two videos can give the same name.",
+  },
+  { id: "video-number", pattern: "{videoId}-{nn}", parts: "video and number" },
+];
+
+export function presetForPattern(pattern: string): ClipIdPreset | null {
+  return CLIP_ID_PRESETS.find((p) => p.pattern === pattern.trim()) ?? null;
+}
+
+/** The worked example for a pattern, using the campaign's own prefix and a sample video. */
+export function clipIdExample(pattern: string, prefix: string, n = 1): string {
+  return formatClipId({ clipIdPattern: pattern, prefix: prefix || "XX" }, SAMPLE_VIDEO_ID, n);
+}
+
+// --- Folder defaults -------------------------------------------------------------
+
+/** True when nothing has been chosen yet, so a default should be offered. */
+export function needsDefaultFolders(f: { clipsDir: string }): boolean {
+  return !f.clipsDir.trim();
+}
+
+/**
+ * Folders to store on first run. Keeps anything already chosen; never lets the two folders be the
+ * same. Returns null when there is nothing to change.
+ */
+export function applyDefaultFolders<T extends { clipsDir: string; dataDir: string }>(
+  current: T,
+  offered: { clipsDir?: string; dataDir?: string } | null | undefined,
+): T | null {
+  if (!offered?.clipsDir || !needsDefaultFolders(current)) return null;
+  let dataDir = current.dataDir || offered.dataDir || defaultDataDir(offered.clipsDir);
+  if (sameFolder(offered.clipsDir, dataDir)) dataDir = defaultDataDir(offered.clipsDir);
+  return { ...current, clipsDir: offered.clipsDir, dataDir };
+}
+
+/**
+ * With the Data folder hidden nobody can fix a clash with it, so move it beside the clips folder
+ * instead of reporting a problem about a setting they cannot see. Visible: left alone.
+ */
+export function reconcileDataDir(clipsDir: string, dataDir: string, dataVisible: boolean): string {
+  return !dataVisible && sameFolder(clipsDir, dataDir) ? defaultDataDir(clipsDir) : dataDir;
+}
+
+/** The Data folder only does anything for the channel exporter, so only show it with that. */
+export function dataFolderVisible(built: boolean, ownerAccess: boolean): boolean {
+  return built && ownerAccess;
+}
+
 // --- Used ranges -------------------------------------------------------------
 
 export function usedRangesFor(c: Campaign | null | undefined, videoId: string): UsedRange[] {

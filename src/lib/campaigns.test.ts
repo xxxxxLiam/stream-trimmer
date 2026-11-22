@@ -24,6 +24,14 @@ import {
   usedRangesFor,
   validateCampaign,
   type Campaign,
+  CLIP_ID_PRESETS,
+  SAMPLE_VIDEO_ID,
+  applyDefaultFolders,
+  clipIdExample,
+  dataFolderVisible,
+  needsDefaultFolders,
+  presetForPattern,
+  reconcileDataDir,
 } from "./campaigns";
 
 function make(name = "Daily Shorts", extra = {}): Campaign {
@@ -206,4 +214,48 @@ test("two campaigns cannot carry the same name (create, rename, validation)", ()
 test("a build without the exporter does not name it in the suggested folder", () => {
   assert.equal(DATA_FOLDER_NAME, "data"); // tests run in the public shape
   assert.equal(defaultDataDir("/v/clips"), "/v/data");
+});
+
+test("every ready-made pattern only uses tokens the code can expand, and numbers its clips", () => {
+  for (const p of CLIP_ID_PRESETS) {
+    const left = p.pattern.replace(/\{(prefix|videoId|nn|n)\}/g, "");
+    assert.ok(!/[{}]/.test(left), `${p.pattern} has a token formatClipId cannot expand`);
+    assert.deepEqual(validateCampaign({ name: "x", clipsDir: "", dataDir: "", clipIdPattern: p.pattern }), []);
+    // The example round-trips: the number it shows is the number clipNumber reads back.
+    const id = clipIdExample(p.pattern, "SHD", 7);
+    assert.equal(clipNumber({ clipIdPattern: p.pattern, prefix: "SHD" }, SAMPLE_VIDEO_ID, id), 7);
+  }
+});
+
+test("pattern examples use the campaign's own prefix and a sample video id", () => {
+  assert.equal(clipIdExample("{prefix}-{videoId}-{nn}", "SHD"), "SHD-9xK2mQ-01");
+  assert.equal(clipIdExample("{prefix}-{nn}", "SHD"), "SHD-01");
+  assert.equal(clipIdExample("{prefix}-{nn}", ""), "XX-01");
+  assert.equal(presetForPattern(" {prefix}-{nn} ")?.id, "prefix-number");
+  assert.equal(presetForPattern("{prefix}_{nn}"), null, "hand-written patterns are not presets");
+  // No date token exists, so no preset may claim one.
+  assert.ok(CLIP_ID_PRESETS.every((p) => !/date|year|\{yy/i.test(p.pattern)));
+  assert.equal(clipIdExample("{prefix}-{date}-{nn}", "A"), "A-{date}-01", "an unknown token is left as typed");
+});
+
+test("first-run folder defaults fill gaps and never replace a choice", () => {
+  const offered = { clipsDir: "/v/Clipr/Clips", dataDir: "/v/Clipr/Data" };
+  assert.deepEqual(applyDefaultFolders({ clipsDir: "", dataDir: "" }, offered), offered);
+  assert.equal(applyDefaultFolders({ clipsDir: "/mine", dataDir: "" }, offered), null);
+  assert.deepEqual(applyDefaultFolders({ clipsDir: "", dataDir: "/keep" }, offered)?.dataDir, "/keep");
+  assert.equal(applyDefaultFolders({ clipsDir: "", dataDir: "" }, null), null);
+  assert.equal(applyDefaultFolders({ clipsDir: "", dataDir: "" }, { clipsDir: "/a", dataDir: "/a/" })?.dataDir, "/data");
+  assert.equal(needsDefaultFolders({ clipsDir: "  " }), true);
+});
+
+test("the Data folder shows only with the exporter built in and owner access", () => {
+  assert.equal(dataFolderVisible(false, true), false);
+  assert.equal(dataFolderVisible(true, false), false);
+  assert.equal(dataFolderVisible(true, true), true);
+});
+
+test("a hidden Data folder is moved aside instead of clashing; a visible one is left for the form to report", () => {
+  assert.equal(reconcileDataDir("/a/clips", "/a/clips/", false), "/a/data");
+  assert.equal(reconcileDataDir("/a/clips", "/a/clips", true), "/a/clips");
+  assert.equal(reconcileDataDir("/a/clips", "/b/data", false), "/b/data");
 });

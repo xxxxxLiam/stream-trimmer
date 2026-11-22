@@ -66,7 +66,7 @@ export default function PreviewPanel() {
         transition={{ duration: 0.16, ease: "easeOut" }}
         className="flex shrink-0 flex-col gap-3"
       >
-        <div className="relative mx-auto aspect-video w-full max-w-[80vh] overflow-hidden rounded-panel border border-hairline bg-panel-raised">
+        <div className="relative aspect-video w-full overflow-hidden rounded-panel border border-hairline bg-panel-raised">
           {videoId && !embedBlocked && (
             <div ref={player.containerRef} className="absolute inset-0" />
           )}
