@@ -26,7 +26,7 @@ import {
   type BankedClip,
 } from "../lib/bank";
 import type { ParsedClip } from "../lib/bankImport";
-import { suggestProjectName } from "../lib/projectName";
+import { suggestProjectName } from "../lib/projectName"; import { playFrom } from "../lib/playFrom";
 import { formatLength, formatTimecode } from "../lib/segments";
 import DownloadsPanel from "./DownloadsPanel";
 import ImportTimestamps from "./ImportTimestamps";
@@ -183,7 +183,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
   const load = useCallback(
     (clip: BankedClip) => {
       setSelected(clip.id);
-      seg.load(clip.segments);
+      seg.load(clip.segments); if (clip.segments[0]) playFrom(clip.segments[0].start);
     },
     [seg],
   );
