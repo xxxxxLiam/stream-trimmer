@@ -5,6 +5,8 @@
  *   Bank (imported candidate clips, with category and tier filters) and All saved (the
  *   download history). Clicking a bank row loads its segments into the mark bar; Cut on the
  *   row cuts it directly and, once saved, flips it to cut and records its ranges as used.
+ *   Each banked row carries a project name box, pre-filled with a two-word suggestion taken
+ *   from the imported label (see projectName.ts); clearing it uses the campaign's name pattern.
  *   BUILD-SPEC 12b and A1.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -24,6 +26,7 @@ import {
   type BankedClip,
 } from "../lib/bank";
 import type { ParsedClip } from "../lib/bankImport";
+import { suggestProjectName } from "../lib/projectName";
 import { formatLength, formatTimecode } from "../lib/segments";
 import DownloadsPanel from "./DownloadsPanel";
 import ImportTimestamps from "./ImportTimestamps";
@@ -33,9 +36,10 @@ export type ClipsColumnProps = {
   /**
    * Cut a banked clip directly (all its segments, joined as one file). Resolve true once the
    * file is saved; the row then flips to cut and its ranges join the campaign's used ranges.
+   * `projectName` is the name in the row's box; empty means use the campaign's name pattern.
    * Without it, Cut is disabled.
    */
-  onCutBanked?: (clip: BankedClip) => Promise<boolean> | boolean;
+  onCutBanked?: (clip: BankedClip, projectName?: string) => Promise<boolean> | boolean;
 };
 
 type Tab = "video" | "bank" | "all";
@@ -133,6 +137,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
   const [sort, setSort] = useState<BankSort>("order");
   const [selected, setSelected] = useState<string | null>(null);
   const [cutting, setCutting] = useState<string | null>(null);
+  const [names, setNames] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [summary, setSummary] = useState("");
 
@@ -150,6 +155,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
     setImporting(false);
     setNotice("");
     setSummary("");
+    setNames({});
   }, [campaignId, vid]);
 
   // Paint the plan on the timeline. syncVideo clears it on a video change, so reapply when it is empty.
@@ -183,12 +189,12 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
   );
 
   const cut = useCallback(
-    async (clip: BankedClip) => {
+    async (clip: BankedClip, projectName?: string) => {
       if (!onCutBanked || !campaignId || !vid) return;
       setCutting(clip.id);
       setNotice("");
       try {
-        const ok = await onCutBanked(clip);
+        const ok = await onCutBanked(clip, projectName);
         if (ok) {
           finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
         } else {
@@ -247,6 +253,8 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
               ? `${formatLength(b.deltaSec)} past the cap`
               : "";
     const outOfBand = b.status === "under" || b.status === "over" || b.status === "over-hard";
+    // The box shows the suggestion until it is edited; an emptied box means "use the pattern".
+    const projectName = names[clip.id] ?? suggestProjectName(clip);
     return (
       <li key={clip.id}>
         <div
@@ -285,6 +293,21 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
               )}
               <span className="text-meta text-fg-dim">{clip.status}</span>
             </div>
+            {opts.fromBank && clip.status === "banked" && (
+              <label className="flex items-center gap-2 pt-1">
+                <span className="text-meta text-fg-dim">Project name</span>
+                <input
+                  className="field min-w-0 flex-1"
+                  dir="auto"
+                  aria-label={`Project name for ${clip.id}`}
+                  placeholder="Uses your name pattern"
+                  value={projectName}
+                  onChange={(e) => setNames((p) => ({ ...p, [clip.id]: e.target.value }))}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+              </label>
+            )}
             {opts.fromBank && (
               <div className="flex items-center gap-1 pt-1">
                 {clip.status === "banked" && (
@@ -295,7 +318,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
                     title={onCutBanked ? "Cut this clip as one file" : "Cutting is not connected yet"}
                     onClick={(e) => {
                       e.stopPropagation();
-                      void cut(clip);
+                      void cut(clip, projectName.trim());
                     }}
                   >
                     {cutting === clip.id ? "Cutting" : "Cut"}
