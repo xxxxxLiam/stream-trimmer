@@ -454,7 +454,12 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
     ) : gate ? (
       <p className="px-1 py-4 text-body text-fg-dim">{gate}</p>
     ) : tab === "bank" ? (
-      importing ? importView : bankView
+      // The importer is a dialog over the whole window now, so the bank stays
+      // behind it rather than being replaced by a panel squeezed into this column.
+      <>
+        {bankView}
+        {importing && importView}
+      </>
     ) : (
       videoView
     );

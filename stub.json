@@ -1,0 +1,17 @@
+{
+  "info": {
+    "id": "stub0000001",
+    "title": "Stub video",
+    "duration": 3600,
+    "uploader": "Stub channel"
+  },
+  "exitCode": 0,
+  "stderr": "",
+  "delayMs": 0,
+  "progress": [
+    0,
+    50,
+    100
+  ],
+  "writeMedia": true
+}

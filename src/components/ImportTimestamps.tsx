@@ -1,11 +1,12 @@
 /**
  * File: ImportTimestamps.tsx
  * Path: src/components/ImportTimestamps.tsx
- * Description: Paste box for the clip bank (BUILD-SPEC 12b, A1). Shows a worked example of
- *   every accepted shape, a live preview of what was understood, and a per-line error list.
- *   Nothing is stored until the user confirms.
+ * Description: Paste box for the clip bank (BUILD-SPEC 12b, A1). A centred dialog, not a
+ *   panel in the 320px clips column: a paste is many lines wide and you have to be able to
+ *   read what you pasted. Shows what was understood, a per-line error list, and the accepted
+ *   shapes behind a disclosure. Nothing is stored until the user confirms.
  */
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { parseBankImport, type ParsedClip } from "../lib/bankImport";
 import { formatLength } from "../lib/segments";
 
@@ -32,122 +33,186 @@ const EXAMPLES: Array<{ shape: string; text: string }> = [
 export default function ImportTimestamps({ duration, onImport, onCancel }: ImportTimestampsProps) {
   const [text, setText] = useState("");
   const areaId = useId();
+  const titleId = useId();
+  const areaRef = useRef<HTMLTextAreaElement | null>(null);
   const preview = useMemo(() => parseBankImport(text, { duration }), [text, duration]);
   const hasInput = text.trim().length > 0;
   const n = preview.clipCount;
+  const lineCount = text ? text.split(/\r\n|\r|\n/).filter((l) => l.trim()).length : 0;
+
+  // The paste is the task, so the caret starts in the box.
+  useEffect(() => {
+    areaRef.current?.focus();
+  }, []);
+
+  // Esc leaves without importing. Nothing has been stored at this point.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onCancel]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" aria-label="Import timestamps">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-section font-medium text-fg">Import timestamps</h2>
-        <button type="button" className="chip" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-      <p className="text-meta text-fg-dim">
-        One clip per line. Paste once for this video and it stays banked.
-      </p>
-
-      <label htmlFor={areaId} className="sr-only">
-        Timestamps, one clip per line
-      </label>
-      <textarea
-        id={areaId}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={8}
-        spellCheck={false}
-        placeholder="Paste your timestamps here"
-        className="w-full resize-y rounded-control border bg-raised p-3 font-mono text-body text-fg outline-none focus-visible:border-accent"
-        style={{ borderColor: "var(--c-hairline)", fontVariantNumeric: "tabular-nums" }}
-      />
-
-      {hasInput && (
-        <section aria-label="What was understood" className="flex flex-col gap-2">
-          <p className="text-body text-fg" aria-live="polite">
-            {n} {n === 1 ? "clip" : "clips"}, {preview.segmentCount}{" "}
-            {preview.segmentCount === 1 ? "segment" : "segments"},{" "}
-            <span className="font-mono" style={{ fontVariantNumeric: "tabular-nums" }}>
-              {formatLength(preview.totalSec)}
-            </span>{" "}
-            in total
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.55)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="surface-panel flex max-h-[86vh] w-full max-w-[860px] flex-col rounded-panel border border-hairline shadow-drawer"
+      >
+        <header className="flex shrink-0 items-baseline gap-3 border-b border-hairline px-5 py-4">
+          <h2 id={titleId} className="text-section font-medium text-fg">
+            Import timestamps
+          </h2>
+          <p className="min-w-0 flex-1 truncate text-meta text-fg-dim">
+            One clip per line. Paste once for this video and it stays banked.
           </p>
-          <p className="text-meta text-fg-dim">
-            {preview.withCategory} with a category, {preview.withoutCategory} without
-            {preview.withTier > 0 ? `. ${preview.withTier} with a tier` : ""}
-          </p>
-          {(preview.categories.length > 0 || preview.tiers.length > 0) && (
-            <div className="flex flex-wrap gap-1">
-              {preview.categories.map((c) => (
-                <span key={`c-${c}`} className="chip">
-                  {c}
-                </span>
-              ))}
-              {preview.tiers.map((t) => (
-                <span key={`t-${t}`} className="chip">
-                  Tier {t}
-                </span>
-              ))}
-            </div>
-          )}
+          <button type="button" className="chip shrink-0" onClick={onCancel}>
+            Cancel
+          </button>
+        </header>
 
-          {preview.errors.length > 0 && (
-            <div
-              role="alert"
-              className="rounded-control border border-accent bg-accent-card p-3 shadow-accent-card"
-            >
-              <p className="text-body font-medium text-accent">
-                {preview.errors.length} {preview.errors.length === 1 ? "line" : "lines"} not
-                understood. They will be skipped.
-              </p>
-              <ul className="mt-2 flex flex-col gap-2">
-                {preview.errors.map((e) => (
-                  <li key={e.line} className="text-meta">
-                    <span className="font-mono text-fg" style={{ fontVariantNumeric: "tabular-nums" }}>
-                      Line {e.line}
-                    </span>
-                    <span className="text-fg-dim"> {e.reason}</span>
-                    <span className="block truncate font-mono text-fg-dim">{e.text}</span>
-                  </li>
-                ))}
-              </ul>
+        {/* tabIndex so everything inside stays reachable by keyboard with the bar hidden. */}
+        <div
+          tabIndex={0}
+          aria-label="Import timestamps, scrollable"
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4"
+        >
+          <div className="flex min-h-0 flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <label htmlFor={areaId} className="text-body font-medium text-fg">
+                Your timestamps
+              </label>
+              <span className="text-meta text-fg-dim" aria-live="polite">
+                {lineCount > 0 ? `${lineCount} ${lineCount === 1 ? "line" : "lines"}` : "nothing pasted yet"}
+              </span>
             </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="btn"
-              disabled={n === 0}
-              onClick={() => onImport(preview.clips)}
-            >
-              {n === 0 ? "Nothing to import" : `Import ${n} ${n === 1 ? "clip" : "clips"}`}
-            </button>
-            <span className="text-meta text-fg-dim">Review the list, then confirm.</span>
+            <textarea
+              id={areaId}
+              ref={areaRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={12}
+              spellCheck={false}
+              placeholder={"Ruling:\n12:04 - 12:31  can you combine these two prayers [1]\n28:50 - 29:19  is this income halal [2]"}
+              className="w-full shrink-0 resize-y rounded-control border bg-raised p-3 font-mono text-body leading-relaxed text-fg outline-none focus-visible:border-accent"
+              style={{
+                borderColor: "var(--c-hairline)",
+                fontVariantNumeric: "tabular-nums",
+                minHeight: "15rem",
+              }}
+            />
           </div>
-        </section>
-      )}
 
-      <section aria-label="Accepted shapes" className="flex flex-col gap-2">
-        <h3 className="text-body font-medium text-fg">Accepted shapes</h3>
-        <ul className="flex flex-col gap-2">
-          {EXAMPLES.map((ex) => (
-            <li key={ex.shape} className="flex flex-col gap-1">
-              <span className="text-meta text-fg-dim">{ex.shape}</span>
-              <pre
-                className="m-0 overflow-x-auto rounded-control border bg-raised px-3 py-2 font-mono text-meta text-fg"
-                style={{ borderColor: "var(--c-hairline)", fontVariantNumeric: "tabular-nums" }}
-              >
-                {ex.text}
-              </pre>
-            </li>
-          ))}
-        </ul>
-        <p className="text-meta text-fg-dim">
-          Categories and tiers are whatever you write. If a line says more than one way, the
-          explicit pair wins, then brackets or pipes, then the heading, then the id.
-        </p>
-      </section>
+          {hasInput && (
+            <section aria-label="What was understood" className="flex shrink-0 flex-col gap-2">
+              <p className="text-body text-fg" aria-live="polite">
+                {n} {n === 1 ? "clip" : "clips"}, {preview.segmentCount}{" "}
+                {preview.segmentCount === 1 ? "segment" : "segments"},{" "}
+                <span className="font-mono" style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {formatLength(preview.totalSec)}
+                </span>{" "}
+                in total
+              </p>
+              <p className="text-meta text-fg-dim">
+                {preview.withCategory} with a category, {preview.withoutCategory} without
+                {preview.withTier > 0 ? `. ${preview.withTier} with a tier` : ""}
+              </p>
+              {(preview.categories.length > 0 || preview.tiers.length > 0) && (
+                <div className="flex flex-wrap gap-1">
+                  {preview.categories.map((c) => (
+                    <span key={`c-${c}`} className="chip">
+                      {c}
+                    </span>
+                  ))}
+                  {preview.tiers.map((t) => (
+                    <span key={`t-${t}`} className="chip">
+                      Tier {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {preview.errors.length > 0 && (
+                <div
+                  role="alert"
+                  className="rounded-control border border-accent bg-accent-card p-3 shadow-accent-card"
+                >
+                  <p className="text-body font-medium text-accent">
+                    {preview.errors.length} {preview.errors.length === 1 ? "line" : "lines"} not
+                    understood. They will be skipped.
+                  </p>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {preview.errors.map((e) => (
+                      <li key={e.line} className="text-meta">
+                        <span
+                          className="font-mono text-fg"
+                          style={{ fontVariantNumeric: "tabular-nums" }}
+                        >
+                          Line {e.line}
+                        </span>
+                        <span className="text-fg-dim"> {e.reason}</span>
+                        <span className="block truncate font-mono text-fg-dim">{e.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Closed by default. The parser is forgiving and the preview above teaches far
+              better than a grammar does, so the grammar is here for the one person who
+              wants it rather than in front of the nine who do not. */}
+          <details className="shrink-0">
+            <summary className="cursor-pointer text-body text-fg-dim">
+              What else can I paste?
+            </summary>
+            <ul className="mt-3 flex flex-col gap-2">
+              {EXAMPLES.map((ex) => (
+                <li key={ex.shape} className="flex flex-col gap-1">
+                  <span className="text-meta text-fg-dim">{ex.shape}</span>
+                  <pre
+                    className="m-0 overflow-x-auto rounded-control border bg-raised px-3 py-2 font-mono text-meta text-fg"
+                    style={{ borderColor: "var(--c-hairline)", fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {ex.text}
+                  </pre>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-meta text-fg-dim">
+              Categories and tiers are whatever you write. If a line says more than one way, the
+              explicit pair wins, then brackets or pipes, then the heading, then the id.
+            </p>
+          </details>
+        </div>
+
+        <footer className="flex shrink-0 items-center gap-3 border-t border-hairline px-5 py-4">
+          <button
+            type="button"
+            className="btn"
+            disabled={n === 0}
+            onClick={() => onImport(preview.clips)}
+          >
+            {n === 0 ? "Nothing to import" : `Import ${n} ${n === 1 ? "clip" : "clips"}`}
+          </button>
+          <span className="min-w-0 flex-1 text-meta text-fg-dim">
+            {hasInput ? "Review the list, then confirm." : "Paste above to see what it reads."}
+          </span>
+        </footer>
+      </div>
     </div>
   );
 }
