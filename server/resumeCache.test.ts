@@ -128,7 +128,7 @@ test("G-1: tryClaim gives the shared folder to one job at a time", () => {
   });
 });
 
-test("item 11: usage counts only what Clear would remove, so the Downloads label is true", () => {
+test("item 11 / G2-7: usage reports all the bytes on disk and says which part Clear can remove", () => {
   inPrivateTmp(() => {
     const idle = workDir(CLIP_PREFIX, ["idle-usage"]);
     fs.writeFileSync(path.join(idle, "a.part"), "x".repeat(100));
@@ -140,11 +140,21 @@ test("item 11: usage counts only what Clear would remove, so the Downloads label
     holdFolder(finished, 60_000);
 
     const usage = cacheUsage();
-    assert.deepEqual(usage, { folders: 1, bytes: 100, protectedFolders: 2 });
+    // G2-7: the held clip and the running job are real disk use. They used to
+    // be left out entirely, so 6 KB on disk read as "0 folders, 100 bytes".
+    assert.deepEqual(usage, {
+      folders: 3,
+      bytes: 6100,
+      clearableFolders: 1,
+      clearableBytes: 100,
+      protectedFolders: 2,
+      protectedBytes: 6000,
+    });
 
     const cleared = clearCache();
-    assert.equal(cleared.removed, usage.folders, "what was shown is what went");
+    assert.equal(cleared.removed, usage.clearableFolders, "what was offered is what went");
     assert.equal(cleared.skipped, usage.protectedFolders);
+    assert.equal(cacheUsage().bytes, usage.protectedBytes, "what is left is what was protected");
     assert.ok(fs.existsSync(path.join(finished, "clip.mp4")), "the finished clip survived");
     assert.ok(fs.existsSync(path.join(busy, "b.part")), "the running job's partial survived");
     release();

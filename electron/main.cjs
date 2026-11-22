@@ -46,7 +46,10 @@ const {
 } = require("./updater.cjs");
 const logger = require("./logger.cjs");
 const { readMachineId, hashMachineId } = require("./machineId.cjs");
-const ownerGate = require("./ownerCheck.cjs").createOwnerCheck({ readMachineId, hashMachineId });
+const { createOwnerCheck, readBakedShape } = require("./ownerCheck.cjs");
+// Read once, at start: what this build was baked with. Absent in a public build.
+const bakedShape = readBakedShape(path.join(__dirname, "dist"));
+const ownerGate = createOwnerCheck({ readMachineId, hashMachineId, getBaked: () => bakedShape });
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
@@ -90,9 +93,24 @@ let settings = null;
 function loadSettings() {
   settings = createSettingsStore(
     path.join(app.getPath("userData"), "settings.json"),
-    { log: (message) => logger.log("settings", message) },
+    {
+      log: (message) => logger.log("settings", message),
+      // Null in a public build, so the migration never names the exporter's folder.
+      dataFolderName: bakedShape ? bakedShape.dataFolderName || null : null,
+    },
   );
   settings.load();
+}
+
+// Every reader of the log goes through here. The log can hold cookie rows,
+// bearer tokens, signed URLs, an email and the home path, so no handler reads
+// the raw file text (logger.tail) itself; electron/diagnosticsPath.test.ts
+// fails if one does. A new reader calls readLogScrubbed() and is safe by default.
+function scrubForDisplay(text) {
+  return redact(String(text ?? ""), { homeDir: os.homedir() });
+}
+function readLogScrubbed(lines = 500) {
+  return scrubForDisplay(logger.tail(lines));
 }
 
 let serverHandle = null; // { close(cb) } returned by the bundled server
@@ -604,7 +622,7 @@ function registerIpc() {
     try {
       // Owner-only, like the exporter that produces these folders. A refusal
       // carries no hint the feature exists.
-      if (!ownerGate.isOwner()) return { ok: false, error: "Could not save." };
+      if (!(await ownerGate.isOwner())) return { ok: false, error: "Could not save." };
       const result = await saveExportFiles({
         dirPath: payload?.dirPath,
         folder: payload?.folder,
@@ -778,9 +796,9 @@ function registerIpc() {
   // Owner gate: is this computer on the build's allowlist? Answers a boolean
   // and nothing else. The list and salt come from the renderer bundle because
   // this file is not bundled by Vite. Never logs or returns the id or hash.
-  // The verdict is remembered in ownerGate so export:save can refuse non-owners
-  // too; only the boolean ever leaves it.
-  ipcMain.handle("owner:check", (_e, list, salt) => ownerGate.check(list, salt));
+  // The arguments are ignored: main answers from what this build was baked with,
+  // so a page cannot choose its own answer. export:save asks the same gate.
+  ipcMain.handle("owner:check", () => ownerGate.check());
 
   // Editor handoff (BUILD-SPEC 11c): editor:installed / probe / writeFcpxml /
   // openWith / reveal / copyFiles. Failures come back as { ok:false, error }.
@@ -801,8 +819,8 @@ function registerIpc() {
   // Surfaces the local log so a crash can be reported without hunting for a
   // hidden folder. Only event names and error messages are ever recorded.
   ipcMain.handle("diagnostics:read", () => ({
-    path: logger.logFilePath(),
-    text: logger.tail(500),
+    path: scrubForDisplay(logger.logFilePath() || ""),
+    text: readLogScrubbed(),
   }));
 
   ipcMain.handle("diagnostics:reveal", () => {
@@ -823,7 +841,7 @@ function registerIpc() {
       // The log can hold cookie rows, bearer tokens, signed URLs, the user's
       // email and home path. Scrub it here, in the process that owns the
       // clipboard, so no caller can put the raw text there.
-      clipboard.writeText(redact(logger.tail(500), { homeDir: os.homedir() }));
+      clipboard.writeText(readLogScrubbed());
       return { ok: true };
     } catch (err) {
       return { ok: false, error: logger.describe(err) };

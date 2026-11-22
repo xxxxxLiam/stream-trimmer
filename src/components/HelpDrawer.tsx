@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CHANNEL_HELP_TASKS, HELP_TASKS, searchTasks, type HelpTask } from "../lib/helpTasks";
 import SetupChecklist from "./SetupChecklist";
 import Spotlight from "./Spotlight";
+import { isSignInGateUp, useYouTubeConnection } from "../lib/youtubeConnection";
 
 export type HelpDrawerProps = { open: boolean; onClose: () => void };
 
@@ -25,6 +26,12 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
   const [step, setStep] = useState(0);
   const [present, setPresent] = useState(true);
   const [setupOpen, setSetupOpen] = useState(false);
+  // AF2-3: the sign-in gate makes the app inert, this drawer with it. A drawer that stays drawn
+  // over the gate is visible, dead and click-through, so it is closed while the gate is up.
+  const gateUp = isSignInGateUp(useYouTubeConnection());
+  useEffect(() => {
+    if (open && gateUp) onClose();
+  }, [open, gateUp, onClose]);
   const searchRef = useRef<HTMLInputElement>(null);
   const asideRef = useRef<HTMLElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
@@ -63,7 +70,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || gateUp) return null;
 
   const pick = (id: string) => {
     setTaskId(id);

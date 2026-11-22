@@ -508,8 +508,10 @@ test("ONE segment takes today's single-range path with no concat", async (t) => 
   t.after(stop);
 
   // Both shapes of the same request.
+  let r0Path = "";
   for (const body of [{ start: 10, end: 20 }, { segments: [{ start: 10, end: 20 }] }]) {
     const r = await cut(harness, body);
+    r0Path = r.body.path;
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal(r.headers.get("X-Join-Method"), null);
     assert.equal(r.body.segments, 1);
@@ -517,9 +519,12 @@ test("ONE segment takes today's single-range path with no concat", async (t) => 
     assert.match(fs.readFileSync(r.body.path, "utf8"), /duration=10\n/);
   }
   assert.equal(ffmpegCalls().filter((c) => c.startsWith("concat")).length, 0);
-  // The folder is the same one a single range always used: no segment files.
+  // G2-1: even a lone range is written into the resumable folder (so a dropped
+  // download's `.part` survives the failed request's cleanup) and moved to
+  // clip.mp4 only once it is finished. It never reaches the join.
   const runs = execLines(harness);
-  assert.ok(runs.every((o) => String(o.output).endsWith("clip.mp4")));
+  assert.ok(runs.every((o) => String(o.output).endsWith("seg-01.mp4")));
+  assert.ok(r0Path && r0Path.endsWith("clip.mp4"));
 });
 
 test("no segment file, list or private cookie copy is left behind on success", async (t) => {

@@ -25,7 +25,12 @@ let libraryPresent = true;
 };
 
 const mk = (id: string) => ({ id, path: `/c/${id}.mp4`, segments: [{ start: 0, end: 5 }] });
-const ctx = (ids: string[]) => ({ campaignName: "Acme", clipsDir: "/c", clips: ids.map(mk) });
+const ctx = (ids: string[], campaignId: string | null = "acme", campaignName = "Acme") => ({
+  campaignId,
+  campaignName,
+  clipsDir: "/c",
+  clips: ids.map(mk),
+});
 
 test("D-4: a failed automatic send is published with the same message as the panel's button", async () => {
   const H = await import("./EditorHandoff");
@@ -66,4 +71,35 @@ test("D-5: cutting another clip sends every clip of the session, not just the ne
   assert.equal((writes[1].contents.match(/<asset id=/g) ?? []).length, 3);
   await H.runAfterCutting(on, ctx(["A-04"]));
   assert.equal((writes[2].contents.match(/<asset id=/g) ?? []).length, 4);
+});
+
+const idsIn = (xml: string) => [...xml.matchAll(/<asset id="[^"]*" name="([^"]*)"/g)].map((m) => m[1]);
+
+test("CD2-1: a campaign's document never holds another campaign's clips, even in a shared clips folder", async () => {
+  const H = await import("./EditorHandoff");
+  const { DEFAULT_EDITOR_SETTINGS } = await import("../lib/fcpxml");
+  H.resetSessionHandoff();
+  writes.length = 0;
+  const off = { ...DEFAULT_EDITOR_SETTINGS };
+  const on = { ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const };
+  // Client A cuts two clips, automatic send off. Client B inherited the SAME folder ("/c").
+  await H.runAfterCutting(off, ctx(["AAA-01"], "client-a", "Client A"));
+  await H.runAfterCutting(off, ctx(["AAA-02"], "client-a", "Client A"));
+  const out = await H.runAfterCutting(on, ctx(["BBB-01"], "client-b", "Client B"));
+  assert.equal(out?.ok, true);
+  assert.equal(writes.length, 1);
+  assert.deepEqual(idsIn(writes[0].contents), ["BBB-01"], "only Client B's clip is in Client B's document");
+  assert.doesNotMatch(writes[0].contents, /AAA-0/);
+  // Switching back: A's own session is still A's, and still free of B's.
+  await H.runAfterCutting({ ...on }, ctx(["AAA-03"], "client-a", "Client A"));
+  assert.deepEqual(idsIn(writes[1].contents), ["AAA-01", "AAA-02", "AAA-03"]);
+});
+
+test("CD2-1: an automatic outcome is tagged with the campaign it ran for", async () => {
+  const H = await import("./EditorHandoff");
+  const { DEFAULT_EDITOR_SETTINGS } = await import("../lib/fcpxml");
+  H.resetSessionHandoff();
+  const on = { ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const };
+  await H.runAfterCutting(on, ctx(["AAA-01"], "client-a", "Client A"));
+  assert.equal(H.getAfterCuttingOutcome()?.campaignId, "client-a");
 });

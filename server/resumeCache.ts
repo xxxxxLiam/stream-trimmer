@@ -107,24 +107,45 @@ function cacheDirs(): string[] {
   }
 }
 
-/**
- * What Clear would actually remove: folders a job is using, and finished clips still waiting to be
- * collected, are protected (see below) and are NOT counted, so the number the user is shown is the
- * number that goes. `protectedFolders` is how many were left out.
- */
-export function cacheUsage(): { folders: number; bytes: number; protectedFolders: number } {
-  let folders = 0;
-  let bytes = 0;
-  let protectedFolders = 0;
+export interface CacheUsage {
+  /** Every work folder on disk, protected or not: what the temp root really holds. */
+  folders: number;
+  bytes: number;
+  /** The part of that Clear would remove right now. */
+  clearableFolders: number;
+  clearableBytes: number;
+  /**
+   * The part Clear leaves alone: folders a job is using, and finished clips
+   * still waiting to be collected (see below). They are real disk use, so they
+   * are counted in `folders`/`bytes`, and broken out here so the UI can say why
+   * Clear will not free them.
+   */
+  protectedFolders: number;
+  protectedBytes: number;
+}
+
+export function cacheUsage(): CacheUsage {
+  const u: CacheUsage = {
+    folders: 0,
+    bytes: 0,
+    clearableFolders: 0,
+    clearableBytes: 0,
+    protectedFolders: 0,
+    protectedBytes: 0,
+  };
   for (const d of cacheDirs()) {
+    const size = dirSize(d);
+    u.folders += 1;
+    u.bytes += size;
     if (isProtected(d)) {
-      protectedFolders += 1;
-      continue;
+      u.protectedFolders += 1;
+      u.protectedBytes += size;
+    } else {
+      u.clearableFolders += 1;
+      u.clearableBytes += size;
     }
-    folders += 1;
-    bytes += dirSize(d);
   }
-  return { folders, bytes, protectedFolders };
+  return u;
 }
 
 // --- in-use markers --------------------------------------------------------

@@ -61,6 +61,10 @@ export function createSegmentStore() {
     locked: false,
   };
   const listeners = new Set<() => void>();
+  // Set by restore(): the video a saved clip belongs to, while the tab's clipper has not yet
+  // caught up to it. A relaunch (or Ctrl+Shift+T) puts the clip back first and only then
+  // sets the url, so every mount-time syncVideo(null) in between would wipe it (B2-4/B2-5).
+  let awaitingVideo: string | null = null;
 
   const set = (next: Partial<SegmentsState>) => {
     state = { ...state, ...next };
@@ -102,11 +106,17 @@ export function createSegmentStore() {
     },
     /** Segments belong to one video: a new video starts a new clip. */
     syncVideo(videoId: string | null) {
+      if (awaitingVideo !== null) {
+        // The clipper has not reached the restored video yet: "no video" is not a change.
+        if (videoId === null) return;
+        awaitingVideo = null;
+      }
       if (state.videoId === videoId) return;
       set({ videoId, segments: EMPTY, banked: EMPTY_BANKED });
     },
     /** Put back a clip saved from an earlier session, together with the video it belongs to. */
     restore(videoId: string | null, segments: readonly Segment[]) {
+      awaitingVideo = videoId && segments.length ? videoId : null;
       set({
         videoId,
         segments: segments.length ? segments.map((s) => ({ start: s.start, end: s.end })) : EMPTY,

@@ -4,7 +4,11 @@
  * Description: Local Express backend — /api/info, /api/download, /api/transcript.
  * Uses bundled yt-dlp (with PATH fallback) and ffmpeg-static. Runs via `tsx`.
  */
-import express, { type Request, type Response } from "express";
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 import cors from "cors";
 import fs from "node:fs";
 import os from "node:os";
@@ -459,11 +463,34 @@ const binariesOk = preflight();
 
 /**
  * True only for a real YouTube address: http(s), no embedded credentials, and a
- * host that IS youtube.com (or a subdomain of it) or youtu.be. The host is read
- * from the parsed URL; a substring test over the whole string would accept
- * `https://youtube.com@evil.example/` and `http://169.254.169.254/youtube.com`.
+ * host that IS youtube.com (or a subdomain of it) or youtu.be.
+ *
+ * The check and its consumer must agree about where the host ends. Node's WHATWG
+ * `new URL` and Python's `urlsplit` (yt-dlp's own parser) do not: WHATWG treats
+ * `\` like `/`, strips tab/newline, accepts `https:host` with no slashes and
+ * IDNA-maps non-ASCII, so `https://www.youtube.com\@evil.example/` is
+ * `www.youtube.com` to one and `evil.example` to the other. Rather than
+ * normalise, anything the two could read differently is refused: a backslash, a
+ * raw or percent-encoded control character, whitespace, a scheme not followed by
+ * `//`, and an authority that is not plain ASCII `host[:port]` (which rules out
+ * userinfo, brackets, `%`-escapes, non-ASCII and IP-literal tricks in one rule).
+ * What is left is then read by BOTH parsers and must give the same host.
  */
 export function isYouTubeUrl(value: string): boolean {
+  if (typeof value !== "string" || value.length > 4096) return false;
+  // Control characters, DEL, whitespace, backslash, anything non-ASCII-printable.
+  if (/[^\x21-\x7e]/.test(value) || value.includes("\\")) return false;
+  // Percent-encoded control characters (%00-%1f, %7f) and an encoded backslash.
+  if (/%(?:[01][0-9a-f]|7f|5c)/i.test(value)) return false;
+  // The scheme must be followed by exactly `//`, as RFC 3986 requires.
+  const m = /^(https?):\/\/([^/?#]*)/i.exec(value);
+  if (!m) return false;
+  const authority = m[2];
+  // Plain `host` or `host:port`: no `@` (userinfo), `[` (IP literal), `%`, ...
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.?(?::\d{1,5})?$/.test(authority)) {
+    return false;
+  }
+  const rawHost = authority.replace(/:\d+$/, "").toLowerCase().replace(/\.$/, "");
   let u: URL;
   try {
     u = new URL(value);
@@ -473,6 +500,8 @@ export function isYouTubeUrl(value: string): boolean {
   if (u.protocol !== "https:" && u.protocol !== "http:") return false;
   if (u.username || u.password) return false;
   const host = u.hostname.toLowerCase().replace(/\.$/, "");
+  // Both readings of the host must be the same string, and that string YouTube.
+  if (host !== rawHost) return false;
   return (
     host === "youtube.com" ||
     host.endsWith(".youtube.com") ||
@@ -644,7 +673,12 @@ app.use(
     origin: (origin, cb) => cb(null, !origin || ALLOWED_ORIGINS.has(origin)),
   }),
 );
-app.use(express.json());
+// Request bodies are small JSON (a URL, a few ranges), so the cap is the
+// body-parser default made explicit: 100 KB, measured after any gzip inflation.
+// Anything larger, and any body that is not JSON, is answered by the error
+// handler registered after the routes, as JSON, never as an HTML stack trace.
+const JSON_BODY_LIMIT = "100kb";
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 // When packaged inside Electron, this same server also serves the built UI so
 // the window loads over http://127.0.0.1 instead of file://. A real origin is
@@ -2720,6 +2754,86 @@ if (uiDir && fs.existsSync(uiDir)) {
     res.sendFile(path.join(uiDir, "index.html"));
   });
 }
+
+// --- Errors ---------------------------------------------------------------
+//
+// Express's default handler answers with an HTML page holding the stack trace,
+// and so the absolute install path (and the user's name in it). Every failure
+// that reaches here is answered as {error, code}, with nothing from the stack.
+// The full error goes to the server log only.
+
+app.use("/api", (req: Request, res: Response) => {
+  res
+    .status(404)
+    .json({ error: `No such endpoint: ${req.method} ${req.path.slice(0, 120)}`, code: "not_found" });
+});
+
+export function errorResponseFor(err: unknown): {
+  status: number;
+  body: { error: string; code: string };
+} {
+  const e = (err ?? {}) as { type?: string; status?: number; statusCode?: number };
+  switch (e.type) {
+    case "entity.parse.failed":
+      return {
+        status: 400,
+        body: {
+          error:
+            "The request body is not valid JSON (an object is expected).",
+          code: "invalid_json",
+        },
+      };
+    case "entity.too.large":
+      return {
+        status: 413,
+        body: {
+          error: `The request body is larger than the ${JSON_BODY_LIMIT} this server accepts.`,
+          code: "body_too_large",
+        },
+      };
+    case "encoding.unsupported":
+    case "charset.unsupported":
+      return {
+        status: 415,
+        body: {
+          error: "The request body uses an encoding this server does not accept.",
+          code: "unsupported_encoding",
+        },
+      };
+    case "request.aborted":
+    case "request.size.invalid":
+    case "stream.encoding.set":
+      return {
+        status: 400,
+        body: { error: "The request body could not be read.", code: "bad_body" },
+      };
+  }
+  const status = e.status ?? e.statusCode;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    return {
+      status,
+      body: { error: "The request could not be processed.", code: "bad_request" },
+    };
+  }
+  return {
+    status: 500,
+    body: {
+      error: "The server hit an unexpected error. Try again.",
+      code: "server_error",
+    },
+  };
+}
+
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  const { status, body } = errorResponseFor(err);
+  console.error(
+    `[server] ${req.method} ${req.path} -> ${status} ${body.code}: ${
+      err instanceof Error ? err.message : String(err)
+    }`,
+  );
+  if (res.headersSent) return next(err);
+  res.status(status).json(body);
+});
 
 // Loopback only: with no host Node binds every interface, which put the whole
 // API on the user's LAN.

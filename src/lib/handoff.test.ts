@@ -11,6 +11,9 @@ import {
   formatTimecode,
   formatTranscript,
   formatUsedMaterial,
+  addSessionClip,
+  sessionClipsFor,
+  type SessionClipsByCampaign,
 } from "./handoff";
 
 const ID = "dQw4w9WgXcQ";
@@ -155,4 +158,24 @@ test("blocks: no segments disables segment blocks", () => {
   const blocks = buildHandoffBlocks({ url: CANON, lines, segments: [], clipId: "X" });
   for (const i of [2, 3, 4, 5]) assert.equal(blocks[i].available, false);
   assert.equal(blocks[1].available, true);
+});
+
+test("CD2-3: a campaign is offered only its own session clips", () => {
+  let all: SessionClipsByCampaign<{ id: string; path: string }> = {};
+  all = addSessionClip(all, "a", { id: "AAA-01", path: "/A clips/AAA-01.mp4" });
+  all = addSessionClip(all, "a", { id: "AAA-02", path: "/A clips/AAA-02.mp4" });
+  assert.deepEqual(sessionClipsFor(all, "a").map((c) => c.id), ["AAA-01", "AAA-02"]);
+  assert.deepEqual(sessionClipsFor(all, "b"), [], "nothing cut for B: nothing to send or copy");
+  assert.deepEqual(sessionClipsFor(all, null), [], "no campaign is not a campaign");
+  all = addSessionClip(all, "b", { id: "BBB-01", path: "/B clips/BBB-01.mp4" });
+  all = addSessionClip(all, "a", { id: "AAA-01", path: "/A clips/AAA-01 2.mp4" });
+  assert.deepEqual(sessionClipsFor(all, "b").map((c) => c.path), ["/B clips/BBB-01.mp4"]);
+  assert.deepEqual(sessionClipsFor(all, "a").map((c) => c.path), ["/A clips/AAA-02.mp4", "/A clips/AAA-01 2.mp4"], "a re-cut replaces, never duplicates");
+});
+
+test("CD2-3: a clip cut with no campaign stays apart from every campaign", () => {
+  const all = addSessionClip({}, null, { id: "clip-1", path: "/x.mp4" });
+  assert.equal(sessionClipsFor(all, null).length, 1);
+  assert.equal(sessionClipsFor(all, "a").length, 0);
+  assert.equal(sessionClipsFor(all, "").length, 1, "an empty id is the same as none");
 });

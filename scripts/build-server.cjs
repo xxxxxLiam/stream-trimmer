@@ -48,6 +48,25 @@ require(${JSON.stringify(path.resolve(__dirname, "..", "server", "index.ts"))});
 module.exports = capture;
 `;
 
+// The main process cannot see Vite's defines, so an owner build also writes what
+// it was baked with to a sidecar next to the server bundle (electron/ownerCheck.cjs
+// reads it; its keys are deliberately plain, that file ships in every build). A public build writes nothing and removes any stale one a previous
+// owner build left behind, so "no sidecar" means "no exporter". The folder name
+// is the same one src/lib/campaigns.ts uses when the exporter is built.
+const shapeFile = path.join(path.dirname(outFile), "build-shape.json");
+if (channelData) {
+  fs.writeFileSync(
+    shapeFile,
+    JSON.stringify({
+      list: ownerSetting("VITE_OWNER_MACHINES"),
+      salt: ownerSetting("VITE_OWNER_SALT"),
+      dataFolderName: "channel-data",
+    }),
+  );
+} else {
+  fs.rmSync(shapeFile, { force: true });
+}
+
 const shimFile = path.join(path.dirname(outFile), "_entry.cjs");
 fs.writeFileSync(shimFile, shim);
 

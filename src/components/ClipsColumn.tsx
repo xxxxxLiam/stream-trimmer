@@ -97,6 +97,28 @@ function tierText(tier: string): string {
   return /^\d+$/.test(tier) ? `T${tier}` : tier;
 }
 
+/**
+ * What a finished cut of a banked row records: the row flips to `cut` and its ranges join the
+ * used-ranges record. Both are written against `campaignId`, the campaign the cut STARTED in. The
+ * download takes a while and the user may switch client meanwhile; `recordUse` without an id falls
+ * back to whichever campaign is active NOW, which wrote client A's range onto client B.
+ */
+export function finishBankedCut(args: {
+  campaignId: string;
+  videoId: string;
+  clipId: string;
+  markCut: (campaignId: string, videoId: string, clipId: string) => { ranges: { start: number; end: number }[] } | null;
+  recordUse: (
+    videoId: string,
+    ranges: ReadonlyArray<{ start: number; end: number }>,
+    clipId: string,
+    campaignId?: string,
+  ) => void;
+}): void {
+  const res = args.markCut(args.campaignId, args.videoId, args.clipId);
+  if (res) args.recordUse(args.videoId, res.ranges, args.clipId, args.campaignId);
+}
+
 export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps) {
   const { videoId, duration } = useClipperContext();
   const { active, recordUse, usedFor } = useCampaign();
@@ -168,8 +190,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
       try {
         const ok = await onCutBanked(clip);
         if (ok) {
-          const res = bankStore.markCut(campaignId, vid, clip.id);
-          if (res) recordUse(vid, res.ranges, clip.id);
+          finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
         } else {
           setNotice(`${clip.id} was not cut. It stays in the bank.`);
         }

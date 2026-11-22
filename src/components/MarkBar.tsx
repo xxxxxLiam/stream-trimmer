@@ -273,10 +273,10 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
   });
 
   return (
-    <div className={`surface-panel flex flex-col gap-4 p-4 ${className ?? ""}`}>
+    <div className={`surface-panel flex flex-col gap-3 p-4 ${className ?? ""}`}>
       {/* In / out */}
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-[112px] flex-1 flex-col gap-1">
+        <label className="flex min-w-[84px] flex-1 flex-col gap-1">
           <span className="flex items-center gap-1 text-meta text-fg-dim">
             In <Kbd>I</Kbd>
           </span>
@@ -292,7 +292,7 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
             aria-invalid={startBad}
           />
         </label>
-        <label className="flex min-w-[112px] flex-1 flex-col gap-1">
+        <label className="flex min-w-[84px] flex-1 flex-col gap-1">
           <span className="flex items-center gap-1 text-meta text-fg-dim">
             Out <Kbd>O</Kbd>
           </span>
@@ -346,23 +346,6 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
         </p>
       )}
 
-      {/* Segments */}
-      {hasSegments ? (
-        <SegmentList
-          segments={segments}
-          lines={transcript}
-          onMove={store.move}
-          onRemove={store.remove}
-          onSeek={requestSeek}
-          usedIndexes={usedIndexes}
-        />
-      ) : (
-        <p className="m-0 text-meta text-fg-dim">
-          No segments yet. Mark an in and out, then Add segment. Add as many as you like and they
-          join, in order, into one file.
-        </p>
-      )}
-
       {/* Overlap warning: accent text on the accent tint, never a filled accent. */}
       {overlaps.length > 0 && (
         <div id="ui-overlap-warning" className="card-alert flex flex-col gap-3 p-3" role="alert">
@@ -395,14 +378,14 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
         </div>
       )}
 
-      {/* Stitched total, band, and the one primary action. In the three-column layout
-          (styles.css, .cut-row) it sticks to the bottom of the centre column, so Cut never
-          needs a scroll at the default window however many segments are above it. In the
-          wrapped layout below 960px it stays in flow: stuck there it would cover In and Add
-          at the 900x600 minimum. */}
+      {/* Stitched total, band, and the one primary action. It sits directly under In / Out
+          and Add, in flow, and the segment list comes after it: the list is the part that
+          grows, so Cut neither moves when segments are added nor covers anything. (It used
+          to be sticky at the bottom of the column, which put it over the controls above it
+          at 1100x760 and at every 600-660px window: B2-1, H2-1.) */}
       <div
         id="ui-cut-row"
-        className="cut-row z-10 -mx-4 -mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-4 rounded-b-panel border-t border-hairline bg-[var(--c-panel)] px-4 pb-4 pt-3"
+        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-hairline pt-2"
       >
         <div className="flex min-w-[200px] flex-1 flex-col gap-1">
           <span className="text-meta text-fg-dim">
@@ -449,6 +432,23 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
           <span className="font-mono text-meta">⌘↵</span>
         </button>
       </div>
+
+      {/* Segments */}
+      {hasSegments ? (
+        <SegmentList
+          segments={segments}
+          lines={transcript}
+          onMove={store.move}
+          onRemove={store.remove}
+          onSeek={requestSeek}
+          usedIndexes={usedIndexes}
+        />
+      ) : (
+        <p className="m-0 text-meta text-fg-dim">
+          No segments yet. Mark an in and out, then Add segment. Add as many as you like and they
+          join, in order, into one file.
+        </p>
+      )}
     </div>
   );
 }

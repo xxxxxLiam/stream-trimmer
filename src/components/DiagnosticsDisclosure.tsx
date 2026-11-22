@@ -15,6 +15,7 @@ import {
   buildDiagnosticsBundle,
   fenceForClipboard,
   offersDeveloperDiagnostics,
+  redact,
   type FailureAttempt,
   type FailureDiagnostics,
 } from "../lib/diagnostics";
@@ -91,8 +92,10 @@ export default function DiagnosticsDisclosure() {
     if (!api?.readDiagnostics) return;
     try {
       const result = await api.readDiagnostics();
-      setLogPath(result.path);
-      setText(result.text || "The log is empty.");
+      // Main already scrubs both. This second pass is for the day a new reader forgets: whatever
+      // reaches this <pre> sits under a sentence promising no cookies, tokens or personal data.
+      setLogPath(result.path ? redact(result.path) : result.path);
+      setText(redact(result.text) || "The log is empty.");
     } catch {
       setText("Could not read the log. Try Refresh.");
     }

@@ -16,7 +16,7 @@
  *   `runAfterCutting` is exported for the cut flow to call once a clip is saved.
  *   No filled-accent button here: the primary action belongs to the screen.
  */
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   FRAME_RATE_CHOICES,
   buildSessionFcpxml,
@@ -30,7 +30,7 @@ import {
   type RawProbe,
   type SessionClip,
 } from "../lib/fcpxml";
-import { writeClipboard } from "../lib/handoff";
+import { mergeSessionClips, sessionCampaignKey, writeClipboard } from "../lib/handoff";
 
 type Result = { ok: boolean; error?: string; missing?: string; path?: string };
 
@@ -106,6 +106,11 @@ export function projectOptions(
 }
 
 export interface HandoffContext {
+  /**
+   * The campaign these clips were cut under. Required, because the session batch is scoped to it:
+   * a clip cut for one campaign must never appear in another campaign's document.
+   */
+  campaignId: string | null;
   campaignName?: string;
   sourceTitle?: string;
   /** Folder the .fcpxml is written to: the campaign's clips folder. */
@@ -213,10 +218,10 @@ async function exportNamed(
  * `runAfterCutting` without anywhere to put its answer, so the answer is kept
  * here and the panel shows it, the same way it shows its own buttons' results.
  */
-let lastAuto: { outcome: HandoffOutcome } | null = null;
+let lastAuto: { outcome: HandoffOutcome; campaignId: string | null } | null = null;
 const autoListeners = new Set<() => void>();
 
-export function getAfterCuttingOutcome(): { outcome: HandoffOutcome } | null {
+export function getAfterCuttingOutcome(): { outcome: HandoffOutcome; campaignId: string | null } | null {
   return lastAuto;
 }
 
@@ -227,30 +232,31 @@ export function subscribeAfterCutting(l: () => void): () => void {
   };
 }
 
-function publishAuto(outcome: HandoffOutcome | null): void {
+function publishAuto(outcome: HandoffOutcome | null, campaignId: string | null): void {
   if (!outcome) return;
-  lastAuto = { outcome };
+  lastAuto = { outcome, campaignId };
   autoListeners.forEach((l) => l());
 }
 
 /**
- * Every clip cut this session, per clips folder, newest version of an id wins.
- * Each cut calls `runAfterCutting` with only its own clip; the document for the
- * session has to hold all of them or the next send would replace the file with
- * a one-clip version.
+ * Every clip cut this session, newest version of an id wins. Each cut calls `runAfterCutting`
+ * with only its own clip; the document for the session has to hold all of them or the next send
+ * would replace the file with a one-clip version.
+ *
+ * A batch belongs to exactly one CAMPAIGN (then the folder it is written to). The folder alone
+ * is not an identity: a new campaign inherits the previous one's clips folder, so a batch keyed
+ * by folder carried one client's clips into another client's Final Cut document.
  */
 const sessionBatch = new Map<string, SessionClip[]>();
 
 function rememberClips(ctx: HandoffContext): SessionClip[] {
-  const key = ctx.clipsDir ?? "";
-  const prev = sessionBatch.get(key) ?? [];
-  const fresh = new Set(ctx.clips.map((c) => c.id));
-  const next = [...prev.filter((c) => !fresh.has(c.id)), ...ctx.clips];
+  const key = `${sessionCampaignKey(ctx.campaignId)}\u0001${ctx.clipsDir ?? ""}`;
+  const next = mergeSessionClips(sessionBatch.get(key) ?? [], ctx.clips);
   sessionBatch.set(key, next);
   return next;
 }
 
-/** Forget the session's clips and the last automatic outcome (new session; tests). */
+/** Forget every campaign's session clips and the last automatic outcome (tests; nothing in the app needs it). */
 export function resetSessionHandoff(): void {
   sessionBatch.clear();
   lastAuto = null;
@@ -274,7 +280,7 @@ export async function runAfterCutting(
   } catch (err) {
     outcome = { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
-  publishAuto(outcome);
+  publishAuto(outcome, ctx.campaignId);
   return outcome;
 }
 
@@ -327,10 +333,12 @@ async function runAfterCuttingInner(
 export type EditorHandoffProps = {
   settings: EditorHandoffSettings;
   onChange: (next: EditorHandoffSettings) => void;
+  /** The active campaign. The clips below are this campaign's alone, and so is the status shown. */
+  campaignId: string | null;
   campaignName?: string;
   sourceTitle?: string;
   clipsDir?: string;
-  /** Every finished clip from this session, in the order they were cut. */
+  /** Every finished clip from this session for THIS campaign, in the order they were cut. */
   clips: SessionClip[];
 };
 
@@ -343,6 +351,7 @@ const OPTIONS: { value: AfterCutting; label: string }[] = [
 export default function EditorHandoff({
   settings,
   onChange,
+  campaignId,
   campaignName,
   sourceTitle,
   clipsDir,
@@ -355,7 +364,13 @@ export default function EditorHandoff({
   const set = (patch: Partial<EditorHandoffSettings>) => onChange({ ...settings, ...patch });
 
   // The automatic send answers here: show it, and open the panel so a failure is seen.
-  const auto = useSyncExternalStore(subscribeAfterCutting, getAfterCuttingOutcome, getAfterCuttingOutcome);
+  // It is shown only under the campaign it ran for: another client's "Saved X.fcpxml with 2 clips"
+  // is not this campaign's status, and neither is a button result left from before the switch.
+  const autoAny = useSyncExternalStore(subscribeAfterCutting, getAfterCuttingOutcome, getAfterCuttingOutcome);
+  const auto = autoAny && autoAny.campaignId === campaignId ? autoAny : null;
+  useEffect(() => {
+    setStatus(null);
+  }, [campaignId]);
   useEffect(() => {
     if (!auto) return;
     setStatus(auto.outcome);
@@ -371,7 +386,7 @@ export default function EditorHandoff({
     };
   }, [open]);
 
-  const ctx: HandoffContext = { campaignName, sourceTitle, clipsDir, clips };
+  const ctx: HandoffContext = { campaignId, campaignName, sourceTitle, clipsDir, clips };
   const eventName = resolveEventName({ from: settings.eventName, campaignName, sourceTitle });
   const nextName = useNextProjectName();
   const projectOn = settings.createProject && settings.projectEvent.trim() !== "";
@@ -395,20 +410,29 @@ export default function EditorHandoff({
   const hasClips = clips.length > 0;
   const noClipsReason = hasClips ? undefined : "No clips yet";
 
+  // A send that finishes after the campaign changed answers for the old campaign: drop its message.
+  const liveCampaign = useRef(campaignId);
+  liveCampaign.current = campaignId;
   const run = async (job: () => Promise<HandoffOutcome | null>) => {
+    const startedFor = campaignId;
+    const answer = (o: HandoffOutcome | null) => {
+      if (liveCampaign.current === startedFor) setStatus(o);
+    };
     setBusy(true);
     setStatus(null);
     try {
-      setStatus(await job());
+      answer(await job());
     } catch (err) {
-      setStatus({ ok: false, message: err instanceof Error ? err.message : String(err) });
+      answer({ ok: false, message: err instanceof Error ? err.message : String(err) });
     } finally {
       setBusy(false);
     }
   };
 
   const copyPaths = async () => {
+    const startedFor = campaignId;
     const r = await writeClipboard(clips.map((c) => c.path).join("\n"));
+    if (liveCampaign.current !== startedFor) return;
     setStatus(
       r.ok
         ? { ok: true, message: `Copied ${clips.length} file ${clips.length === 1 ? "path" : "paths"}.` }

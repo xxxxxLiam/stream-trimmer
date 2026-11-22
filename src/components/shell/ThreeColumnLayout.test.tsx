@@ -20,14 +20,23 @@ function windowSize() {
   return { width: num("width"), minWidth: num("minWidth") };
 }
 
-test("H-3: the three-column breakpoint is at or below the width the app opens at", () => {
+test("H-3/H2-2: the three-column breakpoint survives one zoom step at the default window and holds at the minimum", () => {
   const css = read("src/styles.css");
   const m = /@container \(min-width: (\d+)px\)\s*\{\s*\.cols-row/.exec(css);
   assert.ok(m, "styles.css has the @container rule for .cols-row");
   assert.equal(Number(m![1]), THREE_COLUMN_MIN_PX, "CSS and the exported constant agree");
   const { width, minWidth } = windowSize();
   assert.ok(THREE_COLUMN_MIN_PX <= width, `breakpoint ${THREE_COLUMN_MIN_PX} <= default window ${width}`);
-  assert.ok(THREE_COLUMN_MIN_PX > minWidth, "the minimum window still degrades to the stacked layout");
+  // Ctrl+Plus once is 125%: 1100 / 1.25 = 880 CSS px. It used to land 80px under the line.
+  assert.ok(THREE_COLUMN_MIN_PX <= width / 1.25, `still three columns at 125% (${width / 1.25}px)`);
+  assert.ok(THREE_COLUMN_MIN_PX <= minWidth, "the minimum window gets three columns too");
+});
+
+test("H2-2: when the columns do wrap, the mark column comes first", () => {
+  const css = read("src/styles.css");
+  assert.match(css, /\.cols-centre\s*\{\s*order:\s*-1;\s*\}/);
+  const at = css.indexOf("@container (min-width: 840px)");
+  assert.match(css.slice(at, css.indexOf("\n}\n", at)), /\.cols-centre\s*\{[^}]*order:\s*0;/);
 });
 
 test("H-3: no window-width breakpoint is left in the layout markup", () => {

@@ -224,10 +224,11 @@ test("redactor: leaves ordinary text alone", () => {
 test("mutation: disabling any single rule makes the fixture leak", () => {
   const needed: Record<string, readonly string[]> = {
     "cookie-file-contents": ["SECRETCOOKIEVALUE"],
-    "auth-headers": ["SID=SECRETCOOKIEVALUE"],
+    "auth-headers": [], // overlaps cookie-assignment on a SID cookie; focused case below
     "cookies-flag": [],
     "cookies-option": [],
     "cookie-file-path": [],
+    "cookie-assignment": [],
     "url-secrets": [SIG, "ALsigsecret77", "203.0.113.7"],
     "po-token": [],
     "home-dir": ["/Users/samantha"],
@@ -258,6 +259,10 @@ test("mutation: rules that overlap are each load-bearing on a focused input", ()
     ["cookies-option", `{"cookies":"/tmp/z/jar-two.dat"}`, "jar-two.dat"],
     ["cookie-file-path", `read /tmp/z/my-cookies.txt ok`, "my-cookies.txt"],
     ["po-token", `po_token=${PO}`, PO],
+    ["auth-headers", `Authorization: Basic ZZAUTHVALUE77`, "ZZAUTHVALUE77"],
+    ["po-token", `{"access_token": "JSONQUOTEDTOKEN77"}`, "JSONQUOTEDTOKEN77"],
+    ["cookie-assignment", `sent __Secure-3PAPISID=BARECOOKIEVALUE77 ok`, "BARECOOKIEVALUE77"],
+    ["url-secrets", `https://rr1.googlevideo.com/videoplayback/id/PATHSTREAMID77/sig/PATHSIGVALUE77/file/v.mp4`, "PATHSIGVALUE77"],
   ];
   for (const [id, input, needle] of cases) {
     assert.ok(!redact(input, {}).includes(needle), `${id}: enabled should hide it`);

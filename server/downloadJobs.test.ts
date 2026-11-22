@@ -44,8 +44,9 @@ const freshUrl = () => `${YT_URL}&n=${++nextUrl}`;
 async function withHarness<T>(
   fn: (h: JobHarness) => Promise<T>,
   env?: Record<string, string>,
+  extra: { slowConcatSec?: number } = {},
 ): Promise<T> {
-  const h = await startJobHarness({ env });
+  const h = await startJobHarness({ env, ...extra });
   try {
     return await fn(h);
   } finally {
@@ -460,4 +461,288 @@ test("F-5: a metadata pre-flight failure carries diagnostics", SLOW, () =>
     const past = await downloadPath(h, "job_f5_past", { url: freshUrl(), segments: [{ start: 0, end: 100 }] });
     assert.equal(past.body.code, "out_point_past_end");
     assert.equal(past.body.diagnostics?.jobId, "job_f5_past");
+  }));
+
+// =============================================================================
+// Audit run 2, server findings G2-1 / G2-2 / G2-4 / G2-5 / G2-7
+// =============================================================================
+
+/** Every `.part` file under the server's work folders, as "folder/name:size". */
+function partFiles(h: JobHarness): string[] {
+  const out: string[] = [];
+  for (const f of workFolders(h)) {
+    const dir = path.join(h.serverTmp, f);
+    for (const n of fs.readdirSync(dir)) {
+      if (n.endsWith(".part")) out.push(`${f}/${n}:${fs.statSync(path.join(dir, n)).size}`);
+    }
+  }
+  return out;
+}
+
+for (const shape of [
+  { name: "one range", segments: [{ start: 0, end: 4 }], full: false },
+  {
+    name: "one range, whole-file fallback",
+    segments: [{ start: 0, end: 4 }],
+    full: true,
+  },
+  {
+    name: "two ranges",
+    segments: [
+      { start: 0, end: 2 },
+      { start: 5, end: 7 },
+    ],
+    full: false,
+  },
+]) {
+  test(`G2-1: a dropped download keeps its bytes and the retry resumes from them (${shape.name})`, SLOW, () =>
+    withHarness(async (h) => {
+      const body = { url: freshUrl(), segments: shape.segments };
+      // sectioned run (or, with failSections, the whole-file run) drops mid-way
+      h.configure(
+        shape.full
+          ? { failSections: true, partialBytes: 123_456, partialOnFull: true }
+          : { partialBytes: 123_456 },
+      );
+      const failed = await downloadPath(h, "job_rc_g21", body);
+      assert.equal(failed.status, 502, JSON.stringify(failed.body));
+      assert.equal(failed.body.code, "network_dropped");
+      // The response says the partial is on disk; it must be.
+      const parts = partFiles(h);
+      assert.equal(parts.length, 1, `the partial was deleted with the failed job: ${JSON.stringify(parts)}`);
+      assert.match(parts[0], /:123456$/);
+      assert.match(failed.body.error, /already fetched is on disk/);
+      assert.match(failed.body.error, /0\.1 MB/, "the message should name the bytes it kept");
+
+      // The retry finds it, says so, and finishes.
+      // (the fake cannot cut a section itself, so the retry trims locally)
+      h.configure({ failSections: true });
+      const again = await downloadPath(h, "job_rc_g21_retry", body);
+      assert.equal(again.status, 200, JSON.stringify(again.body));
+      assert.match(h.log(), /resuming with 123456 cached byte\(s\)/);
+      assert.ok(fs.existsSync(again.body.path), "the retried clip is missing");
+      // (a sectioned partial is consumed by yt-dlp itself; this fake retries by
+      // the whole-file path, so only that shape can show the partial go away)
+      if (shape.full) assert.deepEqual(partFiles(h), [], "a finished download left its partial behind");
+    }));
+}
+
+test("G2-2: a backslash, control character or userinfo cannot move the host the engine reads", SLOW, () =>
+  withHarness(async (h) => {
+    const bad = [
+      // the audit's three differentials
+      "https://www.youtube.com\\@evil.example/watch?v=x",
+      "https://www.youtube.com\\\\@evil.example/watch?v=x",
+      "https://www.youtube.com\\.evil.example/x",
+      // fresh ones: the same idea with other terminators and encodings
+      "https://www.youtube.com\\evil.example/x",
+      "https://www.youtube.com%5c@evil.example/x",
+      "https://www.youtube.com%5C.evil.example/x",
+      "https://www.youtube.com%00.evil.example/x",
+      "https://www.youtube.com%0d%0a.evil.example/x",
+      "https://www.youtube.com%09@evil.example/x",
+      "https://www.youtube.com%2f@evil.example/x",
+      "https://www.youtube.com\t@evil.example/x",
+      "https://www.youtube.com\n@evil.example/x",
+      "https://www.youtube.com\r.evil.example/x",
+      "https://www.youtube.com\u0000.evil.example/x",
+      "https://www.youtube.com\u007f.evil.example/x",
+      "https://www.youtube.com @evil.example/x",
+      "https://www.youtube.com。evil.example/x",
+      "https://www.youtube.com／@evil.example/x",
+      "https://www.youtube.com＼@evil.example/x",
+      "https://www.youtube.com＠evil.example/x",
+      "https://www.youtu​e.com/x",
+      "https://youtu.be\\@evil.example/x",
+      "https:\\\\www.youtube.com\\@evil.example/x",
+      "https:/\\www.youtube.com/x",
+      "https:///www.youtube.com@evil.example/x",
+      "https:www.youtube.com@evil.example/x",
+      "https:/www.youtube.com/x",
+      " https://www.youtube.com/x",
+      "https://www.youtube.com/x ",
+      "\thttps://www.youtube.com/x",
+      "https://user@www.youtube.com/x",
+      "https://user:pw@www.youtube.com/x",
+      "https://www.youtube.com:@evil.example/x",
+      "https://www.youtube.com:80@evil.example/x",
+      "https://www.youtube.com:abc/x",
+      "https://www.youtube.com:99999999/x",
+      "https://[::1]/youtube.com",
+      "https://127.0.0.1/",
+      "https://2130706433/",
+      "https://0x7f.1/",
+      "https://xn--yutube-dva.com/",
+      "https://youtube.com.evil.example/",
+      "https://evil.example/https://www.youtube.com/",
+      "https://evil.example?@www.youtube.com/",
+      "https://evil.example#@www.youtube.com/",
+      "https://evil.example;@www.youtube.com/",
+      "javascript://www.youtube.com/%0aalert(1)",
+      "data:text/html,www.youtube.com",
+      "HTTPS://WWW.YOUTUBE.COM\\@evil.example/x",
+    ];
+    for (const url of bad) {
+      const res = await h.post("/api/info", { url });
+      assert.equal(res.status, 400, `${JSON.stringify(url)} was accepted (${res.status})`);
+    }
+    assert.equal(h.calls().length, 0, "yt-dlp was run for a URL one of the two parsers reads as another host");
+
+    // Still fine: ordinary links, with ports, trailing dots, queries and fragments.
+    for (const url of [
+      "https://www.youtube.com/watch?v=abc&t=10s#x",
+      "https://youtu.be/abc?si=a%2Fb",
+      "http://m.youtube.com:443/watch?v=abc",
+      "HTTPS://WWW.YOUTUBE.COM/watch?v=abc",
+      "https://www.youtube.com./watch?v=abc",
+    ]) {
+      const res = await h.post("/api/info", { url });
+      assert.equal(res.status, 200, `${url} was refused`);
+    }
+  }));
+
+test("G2-2: every URL that is accepted has the same host in Python's urlsplit (yt-dlp's parser)", SLOW, async () => {
+  const { spawnSync } = await import("node:child_process");
+  if (spawnSync("python3", ["-I", "-c", "pass"]).status !== 0) return; // no python here
+  const candidates = [
+    "https://www.youtube.com/watch?v=abc",
+    "https://youtu.be/abc",
+    "http://m.youtube.com:8080/x",
+    "https://www.youtube.com./x",
+    "https://www.youtube.com\\@evil.example/x",
+    "https://www.youtube.com%5c@evil.example/x",
+    "https://www.youtube.com\t@evil.example/x",
+    "https://youtube.com@evil.example/x",
+    "https://evil.example\\@www.youtube.com/x",
+  ];
+  await withHarness(async (h) => {
+    for (const url of candidates) {
+      const status = (await h.post("/api/info", { url })).status;
+      if (status !== 200) continue;
+      const py = spawnSync(
+        "python3",
+        ["-I", "-c", "import sys,urllib.parse;print(urllib.parse.urlsplit(sys.argv[1]).hostname)", url],
+        { encoding: "utf8" },
+      ).stdout.trim();
+      const node = new URL(url).hostname.replace(/\.$/, "");
+      assert.equal(py.replace(/\.$/, ""), node, `parsers disagree about ${JSON.stringify(url)}`);
+    }
+  });
+});
+
+test("G2-4: a malformed or oversized body is answered with JSON, never an HTML stack trace", SLOW, () =>
+  withHarness(async (h) => {
+    const routes = [
+      "/api/info",
+      "/api/transcript",
+      "/api/comments",
+      "/api/download",
+      "/api/download/cancel",
+      "/api/auth/youtube/status",
+      "/api/cache/clear",
+    ];
+    const bodies: Array<[string, string, number]> = [
+      ["{ not json", "invalid_json", 400],
+      ['{"url": "https://www.youtube.com/watch?v=x"', "invalid_json", 400],
+      ["null", "invalid_json", 400],
+      ['"hi"', "invalid_json", 400],
+      ["42", "invalid_json", 400],
+      [JSON.stringify({ url: "x".repeat(200_000) }), "body_too_large", 413],
+      ["x".repeat(10_000_000), "body_too_large", 413],
+    ];
+    for (const route of routes) {
+      for (const [body, code, status] of bodies) {
+        const res = await fetch(`${h.baseUrl}${route}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+        const text = await res.text();
+        assert.match(res.headers.get("content-type") ?? "", /application\/json/, `${route}: ${text.slice(0, 120)}`);
+        const json = JSON.parse(text);
+        assert.equal(res.status, status, `${route} ${body.slice(0, 20)}: ${text}`);
+        assert.equal(json.code, code);
+        assert.equal(typeof json.error, "string");
+        // nothing from the stack, no absolute path, no user name
+        assert.doesNotMatch(text, /<!DOCTYPE|<pre>|node_modules|\bat \S+ \(|\/home\/|\/Users\/|\.cjs|\.ts:/);
+      }
+    }
+    assert.match((await (await fetch(`${h.baseUrl}/api/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "x".repeat(200_000),
+    })).json()).error, /100kb/, "the limit is not named");
+
+    // an unknown API path is JSON too
+    const missing = await fetch(`${h.baseUrl}/api/nope`, { method: "POST" });
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).code, "not_found");
+    // and the server is still answering
+    assert.equal((await fetch(`${h.baseUrl}/api/cache/usage`)).status, 200);
+  }));
+
+function procsWithCmdline(needle: string): number[] {
+  const hits: number[] = [];
+  for (const pid of fs.readdirSync("/proc").filter((n) => /^\d+$/.test(n))) {
+    try {
+      const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ");
+      if (cmd.includes(needle)) hits.push(Number(pid));
+    } catch {
+      /* gone */
+    }
+  }
+  return hits;
+}
+
+test("G2-5: cancelling during the join stops the join ffmpeg too", SLOW, () =>
+  withHarness(
+    async (h) => {
+      const body = {
+        url: freshUrl(),
+        segments: [
+          { start: 0, end: 2 },
+          { start: 5, end: 7 },
+        ],
+      };
+      const t0 = Date.now();
+      const job = downloadPath(h, "job_rc_g25", body);
+      // the join is running once its (slow) ffmpeg wrapper is sleeping
+      await until(() => procsWithCmdline("sleep 47").length > 0, 30_000, "the join ffmpeg");
+      const cancel = await h.post("/api/download/cancel", { jobId: "job_rc_g25" });
+      assert.deepEqual(await cancel.json(), { ok: true, found: true });
+      const r = await Promise.race([job, sleep(10_000).then(() => null)]);
+      assert.ok(r, "the download request was still waiting on the join 10 s after Cancel");
+      assert.equal(r.status, 499);
+      assert.equal(r.body.code, "cancelled");
+      assert.ok(Date.now() - t0 < 30_000);
+      await until(() => procsWithCmdline("sleep 47").length === 0, 5_000, "the join to die");
+      assert.deepEqual(workFolders(h), [], "the cancelled job left its folders");
+    },
+    undefined,
+    { slowConcatSec: 47 },
+  ));
+
+test("G2-7: uncollected clips are counted in the cache figure, and broken out as protected", SLOW, () =>
+  withHarness(async (h) => {
+    const sizes: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const r = await downloadPath(h, `job_rc_g27_${i}`, {
+        url: freshUrl(),
+        segments: [{ start: 0, end: 2 }],
+      });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      sizes.push(r.body.size);
+    }
+    const total = sizes.reduce((a, b) => a + b, 0);
+    const usage = await (await fetch(`${h.baseUrl}/api/cache/usage`)).json();
+    assert.equal(usage.folders, 3, JSON.stringify(usage));
+    assert.ok(usage.bytes >= total, `reports ${usage.bytes} bytes for ${total} bytes of clips on disk`);
+    assert.equal(usage.protectedFolders, 3);
+    assert.equal(usage.protectedBytes, usage.bytes);
+    assert.equal(usage.clearableBytes, 0);
+    // Clear leaves them (the hold is deliberate) and the figure does not pretend otherwise.
+    const cleared = await (await h.post("/api/cache/clear", {})).json();
+    assert.equal(cleared.removed, 0);
+    assert.equal(cleared.skipped, 3);
+    assert.equal(cleared.bytes, usage.bytes);
   }));

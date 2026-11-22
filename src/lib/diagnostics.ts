@@ -94,6 +94,10 @@ const SENSITIVE_PARAM_EXACT = new Set(["s", "ip", "si", "n", "id"]);
 const SENSITIVE_PARAM_CONTAINS =
   /sig|token|secret|key|auth|pass|session|cookie|credential|pot|sid|visitor|ticket/i;
 
+/** googlevideo's signed URLs also carry these names as path segments: `/sig/<value>`. */
+const PATH_SECRET =
+  /\/(id|ip|s|si|n|sig|lsig|signature|pot|key|token|visitor|ticket|session)\/[^/\s]+/gi;
+
 function isSensitiveParam(name: string): boolean {
   const n = name.toLowerCase();
   return SENSITIVE_PARAM_EXACT.has(n) || SENSITIVE_PARAM_CONTAINS.test(n);
@@ -146,14 +150,21 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
       ),
   },
   {
-    // Signed URLs: strip the values of token-like and signature-like parameters.
+    // Signed URLs: strip the values of token-like and signature-like parameters, and the same
+    // names when googlevideo carries them as path segments (`/id/<x>/sig/<y>/file/...`).
     id: "url-secrets",
     apply: (t) =>
-      t.replace(/https?:\/\/[^\s"'<>]+/gi, (url) =>
-        url.replace(/([?&#;])([^=&#;\s]+)=([^&#;\s]*)/g, (m, sep: string, name: string) =>
-          isSensitiveParam(name) ? `${sep}${name}=REDACTED` : m,
-        ),
-      ),
+      t.replace(/https?:\/\/[^\s"'<>]+/gi, (url) => {
+        const cut = url.search(/[?#]/);
+        const head = (cut < 0 ? url : url.slice(0, cut)).replace(PATH_SECRET, "/$1/REDACTED");
+        const rest = cut < 0 ? "" : url.slice(cut);
+        return (
+          head +
+          rest.replace(/([?&#;])([^=&#;\s]+)=([^&#;\s]*)/g, (m, sep: string, name: string) =>
+            isSensitiveParam(name) ? `${sep}${name}=REDACTED` : m,
+          )
+        );
+      }),
   },
   {
     // PO tokens and the other identity-bearing values yt-dlp accepts or prints.
@@ -161,10 +172,20 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     apply: (t) =>
       t
         .replace(
-          /(po[_ -]?tokens?|visitor[_ -]?data|data[_ -]?sync[_ -]?id|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)(\s*[=:]\s*)[^\s"';,&]+/gi,
+          /(po[_ -]?tokens?|visitor[_ -]?data|data[_ -]?sync[_ -]?id|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)(["']?\s*[=:]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s"';,&}]+)/gi,
           "$1$2<redacted>",
         )
         .replace(/\bbearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer <redacted>"),
+  },
+  {
+    // A Google session cookie assigned on its own (`__Secure-3PAPISID=...`), with no `Cookie:`
+    // header in front of it for auth-headers to key on.
+    id: "cookie-assignment",
+    apply: (t) =>
+      t.replace(
+        /(?<![\w-])((?:__Secure-|__Host-)?(?:[1-3]?PSID(?:CC|TS)?|[1-3]?PAPISID|SAPISID|APISID|HSID|SSID|SIDCC|SID|LOGIN_INFO|VISITOR_INFO1_LIVE))(\s*=\s*)[^\s;,"']+/g,
+        "$1$2<redacted>",
+      ),
   },
   {
     // The home directory, wherever it appears: first the exact one we were told,

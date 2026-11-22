@@ -92,16 +92,6 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  /* No visible scrollbars anywhere (CLAUDE.md). Scrolling by wheel, trackpad, keyboard and
-     script is untouched; every scroll region below is keyboard-reachable. */
-  *::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-  }
-  * {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
   input::placeholder {
     color: var(--c-fg-dim);
   }
@@ -128,13 +118,6 @@
 }
 
 @layer components {
-  /* ---- Workspace columns ---------------------------------------------- */
-  /* Responds to the width of its own area (the help drawer is a 400px sibling), not the
-     window. 960 = THREE_COLUMN_MIN_PX in ThreeColumnLayout.tsx; the app opens at 1100 and
-     cannot go below 900, so the default window gets three columns and the minimum stacks. */
-  .cols-host {
-    container-type: inline-size;
-  }
   .surface-panel {
     background: var(--g-panel), var(--c-panel);
     box-shadow: var(--g-panel-shadow);
@@ -367,25 +350,6 @@
 
 }
 
-/* Unlayered on purpose: it must beat the max-h/max-w utilities on the same elements. */
-@container (min-width: 960px) {
-  .cols-row {
-    height: 100%;
-    flex-wrap: nowrap;
-  }
-  .cols-side {
-    max-height: none;
-    max-width: 400px;
-  }
-  .cols-clips {
-    max-width: 360px;
-  }
-  .cols-centre {
-    min-height: 0;
-    overflow-y: auto;
-  }
-}
-
 /* ---- Surfaces ------------------------------------------------------- */
 .surface-ground {
   background: var(--g-ground), var(--c-bg);
@@ -393,13 +357,42 @@
 
 /* ---- Workspace columns ------------------------------------------------ */
 /* The columns respond to the width of their own area (the help drawer is a 400px sibling),
-   not the window. 960 = THREE_COLUMN_MIN_PX in ThreeColumnLayout.tsx. The app opens at 1100
-   and cannot go below 900: the default gets three columns, the minimum stacks. Unlayered on
-   purpose so these beat the max-h / max-w utilities on the same elements. */
+   not the window. 840 = THREE_COLUMN_MIN_PX in ThreeColumnLayout.tsx: the default window
+   (1100) keeps three columns through one zoom step (880 at 125%), and the 900px minimum
+   gets them too. Below that the columns wrap, with the mark column FIRST so In, Out, Add
+   and Cut are what you see. Unlayered on purpose so these beat the max-h / max-w
+   utilities on the same elements. */
 .cols-host {
   container-type: inline-size;
 }
-@container (min-width: 960px) {
+.cols-centre {
+  order: -1;
+}
+
+/* The video never takes more height than leaves room for the controls under it. In/Out,
+   Add and Cut sit directly below the timeline, so a player that grows to the full column
+   width pushes them off the screen at the heights real laptops have (600-760). The cap
+   is on the box's WIDTH because its height follows from the 16:9 ratio. 440px is the
+   Timeline + the mark bar's fixed rows + the player's own controls; with a segment list
+   open the list takes a further 100px. The floor keeps a player on screen at 200% zoom. */
+.cols-centre .aspect-video {
+  max-width: max(150px, min(80vh, calc((100vh - 440px) * 16 / 9)));
+}
+.cols-centre:has(#ui-segment-list) .aspect-video {
+  max-width: max(150px, min(80vh, calc((100vh - 540px) * 16 / 9)));
+}
+
+/* The segment list scrolls inside itself. It is the LAST thing in the mark bar, so growing
+   it never moves In, Out, Add or Cut; it is reachable by wheel and by Tab (every row is a
+   button). */
+.seg-scroll {
+  max-height: clamp(112px, calc(100vh - 620px), 280px);
+  overflow-y: auto;
+  padding: 2px;
+  margin: -2px;
+}
+
+@container (min-width: 840px) {
   .cols-row {
     height: 100%;
     flex-wrap: nowrap;
@@ -408,17 +401,24 @@
     max-height: none;
     max-width: 400px;
   }
+  .cols-transcript {
+    flex-basis: 240px;
+  }
   .cols-clips {
     max-width: 360px;
+    flex-basis: 220px;
   }
   .cols-centre {
+    order: 0;
     min-height: 0;
     overflow-y: auto;
   }
-  /* The primary action stays on screen: MarkBar's Cut row sticks to the bottom of the
-     scrolling centre column. Not applied when the columns wrap (see MarkBar). */
-  .cut-row {
-    position: sticky;
-    bottom: 0;
+}
+@container (min-width: 1040px) {
+  .cols-transcript {
+    flex-basis: 280px;
+  }
+  .cols-clips {
+    flex-basis: 260px;
   }
 }

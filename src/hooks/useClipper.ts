@@ -33,7 +33,9 @@ import { readSetting, writeSetting } from "../lib/persist";
 import type { FailureAttempt, FailureDiagnostics } from "../lib/diagnostics";
 import {
   cookiePayload,
+  isSignedOut,
   markDisconnected,
+  signedOutQuality,
   useYouTubeConnection,
 } from "../lib/youtubeConnection";
 
@@ -394,6 +396,16 @@ export function useClipper() {
   useEffect(() => {
     setError(validationError || "");
   }, [validationError]);
+
+  // AF2-2: signed out, the engine only serves 360p, so hold the quality there (and give the
+  // user's choice back when they sign in) instead of failing the first Cut at the default Best.
+  const heldQuality = useRef<string | null>(null);
+  const signedOut = isSignedOut(connection);
+  useEffect(() => {
+    const next = signedOutQuality({ signedOut, format, quality, held: heldQuality.current });
+    heldQuality.current = next.held;
+    if (next.quality !== quality) setQuality(next.quality);
+  }, [signedOut, format, quality]);
 
   // Keep quality valid when switching format (resolutions vs bitrates).
   useEffect(() => {

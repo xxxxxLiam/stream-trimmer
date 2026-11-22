@@ -1,41 +1,64 @@
 /**
  * File: MarkBar.cutRow.test.ts
  * Path: src/components/MarkBar.cutRow.test.ts
- * Description: Cut is the primary action and must not scroll out of reach at the default
- * window. It lives in a row that is sticky to the bottom of the scrolling column. (The
- * measured proof is in audit/run-1/fixes/T10.md; this pins the structure so it cannot
- * quietly regress.) Source-level because the repo has no DOM test environment.
+ * Description: Cut is the primary action and must be reachable WITHOUT burying the controls
+ * before it (B2-1, H2-1). Run 1 made the Cut row sticky; that put an opaque row over In, Out,
+ * Add and the segment list at 1100x760 and at every 600-660px window. The row is now in flow,
+ * directly under In/Out/Add, and the segment list (the thing that grows) comes after it and
+ * scrolls inside itself. Source-level because the repo has no DOM test environment; the
+ * measured hit-tests are in audit/run-2/fixes/RB.md.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const src = readFileSync(new URL("./MarkBar.tsx", import.meta.url), "utf8");
+const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+const list = readFileSync(new URL("./SegmentList.tsx", import.meta.url), "utf8");
 
-test("the Cut button sits inside a row that sticks in the three-column layout", () => {
+test("the Cut row is in flow: nothing is sticky, fixed or z-indexed over the mark bar", () => {
   const rowStart = src.indexOf('id="ui-cut-row"');
   assert.ok(rowStart > 0, "ui-cut-row exists");
   const openTag = src.slice(src.lastIndexOf("<div", rowStart), src.indexOf(">", rowStart));
-  assert.match(openTag, /\bcut-row\b/);
-  assert.match(openTag, /bg-\[var\(--c-panel\)\]/, "needs an opaque panel background or content shows through");
+  assert.doesNotMatch(openTag, /\b(sticky|fixed|absolute)\b|\bz-\d+|-m[xb]-4/);
+  assert.doesNotMatch(css, /\.cut-row\b/, "no .cut-row rule is left in the stylesheet");
+  assert.doesNotMatch(css, /position:\s*sticky/);
   const cutAt = src.indexOf('id="ui-cut"');
   assert.ok(cutAt > rowStart, "Cut is after the row opens");
-  // Nothing but the row's own content between the row and the button: the row closes after Cut.
   const afterCut = src.slice(cutAt);
   assert.ok(afterCut.indexOf("</button>") < afterCut.indexOf("</div>"), "Cut is inside the row");
 });
 
-test("the cut-row class is sticky to the bottom in the three-column layout only", () => {
-  const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
-  const at = css.lastIndexOf("@container (min-width: 960px) {");
-  assert.ok(at > 0);
-  const block = css.slice(at, css.indexOf("\n}\n", at));
-  assert.match(block, /\.cut-row\s*\{\s*position:\s*sticky;\s*bottom:\s*0;\s*\}/);
-  // And not outside it: a stuck row would cover In and Add at the 900x600 minimum.
-  assert.doesNotMatch(css.slice(0, at), /\.cut-row\s*\{/);
+test("order in the mark bar: In, Out, Add, then Cut, then the segment list", () => {
+  const at = (needle: string) => {
+    const i = src.indexOf(needle);
+    assert.ok(i > 0, `${needle} present`);
+    return i;
+  };
+  const order = [at('id="ui-mark-in"'), at('id="ui-mark-out"'), at('id="ui-add-segment"'), at('id="ui-cut-row"'), at("<SegmentList")];
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
 });
 
-test("no visible scrollbar is introduced by the sticky row", () => {
-  const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+test("the segment list scrolls inside itself and stays keyboard-reachable", () => {
+  assert.match(list, /className="seg-scroll"/);
+  const rule = /\.seg-scroll\s*\{([^}]*)\}/.exec(css);
+  assert.ok(rule, ".seg-scroll rule exists");
+  assert.match(rule![1], /max-height:/);
+  assert.match(rule![1], /overflow-y:\s*auto/);
+  // Every row is a real button, so Tab reaches all of them.
+  assert.match(list, /<button\s+type="button"\s+className="flex min-w-0 flex-1/);
+  assert.match(list, /aria-label=\{`Remove segment/);
+});
+
+test("the player never takes more height than leaves room for the mark bar", () => {
+  const rule = /\.cols-centre \.aspect-video\s*\{([^}]*)\}/.exec(css);
+  assert.ok(rule, "a height-aware cap on the player box");
+  assert.match(rule![1], /100vh/);
+  assert.match(css, /\.cols-centre:has\(#ui-segment-list\) \.aspect-video/);
+});
+
+test("no visible scrollbar is introduced, and the rule is stated once", () => {
   assert.match(css, /::-webkit-scrollbar\s*\{\s*width:\s*0;\s*height:\s*0;?\s*\}/);
+  assert.equal((css.match(/::-webkit-scrollbar\s*\{/g) ?? []).length, 1);
+  assert.equal((css.match(/@container \(min-width: 840px\)/g) ?? []).length, 1, "one copy of the container block");
 });

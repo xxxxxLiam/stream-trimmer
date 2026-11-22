@@ -8,7 +8,7 @@
 import type { ReactNode } from "react";
 
 /** Keep in step with the @container rule in styles.css (a test pins them together). */
-export const THREE_COLUMN_MIN_PX = 960;
+export const THREE_COLUMN_MIN_PX = 840;
 
 export type ThreeColumnLayoutProps = {
   /** FIND. Left column. */

@@ -13,6 +13,9 @@
  *   corruptSource  write a truncated, unplayable file for source.* outputs
  *   failProbe      exit 1 with stderr on the metadata probe
  *   stderr         text for failProbe
+ *   partialBytes   leave `<output>.part` of this many bytes and fail with a
+ *                  dropped-connection error (what a broken download leaves)
+ *   partialOnFull  with partialBytes: only the whole-file (source.*) download drops
  *   cookieWriteBack  text written to the --cookies file on exit, as real yt-dlp does
  * Every call appends {pid, argv} to FAKE_JOB_LOG; download runs also append
  * their pid to FAKE_JOB_LOG + ".pids". The "media" is audit/fixtures/fixture.mp4.
@@ -85,6 +88,16 @@ async function main() {
   }
   const out = valOf("--output") || valOf("-o");
   const fixture = process.env.FAKE_JOB_FIXTURE;
+  if (
+    cfg.partialBytes &&
+    out &&
+    (!cfg.partialOnFull || path.basename(out).startsWith("source."))
+  ) {
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out + ".part", Buffer.alloc(Number(cfg.partialBytes), 1));
+    process.stderr.write("ERROR: unable to download video data: Connection reset by peer\n");
+    process.exit(1);
+  }
   if (out && fixture) {
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (cfg.corruptSource && path.basename(out).startsWith("source.")) {
@@ -92,6 +105,8 @@ async function main() {
     } else {
       fs.copyFileSync(fixture, out);
     }
+    // A finished download replaces whatever partial a failed run left behind.
+    fs.rmSync(out + ".part", { force: true });
   }
 }
 main().catch((e) => {

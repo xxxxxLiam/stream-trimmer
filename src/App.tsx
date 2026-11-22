@@ -30,6 +30,7 @@ import {
   type SessionClip,
 } from "./lib/fcpxml";
 import { getDownloads } from "./lib/downloads";
+import { addSessionClip, sessionClipsFor, type SessionClipsByCampaign } from "./lib/handoff";
 import { readSetting, writeSetting } from "./lib/persist";
 import type { BankedClip } from "./lib/bank";
 import PreviewPanel from "./components/PreviewPanel";
@@ -249,7 +250,13 @@ function Layout({ active }: { active: boolean }) {
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
   const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
-  const [sessionClips, setSessionClips] = useState<SessionClip[]>([]);
+  // Clips cut this session, kept per campaign: the panel's Export / Send all / Copy file path read
+  // only the ACTIVE campaign's list, so another client's clips are never offered, or sent.
+  const [sessionByCampaign, setSessionByCampaign] = useState<SessionClipsByCampaign<SessionClip>>({});
+  const sessionClips = useMemo(
+    () => sessionClipsFor(sessionByCampaign, campaign?.id ?? null) as SessionClip[],
+    [sessionByCampaign, campaign?.id],
+  );
   const editorRef = useRef(editorSettings);
   editorRef.current = editorSettings;
 
@@ -297,8 +304,10 @@ function Layout({ active }: { active: boolean }) {
 
   // Once a clip is saved: remember it for the session batch and run the campaign's
   // "After cutting" choice. Never blocks or fails the cut itself.
+  // `settings` are the ones in force when the cut STARTED: a switch while it runs must not apply
+  // the new campaign's "After cutting" choice to this campaign's clip.
   const afterSaved = useCallback(
-    (clipId: string, label: string | undefined, segments: Segment[]) => {
+    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings) => {
       const saved = getDownloads().find((d) => d.kind === "clip" && d.path);
       if (!saved) return; // browser download: no file path to hand on
       const clip: SessionClip = {
@@ -308,15 +317,17 @@ function Layout({ active }: { active: boolean }) {
         segments: segments.map((s) => ({ start: s.start, end: s.end })),
         sourceUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : sourceUrl || undefined,
       };
-      setSessionClips((prev) => [...prev.filter((c) => c.id !== clipId), clip]);
-      void runAfterCutting(editorRef.current, {
+      const cutFor = campaign?.id ?? null;
+      setSessionByCampaign((prev) => addSessionClip(prev, cutFor, clip));
+      void runAfterCutting(settings, {
+        campaignId: cutFor,
         campaignName: campaign?.name,
         sourceTitle: info?.title,
         clipsDir: folders.clipsDir || saveDir || undefined,
         clips: [clip],
       }).catch(() => {});
     },
-    [videoId, sourceUrl, campaign?.name, info?.title, folders.clipsDir, saveDir],
+    [videoId, sourceUrl, campaign?.id, campaign?.name, info?.title, folders.clipsDir, saveDir],
   );
 
   // Cut: name the clip from the campaign pattern, then record its ranges as used so the
@@ -325,12 +336,13 @@ function Layout({ active }: { active: boolean }) {
     async (segments: Segment[]) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
+      const startSettings = editorRef.current;
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
       const clipId = campaign ? nextClipId(videoId, taken) : null;
       const ok = await download({ segments, clipId: clipId ?? undefined });
       if (!ok) return;
       if (cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
-      afterSaved(clipId ?? `clip-${Date.now()}`, undefined, segments);
+      afterSaved(clipId ?? `clip-${Date.now()}`, undefined, segments, startSettings);
       clearSegments();
       setStartText("");
       setEndText("");
@@ -343,8 +355,9 @@ function Layout({ active }: { active: boolean }) {
   const cutBanked = useCallback(
     async (clip: BankedClip): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
+      const startSettings = editorRef.current;
       const ok = await download({ segments: clip.segments, clipId: clip.id });
-      if (ok) afterSaved(clip.id, clip.label, clip.segments);
+      if (ok) afterSaved(clip.id, clip.label, clip.segments, startSettings);
       return ok;
     },
     [download, afterSaved],
@@ -411,6 +424,7 @@ function Layout({ active }: { active: boolean }) {
                   <EditorHandoff
                     settings={editorSettings}
                     onChange={setEditorSettings}
+                    campaignId={campaign?.id ?? null}
                     campaignName={campaign?.name}
                     sourceTitle={info?.title}
                     clipsDir={folders.clipsDir || saveDir || undefined}

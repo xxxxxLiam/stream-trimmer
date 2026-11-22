@@ -12,13 +12,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 
-/** "/a/b/clips" -> "/a/b/channel-data". Same rule as defaultDataDir in src/lib/campaigns.ts. */
-function siblingDataDir(clipsDir) {
+/** "/a/b/clips" -> "/a/b/<name>". Same rule as defaultDataDir in src/lib/campaigns.ts. */
+function siblingDataDir(clipsDir, name) {
   const trimmed = String(clipsDir).replace(/[\\/]+$/, "");
   const sep = trimmed.includes("\\") && !trimmed.includes("/") ? "\\" : "/";
   const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  if (cut < 0) return "channel-data";
-  return `${trimmed.slice(0, cut)}${sep}channel-data`;
+  if (cut < 0) return name;
+  return `${trimmed.slice(0, cut)}${sep}${name}`;
 }
 
 /**
@@ -26,12 +26,16 @@ function siblingDataDir(clipsDir) {
  *  - The single `clipper.saveDir` (or, failing that, the first entry of
  *    `clipper.saveDirs`) becomes `clipper.clipsDir`. The old keys are left in
  *    place so a downgrade still finds its folder.
- *  - `clipper.dataDir` defaults to a sibling `channel-data` folder, flagged
- *    `clipper.dataDirConfirmed: false` so the UI asks the user to confirm it
- *    rather than silently choosing. Nothing is created on disk.
+ *  - The data folder is flagged `clipper.dataDirConfirmed: false` so the UI asks
+ *    the user to confirm it rather than silently choosing. Nothing is created
+ *    on disk. This file ships in every build and must not name a folder: the
+ *    suggested name belongs to the build shape, so it is only written when the
+ *    caller supplies `dataFolderName` (a build that has the exporter). Without
+ *    one, `clipper.dataDir` stays unset and the renderer derives its own
+ *    suggestion from the clips folder (src/lib/campaigns.ts, gated by build).
  * Idempotent: values the user already set are never overwritten.
  */
-function migrateSettings(input) {
+function migrateSettings(input, { dataFolderName } = {}) {
   const s = { ...input };
   if (!s["clipper.clipsDir"]) {
     const legacy =
@@ -42,8 +46,8 @@ function migrateSettings(input) {
     if (legacy) s["clipper.clipsDir"] = legacy;
   }
   if (s["clipper.clipsDir"] && !s["clipper.dataDir"]) {
-    s["clipper.dataDir"] = siblingDataDir(s["clipper.clipsDir"]);
-    s["clipper.dataDirConfirmed"] = false;
+    if (dataFolderName) s["clipper.dataDir"] = siblingDataDir(s["clipper.clipsDir"], dataFolderName);
+    if (s["clipper.dataDirConfirmed"] === undefined) s["clipper.dataDirConfirmed"] = false;
   }
   return s;
 }
@@ -70,7 +74,7 @@ function parseSettingsText(text) {
   return { status: "invalid", data: {} };
 }
 
-function createSettingsStore(filePath, { log } = {}) {
+function createSettingsStore(filePath, { log, dataFolderName } = {}) {
   let cache = {};
   let loaded = false;
   // Keys the user actually removed. Tracked separately so a write can merge
@@ -128,7 +132,7 @@ function createSettingsStore(filePath, { log } = {}) {
   /** Reads the file into memory. Must run before the window is created. */
   function load() {
     const raw = readFile();
-    cache = migrateSettings(raw);
+    cache = migrateSettings(raw, { dataFolderName });
     removed.clear();
     loaded = true;
     // Write the migration back once, so the renderer and the file agree.

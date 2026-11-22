@@ -13,33 +13,69 @@ const require = createRequire(import.meta.url);
 const { createOwnerCheck } = require("./ownerCheck.cjs");
 
 const hash = (id: string, salt: string) => `h(${id}|${salt})`;
-const make = (id: string | null) => createOwnerCheck({ readMachineId: async () => id, hashMachineId: hash });
+const make = (id: string | null, baked: { list: string; salt: string } | null) =>
+  createOwnerCheck({ readMachineId: async () => id, hashMachineId: hash, getBaked: () => baked });
 
-test("nobody is owner before a check has said so", () => {
-  assert.equal(make("m1").isOwner(), false);
+test("a build with nothing baked in (every public build) has no owner", async () => {
+  const o = make("m1", null);
+  assert.equal(await o.isOwner(), false);
+  assert.equal(await o.check(), false);
 });
 
-test("a matching hash makes this machine owner; the raw id and hash never come back", async () => {
-  const o = make("m1");
-  const r = await o.check([hash("m1", "s")], "s");
-  assert.equal(r, true);
-  assert.equal(o.isOwner(), true);
+test("a baked hash that matches this machine makes it owner; raw id and hash never come back", async () => {
+  const o = make("m1", { list: hash("m1", "s"), salt: "s" });
+  assert.equal(await o.check(), true);
+  assert.equal(await o.isOwner(), true);
   assert.deepEqual(Object.keys(o).sort(), ["check", "isOwner"]);
 });
 
-test("a non-matching list, missing salt or unreadable id stays non-owner", async () => {
-  const o = make("m1");
-  assert.equal(await o.check([hash("other", "s")], "s"), false);
-  assert.equal(o.isOwner(), false);
-  assert.equal(await o.check([hash("m1", "s")], ""), false);
-  assert.equal(await make(null).check([hash("m1", "s")], "s"), false);
-  assert.equal(await o.check("nope" as never, "s"), false);
+test("a baked list for another machine, a missing salt or an unreadable id is not owner", async () => {
+  assert.equal(await make("m1", { list: hash("other", "s"), salt: "s" }).isOwner(), false);
+  assert.equal(await make("m1", { list: hash("m1", "s"), salt: "" }).isOwner(), false);
+  assert.equal(await make(null, { list: hash("m1", "s"), salt: "s" }).isOwner(), false);
+  assert.equal(await make("m1", { list: "", salt: "s" }).isOwner(), false);
 });
 
-test("'*' admits any machine without reading the id", async () => {
-  const o = createOwnerCheck({ readMachineId: async () => { throw new Error("no"); }, hashMachineId: hash });
-  assert.equal(await o.check(["*"], "s"), true);
-  assert.equal(o.isOwner(), true);
+test("'*' baked into the build admits any machine without reading the id", async () => {
+  const o = createOwnerCheck({
+    readMachineId: async () => { throw new Error("no"); },
+    hashMachineId: hash,
+    getBaked: () => ({ list: "*", salt: "" }),
+  });
+  assert.equal(await o.isOwner(), true);
+});
+
+test("E2-2: nothing the renderer sends can change the verdict, before or after", async () => {
+  // A non-owner build (list is another machine's) and a public build (nothing baked).
+  for (const baked of [{ list: hash("other", "s"), salt: "s" }, null]) {
+    const o = make("m1", baked);
+    // The page's own forged answers: the wildcard, and this machine's real hash with a salt it chose.
+    assert.equal(await (o.check as (...a: unknown[]) => Promise<boolean>)(["*"], ""), false);
+    assert.equal(await o.isOwner(), false, "a forged wildcard flipped export:save's gate");
+    assert.equal(await (o.check as (...a: unknown[]) => Promise<boolean>)([hash("m1", "mine")], "mine"), false);
+    assert.equal(await o.isOwner(), false, "a forged hash flipped export:save's gate");
+  }
+});
+
+test("main.cjs does not register owner:check with the renderer's arguments", () => {
+  const src = readFileSync(new URL("./main.cjs", import.meta.url), "utf8");
+  const line = src.split("\n").find((l) => l.includes('ipcMain.handle("owner:check"')) ?? "";
+  assert.ok(line, "owner:check handler missing");
+  assert.doesNotMatch(line, /\(_e,\s*\w+/, "owner:check must not take renderer arguments");
+  assert.doesNotMatch(line, /check\([^)]+\)/, "owner:check must not forward arguments to the gate");
+});
+
+test("readBakedShape: no sidecar means no owner; a sidecar's list is what main uses", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { readBakedShape } = require("./ownerCheck.cjs");
+  const dir = mkdtempSync(join(tmpdir(), "shape-"));
+  assert.equal(readBakedShape(dir), null);
+  writeFileSync(join(dir, "build-shape.json"), "{not json");
+  assert.equal(readBakedShape(dir), null);
+  writeFileSync(join(dir, "build-shape.json"), JSON.stringify({ list: "AbC", salt: "s", dataFolderName: "x" }));
+  assert.deepEqual(readBakedShape(dir), { list: "AbC", salt: "s", dataFolderName: "x" });
 });
 
 test("export:save checks the owner before it touches any file", () => {
@@ -47,7 +83,7 @@ test("export:save checks the owner before it touches any file", () => {
   const start = src.indexOf('ipcMain.handle("export:save"');
   assert.ok(start > 0);
   const body = src.slice(start, src.indexOf("ipcMain.handle", start + 10));
-  const guard = body.indexOf("ownerGate.isOwner()");
+  const guard = body.indexOf("await ownerGate.isOwner()");
   const save = body.indexOf("saveExportFiles(");
   assert.ok(guard > 0, "export:save has no owner check");
   assert.ok(guard < save, "owner check must come before saveExportFiles");

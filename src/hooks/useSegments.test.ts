@@ -79,3 +79,37 @@ test("restore puts back segments with their video so syncVideo of that video kee
   s.syncVideo("BBB");
   assert.equal(s.get().segments.length, 0);
 });
+
+test("B2-4/B2-5: a restored clip survives the mount-time 'no video yet' sync", () => {
+  // TabBridge restores the clip and then sets the url; MarkBar's mount effect runs in
+  // between with videoId still null. That used to wipe the clip.
+  const store = createSegmentStore();
+  store.restore("AAA", [seg(10, 20), seg(60, 90)]);
+  store.syncVideo(null);
+  assert.deepEqual(store.get().segments, [seg(10, 20), seg(60, 90)]);
+  assert.equal(store.get().videoId, "AAA");
+  // The clipper then reaches the restored video: still the same clip.
+  store.syncVideo("AAA");
+  assert.deepEqual(store.get().segments, [seg(10, 20), seg(60, 90)]);
+});
+
+test("B2-4/B2-5: the protection ends once the clipper has caught up", () => {
+  const store = createSegmentStore();
+  store.restore("AAA", [seg(10, 20)]);
+  store.syncVideo(null);
+  store.syncVideo("AAA");
+  // Now a real change still starts a clean clip, and so does clearing the link.
+  store.syncVideo(null);
+  assert.deepEqual(store.get().segments, []);
+  store.restore("AAA", [seg(10, 20)]);
+  store.syncVideo("BBB");
+  assert.deepEqual(store.get().segments, [], "a different video is a new clip");
+  assert.equal(store.get().videoId, "BBB");
+});
+
+test("B2-4/B2-5: restoring nothing leaves syncVideo behaving as before", () => {
+  const store = createSegmentStore();
+  store.restore("AAA", []);
+  store.syncVideo(null);
+  assert.equal(store.get().videoId, null);
+});

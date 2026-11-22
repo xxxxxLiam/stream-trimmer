@@ -88,6 +88,9 @@ export default function SegmentList({
 
   return (
     <div className={className}>
+      {/* The list scrolls inside itself (styles.css .seg-scroll) so a long clip cannot push
+          Cut or the fields above it around. Every row is a button, so Tab reaches them all. */}
+      <div className="seg-scroll">
       <ol id="ui-segment-list" className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Segments, in the order they are joined">
         {segments.map((seg, i) => {
           const line = lineAtTime(lines, seg.start);
@@ -194,6 +197,7 @@ export default function SegmentList({
           );
         })}
       </ol>
+      </div>
       <span className="sr-only" role="status" aria-live="polite">
         {announce}
       </span>

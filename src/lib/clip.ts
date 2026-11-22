@@ -208,18 +208,49 @@ export function parseTimestamp(text: string | null | undefined): number | null {
   return null;
 }
 
-export function extractVideoId(url: string): string | null {
+const ID_PATH_KINDS = ["embed", "shorts", "v", "e", "live"];
+
+function isYouTubeHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return (
+    h === "youtube.com" ||
+    h.endsWith(".youtube.com") ||
+    h === "youtube-nocookie.com" ||
+    h.endsWith(".youtube-nocookie.com")
+  );
+}
+
+/**
+ * The video id in a pasted link, or null when it is not a single video. Covers what a
+ * clipper actually pastes: watch?v=, youtu.be/<id>, /live/<id> (a stream's canonical link),
+ * /shorts/<id>, /embed/<id>, /v/<id>, m. and music. hosts, youtube-nocookie.com, tracking
+ * parameters (?si=, &t=, &feature=), a trailing slash, and a link pasted without its
+ * "https://". Channels, handles, playlists and search pages have no id and give null.
+ */
+export function extractVideoId(raw: string): string | null {
+  const text = raw.trim();
+  if (!text) return null;
+  let u: URL;
   try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1) || null;
-    const v = u.searchParams.get("v");
-    if (v) return v;
-    const parts = u.pathname.split("/");
-    const i = parts.findIndex((p) => ["embed", "shorts", "v"].includes(p));
-    return i >= 0 ? parts[i + 1] || null : null;
+    u = new URL(text);
   } catch {
-    return null;
+    // "youtube.com/watch?v=..." copied without its scheme.
+    if (!/^(?:[\w-]+\.)*(?:youtube(?:-nocookie)?\.com|youtu\.be)(?:[/?#]|$)/i.test(text)) return null;
+    try {
+      u = new URL(`https://${text}`);
+    } catch {
+      return null;
+    }
   }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  const host = u.hostname.toLowerCase();
+  const parts = u.pathname.split("/").filter(Boolean);
+  if (host === "youtu.be" || host.endsWith(".youtu.be")) return parts[0] || null;
+  if (!isYouTubeHost(host)) return null;
+  const v = u.searchParams.get("v");
+  if (v) return v;
+  if (parts.length >= 2 && ID_PATH_KINDS.includes(parts[0])) return parts[1];
+  return null;
 }
 
 // Normalize any YouTube URL variant (shorts, youtu.be, embed, m.youtube.com)

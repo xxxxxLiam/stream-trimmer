@@ -73,7 +73,7 @@ export interface JobHarness {
 }
 
 export async function startJobHarness(
-  opts: { env?: Record<string, string> } = {},
+  opts: { env?: Record<string, string>; slowConcatSec?: number } = {},
 ): Promise<JobHarness> {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "jobtest-"));
   const serverTmp = path.join(tmpDir, "tmp");
@@ -85,7 +85,17 @@ export async function startJobHarness(
   const ytDlp = path.join(binDir, "yt-dlp");
   fs.writeFileSync(ytDlp, `#!/bin/sh\nexec "${process.execPath}" "${fake}" "$@"\n`);
   fs.chmodSync(ytDlp, 0o755);
-  fs.symlinkSync(REAL_FFMPEG, path.join(binDir, "ffmpeg"));
+  if (opts.slowConcatSec) {
+    // A join that takes a long time (a real re-encode of a long clip does):
+    // sleeps before the concat demuxer runs, then does the real work.
+    fs.writeFileSync(
+      path.join(binDir, "ffmpeg"),
+      `#!/bin/sh\ncase "$*" in *concat*) sleep ${opts.slowConcatSec};; esac\nexec "${REAL_FFMPEG}" "$@"\n`,
+    );
+    fs.chmodSync(path.join(binDir, "ffmpeg"), 0o755);
+  } else {
+    fs.symlinkSync(REAL_FFMPEG, path.join(binDir, "ffmpeg"));
+  }
 
   const cfgFile = path.join(tmpDir, "cfg.json");
   const callLog = path.join(tmpDir, "calls.log");
@@ -114,6 +124,9 @@ export async function startJobHarness(
       ...process.env,
       PORT: String(port),
       ELECTRON_RESOURCES_BIN: binDir,
+      // The server only takes ffmpeg from <resources>/bin when packaged; point it
+      // there for the one option that needs its own ffmpeg.
+      ...(opts.slowConcatSec ? { ELECTRON_RESOURCES: tmpDir } : {}),
       VITE_ENABLE_CHANNEL_DATA: "",
       TMPDIR: serverTmp,
       TMP: serverTmp,

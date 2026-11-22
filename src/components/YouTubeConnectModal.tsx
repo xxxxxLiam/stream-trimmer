@@ -299,7 +299,8 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
           Continue without signing in (360p)
         </button>
         <p className="mt-2 text-[12px] leading-snug text-fg-dim">
-          Videos download at 360p until you sign in. You can sign in later from
+          Videos download at 360p until you sign in, so the quality setting moves
+          to 360p for you and goes back when you do. You can sign in later from
           the sign-in chip in the header.
         </p>
 
