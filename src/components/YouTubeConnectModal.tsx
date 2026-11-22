@@ -23,6 +23,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRepeat,
   BoxArrowUpRight,
+  Check,
   ChevronDown,
   ChevronRight,
   ExclamationTriangleFill,
@@ -41,6 +42,7 @@ import {
   selectBrowser,
   sweepBrowsers,
   useYouTubeConnection,
+  type YouTubeConnectionState,
 } from "../lib/youtubeConnection";
 
 /** An indeterminate bar: no step here reports a percentage, so never fake one. */
@@ -109,6 +111,25 @@ export function extensionFor(browser: CookieBrowser | string): {
 export const COOKIE_EXTENSION_WARNING =
   'Install exactly this name. The older "Get cookies.txt" without LOCALLY was reported as malware and removed from the Chrome Web Store; yt-dlp advises uninstalling it. Search results also show look-alike clones.';
 
+export type ConnectPhase = "checking" | "notFound" | "failed";
+
+/**
+ * Which of the three screens to show, read straight off the connection store:
+ *   failed    an imported file was rejected (and nothing is mid-check),
+ *   checking  the automatic sweep has not ended: it is running, or about to
+ *             (`sweepPending`: the launch restore is done and the sweep has not
+ *             started yet), or a file is being verified before the sweep ended,
+ *   notFound  otherwise: the sweep ended empty, or there never is one (browser preview).
+ */
+export function connectPhase(
+  s: Pick<YouTubeConnectionState, "busy" | "sweepEnded" | "importRejected">,
+  sweepPending: boolean,
+): ConnectPhase {
+  if (s.importRejected && !s.busy) return "failed";
+  if (!s.sweepEnded && (sweepPending || s.busy)) return "checking";
+  return "notFound";
+}
+
 // One automatic sweep per app session: a failed sweep must not re-run, and
 // prompt for keychain access again, every time the modal re-renders.
 let autoSwept = false;
@@ -125,6 +146,14 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
   const [dragging, setDragging] = useState(false);
   const ext = extensionFor(state.browser);
   const expired = state.expired;
+  // The same condition the sweep effect below fires on, read at render time so
+  // the frame before the effect runs is already "checking", never "not found".
+  const sweepPending = open && !autoSwept && !state.restoring && state.probed && !state.connected;
+  const phase = connectPhase(state, sweepPending);
+  // Steps 1 and 2 already done within the manual route. Someone whose saved
+  // sign-in expired knows the drill and gets the drop target straight away.
+  const [doneThrough, setDoneThrough] = useState(expired ? 2 : 0);
+  const browserRouteOpen = showBrowserRoute || !ext.extension;
 
   // Step 1 of the flow: look in the browsers before asking the user for anything.
   useEffect(() => {
@@ -219,6 +248,13 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
     };
   }, [gated]);
 
+  // A button that just advanced the flow has left the DOM, taking focus with
+  // it; hand focus back to the dialog so the Tab trap keeps working.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (gated && dialog && !dialog.contains(document.activeElement)) dialog.focus();
+  }, [gated, phase, doneThrough]);
+
   if (!open) return null;
 
   // Silent launch-time restore: show a quiet placeholder rather than the
@@ -250,20 +286,40 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
   // The user chose to carry on signed out; the header chip is the way back.
   if (state.skipped) return null;
 
-  const step = (n: number, title: string, detail: React.ReactNode) => (
-    <li className="flex gap-3">
-      <span
-        aria-hidden
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-accent text-[12px] text-accent"
-      >
-        {n}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[13px] text-fg">{title}</span>
-        <span className="mt-1 block text-[12px] leading-snug text-fg-dim">{detail}</span>
-      </span>
-    </li>
-  );
+  // Failed shows every step, with its words, and the last one open: a rejected
+  // file is usually a stale export, so the private-window advice is what is needed.
+  const opened = phase === "failed" ? 2 : doneThrough;
+
+  const step = (n: number, title: string, detail: React.ReactNode, next?: string) => {
+    const done = n - 1 < opened;
+    const current = n - 1 === opened;
+    if (n - 1 > opened) return null;
+    return (
+      <li className="flex gap-3" key={n}>
+        <span
+          aria-hidden
+          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-accent text-[12px] text-accent"
+        >
+          {done ? <Check size={14} /> : n}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[13px] text-fg">{title}</span>
+          {current || phase === "failed" ? (
+            <span className="mt-1 block text-[12px] leading-snug text-fg-dim">{detail}</span>
+          ) : null}
+          {current && next ? (
+            <button
+              type="button"
+              className="btn mt-2"
+              onClick={() => setDoneThrough((v) => Math.max(v, n))}
+            >
+              {next}
+            </button>
+          ) : null}
+        </span>
+      </li>
+    );
+  };
 
   return (
     <div
@@ -291,6 +347,7 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
             : "Without a sign-in YouTube gives 360p. The sign-in stays on this computer and is never uploaded."}
         </p>
 
+        {/* Reachable in every state: someone stuck at step 2 needs the exit most. */}
         <button
           type="button"
           className="btn mt-4 w-full"
@@ -298,185 +355,201 @@ export default function YouTubeConnectModal({ open }: { open: boolean }) {
         >
           Continue without signing in (360p)
         </button>
-        <p className="mt-2 text-[12px] leading-snug text-fg-dim">
-          Videos download at 360p until you sign in, so the quality setting moves
-          to 360p for you and goes back when you do. You can sign in later from
-          the sign-in chip in the header.
-        </p>
 
-        {state.busy && state.step ? <Working label={state.step} /> : null}
+        {phase === "checking" ? (
+          <Working label={state.busy && state.step ? state.step : "Checking your browsers…"} />
+        ) : (
+          <>
+            <p className="mt-2 text-[12px] leading-snug text-fg-dim">
+              Videos download at 360p until you sign in, so the quality setting moves
+              to 360p for you and goes back when you do. You can sign in later from
+              the sign-in chip in the header.
+            </p>
 
-        <p className="mt-5 text-[13px] text-fg">
-          Not found automatically. Three steps:
-        </p>
-        <ol className="mt-3 space-y-3">
-          {ext.extension
-            ? step(
-                1,
-                `Install ${ext.extension} in ${ext.browserLabel}`,
+            {state.busy && state.step ? <Working label={state.step} /> : null}
+
+            <p className="mt-5 text-[13px] text-fg">
+              Not found automatically. Three steps:
+            </p>
+            <ol className="mt-3 space-y-3">
+              {ext.extension
+                ? step(
+                    1,
+                    `Install ${ext.extension} in ${ext.browserLabel}`,
+                    <>
+                      From {ext.where}. It exports cookies on this computer and sends them nowhere.{" "}
+                      {COOKIE_EXTENSION_WARNING}
+                    </>,
+                    "Installed, next",
+                  )
+                : step(
+                    1,
+                    `${ext.browserLabel}: let the app read the browser directly`,
+                    <>
+                      We have not verified a cookies.txt extension for {ext.browserLabel}, so none is
+                      recommended. Use Check browsers again below, which reads {ext.browserLabel} itself.
+                      {ext.note ? ` ${ext.note}` : ""} Or export from Chrome or Firefox instead.
+                    </>,
+                    "Next",
+                  )}
+              {step(
+                2,
+                "Export the youtube.com cookies",
                 <>
-                  From {ext.where}. It exports cookies on this computer and sends them nowhere.{" "}
-                  {COOKIE_EXTENSION_WARNING}
+                  Open a private window, sign in to YouTube, then in the same tab go to
+                  youtube.com/robots.txt and export from there. Close the private
+                  window afterwards. A session you keep browsing in rotates and
+                  stops working within hours.
                 </>,
-              )
-            : step(
-                1,
-                `${ext.browserLabel}: let the app read the browser directly`,
-                <>
-                  We have not verified a cookies.txt extension for {ext.browserLabel}, so none is
-                  recommended. Use Check browsers again below, which reads {ext.browserLabel} itself.
-                  {ext.note ? ` ${ext.note}` : ""} Or export from Chrome or Firefox instead.
-                </>,
+                "Exported, next",
               )}
-          {step(
-            2,
-            "Export the youtube.com cookies",
-            <>
-              Open a private window, sign in to YouTube, then in the same tab go to
-              youtube.com/robots.txt and export from there. Close the private
-              window afterwards. A session you keep browsing in rotates and
-              stops working within hours.
-            </>,
-          )}
-          {step(
-            3,
-            "Drop the file here",
-            <>Or choose it below. The file and sign-in are checked at once.</>,
-          )}
-        </ol>
+              {step(
+                3,
+                "Drop the file here",
+                <>Or choose it below. The file and sign-in are checked at once.</>,
+              )}
+            </ol>
 
-        <button
-          type="button"
-          className="btn-primary mt-5 flex h-btn w-full items-center justify-center gap-2"
-          disabled={state.busy || !state.canImport}
-          onClick={() => void importCookies()}
-        >
-          {state.busy ? (
-            <ArrowRepeat className="animate-spin" size={16} />
-          ) : (
-            <FileEarmarkArrowUp size={16} />
-          )}
-          {state.busy ? "Checking…" : "Choose cookies.txt"}
-        </button>
-        {!state.canImport ? (
-          <p className="mt-2 text-[12px] leading-snug text-fg-dim">
-            Importing a file needs the desktop app. In the browser preview, use
-            the browser option below.
-          </p>
-        ) : null}
-
-        {state.message ? (
-          <div
-            role="alert"
-            className="mt-4 flex items-start gap-2 rounded-control border border-accent bg-accent-card px-3 py-2 text-[13px] leading-snug text-accent"
-          >
-            <ExclamationTriangleFill className="mt-0.5 shrink-0" size={16} />
-            <span>{state.message}</span>
-          </div>
-        ) : null}
-
-        {state.notice ? (
-          <p role="status" className="mt-3 text-[12px] leading-snug text-fg-dim">
-            {state.notice}
-          </p>
-        ) : null}
-
-        {state.reason ? (
-          <details className="mt-2">
-            <summary className="cursor-pointer text-[12px] text-fg-dim">
-              Technical details
-            </summary>
-            <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-[12px] leading-snug text-fg-dim">
-              {state.reason}
-            </pre>
-          </details>
-        ) : null}
-
-        <p className="mt-4 text-[12px] leading-snug text-fg-dim">
-          Once imported, the sign-in is kept and refreshed each time you use the
-          app. YouTube can end a session at any time, for example after a
-          password change or signing out everywhere. The app tells you when
-          that happens.
-        </p>
-
-        <div className="mt-5 border-t border-hairline pt-3">
-          <p className="text-[12px] leading-snug text-fg-dim">
-            Or read a browser's own cookies. Firefox works on macOS and Windows.
-            Chrome and Chromium on Windows cannot be read, because Chrome 127
-            encrypts its cookies. Cookies read this way rotate, so expect to
-            redo it.
-          </p>
-          <button
-            type="button"
-            className="btn mt-2 flex h-btn w-full items-center justify-center gap-2"
-            disabled={state.busy}
-            onClick={() => void sweepBrowsers()}
-          >
-            <Search size={16} />
-            Check browsers again
-          </button>
-
-          <button
-            type="button"
-            className="mt-3 flex items-center gap-1 text-[12px] text-fg-dim hover:text-fg"
-            aria-expanded={showBrowserRoute}
-            onClick={() => setShowBrowserRoute((v) => !v)}
-          >
-            {showBrowserRoute ? (
-              <ChevronDown size={12} />
-            ) : (
-              <ChevronRight size={12} />
-            )}
-            Pick a browser
-          </button>
-
-          {showBrowserRoute ? (
-            <div className="mt-3">
-              <p className="text-[12px] leading-snug text-fg-dim">
-                Sign in to YouTube in that browser and leave the tab open. Then
-                quit the browser fully. A running browser locks its cookies.
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+            {opened >= 2 ? (
+              <>
                 <button
                   type="button"
-                  className="btn flex items-center gap-2"
-                  onClick={() => void openYouTubeSignIn()}
-                >
-                  <BoxArrowUpRight size={16} />
-                  Open YouTube
-                </button>
-                <select
-                  className="input h-8 rounded-chip border border-hairline bg-panel-raised px-2 text-[13px] capitalize"
-                  aria-label="Browser to check"
-                  value={state.browser}
-                  disabled={state.busy}
-                  onChange={(event) =>
-                    selectBrowser(event.target.value as CookieBrowser)
-                  }
-                >
-                  {COOKIE_BROWSERS.map((browser) => (
-                    <option key={browser} value={browser} className="capitalize">
-                      {browser}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn flex items-center gap-2"
-                  disabled={state.busy}
-                  onClick={() => void checkBrowserConnection()}
+                  className="btn-primary mt-5 flex h-btn w-full items-center justify-center gap-2"
+                  disabled={state.busy || !state.canImport}
+                  onClick={() => void importCookies()}
                 >
                   {state.busy ? (
                     <ArrowRepeat className="animate-spin" size={16} />
-                  ) : null}
-                  {state.busy ? "Checking…" : "Check browser"}
+                  ) : (
+                    <FileEarmarkArrowUp size={16} />
+                  )}
+                  {state.busy ? "Checking…" : "Choose cookies.txt"}
                 </button>
-              </div>
-            </div>
-          ) : null}
+                {!state.canImport ? (
+                  <p className="mt-2 text-[12px] leading-snug text-fg-dim">
+                    Importing a file needs the desktop app. In the browser preview, use
+                    the browser option below.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
 
-          <DiagnosticsDisclosure />
-        </div>
+            {phase === "failed" && state.message ? (
+              <div
+                role="alert"
+                className="mt-4 flex items-start gap-2 rounded-control border border-accent bg-accent-card px-3 py-2 text-[13px] leading-snug text-accent"
+              >
+                <ExclamationTriangleFill className="mt-0.5 shrink-0" size={16} />
+                <span>{state.message}</span>
+              </div>
+            ) : null}
+            {phase === "notFound" && state.message ? (
+              <p role="status" className="mt-3 text-[12px] leading-snug text-fg-dim">
+                {state.message}
+              </p>
+            ) : null}
+
+            {state.notice ? (
+              <p role="status" className="mt-3 text-[12px] leading-snug text-fg-dim">
+                {state.notice}
+              </p>
+            ) : null}
+
+            {state.reason ? (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-[12px] text-fg-dim">
+                  Technical details
+                </summary>
+                <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-chip bg-bg-deep/60 p-2 text-[12px] leading-snug text-fg-dim">
+                  {state.reason}
+                </pre>
+              </details>
+            ) : null}
+
+            {opened >= 2 ? (
+              <p className="mt-4 text-[12px] leading-snug text-fg-dim">
+                Once imported, the sign-in is kept and refreshed each time you use the
+                app. YouTube can end a session at any time, for example after a
+                password change or signing out everywhere. The app tells you when
+                that happens.
+              </p>
+            ) : null}
+
+            <div className="mt-5 border-t border-hairline pt-3">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-[12px] text-fg-dim hover:text-fg"
+                aria-expanded={browserRouteOpen}
+                onClick={() => setShowBrowserRoute((v) => !v)}
+              >
+                {browserRouteOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                Or read a browser's own cookies
+              </button>
+              {browserRouteOpen ? (
+                <div className="mt-2">
+                  <p className="text-[12px] leading-snug text-fg-dim">
+                    Firefox works on macOS and Windows.
+                    Chrome and Chromium on Windows cannot be read, because Chrome 127
+                    encrypts its cookies. Cookies read this way rotate, so expect to
+                    redo it.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn mt-2 flex h-btn w-full items-center justify-center gap-2"
+                    disabled={state.busy}
+                    onClick={() => void sweepBrowsers()}
+                  >
+                    <Search size={16} />
+                    Check browsers again
+                  </button>
+                  <p className="mt-3 text-[12px] leading-snug text-fg-dim">
+                    Sign in to YouTube in that browser and leave the tab open. Then
+                    quit the browser fully. A running browser locks its cookies.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      className="btn flex items-center gap-2"
+                      onClick={() => void openYouTubeSignIn()}
+                    >
+                      <BoxArrowUpRight size={16} />
+                      Open YouTube
+                    </button>
+                    <select
+                      className="input h-8 rounded-chip border border-hairline bg-panel-raised px-2 text-[13px] capitalize"
+                      aria-label="Browser to check"
+                      value={state.browser}
+                      disabled={state.busy}
+                      onChange={(event) =>
+                        selectBrowser(event.target.value as CookieBrowser)
+                      }
+                    >
+                      {COOKIE_BROWSERS.map((browser) => (
+                        <option key={browser} value={browser} className="capitalize">
+                          {browser}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn flex items-center gap-2"
+                      disabled={state.busy}
+                      onClick={() => void checkBrowserConnection()}
+                    >
+                      {state.busy ? (
+                        <ArrowRepeat className="animate-spin" size={16} />
+                      ) : null}
+                      {state.busy ? "Checking…" : "Check browser"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Only once an imported file has been rejected: the one moment a report is wanted. */}
+              {phase === "failed" ? <DiagnosticsDisclosure /> : null}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

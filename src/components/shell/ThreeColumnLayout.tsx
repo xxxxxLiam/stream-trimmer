@@ -3,9 +3,23 @@
  * Path: src/components/shell/ThreeColumnLayout.tsx
  * Description: The workspace body (BUILD-SPEC section 3): transcript | centre | clips,
  *   flex-wrap so the columns stack at phone width. The help drawer is a SIBLING of
- *   the columns so it can stay open while you work.
+ *   the columns so it can stay open while you work. The two side columns can be resized
+ *   with drag handles (keyboard too); the widths persist in "clipper.columnWidths".
  */
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { readSetting, writeSetting } from "../../lib/persist";
+import ColumnHandle from "./ColumnHandle";
+import {
+  COLUMN_WIDTHS_KEY,
+  applyMove,
+  boundsFor,
+  dragWidth,
+  parseStored,
+  resolveWidths,
+  serializeStored,
+  type ColumnKind,
+  type StoredWidths,
+} from "./columnSizes";
 
 /** Keep in step with the @container rule in styles.css (a test pins them together). */
 export const THREE_COLUMN_MIN_PX = 840;
@@ -21,6 +35,8 @@ export type ThreeColumnLayoutProps = {
   drawer?: ReactNode;
 };
 
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 export default function ThreeColumnLayout({
   transcript,
   centre,
@@ -35,10 +51,77 @@ export default function ThreeColumnLayout({
   // `relative` anchors the help drawer, which is absolutely positioned over this area
   // rather than being a flex sibling. As a sibling it took 400px out of the row and
   // reflowed all three columns on open, which is not what a side panel should do.
+  //
+  // Resizing: dragged widths reach the columns as CSS variables (--col-t, --col-c) that
+  // styles.css only reads INSIDE the wide container query, so stacked columns can never be
+  // left with a stuck width. The handles are only rendered while the row is wide.
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [containerPx, setContainerPx] = useState(0);
+  const [stored, setStored] = useState<StoredWidths>(() => parseStored(readSetting<unknown>(COLUMN_WIDTHS_KEY, null)));
+  const storedRef = useRef(stored);
+  storedRef.current = stored;
+  const dragStart = useRef(0);
+
+  useIsoLayoutEffect(() => {
+    const el = hostRef.current;
+    if (!el) return;
+    const measure = () => setContainerPx(el.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const wide = containerPx >= THREE_COLUMN_MIN_PX;
+  const widths = resolveWidths(stored, containerPx || THREE_COLUMN_MIN_PX);
+  const customised = stored.transcript !== null || stored.clips !== null;
+
+  const commit = useCallback((next: StoredWidths, persist: boolean) => {
+    storedRef.current = next;
+    setStored(next);
+    if (persist) writeSetting(COLUMN_WIDTHS_KEY, serializeStored(next));
+  }, []);
+
+  /** Set one column from a width; the other keeps what it is showing now. */
+  const setWidth = (kind: ColumnKind, px: number, persist: boolean) => {
+    commit({ transcript: widths.transcript, clips: widths.clips, [kind]: px }, persist);
+  };
+  const reset = (kind: ColumnKind) => commit({ ...storedRef.current, [kind]: null }, true);
+
+  const handleFor = (kind: ColumnKind) => {
+    const other = kind === "transcript" ? widths.clips : widths.transcript;
+    const { min, max } = boundsFor(kind, containerPx, other);
+    return (
+      <ColumnHandle
+        kind={kind}
+        value={widths[kind]}
+        min={min}
+        max={max}
+        onKeyMove={(move, large) => setWidth(kind, applyMove(kind, move, widths, containerPx, large), true)}
+        onDragStart={() => {
+          dragStart.current = widths[kind];
+        }}
+        onDragTo={(dx) => setWidth(kind, dragWidth(kind, dragStart.current, dx, widths, containerPx), false)}
+        onDragEnd={() => writeSetting(COLUMN_WIDTHS_KEY, serializeStored(storedRef.current))}
+        onReset={() => reset(kind)}
+      />
+    );
+  };
+
+  const rowVars = {
+    "--col-t": `${widths.transcript}px`,
+    "--col-c": `${widths.clips}px`,
+  } as CSSProperties;
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
-      <div role="region" tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="cols-row flex min-w-0 flex-wrap content-start gap-2 p-2">
+      <div ref={hostRef} role="region" tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div
+          className="cols-row relative flex min-w-0 flex-wrap content-start gap-2 p-2"
+          style={wide ? rowVars : undefined}
+          data-sized={wide && customised ? "" : undefined}
+        >
           <section
             id="ui-col-transcript"
             aria-label="Transcript"
@@ -60,6 +143,8 @@ export default function ThreeColumnLayout({
           >
             {clips}
           </section>
+          {wide ? handleFor("transcript") : null}
+          {wide ? handleFor("clips") : null}
         </div>
       </div>
       {drawer}

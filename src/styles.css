@@ -392,6 +392,14 @@
   margin: -2px;
 }
 
+/* ---- Resizable side columns --------------------------------------------- */
+/* ThreeColumnLayout sets --col-t / --col-c on .cols-row and data-sized once a width has
+   been dragged. They are read ONLY inside the wide container query, so stacked columns
+   never carry a width, and the handles do not exist (or show) below it either. */
+.col-handle {
+  display: none;
+}
+
 @container (min-width: 840px) {
   .cols-row {
     height: 100%;
@@ -412,6 +420,54 @@
     order: 0;
     min-height: 0;
     overflow-y: auto;
+  }
+  /* Resizable side columns (see the note above this block). */
+  .cols-row[data-sized] .cols-transcript {
+    flex: 0 0 var(--col-t);
+    max-width: none;
+  }
+  .cols-row[data-sized] .cols-clips {
+    flex: 0 0 var(--col-c);
+    max-width: none;
+  }
+  /* A 12px hit area centred in the 8px gap, with a 2px line drawn in it. */
+  .col-handle {
+    display: block;
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    width: 12px;
+    cursor: col-resize;
+    touch-action: none;
+    border-radius: 5px;
+    z-index: 1;
+  }
+  .col-handle::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 5px;
+    width: 2px;
+    border-radius: 1px;
+    background: transparent;
+  }
+  .col-handle:hover::after,
+  .col-handle:focus-visible::after {
+    background: var(--c-hairline-strong);
+  }
+  .col-handle:active::after {
+    background: var(--accent);
+  }
+  .col-handle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 0;
+  }
+  .col-handle-transcript {
+    left: calc(8px + var(--col-t) + 4px - 6px);
+  }
+  .col-handle-clips {
+    right: calc(8px + var(--col-c) + 4px - 6px);
   }
 }
 @container (min-width: 1040px) {

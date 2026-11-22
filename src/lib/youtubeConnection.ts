@@ -55,6 +55,15 @@ export interface YouTubeConnectionState {
    * this app session, and clears on any successful sign-in.
    */
   skipped: boolean;
+  /**
+   * The automatic browser sweep has run to its end without producing a
+   * sign-in (nothing found, or YouTube throttled it). The connect screen opens
+   * its manual route only after this: it is the fact that "Not found" rests on.
+   * Never cleared by a re-check, so asking again does not hide the manual route.
+   */
+  sweepEnded: boolean;
+  /** The last imported cookies.txt was rejected (unreadable, or YouTube refused it). */
+  importRejected: boolean;
 }
 
 /** The four states the user is ever shown. `checking` is transient. */
@@ -226,6 +235,8 @@ let state: YouTubeConnectionState = {
   expiresAt: null,
   expired: false,
   skipped: readSetting<boolean>(SKIPPED_KEY, false) === true,
+  sweepEnded: false,
+  importRejected: false,
 };
 
 /**
@@ -344,6 +355,7 @@ function markConnected(source: AuthSource) {
     restoring: false,
     expired: false,
     notice: undefined,
+    importRejected: false,
   });
 }
 
@@ -477,10 +489,10 @@ export async function restoreConnection(): Promise<boolean> {
 export async function importCookies(): Promise<boolean> {
   const api = electron();
   if (!api?.importYouTubeCookies) {
-    set({ message: "Importing cookies needs the desktop app." });
+    set({ message: "Importing cookies needs the desktop app.", importRejected: true });
     return false;
   }
-  set({ busy: true, step: "Reading the cookies file…", message: undefined, reason: undefined });
+  set({ busy: true, step: "Reading the cookies file…", message: undefined, reason: undefined, importRejected: false });
   try {
     const result = await api.importYouTubeCookies();
     if (result.cancelled) {
@@ -493,6 +505,7 @@ export async function importCookies(): Promise<boolean> {
         step: undefined,
         probed: true,
         message: result.error || "That file couldn't be used.",
+        importRejected: true,
       });
       return false;
     }
@@ -505,6 +518,7 @@ export async function importCookies(): Promise<boolean> {
       step: undefined,
       probed: true,
       message: error instanceof Error ? error.message : "Import failed.",
+      importRejected: true,
     });
     return false;
   }
@@ -523,6 +537,7 @@ async function verifyImported(): Promise<boolean> {
     return true;
   }
   markFailed(verified, "app", true);
+  if (!state.connected) set({ importRejected: true });
   return state.connected;
 }
 
@@ -537,18 +552,19 @@ export async function importDroppedCookies(file: File): Promise<boolean> {
     set({
       message:
         "Dropping a file needs a newer version of the app. Use Choose cookies.txt instead.",
+      importRejected: true,
     });
     return false;
   }
-  set({ busy: true, step: "Reading the cookies file…", message: undefined, notice: undefined, reason: undefined });
+  set({ busy: true, step: "Reading the cookies file…", message: undefined, notice: undefined, reason: undefined, importRejected: false });
   try {
     if (file.size > 5 * 1024 * 1024) {
-      set({ busy: false, step: undefined, probed: true, message: "That file is too large to be a cookies.txt (over 5 MB)." });
+      set({ busy: false, step: undefined, probed: true, message: "That file is too large to be a cookies.txt (over 5 MB).", importRejected: true });
       return false;
     }
     const result = await api.importYouTubeCookiesText(await file.text());
     if (!result.ok) {
-      set({ busy: false, step: undefined, probed: true, message: result.error || "That file couldn't be used." });
+      set({ busy: false, step: undefined, probed: true, message: result.error || "That file couldn't be used.", importRejected: true });
       return false;
     }
     return await verifyImported();
@@ -558,6 +574,7 @@ export async function importDroppedCookies(file: File): Promise<boolean> {
       step: undefined,
       probed: true,
       message: error instanceof Error ? error.message : "Import failed.",
+      importRejected: true,
     });
     return false;
   }
@@ -585,6 +602,7 @@ export async function signOut(): Promise<void> {
     reason: undefined,
     probed: true,
     restoring: false,
+    importRejected: false,
   });
 }
 
@@ -643,6 +661,10 @@ export function checkConnection(source?: AuthSource): Promise<boolean> {
  */
 export async function sweepBrowsers(): Promise<boolean> {
   const api = electron();
+  // Busy and the epoch are claimed before the first await, so the connect screen
+  // never sees a gap between "about to sweep" and "sweeping".
+  const epoch = signInEpoch;
+  set({ busy: true, browserStatus: "checking", step: "Checking browsers…", message: undefined, reason: undefined });
   let order: CookieBrowser[] = [...COOKIE_BROWSERS];
   try {
     const result = await api?.getBrowserOrder?.(
@@ -653,7 +675,6 @@ export async function sweepBrowsers(): Promise<boolean> {
     /* fall back to the full list in its default order */
   }
 
-  const epoch = signInEpoch;
   const failures: string[] = [];
   for (const browser of order) {
     if (signInEpoch !== epoch) return state.connected;
@@ -683,6 +704,7 @@ export async function sweepBrowsers(): Promise<boolean> {
       result.status === "rate_limited"
     ) {
       markFailed(result, browser);
+      set({ sweepEnded: true });
       return false;
     }
     // "not installed" is not a failure worth reporting back to the user.
@@ -703,6 +725,7 @@ export async function sweepBrowsers(): Promise<boolean> {
         ? "No supported browser is installed with a YouTube session."
         : "None of your browsers would hand over a YouTube session.",
     reason: failures.join("\n") || undefined,
+    sweepEnded: true,
   });
   return false;
 }
