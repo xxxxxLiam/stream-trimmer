@@ -1,9 +1,9 @@
 /**
  * File: MarkBar.tsx
  * Path: src/components/MarkBar.tsx
- * Description: Centre column, under the Timeline. In/out fields, Add segment, the segment
- *   list, the stitched total with the campaign band, the overlap warning and the one
- *   primary action, Cut as one file. See BUILD-SPEC sections 4, 5 and 12.
+ * Description: Centre column, under the Timeline. Start/end fields, Add part, the part
+ *   list, the total length with the campaign band, the overlap warning and the one
+ *   primary action, Cut. See BUILD-SPEC sections 4, 5 and 12.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useClipperContext } from "../context/ClipperContext";
@@ -46,7 +46,9 @@ function Kbd({ children }: { children: ReactNode }) {
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
-  return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
+  return (
+    !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)
+  );
 }
 
 /** The target band drawn as a small scale, with the marker where the total sits. */
@@ -85,15 +87,15 @@ function bandReadout(total: number, band: Band | null): { text: string; out: boo
   const r = bandStatus(total, band);
   switch (r.status) {
     case "none":
-      return { text: "No campaign band to check against", out: false };
+      return { text: "", out: false };
     case "empty":
       return { text: "Nothing marked yet", out: false };
     case "in":
-      return { text: "In band", out: false };
+      return { text: "Within the target length", out: false };
     case "under":
-      return { text: `Out of band, ${formatLength(r.deltaSec)} short`, out: true };
+      return { text: `${formatLength(r.deltaSec)} too short`, out: true };
     case "over":
-      return { text: `Out of band, ${formatLength(r.deltaSec)} long`, out: true };
+      return { text: `${formatLength(r.deltaSec)} too long`, out: true };
     case "over-hard":
       return { text: `Over the hard cap by ${formatLength(r.deltaSec)}`, out: true };
   }
@@ -139,12 +141,13 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
 
   const segments = store.segments;
   const hasSegments = segments.length > 0;
-  // One segment (or just a mark) behaves exactly as before, with no join step.
+  // One part (or just a mark) behaves exactly as before, with no join step.
   const stitched = hasSegments
     ? totalDuration(segments)
     : marked && pendingCheck.ok
       ? end - start
       : 0;
+
   const band: Band | null = active
     ? {
         targetMinSec: active.targetMinSec,
@@ -154,7 +157,7 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
     : null;
   const readout = bandReadout(stitched, band);
 
-  // Overlap with ranges already used. Checks the clip's segments, or the pending mark
+  // Overlap with ranges already used. Checks the clip's parts, or the pending mark
   // when nothing has been added yet.
   const used: readonly NamedRange[] =
     usedProp ?? (videoId && active ? (active.usedRanges[videoId] ?? []) : []);
@@ -170,7 +173,9 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
   );
   const overlapKey = overlaps
     .map((o) =>
-      o.overlaps.map((h) => `${toCheck[o.index].start}-${toCheck[o.index].end}@${h.used.start}-${h.used.end}`).join(","),
+      o.overlaps
+        .map((h) => `${toCheck[o.index].start}-${toCheck[o.index].end}@${h.used.start}-${h.used.end}`)
+        .join(","),
     )
     .join("|");
   const overlapBlocking = overlaps.length > 0 && ackKey !== overlapKey;
@@ -268,17 +273,19 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
     const who = hit.used.clipId ? `clip ${hit.used.clipId}` : "a published clip";
     const where = formatRange({ start: hit.start, end: hit.end });
     return hasSegments
-      ? `Segment ${o.index + 1} (${formatRange(seg)}) overlaps ${who} at ${where}.`
+      ? `Part ${o.index + 1} (${formatRange(seg)}) overlaps ${who} at ${where}.`
       : `This range (${formatRange(seg)}) overlaps ${who} at ${where}.`;
   });
 
+  const cutLabel = hasSegments && segments.length > 1 ? "Cut parts as one file" : "Cut clip";
+
   return (
     <div className={`surface-panel flex flex-col gap-3 p-4 ${className ?? ""}`}>
-      {/* In / out */}
+      {/* Start / end */}
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex min-w-[84px] flex-1 flex-col gap-1">
           <span className="flex items-center gap-1 text-meta text-fg-dim">
-            In <Kbd>I</Kbd>
+            Start <Kbd>I</Kbd>
           </span>
           <input
             id="ui-mark-in"
@@ -294,7 +301,7 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
         </label>
         <label className="flex min-w-[84px] flex-1 flex-col gap-1">
           <span className="flex items-center gap-1 text-meta text-fg-dim">
-            Out <Kbd>O</Kbd>
+            End <Kbd>O</Kbd>
           </span>
           <input
             id="ui-mark-out"
@@ -314,9 +321,9 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
           className="btn"
           onClick={clearRange}
           disabled={!marked}
-          title="Clear the range (⌘⌫)"
+          title="Clear start and end (⌘⌫)"
         >
-          Whole video
+          Clear
         </button>
         <button
           id="ui-add-segment"
@@ -325,21 +332,21 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
           onClick={addSegment}
           disabled={!canAdd}
           aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter"
+          title="Keep this range as a part and mark another (⌘⇧↵)"
         >
-          Add segment
-          <Kbd>⌘⇧↵</Kbd>
+          {hasSegments ? "Add another part" : "Add part"}
         </button>
       </div>
 
       {(problem || (marked && !pendingCheck.ok && info)) && (
         <p className="m-0 text-meta text-fg-dim" role="status">
-          {problem ||
-            (pendingCheck.ok ? "" : describeProblem(pendingCheck.reason))}
+          {problem || (pendingCheck.ok ? "" : describeProblem(pendingCheck.reason))}
         </p>
       )}
+
       {cleared && (
         <p className="m-0 text-meta text-fg-dim">
-          Range cleared.{" "}
+          Start and end cleared.{" "}
           <button type="button" className="link-quiet" onClick={restoreRange}>
             Restore it <Kbd>⌘Z</Kbd>
           </button>
@@ -378,11 +385,11 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
         </div>
       )}
 
-      {/* Stitched total, band, and the one primary action. It sits directly under In / Out
-          and Add, in flow, and the segment list comes after it: the list is the part that
-          grows, so Cut neither moves when segments are added nor covers anything. (It used
-          to be sticky at the bottom of the column, which put it over the controls above it
-          at 1100x760 and at every 600-660px window: B2-1, H2-1.) */}
+      {/* Total length, band, and the one primary action. It sits directly under the
+          start and end fields, in flow, and the part list comes after it: the list is the
+          part that grows, so Cut neither moves when parts are added nor covers anything.
+          (It used to be sticky at the bottom of the column, which put it over the
+          controls above it at 1100x760 and at every 600-660px window: B2-1, H2-1.) */}
       <div
         id="ui-cut-row"
         className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-hairline pt-2"
@@ -390,28 +397,32 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
         <div className="flex min-w-[200px] flex-1 flex-col gap-1">
           <span className="text-meta text-fg-dim">
             {hasSegments
-              ? `Stitched total, ${segments.length} ${segments.length === 1 ? "segment" : "segments"}`
+              ? `Total length, ${segments.length} ${segments.length === 1 ? "part" : "parts"}`
               : "Length"}
           </span>
           <output
             id="ui-stitched-total"
             className="t-numeral text-fg"
             aria-live="polite"
-            aria-label={`Stitched total ${formatTimecode(stitched)}`}
+            aria-label={`Total length ${formatTimecode(stitched)}`}
           >
             {formatTimecode(stitched)}
           </output>
           {band && <BandScale total={stitched} band={band} />}
-          <span className="text-meta text-fg-dim">
-            {readout.out ? <strong className="font-medium text-accent">{readout.text}</strong> : readout.text}
-            {band && (
+          {band && (
+            <span className="text-meta text-fg-dim">
+              {readout.out ? (
+                <strong className="font-medium text-accent">{readout.text}</strong>
+              ) : (
+                readout.text
+              )}
               <span className="font-mono">
-                {" "}
-                · target {formatLength(band.targetMinSec)} to {formatLength(band.targetMaxSec)}, cap{" "}
+                {readout.text ? " · " : ""}
+                target {formatLength(band.targetMinSec)} to {formatLength(band.targetMaxSec)}, cap{" "}
                 {formatLength(band.hardMaxSec)}
               </span>
-            )}
-          </span>
+            </span>
+          )}
         </div>
         <button
           id="ui-cut"
@@ -424,16 +435,16 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
             overlapBlocking
               ? "Resolve the overlap warning first"
               : !cutHandler
-                ? "Multi-segment cut is not wired yet"
-                : undefined
+                ? "Cutting several parts is not wired yet"
+                : "Cut and save (⌘↵)"
           }
         >
-          Cut as one file
+          {cutLabel}
           <span className="font-mono text-meta">⌘↵</span>
         </button>
       </div>
 
-      {/* Segments */}
+      {/* Parts */}
       {hasSegments ? (
         <SegmentList
           segments={segments}
@@ -445,8 +456,8 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
         />
       ) : (
         <p className="m-0 text-meta text-fg-dim">
-          No segments yet. Mark an in and out, then Add segment. Add as many as you like and they
-          join, in order, into one file.
+          Mark a start and end, then Cut. To join several moments into one file, add each one as a
+          part first.
         </p>
       )}
     </div>
