@@ -42,16 +42,27 @@ test("F-3: the help button is drawn above every other z-index in the app", () =>
   assert.ok(HELP_BUTTON_Z > highest, `help button z ${HELP_BUTTON_Z} must exceed ${highest}`);
 });
 
-test("F-3: the Copy blocks panel sits under the header, so it cannot cover the header's controls", () => {
-  const header = Number(/<header className="[^"]*\bz-(\d+)/.exec(readFileSync(join(SRC, "components/shell/AppHeader.tsx"), "utf8"))?.[1]);
-  const panel = Number(/aria-label="Copy blocks"\s*className="[^"]*\bz-(\d+)/.exec(readFileSync(join(SRC, "components/CopyBlocks.tsx"), "utf8"))?.[1]);
-  assert.ok(Number.isFinite(header) && Number.isFinite(panel), `header ${header}, panel ${panel}`);
-  assert.ok(panel < header, `Copy blocks z-${panel} must be below the header z-${header}`);
+test("F-3: Symbols, Copy blocks and Help are all the one centred dialog, not three shapes", () => {
+  // They were a right-edge drawer plus two panels pinned under the header, which needed
+  // clearance maths between them to avoid overlapping. One shape removes that whole class
+  // of bug, so the rule worth protecting is that none of them grows its own overlay again.
+  for (const f of ["components/SymbolPalette.tsx", "components/CopyBlocks.tsx", "components/HelpDrawer.tsx"]) {
+    const src = readFileSync(join(SRC, f), "utf8");
+    assert.match(src, /<CentredDialog\b/, `${f} must render the shared dialog`);
+    assert.doesNotMatch(src, /className="surface-panel fixed/, `${f} must not pin its own panel`);
+  }
 });
 
-test("F-3: the help drawer is above the modal scrim and below the spotlight", () => {
-  const drawer = Number(/id="ui-help-drawer"\s*aria-label="Help"\s*className="[^"]*\bz-\[(\d+)\]/.exec(readFileSync(join(SRC, "components/HelpDrawer.tsx"), "utf8"))?.[1]);
-  assert.ok(drawer > 50 && drawer < 60, `drawer z ${drawer}`);
+test("F-3: the dialog layer is above the app and below the spotlight", () => {
+  const dialog = Number(/className=\{`fixed inset-0 z-\[(\d+)\]/.exec(readFileSync(join(SRC, "components/shell/CentredDialog.tsx"), "utf8"))?.[1]);
+  assert.ok(dialog > 50 && dialog < 60, `dialog z ${dialog}`);
+});
+
+test("F-3: Help stays non-modal, or its own tutorials become impossible to follow", () => {
+  // A help step spotlights a real control and asks the user to press it. A scrim over the
+  // app would swallow that click, so Help must never become modal.
+  const help = readFileSync(join(SRC, "components/HelpDrawer.tsx"), "utf8");
+  assert.match(help, /modal=\{false\}/, "Help must pass modal={false}");
 });
 
 test("F-3: the slot stays in the header layout and the button keeps its id", () => {

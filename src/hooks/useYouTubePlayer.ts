@@ -7,6 +7,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const API_SRC = "https://www.youtube.com/iframe_api";
 const POLL_MS = 200;
+
+/**
+ * How close the player has to get to a requested seek before a polled reading is believed
+ * again. YouTube lands on a keyframe, not the exact second, so this is not zero.
+ */
+export const SEEK_SETTLE_SEC = 0.6;
+/** Stop waiting for a seek to land after this, so a dropped seek cannot freeze the playhead. */
+export const SEEK_TIMEOUT_MS = 1500;
+
+export type PendingSeek = { target: number; until: number } | null;
+
+/**
+ * Whether a polled playhead reading should be believed.
+ *
+ * The IFrame API has no time-update event, so the playhead is polled every POLL_MS. A seek
+ * is asynchronous: for a tick or two after it, getCurrentTime() still reports where the
+ * video WAS. Believing that reading drags the playhead back to the old position and then
+ * forward again a moment later — the visible double-jump on every click of the timeline.
+ *
+ * So while a seek is outstanding, a reading is only believed once the player has actually
+ * arrived near the target, or once we have waited long enough that something clearly went
+ * wrong and a stuck playhead would be worse than a jump.
+ */
+export function acceptPolledTime(polled: number, pending: PendingSeek, now: number): boolean {
+  if (!pending) return true;
+  if (now >= pending.until) return true;
+  return Math.abs(polled - pending.target) <= SEEK_SETTLE_SEC;
+}
 const EMBED_BLOCKED_CODES = [101, 150, 153];
 
 interface YTPlayer {
@@ -75,6 +103,8 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
   const [blocked, setBlocked] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  // Set while a seek is in flight; see acceptPolledTime.
+  const pendingSeek = useRef<PendingSeek>(null);
 
   const containerRef = useCallback((el: HTMLDivElement | null) => {
     nodeRef.current = el;
@@ -140,7 +170,10 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
     const id = window.setInterval(() => {
       try {
         const t = playerRef.current?.getCurrentTime();
-        if (typeof t === "number") setCurrentTime(t);
+        if (typeof t === "number" && acceptPolledTime(t, pendingSeek.current, Date.now())) {
+          pendingSeek.current = null;
+          setCurrentTime(t);
+        }
       } catch {
         /* transient during teardown */
       }
@@ -150,8 +183,11 @@ export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
 
   const seekTo = useCallback((seconds: number, autoplay = false) => {
     try {
-      playerRef.current?.seekTo(Math.max(0, seconds), true);
-      setCurrentTime(Math.max(0, seconds));
+      const target = Math.max(0, seconds);
+      playerRef.current?.seekTo(target, true);
+      // Show the new position at once, and ignore stale polls until the player catches up.
+      pendingSeek.current = { target, until: Date.now() + SEEK_TIMEOUT_MS };
+      setCurrentTime(target);
       if (autoplay) playerRef.current?.playVideo();
     } catch {
       /* not ready yet */

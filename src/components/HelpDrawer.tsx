@@ -13,6 +13,8 @@ import SetupChecklist from "./SetupChecklist";
 import Spotlight from "./Spotlight";
 import { isSignInGateUp, useYouTubeConnection } from "../lib/youtubeConnection";
 
+import CentredDialog from "./shell/CentredDialog";
+
 export type HelpDrawerProps = { open: boolean; onClose: () => void };
 
 // Static flag: a public build compiles the exporter out, and its help tasks with it.
@@ -33,7 +35,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
     if (open && gateUp) onClose();
   }, [open, gateUp, onClose]);
   const searchRef = useRef<HTMLInputElement>(null);
-  const asideRef = useRef<HTMLElement>(null);
+  const asideRef = useRef<HTMLDivElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
 
   const results = useMemo(() => searchTasks(TASKS, query), [query]);
@@ -84,20 +86,17 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
   const last = task ? step >= task.steps.length - 1 : false;
 
   return (
-    <aside
-      ref={asideRef}
+    // Non-modal on purpose: a tutorial step spotlights a real control and asks you to press
+    // it, so a scrim over the app would make the step impossible to follow.
+    <CentredDialog
+      open
+      onClose={onClose}
+      title="Help"
+      widthClass="max-w-[720px]"
       id="ui-help-drawer"
-      aria-label="Help"
-      className="surface-panel absolute inset-y-0 right-0 z-[55] flex min-h-0 w-full flex-col border-l border-hairline shadow-drawer md:w-[400px]"
+      modal={false}
     >
-      <header className="flex items-center gap-2 px-4 pb-2 pt-4">
-        <h2 className="flex-1 text-section">Help</h2>
-        <button type="button" className="icon-btn" aria-label="Close help" title="Close (Esc)" onClick={onClose}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true" focusable="false">
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
-        </button>
-      </header>
+      <div ref={asideRef} className="flex min-h-0 flex-col">
 
       <div className="px-4 pb-3">
         <button
@@ -248,6 +247,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
       {task && current && (
         <Spotlight key={`${task.id}:${step}`} anchorId={current.anchorId} n={step + 1} onPresence={setPresent} />
       )}
-    </aside>
+      </div>
+    </CentredDialog>
   );
 }

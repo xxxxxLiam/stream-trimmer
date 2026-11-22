@@ -376,10 +376,10 @@ function Layout({ active }: { active: boolean }) {
         setHelpOpen((v) => !v);
       } else if (k === ";" && !e.shiftKey) {
         e.preventDefault();
-        setSymbolsOpen((v) => !v);
+        setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; });
       } else if (k === "c" && e.shiftKey) {
         e.preventDefault();
-        setCopyOpen((v) => !v);
+        setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; });
       } else if (k === "," && !e.shiftKey) {
         e.preventDefault();
         setSettingsOpen((v) => !v);
@@ -400,9 +400,9 @@ function Layout({ active }: { active: boolean }) {
         <AppHeader
           {...(CHANNEL_DATA_BUILT ? { screen, onScreen: setScreen, channelAvailable } : null)}
           copyOpen={copyOpen}
-          onToggleCopy={() => setCopyOpen((v) => !v)}
+          onToggleCopy={() => setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; })}
           symbolsOpen={symbolsOpen}
-          onToggleSymbols={() => setSymbolsOpen((v) => !v)}
+          onToggleSymbols={() => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; })}
           helpOpen={helpOpen}
           onToggleHelp={() => setHelpOpen((v) => !v)}
           settingsOpen={settingsOpen}

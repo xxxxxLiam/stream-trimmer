@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SYMBOL_GROUPS, allEntries, matchesQuery, type SymbolEntry } from "../lib/symbols";
 import { writeClipboard } from "../lib/handoff";
-import { useDrawerClearance } from "./useDrawerClearance";
+
+import CentredDialog from "./shell/CentredDialog";
 
 export type SymbolPaletteProps = { open: boolean; onClose: () => void };
 
@@ -59,7 +60,6 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const timer = useRef<number | undefined>(undefined);
-  const right = useDrawerClearance(open);
 
   const byId = useMemo(() => new Map(allEntries().map((e) => [e.id, e])), []);
 
@@ -94,23 +94,8 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
     return () => window.clearTimeout(timer.current);
   }, [open]);
 
-  // Escape always closes; an outside click closes unless Keep on top is on.
-  useEffect(() => {
-    if (!open) return;
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    const down = (e: MouseEvent) => {
-      if (keepOnTop) return;
-      if (!panelRef.current?.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("keydown", key);
-    document.addEventListener("mousedown", down);
-    return () => {
-      document.removeEventListener("keydown", key);
-      document.removeEventListener("mousedown", down);
-    };
-  }, [open, keepOnTop, onClose]);
+  // Esc and the outside click belong to CentredDialog; Keep on top turns the dialog
+  // non-modal there, which is what lets a click reach the transcript behind it.
 
   const copy = useCallback(async (slot: Slot) => {
     const res = await writeClipboard(slot.entry.text);
@@ -180,20 +165,16 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
     });
   };
 
-  if (!open) return null;
-
   let idx = -1;
   return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-label="Symbols and phrases"
-      className="surface-panel fixed top-14 z-20 flex max-h-[calc(100vh-72px)] w-[440px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
-      style={{ right }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="t-section">Symbols</h2>
-        <div className="flex items-center gap-2">
+    <CentredDialog
+      open={open}
+      onClose={onClose}
+      title="Symbols"
+      widthClass="max-w-[820px]"
+      modal={!keepOnTop}
+      aside={
+        <div className="flex justify-end">
           <button
             type="button"
             className="link-quiet"
@@ -203,14 +184,10 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
           >
             Keep on top
           </button>
-          <button type="button" className="icon-btn" aria-label="Close symbols" onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 4l8 8M12 4l-8 8" />
-            </svg>
-          </button>
         </div>
-      </div>
-
+      }
+    >
+      <div ref={panelRef} className="flex min-h-0 flex-col gap-3">
       <input
         ref={searchRef}
         className="field"
@@ -276,6 +253,7 @@ export default function SymbolPalette({ open, onClose }: SymbolPaletteProps) {
       </div>
 
       <p className="t-meta">Arrow keys move, Enter copies, Esc closes.</p>
-    </div>
+      </div>
+    </CentredDialog>
   );
 }

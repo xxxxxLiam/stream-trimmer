@@ -10,8 +10,9 @@
  *   from App. Without it the panel says there is nothing to copy yet.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useDrawerClearance } from "./useDrawerClearance";
 import { buildHandoffBlocks, writeClipboard, type HandoffInput } from "../lib/handoff";
+
+import CentredDialog from "./shell/CentredDialog";
 
 export type CopyBlocksProps = {
   open: boolean;
@@ -36,7 +37,6 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
   const timer = useRef<number | undefined>(undefined);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const right = useDrawerClearance(open);
 
   const blocks = useMemo(() => buildHandoffBlocks(input ?? EMPTY), [input]);
 
@@ -44,18 +44,9 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
     if (!open) return;
     setError(null);
     setCopied(null);
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    const down = (e: MouseEvent) => {
-      if (!panelRef.current?.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("keydown", key);
-    document.addEventListener("mousedown", down);
+    // Esc and the outside click belong to CentredDialog now; this only sets up the panel.
     requestAnimationFrame(() => panelRef.current?.querySelector<HTMLButtonElement>("button[data-copy]:not(:disabled)")?.focus());
     return () => {
-      document.removeEventListener("keydown", key);
-      document.removeEventListener("mousedown", down);
       window.clearTimeout(timer.current);
     };
   }, [open, onClose]);
@@ -76,24 +67,14 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
   };
 
   return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-label="Copy blocks"
-      className="surface-panel fixed top-14 z-20 flex max-h-[calc(100vh-72px)] w-[560px] max-w-[calc(100vw-32px)] flex-col gap-3 p-4 shadow-drawer"
-      style={{ right }}
+    <CentredDialog
+      open={open}
+      onClose={onClose}
+      title="Copy blocks"
+      widthClass="max-w-[760px]"
+      aside={<p className="t-meta truncate">Timecodes are the source video's. Each block goes somewhere different.</p>}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <h2 className="t-section">Copy blocks</h2>
-          <p className="t-meta">Timecodes are the source video's. Each block goes somewhere different.</p>
-        </div>
-        <button type="button" className="icon-btn" aria-label="Close copy blocks" onClick={onClose}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
-        </button>
-      </div>
+      <div ref={panelRef} className="flex min-h-0 flex-col gap-3">
 
       {error && (
         <div role="alert" className="card-alert px-3 py-2 text-body">
@@ -140,6 +121,7 @@ export default function CopyBlocks({ open, onClose, input }: CopyBlocksProps) {
           );
         })}
       </ul>
-    </div>
+      </div>
+    </CentredDialog>
   );
 }
