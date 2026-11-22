@@ -270,20 +270,6 @@ export function buildSetupItems(s: SetupInput): SetupItem[] {
         nonEmpty(fc.fcpLibrary),
       ),
       sub(
-        "fcp-media-event",
-        "Final Cut media event",
-        "Name the event that holds the raw clip.",
-        "The clip arrives in the event you expect.",
-        nonEmpty(fc.mediaEvent),
-      ),
-      sub(
-        "fcp-project-event",
-        "Final Cut project event",
-        "Name the event where the project is created.",
-        "Leave it blank and no project is made.",
-        nonEmpty(fc.projectEvent),
-      ),
-      sub(
         "fcp-timeline",
         "Final Cut timeline format",
         "Pick the size and frame rate of the timeline.",
