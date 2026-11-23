@@ -20,7 +20,7 @@ const {
     set: (key: string, value: unknown) => boolean;
     persist: () => boolean;
   };
-} = require("../electron/settingsStore.cjs");
+} = require("../electron/settingsStore.ts");
 
 function tempFile(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clipper-settings-"));

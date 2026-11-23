@@ -1,7 +1,7 @@
 /**
  * File: exportDest.test.ts
  * Path: electron/exportDest.test.ts
- * Description: export:save must check where it WRITES (exportSave.cjs:41-43),
+ * Description: export:save must check where it WRITES (exportSave.ts:41-43),
  * not only where it reads from. Covers D-7 and the D-6 hole behind it.
  */
 import assert from "node:assert/strict";
@@ -12,7 +12,7 @@ import path from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { saveExportFiles } = require("./exportSave.cjs");
+import { saveExportFiles } from "./exportSave";
 
 function scene() {
   const tmpRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "exportdest-")));

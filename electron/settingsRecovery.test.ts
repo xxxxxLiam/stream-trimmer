@@ -13,7 +13,7 @@ import path from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { createSettingsStore } = require("./settingsStore.cjs");
+import { createSettingsStore } from "./settingsStore";
 
 const GOOD = { "clipper.bank": [{ id: "a" }, { id: "b" }], "clipper.clipsDir": "/x/clips" };
 function file(content: string | Buffer) {

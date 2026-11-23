@@ -1,6 +1,6 @@
 /**
- * File: settingsStore.cjs
- * Path: electron/settingsStore.cjs
+ * File: settingsStore.ts
+ * Path: electron/settingsStore.ts
  * Description: Durable JSON settings file. Pure Node (no electron import) so
  * the persistence rules can be tested directly.
  *
@@ -8,12 +8,12 @@
  * on every launch. Saved folders, folder names, download history and the
  * YouTube connection therefore live in a JSON file in the app's data folder.
  */
-const fs = require("node:fs");
-const path = require("node:path");
-const crypto = require("node:crypto");
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
 
 /** "/a/b/clips" -> "/a/b/<name>". Same rule as defaultDataDir in src/lib/campaigns.ts. */
-function siblingDataDir(clipsDir, name) {
+function siblingDataDir(clipsDir: any, name: any) {
   const trimmed = String(clipsDir).replace(/[\\/]+$/, "");
   const sep = trimmed.includes("\\") && !trimmed.includes("/") ? "\\" : "/";
   const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
@@ -35,7 +35,7 @@ function siblingDataDir(clipsDir, name) {
  *    suggestion from the clips folder (src/lib/campaigns.ts, gated by build).
  * Idempotent: values the user already set are never overwritten.
  */
-function migrateSettings(input, { dataFolderName } = {}) {
+function migrateSettings(input: any, { dataFolderName }: any = {}) {
   const s = { ...input };
   if (!s["clipper.clipsDir"]) {
     const legacy =
@@ -60,7 +60,7 @@ function migrateSettings(input, { dataFolderName } = {}) {
  *  - "empty":   blank file (nothing to lose)
  *  - "invalid": anything else — not JSON, or not an object
  */
-function parseSettingsText(text) {
+function parseSettingsText(text: any) {
   const body = String(text).replace(/^\uFEFF/, "").trim();
   if (!body) return { status: "empty", data: {} };
   try {
@@ -74,13 +74,13 @@ function parseSettingsText(text) {
   return { status: "invalid", data: {} };
 }
 
-function createSettingsStore(filePath, { log, dataFolderName } = {}) {
-  let cache = {};
+function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
+  let cache: any = {};
   let loaded = false;
   // Keys the user actually removed. Tracked separately so a write can merge
   // into the file on disk without a store that never loaded silently wiping
   // everything already saved there.
-  const removed = new Set();
+  const removed = new Set<string>();
 
   /**
    * Keeps a copy of a file we cannot read BEFORE anything replaces it, next to
@@ -88,7 +88,7 @@ function createSettingsStore(filePath, { log, dataFolderName } = {}) {
    * preserving the same bytes twice is a no-op and different bytes never
    * collide. Returns true when a copy exists on disk afterwards.
    */
-  function preserve(bytes) {
+  function preserve(bytes: any) {
     try {
       const hash = crypto.createHash("sha256").update(bytes).digest("hex").slice(0, 10);
       const dest = `${filePath}.corrupt-${hash}`;
@@ -97,7 +97,7 @@ function createSettingsStore(filePath, { log, dataFolderName } = {}) {
         if (log) log(`settings.json could not be parsed; original kept at ${dest}`);
       }
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error("[electron] could not preserve unreadable settings:", err);
       return false;
     }
@@ -112,7 +112,7 @@ function createSettingsStore(filePath, { log, dataFolderName } = {}) {
     let bytes;
     try {
       bytes = fs.readFileSync(filePath);
-    } catch (err) {
+    } catch (err: any) {
       if (err && err.code === "ENOENT") return { ok: true, data: {} };
       // Present but unreadable (permissions, a directory...): do not claim it
       // is empty, and do not write over it.
@@ -156,7 +156,7 @@ function createSettingsStore(filePath, { log, dataFolderName } = {}) {
       fs.writeFileSync(tmp, JSON.stringify(cache, null, 2));
       fs.renameSync(tmp, filePath);
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error("[electron] failed to persist settings:", err);
       return false;
     }
@@ -166,7 +166,7 @@ function createSettingsStore(filePath, { log, dataFolderName } = {}) {
     return cache;
   }
 
-  function set(key, value) {
+  function set(key: any, value: any) {
     if (typeof key !== "string" || !key) return false;
     // Guard against the startup-order bug: never write from a store that has
     // not read the file yet, or the first write blanks every saved key.
@@ -184,7 +184,7 @@ function createSettingsStore(filePath, { log, dataFolderName } = {}) {
   return { load, all, set, persist, path: filePath };
 }
 
-module.exports = {
+export {
   createSettingsStore,
   migrateSettings,
   parseSettingsText,

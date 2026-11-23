@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { interpretCheckResult } = require("./updateCheck.cjs");
+import { interpretCheckResult } from "./updateCheck";
 
 test("null result (check never ran) is an error, not 'none'", () => {
   assert.equal(interpretCheckResult(null, "1.2.3").kind, "error");

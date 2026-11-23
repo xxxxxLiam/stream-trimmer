@@ -26,10 +26,10 @@ function ownerSetting(name) {
   }
 }
 
-// BUILD_SERVER_OUT lets a test build into a scratch folder instead of electron/dist.
+// BUILD_SERVER_OUT lets a test build into a scratch folder instead of out/main.
 const outFile = process.env.BUILD_SERVER_OUT
   ? path.resolve(process.env.BUILD_SERVER_OUT)
-  : path.join(__dirname, "..", "electron", "dist", "server.cjs");
+  : path.join(__dirname, "..", "out", "main", "engine.cjs");
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 
 // Wrap the server so main.cjs can grab the http.Server handle for clean
@@ -49,7 +49,7 @@ module.exports = capture;
 `;
 
 // The main process cannot see Vite's defines, so an owner build also writes what
-// it was baked with to a sidecar next to the server bundle (electron/ownerCheck.cjs
+// it was baked with to a sidecar next to the server bundle (electron/ownerCheck.ts
 // reads it; its keys are deliberately plain, that file ships in every build). A public build writes nothing and removes any stale one a previous
 // owner build left behind, so "no sidecar" means "no exporter". The folder name
 // is the same one src/lib/campaigns.ts uses when the exporter is built.

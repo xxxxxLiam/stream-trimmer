@@ -10,7 +10,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { createOwnerCheck } = require("./ownerCheck.cjs");
+import { createOwnerCheck } from "./ownerCheck";
 
 const hash = (id: string, salt: string) => `h(${id}|${salt})`;
 const make = (id: string | null, baked: { list: string; salt: string } | null) =>
@@ -57,8 +57,8 @@ test("E2-2: nothing the renderer sends can change the verdict, before or after",
   }
 });
 
-test("main.cjs does not register owner:check with the renderer's arguments", () => {
-  const src = readFileSync(new URL("./main.cjs", import.meta.url), "utf8");
+test("main.ts does not register owner:check with the renderer's arguments", () => {
+  const src = readFileSync(new URL("./main.ts", import.meta.url), "utf8");
   const line = src.split("\n").find((l) => l.includes('ipcMain.handle("owner:check"')) ?? "";
   assert.ok(line, "owner:check handler missing");
   assert.doesNotMatch(line, /\(_e,\s*\w+/, "owner:check must not take renderer arguments");
@@ -69,7 +69,7 @@ test("readBakedShape: no sidecar means no owner; a sidecar's list is what main u
   const { mkdtempSync, writeFileSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const { readBakedShape } = require("./ownerCheck.cjs");
+  const { readBakedShape } = require("./ownerCheck.ts");
   const dir = mkdtempSync(join(tmpdir(), "shape-"));
   assert.equal(readBakedShape(dir), null);
   writeFileSync(join(dir, "build-shape.json"), "{not json");
@@ -79,7 +79,7 @@ test("readBakedShape: no sidecar means no owner; a sidecar's list is what main u
 });
 
 test("export:save checks the owner before it touches any file", () => {
-  const src = readFileSync(new URL("./main.cjs", import.meta.url), "utf8");
+  const src = readFileSync(new URL("./main.ts", import.meta.url), "utf8");
   const start = src.indexOf('ipcMain.handle("export:save"');
   assert.ok(start > 0);
   const body = src.slice(start, src.indexOf("ipcMain.handle", start + 10));

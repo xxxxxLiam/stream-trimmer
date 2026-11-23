@@ -1,4 +1,4 @@
-// electron/youtubeSession.cjs — the YouTube session yt-dlp runs with.
+// electron/youtubeSession.ts — the YouTube session yt-dlp runs with.
 //
 // One Netscape cookies.txt in userData, exported by the user from their own
 // browser and adopted here, so yt-dlp can be run with `--cookies <file>`.
@@ -11,16 +11,17 @@
 //
 // Nothing leaves the machine, and cookie VALUES never reach the renderer —
 // only booleans and a path.
-const { app, session } = require("electron");
-const path = require("node:path");
-const fs = require("node:fs");
-const fsp = require("node:fs/promises");
-const { validateCookieText } = require("./cookieFile.cjs");
-const {
+import electron from "electron";
+const { app, session } = electron;
+import path from "node:path";
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import { validateCookieText } from "./cookieFile";
+import {
   isRelevantDomain,
   parseCookieRows,
   resolveAuthState,
-} = require("./cookieState.cjs");
+} from "./cookieState";
 
 // Only ever cleared, never read. See clear().
 const LEGACY_PARTITION = "persist:youtube";
@@ -60,7 +61,7 @@ async function probe() {
       expired: state.expired,
       reason: state.reason,
     };
-  } catch (err) {
+  } catch (err: any) {
     return {
       connected: false,
       path: null,
@@ -82,13 +83,13 @@ async function probe() {
  * Exporting from inside the browser sidesteps both, because the browser does
  * its own decryption.
  */
-async function importCookieFile(sourcePath) {
+async function importCookieFile(sourcePath: any) {
   try {
     if (typeof sourcePath !== "string" || !sourcePath) {
       return { ok: false, error: "No file chosen." };
     }
     return await importCookieText(await fsp.readFile(sourcePath, "utf8"));
-  } catch (err) {
+  } catch (err: any) {
     return {
       ok: false,
       error: err && err.message ? err.message : "Could not read that file.",
@@ -104,7 +105,7 @@ async function importCookieFile(sourcePath) {
  * The same canonical path as ever: userData/yt-cookies.txt. A crash mid-write
  * can never leave a half file, because rename() is atomic.
  */
-async function importCookieText(text) {
+async function importCookieText(text: any) {
   try {
     const raw = String(text || "");
     // A JSON export is the commonest wrong turn: several extensions offer it
@@ -134,7 +135,7 @@ async function importCookieText(text) {
       /* best effort on Windows */
     }
     return { ok: true, count: check.count };
-  } catch (err) {
+  } catch (err: any) {
     return {
       ok: false,
       error: err && err.message ? err.message : "Could not read that file.",
@@ -143,7 +144,7 @@ async function importCookieText(text) {
 }
 
 /** Which of the three ways a cookies.txt can be wrong this one is. */
-function classify(text) {
+function classify(text: any) {
   const rows = parseCookieRows(text);
   if (!String(text || "").trim() || rows.length === 0) return "wrong_format";
   if (!rows.some((row) => isRelevantDomain(row.domain))) return "no_youtube_cookies";
@@ -167,7 +168,7 @@ async function clear() {
   return { ok: true };
 }
 
-module.exports = {
+export {
   importCookieFile,
   importCookieText,
   probe,

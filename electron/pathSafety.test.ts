@@ -2,7 +2,7 @@
  * File: pathSafety.test.ts
  * Path: electron/pathSafety.test.ts
  * Description: Pins the save containment (D-6, D-7), the non-destructive move
- * (D-2) and the drag-target check (D-1) in electron/pathSafety.cjs.
+ * (D-2) and the drag-target check (D-1) in electron/pathSafety.ts.
  */
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
@@ -13,7 +13,7 @@ import path from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const ps = require("./pathSafety.cjs");
+import * as ps from "./pathSafety";
 
 const sha = (f: string) => crypto.createHash("sha256").update(fs.readFileSync(f)).digest("hex");
 const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pathsafety-")));
@@ -39,7 +39,7 @@ test("resolveTarget: '../..' and '../outside' stay contained as literal names", 
   for (const name of ["../..", "../outside"]) {
     const r = ps.resolveTarget({ dirPath: chosen, name });
     assert.equal(r.ok, true, name);
-    assert.equal(path.dirname(r.target), chosen);
+    assert.equal(path.dirname(r.target as string), chosen);
   }
 });
 

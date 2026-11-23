@@ -10,9 +10,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const main = readFileSync(new URL("./main.cjs", import.meta.url), "utf8");
+const main = readFileSync(new URL("./main.ts", import.meta.url), "utf8");
 
-test("main.cjs reads the raw log in exactly one place, and it scrubs", () => {
+test("main.ts reads the raw log in exactly one place, and it scrubs", () => {
   const reads = [...main.matchAll(/logger\.tail\(/g)];
   assert.equal(reads.length, 1, "a second reader of the raw log exists; route it through readLogScrubbed()");
   const fn = main.slice(main.indexOf("function readLogScrubbed"), main.indexOf("let serverHandle"));

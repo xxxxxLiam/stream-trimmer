@@ -1,14 +1,14 @@
 /**
- * File: exportSave.cjs
- * Path: electron/exportSave.cjs
+ * File: exportSave.ts
+ * Path: electron/exportSave.ts
  * Description: Moves a finished channel export out of the engine's temp
  * directory into the user's save folder. Pure (no electron import) so the path
- * checks can be tested, in the same spirit as cookieFile.cjs.
+ * checks can be tested, in the same spirit as cookieFile.ts.
  */
-const fs = require("node:fs");
-const fsp = require("node:fs/promises");
-const path = require("node:path");
-const { resolveTarget } = require("./pathSafety.cjs");
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
+import { resolveTarget } from "./pathSafety";
 
 // The engine writes every export into a folder named with this prefix, under
 // the OS temp dir. Anything else is not something this app produced.
@@ -31,7 +31,7 @@ const EXPORT_PREFIX = "ytchan-";
  * `allowedRoots` is given `dirPath` must be inside one of them. Returns
  * { ok, path } or { ok:false, error }.
  */
-async function saveExportFiles({ dirPath, folder, files, tmpRoot, allowedRoots }) {
+async function saveExportFiles({ dirPath, folder, files, tmpRoot, allowedRoots }: any) {
   if (
     typeof dirPath !== "string" ||
     typeof folder !== "string" ||
@@ -46,10 +46,10 @@ async function saveExportFiles({ dirPath, folder, files, tmpRoot, allowedRoots }
   const root = fs.realpathSync(tmpRoot);
   const resolved = resolveTarget({ dirPath, name: folder, roots: allowedRoots });
   if (!resolved.ok) return { ok: false, error: resolved.error };
-  const target = resolved.target;
+  const target = resolved.target as string;
   await fsp.mkdir(target, { recursive: true });
 
-  const sourceDirs = new Set();
+  const sourceDirs = new Set<string>();
   for (const file of files) {
     if (!file || typeof file.name !== "string" || !file.name) {
       return { ok: false, error: "Invalid save payload" };
@@ -77,10 +77,10 @@ async function saveExportFiles({ dirPath, folder, files, tmpRoot, allowedRoots }
 
     const named = resolveTarget({ dirPath: target, name: file.name });
     if (!named.ok) return { ok: false, error: "Invalid save payload" };
-    const dest = named.target;
+    const dest = named.target as string;
     try {
       await fsp.rename(source, dest);
-    } catch (err) {
+    } catch (err: any) {
       // rename cannot cross devices, and the temp dir often is one.
       if (!err || err.code !== "EXDEV") throw err;
       await fsp.copyFile(source, dest);
@@ -94,4 +94,4 @@ async function saveExportFiles({ dirPath, folder, files, tmpRoot, allowedRoots }
   return { ok: true, path: target };
 }
 
-module.exports = { EXPORT_PREFIX, saveExportFiles };
+export { EXPORT_PREFIX, saveExportFiles };

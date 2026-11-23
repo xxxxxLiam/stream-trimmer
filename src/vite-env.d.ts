@@ -103,7 +103,7 @@ interface ElectronAPI {
    */
   isOwnerMachine?: (list: string[], salt: string) => Promise<boolean>;
   /**
-   * Editor handoff, implemented in electron/editorOpen.cjs. Every call
+   * Editor handoff, implemented in electron/editorOpen.ts. Every call
    * resolves; failures are { ok: false, error } in plain words.
    */
   editor?: {

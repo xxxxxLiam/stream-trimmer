@@ -3,7 +3,7 @@
  * Path: electron/preloadDrag.test.ts
  * Description: D-1 keeper — the bridge's startDrag must refuse unless the
  * browser delivered a genuine (isTrusted) dragstart a moment ago. Loads the
- * real preload.cjs with a fake electron and window.
+ * real preload.ts with a fake electron and window.
  */
 import assert from "node:assert/strict";
 import Module from "node:module";
@@ -30,8 +30,8 @@ function loadPreload() {
     return origLoad.call(this, request, ...rest);
   };
   try {
-    delete require.cache[require.resolve("./preload.cjs")];
-    require("./preload.cjs");
+    delete require.cache[require.resolve("./preload.ts")];
+    require("./preload.ts");
   } finally {
     (Module as any)._load = origLoad;
   }

@@ -1,7 +1,7 @@
 /**
  * File: editorOpen.test.cjs
  * Path: electron/editorOpen.test.cjs
- * Description: Pins editorOpen.cjs failure paths with fake fs / exec, so no Mac
+ * Description: Pins editorOpen.ts failure paths with fake fs / exec, so no Mac
  *   or editor is needed. Run: node --test electron/editorOpen.test.cjs
  */
 const test = require("node:test");
@@ -9,7 +9,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const ed = require("./editorOpen.cjs");
+const ed = require("./editorOpen.ts");
 
 /** A fake fs exposing a tree: { "/Applications": ["Final Cut Pro.app"], ... } */
 function fakeFs(tree, files = []) {

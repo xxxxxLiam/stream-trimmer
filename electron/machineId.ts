@@ -1,25 +1,25 @@
-// electron/machineId.cjs
+// electron/machineId.ts
 // Reads this computer's stable id and turns it into a salted hash. Used by the
 // main process (to answer "is this an owner machine") and by
 // scripts/machine-id.cjs (so the owner can add a device). The raw id never
 // leaves the main process; only the boolean result is sent to the renderer.
 //
 // This is a device check, not a security boundary. See src/lib/ownerGate.ts.
-const { createHash } = require("node:crypto");
-const { execFile } = require("node:child_process");
-const fs = require("node:fs");
+import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
+import fs from "node:fs";
 
-function parseIoregOutput(text) {
+function parseIoregOutput(text: any) {
   const m = /"IOPlatformUUID"\s*=\s*"([0-9A-Fa-f-]{8,})"/.exec(String(text || ""));
   return m ? m[1] : null;
 }
 
-function parseRegOutput(text) {
+function parseRegOutput(text: any) {
   const m = /MachineGuid\s+REG_SZ\s+([0-9A-Fa-f-]{8,})/.exec(String(text || ""));
   return m ? m[1] : null;
 }
 
-function run(cmd, args) {
+function run(cmd: any, args: any) {
   return new Promise((resolve) => {
     try {
       execFile(cmd, args, { timeout: 5000, windowsHide: true }, (err, stdout) =>
@@ -64,10 +64,10 @@ async function readMachineId(platform = process.platform) {
 }
 
 /** sha256 of "salt:id" (id trimmed and lowercased), lowercase hex. */
-function hashMachineId(id, salt) {
+function hashMachineId(id: any, salt: any) {
   return createHash("sha256")
     .update(`${String(salt)}:${String(id).trim().toLowerCase()}`)
     .digest("hex");
 }
 
-module.exports = { readMachineId, hashMachineId, parseIoregOutput, parseRegOutput };
+export { readMachineId, hashMachineId, parseIoregOutput, parseRegOutput };

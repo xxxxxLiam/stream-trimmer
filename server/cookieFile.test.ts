@@ -15,7 +15,7 @@ const {
   validateCookieText: (
     text: unknown,
   ) => { ok: boolean; reason?: string; count?: number };
-} = require("../electron/cookieFile.cjs");
+} = require("../electron/cookieFile.ts");
 
 const row = (domain: string, name: string, value: string) =>
   [domain, "TRUE", "/", "TRUE", "1999999999", name, value].join("\t");

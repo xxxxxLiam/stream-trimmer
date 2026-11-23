@@ -1,7 +1,8 @@
-// electron/main.cjs — Electron main process. Starts one in-process Express
+// electron/main.ts — Electron main process. Starts one in-process Express
 // backend on a free port, loads the built front-end, and shuts everything
 // down cleanly on quit. No dev server ships; this file is CommonJS because
 // the project's package.json sets "type": "module".
+import electron from "electron";
 const {
   app,
   BrowserWindow,
@@ -10,60 +11,61 @@ const {
   ipcMain,
   nativeImage,
   shell,
-} = require("electron");
-const path = require("node:path");
-const net = require("node:net");
-const fs = require("node:fs");
-const fsp = require("node:fs/promises");
-const os = require("node:os");
+} = electron;
+import path from "node:path";
+import net from "node:net";
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import os from "node:os";
 // electron-updater — free auto-updates via GitHub Releases. Reads
 // latest.yml / latest-mac.yml / latest-linux.yml uploaded by
 // electron-builder alongside each release's installer.
 // NOTE: macOS auto-update requires a signed + notarized build. Until this
 // app is signed, mac users must download new versions manually; we handle
 // the resulting error gracefully instead of crashing.
-const { autoUpdater } = require("electron-updater");
-const {
+import { autoUpdater } from "electron-updater";
+import {
   browserCheckOrder,
   detectDefaultBrowser,
-} = require("./defaultBrowser.cjs");
-const youtubeSession = require("./youtubeSession.cjs");
-const { createSettingsStore } = require("./settingsStore.cjs");
-const { saveExportFiles } = require("./exportSave.cjs");
-const {
+} from "./defaultBrowser";
+import * as youtubeSession from "./youtubeSession";
+import { createSettingsStore } from "./settingsStore";
+import { saveExportFiles } from "./exportSave";
+import {
   allowedRoots,
   dragTarget,
   moveWithoutOverwrite,
   resolveTarget,
   writeWithoutOverwrite,
-} = require("./pathSafety.cjs");
-const { interpretCheckResult } = require("./updateCheck.cjs");
-const { redact } = require("./redact.cjs");
-const {
+} from "./pathSafety";
+import { interpretCheckResult } from "./updateCheck";
+import { redact } from "./redact";
+import {
   canInstallInPlace,
   downloadUrl,
   releasesUrl,
-} = require("./updater.cjs");
-const logger = require("./logger.cjs");
-const { readMachineId, hashMachineId } = require("./machineId.cjs");
-const { createOwnerCheck, readBakedShape } = require("./ownerCheck.cjs");
+} from "./updater";
+import * as logger from "./logger";
+import { registerEditorHandlers } from "./editorOpen";
+import { readMachineId, hashMachineId } from "./machineId";
+import { createOwnerCheck, readBakedShape } from "./ownerCheck";
 // Read once, at start: what this build was baked with. Absent in a public build.
-const bakedShape = readBakedShape(path.join(__dirname, "dist"));
+const bakedShape = readBakedShape(__dirname);
 const ownerGate = createOwnerCheck({ readMachineId, hashMachineId, getBaked: () => bakedShape });
 
 
 const isDev = process.env.ELECTRON_DEV === "1";
 // Whether an update can be downloaded and restarted into, or only offered as
-// a download. See electron/updater.cjs.
+// a download. See electron/updater.ts.
 const canInstall = canInstallInPlace(process.platform);
 
 // Drag icon for native file drag-out, resolved once and reused. startDrag
 // needs a non-empty icon synchronously or Windows cancels the drag outright.
-let dragIcon = null;
+let dragIcon: any = null;
 function getDragIcon() {
   if (dragIcon && !dragIcon.isEmpty()) return dragIcon;
   try {
-    const iconPath = path.join(__dirname, "icon.png");
+    const iconPath = path.join(__dirname, "..", "..", "resources", "icon.png");
     if (fs.existsSync(iconPath)) {
       dragIcon = nativeImage
         .createFromPath(iconPath)
@@ -104,12 +106,12 @@ function migrateLegacyUserData() {
       try {
         fs.cpSync(from, to, { recursive: true, errorOnExist: false });
         moved += 1;
-      } catch (err) {
+      } catch (err: any) {
         console.error(`[electron] could not carry over ${entry.name}:`, err);
       }
     }
     if (moved) console.log(`[electron] carried ${moved} item(s) over from "YouTube Clipper"`);
-  } catch (err) {
+  } catch (err: any) {
     // Never let this stop the app starting: a fresh profile is recoverable,
     // a boot loop is not.
     console.error("[electron] user data migration skipped:", err);
@@ -123,19 +125,19 @@ if (!app.requestSingleInstanceLock()) {
   process.exit(0);
 }
 
-let mainWindow = null;
-let splashWindow = null;
+let mainWindow: any = null;
+let splashWindow: any = null;
 // --- Persistent settings -------------------------------------------------
-// Backed by a JSON file in userData (see settingsStore.cjs). Loaded and its
+// Backed by a JSON file in userData (see settingsStore.ts). Loaded and its
 // IPC registered BEFORE the window exists, because the preload reads the
 // snapshot synchronously while the window is being created.
-let settings = null;
+let settings: any = null;
 
 function loadSettings() {
   settings = createSettingsStore(
     path.join(app.getPath("userData"), "settings.json"),
     {
-      log: (message) => logger.log("settings", message),
+      log: (message: any) => logger.log("settings", message),
       // Null in a public build, so the migration never names the exporter's folder.
       dataFolderName: bakedShape ? bakedShape.dataFolderName || null : null,
     },
@@ -147,16 +149,16 @@ function loadSettings() {
 // bearer tokens, signed URLs, an email and the home path, so no handler reads
 // the raw file text (logger.tail) itself; electron/diagnosticsPath.test.ts
 // fails if one does. A new reader calls readLogScrubbed() and is safe by default.
-function scrubForDisplay(text) {
+function scrubForDisplay(text: any) {
   return redact(String(text ?? ""), { homeDir: os.homedir() });
 }
 function readLogScrubbed(lines = 500) {
   return scrubForDisplay(logger.tail(lines));
 }
 
-let serverHandle = null; // { close(cb) } returned by the bundled server
+let serverHandle: any = null; // { close(cb) } returned by the bundled server
 
-function sendUpdateStatus(payload) {
+function sendUpdateStatus(payload: any) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("updater:status", payload);
   }
@@ -215,7 +217,7 @@ function setupAutoUpdater() {
         detail: "Restart the app to apply the update.",
       });
       if (res.response === 0) autoUpdater.quitAndInstall();
-    } catch (err) {
+    } catch (err: any) {
       console.error("[updater] restart dialog failed:", err);
     }
   });
@@ -239,14 +241,14 @@ function pickFreePort() {
     srv.unref();
     srv.on("error", reject);
     srv.listen(0, "127.0.0.1", () => {
-      const { port } = srv.address();
+      const { port } = srv.address() as net.AddressInfo;
       srv.close(() => resolve(port));
     });
   });
 }
 
 function resolveResourcesDir() {
-  if (isDev) return path.resolve(__dirname, "..", "resources");
+  if (isDev) return path.resolve(__dirname, "..", "..", "resources");
   return process.resourcesPath;
 }
 
@@ -262,7 +264,7 @@ async function startBackend() {
   // Serve the built UI from the same local server so the window loads over
   // http://127.0.0.1 instead of file://. YouTube embeds refuse to render in a
   // null-origin (file://) frame, which is why the preview used to stay blank.
-  const uiDir = path.join(__dirname, "..", "dist");
+  const uiDir = path.join(__dirname, "..", "..", "dist");
   if (!isDev && fs.existsSync(path.join(uiDir, "index.html"))) {
     process.env.ELECTRON_UI_DIR = uiDir;
   }
@@ -279,14 +281,14 @@ async function startBackend() {
 
   // Startup diagnostic — confirms binaries are in place before the server
   // starts spawning yt-dlp.
-  const exe = (n) => (process.platform === "win32" ? `${n}.exe` : n);
-  const check = (n) =>
+  const exe = (n: any) => (process.platform === "win32" ? `${n}.exe` : n);
+  const check = (n: any) =>
     fs.existsSync(path.join(binDir, exe(n))) ? "ok" : "MISSING";
   console.log(
     `[electron] binDir=${binDir} (yt-dlp=${check("yt-dlp")}, ffmpeg=${check("ffmpeg")}, deno=${check("deno")})`,
   );
 
-  const bundledServer = path.join(__dirname, "dist", "server.cjs");
+  const bundledServer = path.join(__dirname, "engine.cjs");
   if (!fs.existsSync(bundledServer)) {
     throw new Error(
       `Bundled server missing at ${bundledServer}. Run \`npm run build:electron\`.`,
@@ -312,7 +314,7 @@ function createSplash() {
     skipTaskbar: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
-  splashWindow.loadFile(path.join(__dirname, "splash.html"));
+  splashWindow.loadFile(path.join(__dirname, "..", "..", "resources", "splash.html"));
   splashWindow.once("ready-to-show", () => {
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.show();
   });
@@ -326,7 +328,7 @@ function closeSplash() {
   splashWindow = null;
 }
 
-async function createWindow(port) {
+async function createWindow(port: any) {
   mainWindow = new BrowserWindow({
     // The window may not be smaller than the clipping loop needs. At the old
     // 900x600 floor the mark bar and the Cut button could never be on screen
@@ -342,7 +344,7 @@ async function createWindow(port) {
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
+      preload: path.join(__dirname, "..", "preload", "index.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -367,7 +369,7 @@ async function createWindow(port) {
   // already let the page handle it first. Cmd+Shift+W is left alone as the way to close
   // the window, matching browsers.
   if (process.platform === "darwin") {
-    mainWindow.webContents.on("before-input-event", (event, input) => {
+    mainWindow.webContents.on("before-input-event", (event: any, input: any) => {
       if (
         input.type === "keyDown" &&
         input.meta &&
@@ -382,7 +384,7 @@ async function createWindow(port) {
   }
 
   // Open external links in the user's browser, not inside the app.
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }: any) => {
     shell.openExternal(url);
     return { action: "deny" };
   });
@@ -392,11 +394,11 @@ async function createWindow(port) {
   } else {
     try {
       await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
-    } catch (err) {
+    } catch (err: any) {
       // Emergency fallback — the app still works, minus the video preview.
       console.error("[electron] http load failed, falling back to file://", err);
       await mainWindow.loadFile(
-        path.join(__dirname, "..", "dist", "index.html"),
+        path.join(__dirname, "..", "..", "dist", "index.html"),
       );
     }
   }
@@ -418,13 +420,13 @@ async function createWindow(port) {
 // still buys is the log line. An expired file otherwise shows up as a
 // download that quietly comes back at 360p, hours after the expiry, with
 // nothing in the diagnostics saying why. Read-only, and no network call.
-let cookieCheckTimer = null;
+let cookieCheckTimer: any = null;
 const COOKIE_CHECK_MS = 60 * 60 * 1000;
 
 let lastCookieCheck = 0;
 const COOKIE_CHECK_MIN_GAP_MS = 60 * 1000;
 
-function checkCookieFile(why) {
+function checkCookieFile(why: any) {
   // Focus fires in bursts — alt-tab, a dialog closing, the updater toast —
   // so without a floor one window switch re-reads the file several times.
   const now = Date.now();
@@ -475,7 +477,7 @@ function sweepStaleClips() {
       }
     }
     if (removed) logger.log("clip", `swept ${removed} stale temp folder(s)`);
-  } catch (err) {
+  } catch (err: any) {
     logger.log("clip", `sweep failed: ${logger.describe(err)}`);
   }
 }
@@ -504,7 +506,7 @@ app.whenReady().then(async () => {
     sweepStaleClips();
     startCookieChecks();
     setupAutoUpdater();
-  } catch (err) {
+  } catch (err: any) {
     logger.log("app", `failed to start: ${logger.describe(err)}`);
     closeSplash();
     app.quit();
@@ -540,7 +542,7 @@ app.on("before-quit", () => {
 
 // Folders the user picked in the native dialog this session. Together with the
 // folders saved in settings they are the only places the save handlers write.
-const pickedDirs = new Set();
+const pickedDirs = new Set<string>();
 function saveRoots() {
   return allowedRoots(settings ? settings.all() : {}, [...pickedDirs]);
 }
@@ -626,11 +628,11 @@ function registerIpc() {
       // Never replace a clip that is already there: add " 2", " 3" like the
       // CapCut copy does. A hard link fails with EEXIST instead of replacing,
       // so this holds even if the name is taken between the check and the move.
-      await fsp.mkdir(path.dirname(dest.target), { recursive: true }); const target = await moveWithoutOverwrite(source, dest.target);
+      await fsp.mkdir(path.dirname(dest.target as string), { recursive: true }); const target = await moveWithoutOverwrite(source, dest.target as string);
       await fsp.rm(path.dirname(source), { recursive: true, force: true });
       logger.log("clip", `saved ${path.basename(target)}`);
       return { ok: true, path: target };
-    } catch (err) {
+    } catch (err: any) {
       logger.log("clip", `save failed: ${logger.describe(err)}`);
       return { ok: false, error: logger.describe(err) };
     }
@@ -658,7 +660,7 @@ function registerIpc() {
       // "wx": never replace a file that is already there; " 2", " 3" instead.
       const target = await writeWithoutOverwrite(dest.target, buf);
       return { ok: true, path: target };
-    } catch (err) {
+    } catch (err: any) {
       return {
         ok: false,
         error: err && err.message ? err.message : "Save failed",
@@ -686,22 +688,22 @@ function registerIpc() {
         logger.log("file", "refused export folder outside the chosen folders");
         return { ok: false, error: folder.error };
       }
-      const target = folder.target;
+      const target = folder.target as string;
       // Check every name before creating anything, so a bad one leaves no
       // half-written folder behind.
-      const named = [];
+      const named: [string, string][] = [];
       for (const file of payload.files) {
         if (!file || typeof file.name !== "string") continue;
         const dest = resolveTarget({ dirPath: target, name: file.name });
         if (!dest.ok) return { ok: false, error: dest.error };
-        named.push([dest.target, String(file.contents ?? "")]);
+        named.push([dest.target as string, String(file.contents ?? "")]);
       }
       await fsp.mkdir(target, { recursive: true });
       for (const [dest, contents] of named) {
         await fsp.writeFile(dest, contents, "utf8");
       }
       return { ok: true, path: target };
-    } catch (err) {
+    } catch (err: any) {
       return {
         ok: false,
         error: err && err.message ? err.message : "Save failed",
@@ -734,7 +736,7 @@ function registerIpc() {
           : `refused: ${result.error}`,
       );
       return result;
-    } catch (err) {
+    } catch (err: any) {
       logger.log("export", `save failed: ${logger.describe(err)}`);
       return { ok: false, error: logger.describe(err) };
     }
@@ -773,7 +775,7 @@ function registerIpc() {
       // nativeImage.createThumbnailFromPath is async and startDrag must resolve
       // its icon synchronously inside the gesture. The app icon is cached once.
       event.sender.startDrag({ file: targetPath, icon: getDragIcon() });
-    } catch (err) {
+    } catch (err: any) {
       console.error(
         "[electron] startDrag failed:",
         err && err.message ? err.message : err,
@@ -790,7 +792,7 @@ function registerIpc() {
       // is gone). Points right at the clip rather than just opening the dir.
       shell.showItemInFolder(targetPath);
       return { ok: true };
-    } catch (err) {
+    } catch (err: any) {
       return {
         ok: false,
         error: err && err.message ? err.message : "Failed to reveal",
@@ -817,8 +819,8 @@ function registerIpc() {
       // checkForUpdates resolves without emitting update-not-available when
       // there is nothing new, so the caller gets told either way.
       if (outcome.kind === "none") sendUpdateStatus({ state: "none" });
-      return { ok: true, version: result.updateInfo.version };
-    } catch (err) {
+      return { ok: true, version: (result as any).updateInfo.version };
+    } catch (err: any) {
       const error = err && err.message ? err.message : "Check failed";
       logger.log("updater", `manual check failed: ${error}`);
       sendUpdateStatus({ state: "error", message: error, url: releasesUrl() });
@@ -838,14 +840,14 @@ function registerIpc() {
         expiresAt: result.expiresAt ?? null,
         expired: !!result.expired,
       };
-    } catch (err) {
+    } catch (err: any) {
       logger.log("youtube", `probe: threw ${logger.describe(err)}`);
       return { connected: false, error: logger.describe(err) };
     }
   });
 
   // Import a cookies.txt the user exported from their own browser. On Windows
-  // this is the only route that reliably works — see cookieFile.cjs.
+  // this is the only route that reliably works — see cookieFile.ts.
   ipcMain.handle("youtube:importCookies", async () => {
     try {
       const res = await dialog.showOpenDialog(mainWindow, {
@@ -865,7 +867,7 @@ function registerIpc() {
         `cookie import ok=${result.ok}${result.ok ? ` cookies=${result.count}` : `: ${result.error}`}`,
       );
       return result;
-    } catch (err) {
+    } catch (err: any) {
       logger.log("youtube", `cookie import threw: ${logger.describe(err)}`);
       return { ok: false, error: logger.describe(err) };
     }
@@ -884,7 +886,7 @@ function registerIpc() {
         `cookie drop ok=${result.ok}${result.ok ? ` cookies=${result.count}` : `: ${result.error}`}`,
       );
       return result;
-    } catch (err) {
+    } catch (err: any) {
       logger.log("youtube", `cookie drop threw: ${logger.describe(err)}`);
       return { ok: false, error: logger.describe(err) };
     }
@@ -899,14 +901,14 @@ function registerIpc() {
 
   // Editor handoff (BUILD-SPEC 11c): editor:installed / probe / writeFcpxml /
   // openWith / reveal / copyFiles. Failures come back as { ok:false, error }.
-  require("./editorOpen.cjs").registerEditorHandlers({ ipcMain, shell });
+  registerEditorHandlers({ ipcMain, shell });
 
   ipcMain.handle("youtube:disconnect", async () => {
     try {
       await youtubeSession.clear();
       logger.log("youtube", "disconnect: cleared");
       return { ok: true };
-    } catch (err) {
+    } catch (err: any) {
       logger.log("youtube", `disconnect: threw ${logger.describe(err)}`);
       return { ok: false };
     }
@@ -928,7 +930,7 @@ function registerIpc() {
       }
       shell.showItemInFolder(target);
       return { ok: true, path: target };
-    } catch (err) {
+    } catch (err: any) {
       return { ok: false, error: logger.describe(err) };
     }
   });
@@ -940,7 +942,7 @@ function registerIpc() {
       // clipboard, so no caller can put the raw text there.
       clipboard.writeText(readLogScrubbed());
       return { ok: true };
-    } catch (err) {
+    } catch (err: any) {
       return { ok: false, error: logger.describe(err) };
     }
   });
@@ -951,7 +953,7 @@ function registerIpc() {
     try {
       await shell.openExternal("https://www.youtube.com/signin");
       return { ok: true };
-    } catch (err) {
+    } catch (err: any) {
       return {
         ok: false,
         error: err && err.message ? err.message : "Failed to open browser",
@@ -1005,7 +1007,7 @@ function registerIpc() {
     try {
       autoUpdater.quitAndInstall();
       return { ok: true };
-    } catch (err) {
+    } catch (err: any) {
       return {
         ok: false,
         error: err && err.message ? err.message : "Install failed",

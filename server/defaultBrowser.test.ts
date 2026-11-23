@@ -17,7 +17,7 @@ const {
     defaultBrowser: string | null,
     savedBrowser: string | null,
   ) => string[];
-} = require("../electron/defaultBrowser.cjs");
+} = require("../electron/defaultBrowser.ts");
 
 test("maps common system browser names to yt-dlp names", () => {
   assert.equal(mapBrowserName("Google Chrome"), "chrome");

@@ -15,7 +15,7 @@
  *   my look, CapCut) sits in collapsed rows that each show their current value,
  *   one open at a time, so the dialog rarely needs to scroll.
  * Contract: controlled (`settings` + `onChange`); the owner persists `settings`
- *   on the campaign. Needs the `editor` bridge from electron/editorOpen.cjs on
+ *   on the campaign. Needs the `editor` bridge from electron/editorOpen.ts on
  *   window.electronAPI; without it the actions say so instead of failing.
  *   `runAfterCutting` is exported for the cut flow to call once a clip is saved.
  *   No filled-accent button here: the primary action belongs to the screen.
@@ -40,7 +40,7 @@ import LookEditor from "./LookEditor";
 
 type Result = { ok: boolean; error?: string; missing?: string; path?: string };
 
-/** The renderer side of electron/editorOpen.cjs (exposed by the preload). */
+/** The renderer side of electron/editorOpen.ts (exposed by the preload). */
 export interface EditorBridge {
   installed: () => Promise<{ ok: boolean; apps?: { finalcut: boolean; premiere: boolean; capcut: boolean } }>;
   probe: (file: string) => Promise<({ ok: true } & RawProbe) | { ok: false; error: string }>;
@@ -48,7 +48,7 @@ export interface EditorBridge {
   openWith: (p: { app: "finalcut" | "capcut"; file?: string }) => Promise<Result>;
   /**
    * Whether a directory exists at this absolute path (needs `editor:pathExists`
-   * in electron/editorOpen.cjs). Absent bridge method: a library cannot be
+   * in electron/editorOpen.ts). Absent bridge method: a library cannot be
    * verified, so a send that names one is refused rather than guessed.
    */
   pathExists?: (target: string) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;

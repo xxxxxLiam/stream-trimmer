@@ -11,7 +11,7 @@ import test from "node:test";
 import { redact as rendererRedact } from "../src/lib/diagnostics";
 
 const require = createRequire(import.meta.url);
-const { redact } = require("./redact.cjs");
+import { redact } from "./redact";
 
 const S = "SYNTH";
 const LOG = [

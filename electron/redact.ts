@@ -1,6 +1,6 @@
 /**
- * File: redact.cjs
- * Path: electron/redact.cjs
+ * File: redact.ts
+ * Path: electron/redact.ts
  * Description: Main-process copy of redact() from src/lib/diagnostics.ts, so
  * the log that "Copy log" puts on the clipboard is scrubbed before it leaves
  * the process. The main process cannot import the renderer's TypeScript, so
@@ -8,7 +8,7 @@
  * ever disagree on a planted-secret corpus.
  */
 
-function escapeRe(s) {
+function escapeRe(s: any) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
@@ -22,7 +22,7 @@ const SENSITIVE_PARAM_CONTAINS =
 const PATH_SECRET =
   /\/(id|ip|s|si|n|sig|lsig|signature|pot|key|token|visitor|ticket|session)\/[^/\s]+/gi;
 
-function isSensitiveParam(name) {
+function isSensitiveParam(name: any) {
   const n = name.toLowerCase();
   return SENSITIVE_PARAM_EXACT.has(n) || SENSITIVE_PARAM_CONTAINS.test(n);
 }
@@ -32,7 +32,7 @@ const REDACTION_RULES = [
   {
     // Lines that quote the cookies file itself: the Netscape header and its rows.
     id: "cookie-file-contents",
-    apply: (t) =>
+    apply: (t: any) =>
       t
         .replace(/^.*Netscape HTTP Cookie File.*$/gim, "[cookie data removed]")
         .replace(
@@ -43,7 +43,7 @@ const REDACTION_RULES = [
   {
     // Cookie, Set-Cookie and Authorization headers, whatever wraps them.
     id: "auth-headers",
-    apply: (t) =>
+    apply: (t: any) =>
       t.replace(
         /\b((?:set-)?cookie|authorization|proxy-authorization)(\s*[:=]\s*)[^\n]*/gi,
         "$1$2<redacted>",
@@ -52,7 +52,7 @@ const REDACTION_RULES = [
   {
     // `--cookies <path>` and `--cookies=<path>`, quoted or not.
     id: "cookies-flag",
-    apply: (t) =>
+    apply: (t: any) =>
       t.replace(
         /--cookies(?:=|[ \t]+)(?:"[^"\n]*"|'[^'\n]*'|[^\n]*?\.(?:txt|jar|sqlite)\b|\S+)/g,
         "--cookies <redacted>",
@@ -61,13 +61,13 @@ const REDACTION_RULES = [
   {
     // The same path as an options object: "cookies":"/path/yt-cookies.txt".
     id: "cookies-option",
-    apply: (t) =>
+    apply: (t: any) =>
       t.replace(/(["']?cookies["']?\s*:\s*)(?:"[^"\n]*"|'[^'\n]*')/gi, '$1"<redacted>"'),
   },
   {
     // Any other mention of a cookies file by path.
     id: "cookie-file-path",
-    apply: (t) =>
+    apply: (t: any) =>
       t.replace(
         /(?<![^\s"'=(])(?:~|[A-Za-z]:)?[\\/][^\n"']*?cookies?[\w.-]*\.(?:txt|jar|sqlite)\b/gi,
         "<cookies file>",
@@ -77,14 +77,14 @@ const REDACTION_RULES = [
     // Signed URLs: strip the values of token-like and signature-like parameters, and the same
     // names when googlevideo carries them as path segments (`/id/<x>/sig/<y>/file/...`).
     id: "url-secrets",
-    apply: (t) =>
-      t.replace(/https?:\/\/[^\s"'<>]+/gi, (url) => {
+    apply: (t: any) =>
+      t.replace(/https?:\/\/[^\s"'<>]+/gi, (url: any) => {
         const cut = url.search(/[?#]/);
         const head = (cut < 0 ? url : url.slice(0, cut)).replace(PATH_SECRET, "/$1/REDACTED");
         const rest = cut < 0 ? "" : url.slice(cut);
         return (
           head +
-          rest.replace(/([?&#;])([^=&#;\s]+)=([^&#;\s]*)/g, (m, sep, name) =>
+          rest.replace(/([?&#;])([^=&#;\s]+)=([^&#;\s]*)/g, (m: any, sep: any, name: any) =>
             isSensitiveParam(name) ? `${sep}${name}=REDACTED` : m,
           )
         );
@@ -93,7 +93,7 @@ const REDACTION_RULES = [
   {
     // PO tokens and the other identity-bearing values yt-dlp accepts or prints.
     id: "po-token",
-    apply: (t) =>
+    apply: (t: any) =>
       t
         .replace(
           /(po[_ -]?tokens?|visitor[_ -]?data|data[_ -]?sync[_ -]?id|access[_ -]?token|refresh[_ -]?token|api[_ -]?key)(["']?\s*[=:]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s"';,&}]+)/gi,
@@ -105,7 +105,7 @@ const REDACTION_RULES = [
     // A Google session cookie assigned on its own (`__Secure-3PAPISID=...`), with no `Cookie:`
     // header in front of it for auth-headers to key on.
     id: "cookie-assignment",
-    apply: (t) =>
+    apply: (t: any) =>
       t.replace(
         /(?<![\w-])((?:__Secure-|__Host-)?(?:[1-3]?PSID(?:CC|TS)?|[1-3]?PAPISID|SAPISID|APISID|HSID|SSID|SIDCC|SID|LOGIN_INFO|VISITOR_INFO1_LIVE))(\s*=\s*)[^\s;,"']+/g,
         "$1$2<redacted>",
@@ -115,7 +115,7 @@ const REDACTION_RULES = [
     // The home directory, wherever it appears: first the exact one we were told,
     // then the usual shapes in case it was spelled differently inside engine output.
     id: "home-dir",
-    apply: (t, opts) => {
+    apply: (t: any, opts: any) => {
       let out = t;
       const home = (opts.homeDir ?? "").trim().replace(/[\\/]+$/, "");
       if (home.length > 1) {
@@ -133,15 +133,15 @@ const REDACTION_RULES = [
   },
   {
     id: "email",
-    apply: (t) => t.replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "<email>"),
+    apply: (t: any) => t.replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "<email>"),
   },
 ];
 
 /** Removes credentials and identity from free text. */
-function redact(text, opts = {}) {
+function redact(text: any, opts = {}) {
   let out = String(text == null ? "" : text);
   for (const rule of REDACTION_RULES) out = rule.apply(out, opts);
   return out;
 }
 
-module.exports = { redact, REDACTION_RULES };
+export { redact, REDACTION_RULES };

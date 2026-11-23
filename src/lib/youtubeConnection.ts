@@ -543,7 +543,7 @@ async function verifyImported(): Promise<boolean> {
 
 /**
  * Adopts a cookies.txt dropped on the window. The renderer reads the text and
- * hands it to the main process, which validates with cookieFile.cjs and
+ * hands it to the main process, which validates with cookieFile.ts and
  * commits atomically. Needs `importYouTubeCookiesText` in the preload.
  */
 export async function importDroppedCookies(file: File): Promise<boolean> {

@@ -1,6 +1,6 @@
 /**
- * File: updateCheck.cjs
- * Path: electron/updateCheck.cjs
+ * File: updateCheck.ts
+ * Path: electron/updateCheck.ts
  * Description: Decides what a manual "Check for updates" actually found. Pure
  * (no electron import) so it can be tested.
  *
@@ -14,7 +14,7 @@
  * @returns {{ kind: "error", message: string } | { kind: "none" } | { kind: "pending", version: string }}
  *   "pending": an update exists; the updater's own events report it.
  */
-function interpretCheckResult(result, currentVersion) {
+function interpretCheckResult(result: any, currentVersion: any) {
   const info = result && result.updateInfo;
   const version = info && typeof info.version === "string" ? info.version : "";
   if (!result || !info || !version) {
@@ -29,4 +29,4 @@ function interpretCheckResult(result, currentVersion) {
   return { kind: "none" };
 }
 
-module.exports = { interpretCheckResult };
+export { interpretCheckResult };

@@ -1,7 +1,7 @@
 /**
  * File: settingsMigration.test.ts
  * Path: src/lib/settingsMigration.test.ts
- * Description: Pins the saveDir -> clipsDir/dataDir migration in electron/settingsStore.cjs.
+ * Description: Pins the saveDir -> clipsDir/dataDir migration in electron/settingsStore.ts.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -11,7 +11,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { createSettingsStore, migrateSettings } = require("../../electron/settingsStore.cjs");
+const { createSettingsStore, migrateSettings } = require("../../electron/settingsStore.ts");
 
 test("saveDir becomes clipsDir and dataDir is proposed, unconfirmed", () => {
   const out = migrateSettings({ "clipper.saveDir": "/Users/me/Clips" }, { dataFolderName: "named-by-build" });

@@ -42,7 +42,7 @@ const {
     fileText?: string | null;
     now?: number;
   }) => AuthState;
-} = require("../electron/cookieState.cjs");
+} = require("../electron/cookieState.ts");
 
 const NOW = 1_700_000_000_000;
 const SOON = Math.floor(NOW / 1000) + 60 * 60 * 24 * 30;
@@ -184,7 +184,7 @@ test("probe() sees an imported file, and leaves it alone", async () => {
   try {
     const cookieFile = path.join(dir, "yt-cookies.txt");
     fs.writeFileSync(cookieFile, text);
-    const { probe } = require("../electron/youtubeSession.cjs");
+    const { probe } = require("../electron/youtubeSession.ts");
     const result = await probe();
     assert.equal(result.connected, true);
     assert.equal(result.source, "imported");

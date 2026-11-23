@@ -26,7 +26,7 @@ const {
   downloadUrl: (platform: string, version: unknown) => string;
   releaseTag: (version: unknown) => string | null;
   releasesUrl: () => string;
-} = require("../electron/updater.cjs");
+} = require("../electron/updater.ts");
 
 test("macOS cannot restart into an update, the others can", () => {
   // Squirrel.Mac validates code signatures and this app ships unsigned, so a
@@ -37,7 +37,7 @@ test("macOS cannot restart into an update, the others can", () => {
 });
 
 test("the download links point at the artifacts the build produces", () => {
-  // The names are duplicated in updater.cjs because it must not import the
+  // The names are duplicated in updater.ts because it must not import the
   // build config at runtime. If an artifactName is renamed, this fails rather
   // than a user's download 404ing.
   const root = path.resolve(

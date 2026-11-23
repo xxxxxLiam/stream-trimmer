@@ -1,4 +1,4 @@
-// electron/ownerCheck.cjs
+// electron/ownerCheck.ts
 // The main process's half of the owner gate. The verdict is decided HERE, from
 // values baked into this build (see scripts/build-server.cjs) and this
 // computer's own id. Nothing the renderer sends is ever an input: a page can
@@ -6,15 +6,15 @@
 // answer main already had. Only booleans leave this module. Fails closed: no
 // baked list, no owner.
 // A device check, not a security boundary — see src/lib/ownerGate.ts.
-const fs = require("node:fs");
-const path = require("node:path");
+import fs from "node:fs";
+import path from "node:path";
 
 /**
  * Reads the build's baked owner settings from the sidecar the build script
  * writes beside the bundled server, or null when the build has none (every
  * public build). Never throws.
  */
-function readBakedShape(distDir) {
+function readBakedShape(distDir: any) {
   try {
     const raw = JSON.parse(fs.readFileSync(path.join(distDir, "build-shape.json"), "utf8"));
     if (!raw || typeof raw !== "object" || typeof raw.list !== "string") return null;
@@ -29,15 +29,15 @@ function readBakedShape(distDir) {
 }
 
 /** "a, B ,," -> ["a","b"]. Same rule as parseMachineList in src/lib/ownerGate.ts. */
-function parseList(raw) {
+function parseList(raw: any) {
   return String(raw ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 }
 
-function createOwnerCheck({ readMachineId, hashMachineId, getBaked }) {
-  let localMachineId;
+function createOwnerCheck({ readMachineId, hashMachineId, getBaked }: any) {
+  let localMachineId: any;
 
   async function compute() {
     const baked = typeof getBaked === "function" ? getBaked() : null;
@@ -61,9 +61,9 @@ function createOwnerCheck({ readMachineId, hashMachineId, getBaked }) {
   return {
     // Arguments are accepted so the renderer's call shape keeps working, and
     // ignored: the answer never depends on what the page says.
-    check: (_list, _salt) => isOwner(),
+    check: (_list?: any, _salt?: any) => isOwner(),
     isOwner,
   };
 }
 
-module.exports = { createOwnerCheck, readBakedShape };
+export { createOwnerCheck, readBakedShape };

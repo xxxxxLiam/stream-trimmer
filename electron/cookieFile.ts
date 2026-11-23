@@ -1,18 +1,18 @@
 /**
- * File: cookieFile.cjs
- * Path: electron/cookieFile.cjs
+ * File: cookieFile.ts
+ * Path: electron/cookieFile.ts
  * Description: Validation for an imported Netscape cookies.txt. Pure (no
  * electron import) so it can be tested.
  */
 
-// The Netscape parsing itself lives in cookieState.cjs, which also reads the
+// The Netscape parsing itself lives in cookieState.ts, which also reads the
 // sign-in's expiry out of a file. Both must agree on what counts as a
 // sign-in, so there is exactly one copy of the rules.
-const {
+import {
   AUTH_COOKIES,
   isRelevantDomain,
   parseCookieRows,
-} = require("./cookieState.cjs");
+} from "./cookieState";
 
 /**
  * Checks a Netscape cookies.txt the user exported from their own browser.
@@ -26,11 +26,11 @@ const {
  * Expiry is deliberately NOT checked here: this gate decides whether a file
  * is worth adopting at all, and refusing an import outright over a date is a
  * worse outcome than adopting it and reporting it as expired afterwards —
- * readCookieFileState in cookieState.cjs is what answers that question.
+ * readCookieFileState in cookieState.ts is what answers that question.
  *
  * Returns { ok, reason } — never throws.
  */
-function validateCookieText(text) {
+function validateCookieText(text: any) {
   const raw = String(text || "");
   if (!raw.trim()) {
     return { ok: false, reason: "That file is empty." };
@@ -69,4 +69,4 @@ function validateCookieText(text) {
   return { ok: true, count: relevant.length };
 }
 
-module.exports = { AUTH_COOKIES, validateCookieText };
+export { AUTH_COOKIES, validateCookieText };

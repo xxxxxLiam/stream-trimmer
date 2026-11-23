@@ -1,7 +1,8 @@
-// electron/preload.cjs — reads the loopback API base URL from the additional
-// argument passed by main.cjs and exposes it as window.__API_BASE__ before
+// electron/preload.ts — reads the loopback API base URL from the additional
+// argument passed by main.ts and exposes it as window.__API_BASE__ before
 // any renderer code runs.
-const { contextBridge, ipcRenderer } = require("electron");
+import electron from "electron";
+const { contextBridge, ipcRenderer } = electron;
 
 const arg = process.argv.find((a) => a.startsWith("--api-base="));
 const apiBase = arg ? arg.slice("--api-base=".length) : "";
@@ -36,25 +37,25 @@ try {
         return {};
       }
     })(),
-    setSetting: (key, value) => ipcRenderer.invoke("settings:set", key, value),
+    setSetting: (key: any, value: any) => ipcRenderer.invoke("settings:set", key, value),
     pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"), pickFcpLibrary: () => ipcRenderer.invoke("dialog:pickFcpLibrary"),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.
     getDefaultFolders: () => ipcRenderer.invoke("system:defaultFolders"),
-    saveFile: (payload) => ipcRenderer.invoke("file:save", payload),
+    saveFile: (payload: any) => ipcRenderer.invoke("file:save", payload),
     // Moves a finished clip out of the engine's temp dir. Only the path
     // crosses the bridge — never the media itself.
-    saveClip: (payload) => ipcRenderer.invoke("clip:save", payload),
-    saveFiles: (payload) => ipcRenderer.invoke("file:saveFiles", payload),
+    saveClip: (payload: any) => ipcRenderer.invoke("clip:save", payload),
+    saveFiles: (payload: any) => ipcRenderer.invoke("file:saveFiles", payload),
     // Moves the channel exporter's CSVs out of the engine's temp dir. Like
     // saveClip, only paths cross the bridge — never the file contents.
-    saveExport: (payload) => ipcRenderer.invoke("export:save", payload),
-    showInFolder: (targetPath) =>
+    saveExport: (payload: any) => ipcRenderer.invoke("export:save", payload),
+    showInFolder: (targetPath: any) =>
       ipcRenderer.invoke("file:showInFolder", targetPath),
-    fileExists: (targetPath) => ipcRenderer.invoke("file:exists", targetPath),
+    fileExists: (targetPath: any) => ipcRenderer.invoke("file:exists", targetPath),
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.
-    startDrag: (targetPath) => {
+    startDrag: (targetPath: any) => {
       if (Date.now() - lastTrustedDragStart > DRAG_GESTURE_MS) return;
       ipcRenderer.send("file:startDrag", targetPath);
     },
@@ -66,20 +67,20 @@ try {
     importYouTubeCookies: () => ipcRenderer.invoke("youtube:importCookies"),
     // A cookies.txt dropped on the window: the renderer reads the text and
     // main validates and commits it.
-    importYouTubeCookiesText: (text) =>
+    importYouTubeCookiesText: (text: any) =>
       ipcRenderer.invoke("youtube:importCookiesText", text),
     // Owner gate. Main hashes the local machine id with the supplied salt and
     // answers with a boolean only; the raw id never crosses the bridge.
-    isOwnerMachine: (list, salt) => ipcRenderer.invoke("owner:check", list, salt),
-    // Editor handoff (electron/editorOpen.cjs). Paths and small payloads only.
+    isOwnerMachine: (list: any, salt: any) => ipcRenderer.invoke("owner:check", list, salt),
+    // Editor handoff (electron/editorOpen.ts). Paths and small payloads only.
     editor: {
       installed: () => ipcRenderer.invoke("editor:installed"),
-      probe: (file) => ipcRenderer.invoke("editor:probe", file),
-      writeFcpxml: (payload) => ipcRenderer.invoke("editor:writeFcpxml", payload),
-      openWith: (payload) => ipcRenderer.invoke("editor:openWith", payload),
-      reveal: (target) => ipcRenderer.invoke("editor:reveal", target),
-      copyFiles: (payload) => ipcRenderer.invoke("editor:copyFiles", payload),
-      pathExists: (target) => ipcRenderer.invoke("editor:pathExists", target),
+      probe: (file: any) => ipcRenderer.invoke("editor:probe", file),
+      writeFcpxml: (payload: any) => ipcRenderer.invoke("editor:writeFcpxml", payload),
+      openWith: (payload: any) => ipcRenderer.invoke("editor:openWith", payload),
+      reveal: (target: any) => ipcRenderer.invoke("editor:reveal", target),
+      copyFiles: (payload: any) => ipcRenderer.invoke("editor:copyFiles", payload),
+      pathExists: (target: any) => ipcRenderer.invoke("editor:pathExists", target),
     },
     // Diagnostics: reads the app's own local log so a crash can be reported.
     readDiagnostics: () => ipcRenderer.invoke("diagnostics:read"),
@@ -89,12 +90,12 @@ try {
     // be pointed at that browser's cookie store instead of an imported file.
     openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
     getDefaultBrowser: () => ipcRenderer.invoke("system:defaultBrowser"),
-    getBrowserOrder: (saved) => ipcRenderer.invoke("system:browserOrder", saved),
+    getBrowserOrder: (saved: any) => ipcRenderer.invoke("system:browserOrder", saved),
 
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
-    onUpdateStatus: (cb) => {
-      const listener = (_e, payload) => cb(payload);
+    onUpdateStatus: (cb: any) => {
+      const listener = (_e: any, payload: any) => cb(payload);
       ipcRenderer.on("updater:status", listener);
       return () => ipcRenderer.removeListener("updater:status", listener);
     },

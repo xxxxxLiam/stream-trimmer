@@ -1,11 +1,12 @@
-// electron/logger.cjs — tiny append-only diagnostic log for the desktop app.
+// electron/logger.ts — tiny append-only diagnostic log for the desktop app.
 //
 // Writes to <userData>/logs/main.log, rotating at ~1MB so the file can never
 // grow without bound. Only event names and error messages are recorded —
 // never cookies, tokens, URLs with credentials, or any personal data.
-const { app } = require("electron");
-const path = require("node:path");
-const fs = require("node:fs");
+import electron from "electron";
+const { app } = electron;
+import path from "node:path";
+import fs from "node:fs";
 
 const MAX_BYTES = 1024 * 1024;
 const MAX_LINE = 600;
@@ -18,7 +19,7 @@ const nativeConsole = {
   error: console.error.bind(console),
 };
 
-let logFile = null;
+let logFile: any = null;
 
 function resolveLogFile() {
   if (logFile) return logFile;
@@ -50,7 +51,7 @@ function tail(lines = 400) {
   }
 }
 
-function rotate(target) {
+function rotate(target: any) {
   try {
     const { size } = fs.statSync(target);
     if (size < MAX_BYTES) return;
@@ -61,7 +62,7 @@ function rotate(target) {
 }
 
 /** Appends one timestamped line. Never throws. */
-function log(scope, message) {
+function log(scope: any, message: any) {
   const text = String(message);
   const line = `${new Date().toISOString()} [${scope}] ${
     text.length > MAX_LINE ? `${text.slice(0, MAX_LINE)}…` : text
@@ -72,7 +73,7 @@ function log(scope, message) {
 }
 
 /** Appends one already-formatted line. Never throws. */
-function writeLine(line) {
+function writeLine(line: any) {
   const target = resolveLogFile();
   if (!target) return;
   try {
@@ -90,8 +91,8 @@ function writeLine(line) {
  * the one thing needed to explain a session that exists but will not verify.
  */
 function captureConsole() {
-  const forward = (level) => (...args) => {
-    nativeConsole[level](...args);
+  const forward = (level: any) => (...args: any[]) => {
+    (nativeConsole as any)[level](...args);
     try {
       const text = args
         .map((a) => (typeof a === "string" ? a : describe(a)))
@@ -108,7 +109,7 @@ function captureConsole() {
   console.error = forward("error");
 }
 
-function describe(err) {
+function describe(err: any) {
   if (!err) return "unknown error";
   if (typeof err === "string") return err;
   if (err.stack) return String(err.stack).split("\n").slice(0, 4).join(" | ");
@@ -138,7 +139,7 @@ function installCrashHandlers() {
       `child-process-gone type=${details && details.type} reason=${details && details.reason}`,
     );
   });
-  app.on("gpu-process-crashed", (_event, killed) => {
+  (app as any).on("gpu-process-crashed", (_event: any, killed: any) => {
     log("crash", `gpu-process-crashed killed=${killed}`);
   });
   // Distinguishes "the app decided to quit" from "the app was killed". Without
@@ -156,11 +157,11 @@ function installCrashHandlers() {
 }
 
 /** Attaches per-window diagnostics (unresponsive / renderer death). */
-function watchWindow(name, win) {
+function watchWindow(name: any, win: any) {
   if (!win || win.isDestroyed()) return;
   win.on("unresponsive", () => log("window", `${name} unresponsive`));
   win.on("responsive", () => log("window", `${name} responsive again`));
-  win.webContents.on("render-process-gone", (_e, details) => {
+  win.webContents.on("render-process-gone", (_e: any, details: any) => {
     log(
       "window",
       `${name} renderer gone reason=${details && details.reason}`,
@@ -168,7 +169,7 @@ function watchWindow(name, win) {
   });
 }
 
-module.exports = {
+export {
   log,
   captureConsole,
   watchWindow,

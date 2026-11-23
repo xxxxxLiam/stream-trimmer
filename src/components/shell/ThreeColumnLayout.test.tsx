@@ -14,7 +14,7 @@ const root = process.cwd();
 const read = (p: string) => readFileSync(join(root, p), "utf8");
 
 function windowSize() {
-  const main = read("electron/main.cjs");
+  const main = read("electron/main.ts");
   const opts = /mainWindow = new BrowserWindow\(\{([^}]*)\}/.exec(main)![1];
   const num = (k: string) => Number(new RegExp(`\\b${k}:\\s*(\\d+)`).exec(opts)![1]);
   return { width: num("width"), minWidth: num("minWidth") };

@@ -1,6 +1,6 @@
 /**
- * File: updater.cjs
- * Path: electron/updater.cjs
+ * File: updater.ts
+ * Path: electron/updater.ts
  * Description: Auto-update policy — whether an update can be installed in
  * place on this platform, and where to send the user when it cannot. Pure (no
  * electron import) so it can be tested.
@@ -15,7 +15,7 @@ const REPO = "clipr";
 // The installer each platform downloads. These must match the artifactName
 // entries in package.json's `build` config; updater.test.ts asserts they do,
 // so renaming an artifact breaks a test rather than a user's download link.
-const ASSETS = {
+const ASSETS: Record<string, string> = {
   darwin: "Clipr-macOS-AppleSilicon.dmg",
   win32: "Clipr-Windows-x64-Setup.exe",
   linux: "Clipr-Linux-x64.AppImage",
@@ -37,17 +37,17 @@ const ASSETS = {
  * Windows (NSIS) and Linux (AppImage) update in place unsigned, so they keep
  * the real thing.
  */
-function canInstallInPlace(platform) {
+function canInstallInPlace(platform: any) {
   return platform !== "darwin";
 }
 
 /** The installer filename for a platform, or null if it has no build. */
-function assetName(platform) {
+function assetName(platform: any) {
   return ASSETS[platform] ?? null;
 }
 
 /** Direct download for a released version — one click, no page to read. */
-function downloadUrl(platform, version) {
+function downloadUrl(platform: any, version: any) {
   const asset = assetName(platform);
   const tag = releaseTag(version);
   if (!asset || !tag) return releasesUrl();
@@ -59,13 +59,13 @@ function releasesUrl() {
 }
 
 // Releases are tagged `v<version>`; electron-updater reports the bare version.
-function releaseTag(version) {
+function releaseTag(version: any) {
   const text = String(version ?? "").trim();
   if (!/^v?\d+\.\d+\.\d+/.test(text)) return null;
   return text.startsWith("v") ? text : `v${text}`;
 }
 
-module.exports = {
+export {
   ASSETS,
   OWNER,
   REPO,

@@ -1,9 +1,9 @@
 /**
- * File: cookieState.cjs
- * Path: electron/cookieState.cjs
+ * File: cookieState.ts
+ * Path: electron/cookieState.ts
  * Description: Netscape cookies.txt parsing, and what a cookie file says about
  * the YouTube sign-in it carries — including when that sign-in runs out. Pure
- * (no electron import) so it can be tested, like cookieFile.cjs beside it.
+ * (no electron import) so it can be tested, like cookieFile.ts beside it.
  */
 
 // Any one of these, with a value, means a usable signed-in YouTube session.
@@ -18,7 +18,7 @@ const COLUMNS = 7;
  * 1970" — reading it as a date would retire a perfectly good sign-in.
  * Returns seconds, or null when there is no usable expiry.
  */
-function expirySeconds(raw) {
+function expirySeconds(raw: any) {
   const seconds = Number(raw);
   if (!Number.isFinite(seconds) || seconds <= 0) return null;
   return Math.floor(seconds);
@@ -29,7 +29,7 @@ function expirySeconds(raw) {
  * that is not a full tab-separated cookie line. Never throws — the input is a
  * file the user picked, so it can be anything at all.
  */
-function parseCookieRows(text) {
+function parseCookieRows(text: any) {
   return String(text || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -54,12 +54,12 @@ function parseCookieRows(text) {
  * domain boundary so notyoutube.com, which merely ends in the right letters,
  * is not mistaken for the real thing.
  */
-function isRelevantDomain(domain) {
+function isRelevantDomain(domain: any) {
   return /(^|\.)(youtube\.com|google\.com)$/i.test(String(domain || ""));
 }
 
 /** True for a row that is an auth cookie with an actual value behind it. */
-function isAuthRow(row) {
+function isAuthRow(row: any) {
   return AUTH_COOKIES.includes(row.name) && Boolean(row.value);
 }
 
@@ -71,7 +71,7 @@ function isAuthRow(row) {
  * caller compares it against Date.now() — and is null when the sign-in rests
  * entirely on session cookies, which carry no expiry to report.
  */
-function readCookieFileState(text, now = Date.now()) {
+function readCookieFileState(text: any, now = Date.now()) {
   const rows = parseCookieRows(text);
   const relevant = rows.filter((row) => isRelevantDomain(row.domain));
   const auth = relevant.filter(isAuthRow);
@@ -119,7 +119,7 @@ function readCookieFileState(text, now = Date.now()) {
  * `fileText` is the contents of the cookie file on disk, or null when there
  * is no file. Returns { connected, source, expiresAt, expired, reason }.
  */
-function resolveAuthState({ fileText, now = Date.now() } = {}) {
+function resolveAuthState({ fileText, now = Date.now() }: any = {}) {
   if (fileText == null) {
     return {
       connected: false,
@@ -140,7 +140,7 @@ function resolveAuthState({ fileText, now = Date.now() } = {}) {
   };
 }
 
-module.exports = {
+export {
   AUTH_COOKIES,
   isRelevantDomain,
   parseCookieRows,

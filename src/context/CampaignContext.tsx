@@ -5,7 +5,7 @@
  *   used-ranges record. Persisted through the settings store, so they survive restarts.
  *   Also owns the two folders: clipsDir (cut clips) and dataDir (channel-export CSVs).
  *   With no campaign yet, the folders fall back to the global defaults, which the
- *   desktop app seeds from the old single saveDir (see electron/settingsStore.cjs).
+ *   desktop app seeds from the old single saveDir (see electron/settingsStore.ts).
  *   Pure logic lives in src/lib/campaigns.ts.
  *
  *   The provider holds the campaigns and the LAST campaign picked. Each workspace tab

@@ -242,7 +242,7 @@ test("E-3: different requests still run side by side", SLOW, () =>
 // --- E-4 -----------------------------------------------------------------
 
 const require_ = createRequire(import.meta.url);
-const { readMachineId, hashMachineId } = require_("../electron/machineId.cjs");
+const { readMachineId, hashMachineId } = require_("../electron/machineId.ts");
 const SALT = "test-salt-not-a-secret";
 
 test("E-4: a machine off the owner list gets no exporter at all", SLOW, () =>

@@ -24,7 +24,7 @@ import {
 } from "./csv";
 import { CookieJarMissingError, acquireCookiePath, type CookieLease } from "./cookieJar";
 // @ts-ignore -- plain CommonJS shared with the main process; no type file.
-import { hashMachineId, readMachineId } from "../electron/machineId.cjs";
+import { hashMachineId, readMachineId } from "../electron/machineId.ts";
 import {
   EXPORT_PREFIX,
   appendJsonl,

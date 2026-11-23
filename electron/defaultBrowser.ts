@@ -1,9 +1,9 @@
 /**
- * File: defaultBrowser.cjs
- * Path: electron/defaultBrowser.cjs
+ * File: defaultBrowser.ts
+ * Path: electron/defaultBrowser.ts
  * Description: Maps the operating system's default web browser to yt-dlp's browser names.
  */
-const { execFileSync } = require("node:child_process");
+import { execFileSync } from "node:child_process";
 
 const SUPPORTED_BROWSERS = [
   "chrome",
@@ -14,7 +14,7 @@ const SUPPORTED_BROWSERS = [
   "chromium",
 ];
 
-function mapBrowserName(value) {
+function mapBrowserName(value: any) {
   const name = String(value || "").toLowerCase();
   if (name.includes("brave")) return "brave";
   if (name.includes("firefox")) return "firefox";
@@ -25,7 +25,7 @@ function mapBrowserName(value) {
   return null;
 }
 
-function detectDefaultBrowser(app) {
+function detectDefaultBrowser(app: any) {
   try {
     if (typeof app.getApplicationNameForProtocol === "function") {
       const mapped = mapBrowserName(
@@ -52,13 +52,13 @@ function detectDefaultBrowser(app) {
   return null;
 }
 
-function browserCheckOrder(defaultBrowser, savedBrowser) {
+function browserCheckOrder(defaultBrowser: any, savedBrowser: any) {
   return [...new Set([defaultBrowser, savedBrowser, ...SUPPORTED_BROWSERS])].filter(
     (browser) => SUPPORTED_BROWSERS.includes(browser),
   );
 }
 
-module.exports = {
+export {
   SUPPORTED_BROWSERS,
   mapBrowserName,
   detectDefaultBrowser,

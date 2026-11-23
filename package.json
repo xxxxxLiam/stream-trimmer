@@ -6,7 +6,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "version": "14.0.0",
   "type": "module",
-  "main": "electron/main.cjs",
+  "main": "out/main/index.cjs",
   "scripts": {
     "postinstall": "node scripts/setup.js",
     "setup": "node scripts/setup.js",
@@ -19,8 +19,8 @@
     "test": "tsx --test server/*.test.ts",
     "preview": "vite preview",
     "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\"",
-    "dev:electron": "cross-env ELECTRON_DEV=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"wait-on http://localhost:8080 && electron electron/main.cjs\"",
-    "build:electron": "vite build && node scripts/bundle-binaries.cjs && node scripts/build-server.cjs",
+    "dev:electron": "cross-env ELECTRON_DEV=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"node scripts/build-main.cjs && wait-on http://localhost:8080 && electron out/main/index.cjs\"",
+    "build:electron": "vite build && node scripts/bundle-binaries.cjs && node scripts/build-server.cjs && node scripts/build-main.cjs",
     "dist:mac": "npm run build:electron && electron-builder --mac dmg",
     "dist:win": "npm run build:electron && electron-builder --win nsis",
     "dist:linux": "npm run build:electron && electron-builder --linux AppImage",
@@ -77,7 +77,9 @@
       "output": "dist-electron"
     },
     "files": [
-      "electron/**/*",
+      "out/**/*",
+      "resources/icon.png",
+      "resources/splash.html",
       "dist/**/*",
       "package.json",
       "!**/*.map",

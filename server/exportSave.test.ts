@@ -22,7 +22,7 @@ const {
     files?: unknown;
     tmpRoot: string;
   }) => Promise<{ ok: boolean; path?: string; error?: string }>;
-} = require("../electron/exportSave.cjs");
+} = require("../electron/exportSave.ts");
 
 interface Scene {
   tmpRoot: string;

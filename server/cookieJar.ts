@@ -83,7 +83,7 @@ export function canonicalCookiePath(): string | null {
 
 /**
  * True when the text still carries a signed-in YouTube/Google session. Kept in
- * step with electron/cookieState.cjs (same auth cookie names and domain rule).
+ * step with electron/cookieState.ts (same auth cookie names and domain rule).
  */
 export function jarHasSignIn(text: string): boolean {
   for (const raw of text.split(/\r?\n/)) {
