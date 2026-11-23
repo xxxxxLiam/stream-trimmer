@@ -14,11 +14,13 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const {
   detectBump,
+  rangeFrom,
 }: {
   detectBump: (input: {
     subjects?: string[];
     bodies?: string[];
   }) => { bump: "patch" | "minor" | "major"; why: string };
+  rangeFrom: (input: { tag?: string; logLines?: string[] }) => string | null;
 } = require("../scripts/detectBump.cjs");
 
 const bump = (subjects: string[], bodies: string[] = []) =>
@@ -94,4 +96,36 @@ test("the CLI runs against a real repository", () => {
   assert.equal(run("minor"), "minor");
   assert.equal(run("major"), "major");
   assert.match(run("auto"), /^(patch|minor|major)$/);
+});
+
+
+// The runaway: this repo carries no tags, because the release tag is created in
+// the releases repo over the REST API. The old "no tags, so consider everything"
+// fallback meant two BREAKING CHANGE footers from ~900 commits back re-triggered
+// a major bump on EVERY automatic run. The version went 2.1.0 -> 14.0.0 across
+// twelve unintended releases in a day, each one downloaded by real people.
+test("without a boundary the range is null, so an unbounded scan cannot infer major", () => {
+  assert.equal(rangeFrom({ tag: "", logLines: ["abc feat: a thing", "def fix: another"] }), null);
+  assert.equal(rangeFrom({ tag: "", logLines: [] }), null);
+});
+
+test("the previous Release commit is the boundary when there are no tags", () => {
+  const range = rangeFrom({
+    tag: "",
+    logLines: ["aaa1111 fix: since the release", "bbb2222 Release v2.1.0", "ccc3333 feat!: ancient history"],
+  });
+  assert.equal(range, "bbb2222..HEAD");
+});
+
+test("a tag still wins when one exists", () => {
+  assert.equal(rangeFrom({ tag: "v1.2.3", logLines: ["aaa1111 Release v1.0.0"] }), "v1.2.3..HEAD");
+});
+
+test("only a real Release commit is a boundary, not a commit that mentions one", () => {
+  // "docs: explain the Release v... boundary" must not be mistaken for the thing
+  // it describes, or the range silently starts in the wrong place.
+  assert.equal(
+    rangeFrom({ tag: "", logLines: ["aaa1111 docs: explain the Release v2.1.0 boundary"] }),
+    null,
+  );
 });

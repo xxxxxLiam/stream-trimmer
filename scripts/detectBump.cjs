@@ -2,7 +2,7 @@
  * File: detectBump.cjs
  * Path: scripts/detectBump.cjs
  * Description: Decides patch/minor/major for a release from the commits since
- * the previous tag. Used by .github/workflows/release.yml.
+ * the previous release. Used by .github/workflows/release.yml.
  *
  * This lives in a file rather than inline in the workflow because it needs
  * tests: the first inline version read markers out of commit BODIES, so a
@@ -47,7 +47,29 @@ function detectBump({ subjects = [], bodies = [] } = {}) {
   return { bump: "patch", why: "no breaking change or feature marker found" };
 }
 
-/** Reads the commit range since the last tag and prints the bump. */
+/**
+ * Where to start looking, given what git reports.
+ *
+ * This repo carries NO TAGS: the release tag is created in the public releases
+ * repo over the REST API, because a ref-creation rule here rejects refs/tags/*.
+ * The original fallback for "no tags" was to consider the ENTIRE history, which
+ * turned into a trap — two `BREAKING CHANGE:` footers from ~900 commits ago
+ * meant every automatic run returned `major`, and the version went 2.1.0 to
+ * 14.0.0 across twelve unintended releases in a day.
+ *
+ * So the boundary is the previous `Release v...` commit, the same one the
+ * publish job uses for its notes. If there is no boundary at all we return no
+ * range and the caller defaults to `patch`: an unbounded scan must never again
+ * be able to infer a major bump. A deliberate major is still available — a
+ * [major] marker on the release commit, or a manual run with the level chosen.
+ */
+function rangeFrom({ tag = "", logLines = [] } = {}) {
+  if (tag) return `${tag}..HEAD`;
+  const prev = logLines.find((l) => /^[0-9a-f]+ Release v/.test(l.trim()));
+  return prev ? `${prev.trim().split(/\s+/)[0]}..HEAD` : null;
+}
+
+/** Reads the commit range since the last release and prints the bump. */
 function main() {
   const forced = process.argv[2];
   if (forced && forced !== "auto") {
@@ -57,12 +79,18 @@ function main() {
   const git = (args) =>
     execFileSync("git", args, { encoding: "utf8" }).trim();
 
-  let range = "HEAD";
+  let tag = "";
   try {
-    const prev = git(["describe", "--tags", "--abbrev=0"]);
-    if (prev) range = `${prev}..HEAD`;
+    tag = git(["describe", "--tags", "--abbrev=0"]);
   } catch {
-    /* no tags yet — consider everything */
+    /* no tags in this repo; the boundary below is used instead */
+  }
+  // --skip=1 because HEAD is this release's own commit when one has landed.
+  const logLines = git(["log", "--format=%H %s", "--skip=1", "-n", "500"]).split("\n");
+  const range = rangeFrom({ tag, logLines });
+  if (!range) {
+    process.stdout.write("patch\n");
+    return;
   }
 
   const split = (fmt) =>
@@ -80,4 +108,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { detectBump };
+module.exports = { detectBump, rangeFrom };
