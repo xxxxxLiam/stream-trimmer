@@ -17,7 +17,7 @@ import {
   TabActiveProvider,
   useWorkspace,
 } from "./context/WorkspaceContext";
-import { CampaignProvider, useCampaign } from "./context/CampaignContext";
+import { CampaignProvider, CampaignTabScope, useCampaign } from "./context/CampaignContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import WorkspaceTabs from "./components/WorkspaceTabs";
 import ChannelExportPanel from "./components/ChannelExportPanel";
@@ -88,12 +88,9 @@ function useEditorSettings(campaignId: string | null) {
 function SavedToast() {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
     useClipperContext();
-
   // Deliberately sticky: the notice stays until the user opens the folder or
   // dismisses it explicitly. No auto-dismiss timer.
-
   const canReveal = isElectron && Boolean(savedNotice?.path);
-
   return (
     <AnimatePresence>
       {savedNotice && (
@@ -172,16 +169,13 @@ function TabReporter({ id }: { id: string }) {
     useClipperContext();
   const { exporting, channelUrl, cancelExport } = useChannelState();
   const { reportTab } = useWorkspace();
-
   const title = info?.title || (channelUrl ? channelUrl : "");
   const busy = downloading || exportingComments || loadingInfo || exporting;
-
   const cancelRef = useRef<() => void>(() => {});
   cancelRef.current = () => {
     cancelDownload();
     cancelExport();
   };
-
   useEffect(() => {
     reportTab(id, {
       title,
@@ -189,7 +183,6 @@ function TabReporter({ id }: { id: string }) {
       cancel: () => cancelRef.current(),
     });
   }, [id, title, busy, reportTab]);
-
   return null;
 }
 
@@ -233,6 +226,7 @@ function Layout({ active }: { active: boolean }) {
   // nobody is nagged: someone who just wants to paste a link and cut once never set a
   // campaign up, and that is a legitimate way to use the app.
   const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
+
   // Live input for the Copy blocks panel (D-3). The transcript loads on demand, so opening
   // the panel asks for it rather than showing "No transcript loaded" for a video that has one.
   useEffect(() => {
@@ -253,8 +247,10 @@ function Layout({ active }: { active: boolean }) {
       }),
     [sourceUrl, videoId, transcript, tabSegments, campaign, nextClipId, downloads],
   );
+
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
+
   const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
   // Clips cut this session, kept per campaign: the panel's Export / Send all / Copy file path read
   // only the ACTIVE campaign's list, so another client's clips are never offered, or sent.
@@ -295,7 +291,6 @@ function Layout({ active }: { active: boolean }) {
     // Only a switch (or first load) re-points; later edits flow the other way below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId]);
-
   // Format and quality are set in the footer and belong to the campaign.
   useEffect(() => {
     if (!campaign) return;
@@ -313,13 +308,14 @@ function Layout({ active }: { active: boolean }) {
   // `settings` are the ones in force when the cut STARTED: a switch while it runs must not apply
   // the new campaign's "After cutting" choice to this campaign's clip.
   const afterSaved = useCallback(
-    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings) => {
+    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string) => {
       const saved = getDownloads().find((d) => d.kind === "clip" && d.path);
       if (!saved) return; // browser download: no file path to hand on
       const clip: SessionClip = {
         id: clipId,
         label,
         path: saved.path,
+        projectName: projectName?.trim() || undefined,
         segments: segments.map((s) => ({ start: s.start, end: s.end })),
         sourceUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : sourceUrl || undefined,
       };
@@ -359,11 +355,11 @@ function Layout({ active }: { active: boolean }) {
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
   // The column marks it cut and records the used ranges itself once this resolves true.
   const cutBanked = useCallback(
-    async (clip: BankedClip): Promise<boolean> => {
+    async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
       const startSettings = editorRef.current;
-      const ok = await download({ segments: clip.segments, clipId: clip.id });
-      if (ok) afterSaved(clip.id, clip.label, clip.segments, startSettings);
+      const ok = await download({ segments: clip.segments, clipId: projectName?.trim() || clip.id });
+      if (ok) afterSaved(clip.id, clip.label, clip.segments, startSettings, projectName);
       return ok;
     },
     [download, afterSaved],
@@ -401,7 +397,6 @@ function Layout({ active }: { active: boolean }) {
   return (
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
-
       <main className="flex h-full w-full flex-col overflow-hidden">
         <AppHeader
           {...(CHANNEL_DATA_BUILT ? { screen, onScreen: setScreen, channelAvailable } : null)}
@@ -416,7 +411,6 @@ function Layout({ active }: { active: boolean }) {
           onCloseSettings={closeSettings}
           campaignMenu={<CampaignMenu />}
         />
-
         {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
           <ThreeColumnLayout
             transcript={<TranscriptColumn playhead={playhead} />}
@@ -453,13 +447,11 @@ function Layout({ active }: { active: boolean }) {
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
           </div>
         )}
-
         <AppFooter
           onPickClipsDir={isElectron ? pickClipsDir : undefined}
           onPickDataDir={isElectron ? pickDataDir : undefined}
         />
       </main>
-
       <CampaignStart
         open={active && !campaign && !campaignPromptDismissed}
         onClose={() => setCampaignPromptDismissed(true)}
@@ -473,7 +465,7 @@ function Layout({ active }: { active: boolean }) {
 }
 
 function Shell() {
-  const { tabs, activeId } = useWorkspace();
+  const { tabs, activeId, setTabCampaign } = useWorkspace();
   const connection = useYouTubeConnection();
 
   // No background polling. On launch we read the imported cookies.txt once
@@ -488,7 +480,6 @@ function Shell() {
       <div className="flex items-center border-b border-hairline px-3 py-1">
         <WorkspaceTabs />
       </div>
-
       <div className="relative min-h-0 flex-1">
         {tabs.map((tab) => {
           const active = tab.id === activeId;
@@ -505,7 +496,13 @@ function Shell() {
                 <ChannelBoundary>
                   <TabActiveProvider active={active} tabId={tab.id}>
                     <TabReporter id={tab.id} />
-                    <Layout active={active} />
+                    {/* Each tab keeps its own campaign, so changing it here leaves the others alone. */}
+                    <CampaignTabScope
+                      campaignId={tab.campaignId}
+                      onChange={(cid) => setTabCampaign(tab.id, cid)}
+                    >
+                      <Layout active={active} />
+                    </CampaignTabScope>
                   </TabActiveProvider>
                 </ChannelBoundary>
               </ClipperProvider>
@@ -513,7 +510,6 @@ function Shell() {
           );
         })}
       </div>
-
       <YouTubeConnectModal open={!connection.connected || connection.restoring} />
     </div>
   );

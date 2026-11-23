@@ -3,13 +3,15 @@
  * Path: src/components/Timeline.tsx
  * Description: Centre column, under the video. The scrub track: each segment of the clip
  *   being built as a numbered accent block, already-published ranges as grey hatch, banked
- *   ranges as hollow outlines, the pending in/out mark, and the playhead. Every position
- *   is a percentage of the video duration so the track stays fluid at any width.
+ *   ranges as hollow outlines (click one to play from its start), the pending in/out mark,
+ *   and the playhead. Every position is a percentage of the video duration so the track
+ *   stays fluid at any width.
  */
 import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { useClipperContext } from "../context/ClipperContext";
 import { useCampaign } from "../context/CampaignContext";
 import { useSegments } from "../hooks/useSegments";
+import { playFrom } from "../lib/playFrom";
 import {
   checkRange,
   formatTimecode,
@@ -27,6 +29,8 @@ export type TimelineProps = {
   banked?: readonly NamedRange[];
   playhead?: number;
   onSeek?: (seconds: number) => void;
+  /** Clicking a banked block. Defaults to playing the video from that block's start. */
+  onPlayBanked?: (range: NamedRange) => void;
 };
 
 const HATCH = "repeating-linear-gradient(45deg, #3A3A3D 0 3px, #252527 3px 6px)";
@@ -50,6 +54,7 @@ export default function Timeline({
   banked: bankedProp,
   playhead: playheadProp,
   onSeek,
+  onPlayBanked,
 }: TimelineProps) {
   const clipper = useClipperContext();
   const { active } = useCampaign();
@@ -64,6 +69,7 @@ export default function Timeline({
   const banked = bankedProp ?? store.banked;
   const playhead = playheadProp ?? store.playhead;
   const seek = onSeek ?? clipper.requestSeek;
+  const playBanked = onPlayBanked ?? ((r: NamedRange) => playFrom(r.start));
   const enabled = duration > 0;
 
   // The pending mark is only drawn once the user has typed or set one.
@@ -134,18 +140,33 @@ export default function Timeline({
             ) : null,
           )}
 
+        {/* Banked ranges: click one (or focus it and press Enter) to play from its start.
+            Pointer events stop here so the track underneath does not also seek. */}
         {enabled &&
           banked.map((b, i) =>
             checkRange(b).ok ? (
               <div
                 key={`bank-${i}-${b.start}-${b.end}`}
-                className="pointer-events-none absolute inset-y-0 rounded-chip"
+                role="button"
+                tabIndex={0}
+                aria-label={`Play banked clip${b.label ? ` ${b.label}` : ""} from ${formatTimecode(b.start)}`}
+                className="absolute inset-y-0 cursor-pointer rounded-chip hover:bg-hover"
                 style={{
                   ...spanStyle(b, duration),
-                  minWidth: 3,
+                  minWidth: 6,
                   boxShadow: "inset 0 0 0 1.5px var(--c-fg-dim)",
                 }}
-                title={`Banked${b.label ? `: ${b.label}` : ""} ${formatTimecode(b.start)} to ${formatTimecode(b.end)}`}
+                title={`Banked${b.label ? `: ${b.label}` : ""} ${formatTimecode(b.start)} to ${formatTimecode(b.end)}. Click to play from the start.`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerMove={(e) => e.stopPropagation()}
+                onClick={() => playBanked(b)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    playBanked(b);
+                  }
+                }}
               />
             ) : null,
           )}
@@ -214,7 +235,7 @@ export default function Timeline({
                 style={{ boxShadow: "inset 0 0 0 1.5px var(--c-fg-dim)" }}
                 aria-hidden="true"
               />
-              Banked
+              Banked, click to play
             </span>
           )}
         </span>

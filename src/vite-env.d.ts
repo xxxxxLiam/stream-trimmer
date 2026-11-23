@@ -13,7 +13,7 @@ interface ImportMetaEnv {
 /** Baked by vite.config.ts. Prefer these over reading import.meta.env. */
 declare const __CHANNEL_DATA__: boolean;
 declare const __OWNER_MACHINES__: string;
-declare const __OWNER_SALT__: string;
+declare const __OWNER_SALT__: string;x
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
@@ -36,7 +36,7 @@ interface ElectronAPI {
   isElectron: true;
   settingsSnapshot?: Record<string, unknown>;
   setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean }>;
-  pickDirectory: () => Promise<string | null>;
+  pickDirectory: () => Promise<string | null>; pickFcpLibrary?: () => Promise<string | null>;
   /** Folders to fall back to on a fresh install; null if they could not be made. */
   getDefaultFolders?: () => Promise<{ clipsDir: string; dataDir: string } | null>;
   saveFile: (payload: {

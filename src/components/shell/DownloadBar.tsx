@@ -3,11 +3,11 @@
  * Path: src/components/shell/DownloadBar.tsx
  * Description: Status strip in the centre column: the real failure text, progress and
  *   Cancel. It has no primary button: the one filled-accent action on screen is MarkBar's
- *   "Cut as one file" (also ⌘↵).
+ *   Cut button (also ⌘↵). The clip length lives in MarkBar, so this strip does not repeat it.
  */
 import { motion } from "framer-motion";
 import { useClipperContext } from "../../context/ClipperContext";
-import { formatBytes, formatTimestamp } from "../../lib/clip";
+import { formatBytes } from "../../lib/clip";
 import { useSegments } from "../../hooks/useSegments";
 import { CopyFailureDiagnostics } from "../DiagnosticsDisclosure";
 import { redact } from "../../lib/diagnostics";
@@ -46,8 +46,6 @@ export default function DownloadBar() {
     downloading,
     validationError,
     format,
-    start,
-    end,
     estimatedBytes,
     isElectron,
     saveDir,
@@ -58,8 +56,7 @@ export default function DownloadBar() {
     error,
     failure,
   } = useClipperContext();
-
-  const { segments, total } = useSegments();
+  const { segments } = useSegments();
   const hasSegments = segments.length > 0;
   const needsSaveDir = isElectron && !saveDir;
 
@@ -67,6 +64,7 @@ export default function DownloadBar() {
   // no video and an error, say the error.
   const failed = !info && !loadingInfo && Boolean(error);
   const shownError = displayError(error, failure);
+
   const status = failed
     ? shownError
     : loadingInfo
@@ -74,12 +72,11 @@ export default function DownloadBar() {
       : !info
         ? "Paste a YouTube link to begin"
         : needsSaveDir
-          ? "Choose a clips folder in the footer"
-          : hasSegments
-            ? `${segments.length} ${segments.length === 1 ? "segment" : "segments"}, ${formatTimestamp(total)} · ${format.toUpperCase()}`
-            : validationError
-              ? validationError
-              : `${formatTimestamp(end - start)} clip · ${format.toUpperCase()}`;
+          ? "Choose a clips folder in the footer before you cut"
+          : validationError && !hasSegments
+            ? validationError
+            : `Saves as ${format.toUpperCase()}`;
+
   const sizeLabel =
     info && !hasSegments && !validationError && estimatedBytes > 0
       ? `~${formatBytes(estimatedBytes)} estimated`

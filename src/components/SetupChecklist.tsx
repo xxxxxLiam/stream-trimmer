@@ -155,7 +155,7 @@ export default function SetupChecklist() {
           const section = document.querySelector<HTMLElement>('[aria-label="Editor handoff"]');
           const toggle = section?.querySelector<HTMLButtonElement>("button[aria-expanded]");
           if (toggle && toggle.getAttribute("aria-expanded") !== "true") toggle.click();
-          section?.scrollIntoView({ block: "nearest" });
+          toggle?.focus();
           toggle?.focus();
           return;
         }

@@ -48,7 +48,7 @@ function allowedRoots(settingsObj, picked = []) {
     if (typeof v === "string" && v.trim() && path.isAbsolute(v)) out.add(v);
   };
   for (const key of ["clipper.saveDir", "clipper.clipsDir", "clipper.dataDir"]) add(s[key]);
-  if (Array.isArray(s["clipper.saveDirs"])) s["clipper.saveDirs"].forEach(add);
+  if (Array.isArray(s["clipper.saveDirs"])) s["clipper.saveDirs"].forEach(add); if (Array.isArray(s["clipper.campaigns"])) for (const c of s["clipper.campaigns"]) if (c && typeof c === "object") { add(c.clipsDir); add(c.dataDir); }
   for (const p of picked) add(p);
   return [...out];
 }

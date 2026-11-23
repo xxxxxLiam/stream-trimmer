@@ -24,7 +24,7 @@ const { execFile } = require("node:child_process");
 const APPS = {
   finalcut: {
     label: "Final Cut Pro",
-    match: (name) => /^Final Cut Pro( Trial)?\.app$/.test(name),
+    match: (name) => /^Final Cut Pro( Creator Studio| Trial)?\.app$/.test(name),
   },
   premiere: {
     label: "Adobe Premiere Pro",

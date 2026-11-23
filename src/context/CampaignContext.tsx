@@ -7,6 +7,9 @@
  *   With no campaign yet, the folders fall back to the global defaults, which the
  *   desktop app seeds from the old single saveDir (see electron/settingsStore.cjs).
  *   Pure logic lives in src/lib/campaigns.ts.
+ *
+ *   The provider holds the campaigns and the LAST campaign picked. Each workspace tab
+ *   wraps itself in CampaignTabScope, which gives that tab its own selected campaign.
  */
 import {
   createContext,
@@ -67,15 +70,20 @@ export type CampaignState = {
   remove: (id: string) => void;
   /** Effective folders: the active campaign's, else the global defaults. */
   folders: Folders;
-  /** Returns a problem to show, or null. Clips and Data may not be the same folder. */
-  setClipsDir: (dir: string) => string | null;
-  setDataDir: (dir: string) => string | null;
+  /** The global default folders, used when a campaign has none of its own. */
+  defaultFolders: Folders;
+  /**
+   * Returns a problem to show, or null. Clips and Data may not be the same folder.
+   * `forId` is the campaign to change; it defaults to the active one.
+   */
+  setClipsDir: (dir: string, forId?: string) => string | null;
+  setDataDir: (dir: string, forId?: string) => string | null;
   /**
    * Open the system folder dialog, then apply the choice. Resolves to a problem to show
    * (e.g. same folder as the other one), or null. Desktop app only; otherwise a no-op.
    */
-  pickClipsDir: () => Promise<string | null>;
-  pickDataDir: () => Promise<string | null>;
+  pickClipsDir: (forId?: string) => Promise<string | null>;
+  pickDataDir: (forId?: string) => Promise<string | null>;
   /** Accept the suggested data folder as it is. */
   confirmDataDir: () => void;
   /** Used ranges for a video under the active campaign. */
@@ -92,8 +100,8 @@ export type CampaignState = {
     clipId: string,
     campaignId?: string,
   ) => void;
-  /** Take a clip's ranges back out. */
-  forgetUse: (videoId: string, clipId: string) => void;
+  /** Take a clip's ranges back out. Defaults to the active campaign. */
+  forgetUse: (videoId: string, clipId: string, campaignId?: string) => void;
   usedCount: number;
 };
 
@@ -108,6 +116,11 @@ function loadFolders(): Folders {
     dataDir: data,
     dataDirConfirmed: readSetting<boolean>(KEY_DATA_OK, true) !== false,
   };
+}
+
+/** Only a real id counts: a click event passed by mistake must not pick a campaign. */
+function idOrUndefined(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
 }
 
 export function CampaignProvider({ children }: { children: ReactNode }) {
@@ -209,9 +222,10 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   );
 
   const setClipsDir = useCallback(
-    (dir: string) => {
+    (dir: string, forId?: string) => {
       const d = defaultsRef.current;
-      const a = campaignsRef.current.find((c) => c.id === activeIdRef.current);
+      const targetId = idOrUndefined(forId) ?? activeIdRef.current;
+      const a = campaignsRef.current.find((c) => c.id === targetId);
       const data = a?.dataDir || d.dataDir;
       if (sameFolder(dir, data)) return "Clips and Data need different folders.";
       if (a) commit(updateCampaign(campaignsRef.current, a.id, { clipsDir: dir }));
@@ -223,9 +237,10 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   );
 
   const setDataDir = useCallback(
-    (dir: string) => {
+    (dir: string, forId?: string) => {
       const d = defaultsRef.current;
-      const a = campaignsRef.current.find((c) => c.id === activeIdRef.current);
+      const targetId = idOrUndefined(forId) ?? activeIdRef.current;
+      const a = campaignsRef.current.find((c) => c.id === targetId);
       const clips = a?.clipsDir || d.clipsDir;
       if (sameFolder(dir, clips)) return "Clips and Data need different folders.";
       if (a) commit(updateCampaign(campaignsRef.current, a.id, { dataDir: dir }));
@@ -235,15 +250,21 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     [commit, saveDefaults],
   );
 
-  const pickClipsDir = useCallback(async () => {
-    const dir = await window.electronAPI?.pickDirectory();
-    return dir ? setClipsDir(dir) : null;
-  }, [setClipsDir]);
+  const pickClipsDir = useCallback(
+    async (forId?: string) => {
+      const dir = await window.electronAPI?.pickDirectory();
+      return dir ? setClipsDir(dir, idOrUndefined(forId)) : null;
+    },
+    [setClipsDir],
+  );
 
-  const pickDataDir = useCallback(async () => {
-    const dir = await window.electronAPI?.pickDirectory();
-    return dir ? setDataDir(dir) : null;
-  }, [setDataDir]);
+  const pickDataDir = useCallback(
+    async (forId?: string) => {
+      const dir = await window.electronAPI?.pickDirectory();
+      return dir ? setDataDir(dir, idOrUndefined(forId)) : null;
+    },
+    [setDataDir],
+  );
 
   const confirmDataDir = useCallback(() => {
     const d = defaultsRef.current;
@@ -278,8 +299,8 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   );
 
   const forgetUse = useCallback(
-    (videoId: string, clipId: string) => {
-      const id = activeIdRef.current;
+    (videoId: string, clipId: string, campaignId?: string) => {
+      const id = idOrUndefined(campaignId) ?? activeIdRef.current;
       const list = campaignsRef.current;
       commit(list.map((c) => (c.id === id ? removeUsedRangesFor(c, videoId, clipId) : c)));
     },
@@ -333,6 +354,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       update,
       remove,
       folders,
+      defaultFolders: defaults,
       setClipsDir,
       setDataDir,
       pickClipsDir,
@@ -353,6 +375,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       update,
       remove,
       folders,
+      defaults,
       setClipsDir,
       setDataDir,
       pickClipsDir,
@@ -372,4 +395,159 @@ export function useCampaign(): CampaignState {
   const ctx = useContext(CampaignContext);
   if (!ctx) throw new Error("useCampaign must be used inside CampaignProvider");
   return ctx;
+}
+
+/**
+ * Gives one workspace tab its own selected campaign. Everything inside reads `useCampaign()`
+ * as before, but `active`, the folders, the clip ids and the used ranges all follow THIS tab's
+ * campaign, so switching it here leaves every other tab alone.
+ *
+ * `campaignId` is what the tab last remembered. With none (a new tab, or a tab saved before
+ * this existed) or a campaign that has since been deleted, it takes the last campaign picked
+ * anywhere and remembers that through `onChange`. Picking a campaign in a tab also records it
+ * as "last picked", which is what the next new tab starts on.
+ */
+export function CampaignTabScope({
+  campaignId,
+  onChange,
+  children,
+}: {
+  campaignId?: string;
+  onChange: (id: string) => void;
+  children: ReactNode;
+}) {
+  const parent = useCampaign();
+  const {
+    campaigns,
+    activeId: lastPickedId,
+    defaultFolders,
+    setActiveId: setLastPicked,
+    create: createCampaignGlobal,
+    recordUse: recordUseGlobal,
+    forgetUse: forgetUseGlobal,
+    setClipsDir: setClipsDirGlobal,
+    setDataDir: setDataDirGlobal,
+    pickClipsDir: pickClipsDirGlobal,
+    pickDataDir: pickDataDirGlobal,
+  } = parent;
+
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const id = useMemo(
+    () => (campaignId && campaigns.some((c) => c.id === campaignId) ? campaignId : lastPickedId),
+    [campaignId, campaigns, lastPickedId],
+  );
+
+  // Pin the tab to the campaign it is actually showing.
+  useEffect(() => {
+    if (id && id !== campaignId) onChangeRef.current(id);
+  }, [id, campaignId]);
+
+  const active = useMemo(() => campaigns.find((c) => c.id === id) ?? null, [campaigns, id]);
+
+  const setActiveId = useCallback(
+    (next: string | null) => {
+      const resolved = resolveActiveId(campaigns, next);
+      if (resolved) onChangeRef.current(resolved);
+      setLastPicked(resolved);
+    },
+    [campaigns, setLastPicked],
+  );
+
+  const create = useCallback(
+    (input: CampaignInput) => {
+      const made = createCampaignGlobal(input);
+      onChangeRef.current(made.id);
+      return made;
+    },
+    [createCampaignGlobal],
+  );
+
+  const folders = useMemo<Folders>(
+    () => ({
+      clipsDir: active?.clipsDir || defaultFolders.clipsDir,
+      dataDir: active?.dataDir || defaultFolders.dataDir,
+      dataDirConfirmed: defaultFolders.dataDirConfirmed,
+    }),
+    [active, defaultFolders],
+  );
+
+  const setClipsDir = useCallback(
+    (dir: string) => setClipsDirGlobal(dir, id ?? undefined),
+    [setClipsDirGlobal, id],
+  );
+  const setDataDir = useCallback(
+    (dir: string) => setDataDirGlobal(dir, id ?? undefined),
+    [setDataDirGlobal, id],
+  );
+  const pickClipsDir = useCallback(
+    () => pickClipsDirGlobal(id ?? undefined),
+    [pickClipsDirGlobal, id],
+  );
+  const pickDataDir = useCallback(
+    () => pickDataDirGlobal(id ?? undefined),
+    [pickDataDirGlobal, id],
+  );
+
+  const usedFor = useCallback((videoId: string) => usedRangesFor(active, videoId), [active]);
+
+  const nextClipId = useCallback(
+    (videoId: string, otherIds: readonly string[] = []) =>
+      active ? nextId(active, videoId, otherIds) : null,
+    [active],
+  );
+
+  const recordUse = useCallback(
+    (
+      videoId: string,
+      ranges: ReadonlyArray<{ start: number; end: number }>,
+      clipId: string,
+      forCampaignId?: string,
+    ) => recordUseGlobal(videoId, ranges, clipId, forCampaignId ?? id ?? ""),
+    [recordUseGlobal, id],
+  );
+
+  const forgetUse = useCallback(
+    (videoId: string, clipId: string) => forgetUseGlobal(videoId, clipId, id ?? ""),
+    [forgetUseGlobal, id],
+  );
+
+  const value = useMemo<CampaignState>(
+    () => ({
+      ...parent,
+      activeId: id,
+      active,
+      setActiveId,
+      create,
+      folders,
+      setClipsDir,
+      setDataDir,
+      pickClipsDir,
+      pickDataDir,
+      usedFor,
+      nextClipId,
+      recordUse,
+      forgetUse,
+      usedCount: countUsedRanges(active),
+    }),
+    [
+      parent,
+      id,
+      active,
+      setActiveId,
+      create,
+      folders,
+      setClipsDir,
+      setDataDir,
+      pickClipsDir,
+      pickDataDir,
+      usedFor,
+      nextClipId,
+      recordUse,
+      forgetUse,
+    ],
+  );
+
+  return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 }

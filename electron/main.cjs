@@ -525,9 +525,9 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  if (cookieRefreshTimer) {
-    clearInterval(cookieRefreshTimer);
-    cookieRefreshTimer = null;
+  if (cookieCheckTimer) {
+    clearInterval(cookieCheckTimer);
+    cookieCheckTimer = null;
   }
   if (serverHandle && typeof serverHandle.close === "function") {
     try {
@@ -557,13 +557,37 @@ function registerIpc() {
 
   ipcMain.handle("dialog:pickDirectory", async () => {
     const res = await dialog.showOpenDialog(mainWindow, {
-      title: "Choose download folder",
+      title: "Choose a folder",
       properties: ["openDirectory", "createDirectory"],
     });
     if (res.canceled || res.filePaths.length === 0) return null;
     pickedDirs.add(res.filePaths[0]);
     return res.filePaths[0];
   });
+
+  ipcMain.handle("dialog:pickFcpLibrary", async () => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: "Choose your Final Cut Pro library",
+      message: "Pick the library that clips should be sent to.",
+      defaultPath: path.join(app.getPath("home"), "Movies"),
+      // A library is a package, which macOS treats as a file, so openFile is what makes it selectable.
+      properties: ["openFile", "openDirectory"],
+      filters: [{ name: "Final Cut Pro Library", extensions: ["fcpbundle"] }],
+    });
+    if (res.canceled || res.filePaths.length === 0) return null;
+    const picked = res.filePaths[0];
+    if (!/\.fcpbundle$/i.test(picked)) {
+      await dialog.showMessageBox(mainWindow, {
+        type: "info",
+        message: "That is not a Final Cut Pro library.",
+        detail: "Libraries end in .fcpbundle. Pick one from your Movies folder or wherever you keep them.",
+      });
+      return null;
+    }
+    // Deliberately not added to pickedDirs: that list is where the app may write clips.
+    return picked;
+  });
+
 
   // Moves a finished clip from the engine's temp directory to where the user
   // wants it. The media never enters the renderer: it is written once by
@@ -602,7 +626,7 @@ function registerIpc() {
       // Never replace a clip that is already there: add " 2", " 3" like the
       // CapCut copy does. A hard link fails with EEXIST instead of replacing,
       // so this holds even if the name is taken between the check and the move.
-      const target = await moveWithoutOverwrite(source, dest.target);
+      await fsp.mkdir(path.dirname(dest.target), { recursive: true }); const target = await moveWithoutOverwrite(source, dest.target);
       await fsp.rm(path.dirname(source), { recursive: true, force: true });
       logger.log("clip", `saved ${path.basename(target)}`);
       return { ok: true, path: target };

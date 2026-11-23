@@ -4,38 +4,55 @@
  * Description: Paste box for the clip bank (BUILD-SPEC 12b, A1). A centred dialog, not a
  *   panel in the 320px clips column: a paste is many lines wide and you have to be able to
  *   read what you pasted. Shows what was understood, a per-line error list, and the accepted
- *   shapes behind a disclosure. Nothing is stored until the user confirms.
+ *   shapes behind a disclosure. Every clip needs a two word name that nothing else uses;
+ *   until the names are right the import is blocked. Nothing is stored until the user confirms.
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { parseBankImport, type ParsedClip } from "../lib/bankImport";
+import { checkNames } from "../lib/clipName";
 import { formatLength } from "../lib/segments";
 
 export type ImportTimestampsProps = {
   /** Source video length in seconds; ranges past it are reported. */
   duration?: number;
+  /** Clips already in the bank, so a repeated name is found before anything is imported. */
+  existing?: ReadonlyArray<{ id: string; name: string }>;
   /** Called once, after confirm, with the clips that were understood. */
   onImport: (clips: ParsedClip[]) => void;
   onCancel: () => void;
 };
 
+const NO_EXISTING: ReadonlyArray<{ id: string; name: string }> = [];
+
 const EXAMPLES: Array<{ shape: string; text: string }> = [
-  { shape: "Range, id and label", text: "T1-A01  38:43 - 39:26  the hook line here" },
-  { shape: "Separators: - to → – —", text: "0:05:40 to 0:06:35" },
-  { shape: "Two segments, one clip (; or +)", text: "00:01:12 to 00:01:30; 00:10:04 to 00:10:20" },
-  { shape: "Seconds, hours, fractions", text: "90-120   1:12:04–1:12:38   1:00.500-1:02.250" },
-  { shape: "Category and tier, written out", text: "A02 4:10-4:50 category: hook tier: 2" },
-  { shape: "Category and tier, short", text: "A03 7:00-7:40 cat: payoff t: 1" },
-  { shape: "In brackets or pipes", text: "A04 9:00-9:30 [hook] [T2]    A05 11:00-11:30 | hook | T2" },
-  { shape: "A heading sets the category below it", text: "Hook moments:\nA06 12:00-12:40\nA07 14:00-14:30" },
-  { shape: "Tier from the id: T1- means tier 1", text: "T1-A08 15:00-15:45" },
+  { shape: "Range, id and name", text: "T1-A01  38:43 - 39:26  Hook Line" },
+  { shape: "Separators: - to → – —", text: "0:05:40 to 0:06:35  Money Mindset" },
+  { shape: "Two segments, one clip (; or +)", text: "00:01:12 to 00:01:30; 00:10:04 to 00:10:20  Combined Prayers" },
+  { shape: "Seconds, hours, fractions", text: "90-120  Quick Win\n1:12:04–1:12:38  Long Wait\n1:00.500-1:02.250  Half Second" },
+  { shape: "Category and tier, written out", text: "A02 4:10-4:50 Real Hook category: hook tier: 2" },
+  { shape: "Category and tier, short", text: "A03 7:00-7:40 Big Payoff cat: payoff t: 1" },
+  { shape: "In brackets or pipes", text: "A04 9:00-9:30 Cold Open [hook] [T2]\nA05 11:00-11:30 Warm Close | hook | T2" },
+  { shape: "A heading sets the category below it", text: "Hook moments:\nA06 12:00-12:40 Sharp Start\nA07 14:00-14:30 Quiet End" },
+  { shape: "Tier from the id: T1- means tier 1", text: "T1-A08 15:00-15:45 Final Push" },
 ];
 
-export default function ImportTimestamps({ duration, onImport, onCancel }: ImportTimestampsProps) {
+export default function ImportTimestamps({
+  duration,
+  existing = NO_EXISTING,
+  onImport,
+  onCancel,
+}: ImportTimestampsProps) {
   const [text, setText] = useState("");
   const areaId = useId();
   const titleId = useId();
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const preview = useMemo(() => parseBankImport(text, { duration }), [text, duration]);
+  const nameProblems = useMemo(
+    () => checkNames(preview.clips, existing),
+    [preview.clips, existing],
+  );
+  const blocked = nameProblems.length > 0;
   const hasInput = text.trim().length > 0;
   const n = preview.clipCount;
   const lineCount = text ? text.split(/\r\n|\r|\n/).filter((l) => l.trim()).length : 0;
@@ -76,7 +93,7 @@ export default function ImportTimestamps({ duration, onImport, onCancel }: Impor
             Import timestamps
           </h2>
           <p className="min-w-0 flex-1 truncate text-meta text-fg-dim">
-            One clip per line. Paste once for this video and it stays banked.
+            One clip per line, each with its own two word name. Paste once for this video and it stays banked.
           </p>
           <button type="button" className="chip shrink-0" onClick={onCancel}>
             Cancel
@@ -105,7 +122,7 @@ export default function ImportTimestamps({ duration, onImport, onCancel }: Impor
               onChange={(e) => setText(e.target.value)}
               rows={12}
               spellCheck={false}
-              placeholder={"Ruling:\n12:04 - 12:31  can you combine these two prayers [1]\n28:50 - 29:19  is this income halal [2]"}
+              placeholder={"Ruling:\n12:04 - 12:31  Combined Prayers [1]\n28:50 - 29:19  Income Halal [2]"}
               className="w-full shrink-0 resize-y rounded-control border bg-raised p-3 font-mono text-body leading-relaxed text-fg outline-none focus-visible:border-accent"
               style={{
                 borderColor: "var(--c-hairline)",
@@ -143,7 +160,27 @@ export default function ImportTimestamps({ duration, onImport, onCancel }: Impor
                   ))}
                 </div>
               )}
-
+              {blocked && (
+                <div
+                  role="alert"
+                  className="rounded-control border border-accent bg-accent-card p-3 shadow-accent-card"
+                >
+                  <p className="text-body font-medium text-accent">
+                    {nameProblems.length} {nameProblems.length === 1 ? "name needs" : "names need"} fixing
+                    before you can import.
+                  </p>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {nameProblems.map((p) => (
+                      <li key={p.line} className="text-meta">
+                        <span className="font-mono text-fg" style={{ fontVariantNumeric: "tabular-nums" }}>
+                          Line {p.line}
+                        </span>
+                        <span className="text-fg-dim"> {p.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {preview.errors.length > 0 && (
                 <div
                   role="alert"
@@ -193,8 +230,10 @@ export default function ImportTimestamps({ duration, onImport, onCancel }: Impor
               ))}
             </ul>
             <p className="mt-2 text-meta text-fg-dim">
-              Categories and tiers are whatever you write. If a line says more than one way, the
-              explicit pair wins, then brackets or pipes, then the heading, then the id.
+              A name is exactly two words, letters and numbers only, and no two clips share one. It
+              becomes the file name and the Final Cut project name. Categories and tiers are whatever
+              you write. If a line says more than one way, the explicit pair wins, then brackets or
+              pipes, then the heading, then the id.
             </p>
           </details>
         </div>
@@ -203,10 +242,14 @@ export default function ImportTimestamps({ duration, onImport, onCancel }: Impor
           <button
             type="button"
             className="btn"
-            disabled={n === 0}
+            disabled={n === 0 || blocked}
             onClick={() => onImport(preview.clips)}
           >
-            {n === 0 ? "Nothing to import" : `Import ${n} ${n === 1 ? "clip" : "clips"}`}
+            {n === 0
+              ? "Nothing to import"
+              : blocked
+                ? `Fix ${nameProblems.length} ${nameProblems.length === 1 ? "name" : "names"} first`
+                : `Import ${n} ${n === 1 ? "clip" : "clips"}`}
           </button>
           <span className="min-w-0 flex-1 text-meta text-fg-dim">
             {hasInput ? "Review the list, then confirm." : "Paste above to see what it reads."}

@@ -137,7 +137,7 @@ export default function ThreeColumnLayout({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
-      <div ref={hostRef} role="region" tabIndex={0} aria-label="Workspace" className="cols-host min-h-0 min-w-0 flex-1 overflow-y-auto">
+      <div ref={hostRef} role="region" tabIndex={0} aria-label="Workspace" className={`cols-host min-h-0 min-w-0 flex-1 ${wide ? "overflow-clip" : "overflow-y-auto"}`}>
         <div
           className="cols-row relative flex min-w-0 flex-wrap content-start gap-2 p-2"
           style={wide ? rowVars : undefined}

@@ -28,6 +28,7 @@ import {
 import { activeAfterClose, indexForDigit, moveItem, stepIndex } from "../hooks/tabOps";
 
 const STORE_KEY = "clipper.workspaces";
+
 const DEFAULT_TAB_NAME = "New tab";
 
 export type WorkspaceTab = {
@@ -38,15 +39,19 @@ export type WorkspaceTab = {
   url?: string;
   /** The unsaved clip (marked segments) of this tab. */
   segments?: Segment[];
+  /** The campaign this tab is cutting for. Each tab keeps its own. */
+  campaignId?: string;
 };
 
 /** How many closed tabs Ctrl+Shift+T can bring back. */
 const CLOSED_LIMIT = 10;
+
 export type ClosedTab = { tab: WorkspaceTab; index: number };
 
 export function cleanTab(t: WorkspaceTab): WorkspaceTab {
   const out: WorkspaceTab = { id: t.id, name: typeof t.name === "string" ? t.name : "" };
   if (typeof t.url === "string" && t.url) out.url = t.url;
+  if (typeof t.campaignId === "string" && t.campaignId) out.campaignId = t.campaignId;
   if (Array.isArray(t.segments)) {
     const segs = t.segments.filter(
       (s) => s && Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start,
@@ -90,7 +95,13 @@ export function applyTabWork(
       a.every((s, i) => s.start === work.segments[i].start && s.end === work.segments[i].end);
     if (same) return t;
     changed = true;
-    return cleanTab({ id: t.id, name: t.name, url, segments: work.segments as Segment[] });
+    return cleanTab({
+      id: t.id,
+      name: t.name,
+      url,
+      segments: work.segments as Segment[],
+      campaignId: t.campaignId,
+    });
   });
   return changed ? next : tabs;
 }
@@ -127,6 +138,8 @@ export type WorkspaceState = {
   closedCount: number;
   /** A tab reports what it holds so a relaunch or reopen can restore it. */
   reportTabWork: (id: string, work: { url: string; segments: readonly Segment[] }) => void;
+  /** Remember which campaign a tab is cutting for. */
+  setTabCampaign: (id: string, campaignId: string) => void;
   reportTab: (
     id: string,
     meta: TabMeta & { cancel?: () => void },
@@ -134,12 +147,12 @@ export type WorkspaceState = {
 };
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
+
 const TabActiveContext = createContext<boolean>(true);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const initial = useRef<PersistedState | null>(null);
   if (initial.current === null) initial.current = loadState();
-
   const [tabs, setTabs] = useState<WorkspaceTab[]>(initial.current.tabs);
   const [activeId, setActiveId] = useState<string>(initial.current.activeId);
   const [meta, setMeta] = useState<Record<string, TabMeta>>({});
@@ -237,6 +250,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setTabs((prev) => applyTabWork(prev, id, work));
   }, []);
 
+  const setTabCampaign = useCallback((id: string, campaignId: string) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === id && t.campaignId !== campaignId ? { ...t, campaignId } : t)),
+    );
+  }, []);
+
   const reopenTab = useCallback((): boolean => {
     const [last, ...rest] = closedRef.current;
     if (!last) return false;
@@ -326,6 +345,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       reopenTab,
       closedCount: closed.length,
       reportTabWork,
+      setTabCampaign,
       reportTab,
     }),
     [
@@ -341,6 +361,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       reopenTab,
       closed.length,
       reportTabWork,
+      setTabCampaign,
       reportTab,
     ],
   );
