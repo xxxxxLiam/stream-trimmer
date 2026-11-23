@@ -29,7 +29,7 @@ const common = {
 Promise.all([
   esbuild.build({
     ...common,
-    entryPoints: [path.join(root, "electron", "main.ts")],
+    entryPoints: [path.join(root, "src", "main", "index.ts")],
     outfile: path.join(outRoot, "main", "index.cjs"),
   }),
   esbuild.build({

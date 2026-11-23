@@ -10,27 +10,49 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const main = readFileSync(new URL("./main.ts", import.meta.url), "utf8");
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+const root = process.cwd();
+const read = (p: string) => readFileSync(join(root, p), "utf8");
+/** Every non-test main-process source file (electron/ plus src/main/). */
+function mainSources(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(join(root, dir))) {
+    const rel = `${dir}/${name}`;
+    if (statSync(join(root, rel)).isDirectory()) mainSources(rel, out);
+    else if (/\.ts$/.test(name) && !/\.test\./.test(name)) out.push(rel);
+  }
+  return out;
+}
+const sources = [...mainSources("electron"), ...mainSources("src/main")];
+const service = read("src/main/features/diagnostics/services/diagnosticsService.ts");
+const handlers = read("src/main/ipc/diagnosticsHandlers.ts");
+const fnBody = (src: string, name: string) => {
+  const at = src.indexOf(`function ${name}`);
+  assert.ok(at >= 0, `${name} missing`);
+  const next = src.indexOf("\nexport function", at + 10);
+  return src.slice(at, next < 0 ? undefined : next);
+};
 
 test("main.ts reads the raw log in exactly one place, and it scrubs", () => {
-  const reads = [...main.matchAll(/logger\.tail\(/g)];
+  const reads = sources.flatMap((f) => [...read(f).matchAll(/logger\.tail\(/g)].map(() => f));
   assert.equal(reads.length, 1, "a second reader of the raw log exists; route it through readLogScrubbed()");
-  const fn = main.slice(main.indexOf("function readLogScrubbed"), main.indexOf("let serverHandle"));
+  const fn = fnBody(service, "readLogScrubbed");
   assert.ok(fn.includes("logger.tail("), "the single raw read is not inside readLogScrubbed");
   assert.ok(fn.includes("scrubForDisplay("), "readLogScrubbed does not scrub");
 });
 
 test("diagnostics:read and diagnostics:copy both use the scrubbed reader", () => {
-  for (const channel of ["diagnostics:read", "diagnostics:copy"]) {
-    const start = main.indexOf(`ipcMain.handle("${channel}"`);
+  const through: Record<string, string> = { "diagnostics:read": "readDiagnostics", "diagnostics:copy": "copyLog" };
+  for (const channel of Object.keys(through)) {
+    const start = handlers.indexOf(`ipcMain.handle("${channel}"`);
     assert.ok(start > 0, `${channel} missing`);
-    const body = main.slice(start, main.indexOf("ipcMain.handle", start + 10));
-    assert.ok(body.includes("readLogScrubbed("), `${channel} does not use readLogScrubbed()`);
+    const line = handlers.slice(start, handlers.indexOf(";", start));
+    assert.ok(line.includes(`${through[channel]}(`), `${channel} does not call ${through[channel]}()`);
+    assert.ok(fnBody(service, through[channel]).includes("readLogScrubbed("), `${channel} does not use readLogScrubbed()`);
   }
 });
 
 test("the log's own path is scrubbed before it is shown", () => {
-  const start = main.indexOf('ipcMain.handle("diagnostics:read"');
-  const body = main.slice(start, main.indexOf("ipcMain.handle", start + 10));
-  assert.match(body, /scrubForDisplay\(\s*logger\.logFilePath\(\)/);
+  assert.match(fnBody(service, "readDiagnostics"), /scrubForDisplay\(\s*logger\.logFilePath\(\)/);
 });

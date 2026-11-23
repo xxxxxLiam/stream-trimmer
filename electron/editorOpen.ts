@@ -8,8 +8,8 @@
  *   names what was missing; nothing here throws across the IPC bridge.
  *
  *   The pure functions take their dependencies as arguments so the failure
- *   paths can be tested without Electron or a Mac. Only registerEditorHandlers
- *   touches ipcMain and shell.
+ *   paths can be tested without Electron or a Mac. The IPC registration lives
+ *   in src/main/ipc/editorHandlers.ts.
  *
  *   CapCut has no project import, so CapCut is only ever launched or revealed;
  *   its drafts folder is never read or written.
@@ -319,27 +319,6 @@ function pathExists(target: any, fsImpl = fs) {
   }
 }
 
-/**
- * Register the IPC channels. B12 adds one line to main.ts:
- *   require("./editorOpen").registerEditorHandlers({ ipcMain, shell });
- */
-function registerEditorHandlers({ ipcMain, shell }: any) {
-  const guard = (fn: any) => async (_e: any, payload: any) => {
-    try {
-      return await fn(payload);
-    } catch (err: any) {
-      return { ok: false, error: err && err.message ? err.message : String(err) };
-    }
-  };
-  ipcMain.handle("editor:installed", guard(async () => ({ ok: true, apps: installedApps() })));
-  ipcMain.handle("editor:probe", guard((file: any) => probeMedia(file)));
-  ipcMain.handle("editor:writeFcpxml", guard((payload: any) => writeFcpxml(payload || {})));
-  ipcMain.handle("editor:openWith", guard((payload: any) => openWithApp(payload || {})));
-  ipcMain.handle("editor:reveal", guard((target: any) => reveal(target, { shell })));
-  ipcMain.handle("editor:copyFiles", guard((payload: any) => copyFiles(payload || {})));
-  ipcMain.handle("editor:pathExists", guard((target: any) => pathExists(target)));
-}
-
 export {
   APPS,
   findApp,
@@ -352,5 +331,4 @@ export {
   pathExists,
   reveal,
   safeFilename,
-  registerEditorHandlers,
 };

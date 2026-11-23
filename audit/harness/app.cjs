@@ -9,7 +9,7 @@
  *   - Each launch gets a fresh `--user-data-dir`. Electron holds a
  *     single-instance lock per user-data dir, so without this a second helper
  *     silently hands its work to the first one's window.
- *   - The app picks its own free HTTP port (electron/main.ts: pickFreePort),
+ *   - The app picks its own free HTTP port (src/main/modules/engineHost/engineHost.ts: pickFreePort),
  *     so nothing needs coordinating ports.
  *   - `cwd` decides where the server finds yt-dlp/ffmpeg
  *     (server/index.ts: resolveBinDir falls back to `<cwd>/resources/bin`).
