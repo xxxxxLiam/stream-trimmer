@@ -26,7 +26,7 @@ import {
   type BankedClip,
 } from "../lib/bank";
 import type { ParsedClip } from "../lib/bankImport";
-import { suggestProjectName } from "../lib/projectName"; import { playFrom } from "../lib/playFrom";
+import { suggestProjectName } from "../lib/projectName"; import { validateClipName } from "../lib/clipName"; import { playFrom } from "../lib/playFrom";
 import { formatLength, formatTimecode } from "../lib/segments";
 import DownloadsPanel from "./DownloadsPanel";
 import ImportTimestamps from "./ImportTimestamps";
@@ -254,7 +254,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
               : "";
     const outOfBand = b.status === "under" || b.status === "over" || b.status === "over-hard";
     // The box shows the suggestion until it is edited; an emptied box means "use the pattern".
-    const projectName = names[clip.id] ?? suggestProjectName(clip);
+    const projectName = names[clip.id] ?? (validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip));
     return (
       <li key={clip.id}>
         <div
@@ -359,7 +359,7 @@ export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps
   const needsVideo = !vid;
 
   const importView = (
-    <ImportTimestamps duration={duration || undefined} onImport={doImport} onCancel={() => setImporting(false)} />
+    <ImportTimestamps duration={duration || undefined} existing={clips.map((c) => ({ id: c.id, name: c.label }))} onImport={doImport} onCancel={() => setImporting(false)} />
   );
 
   const bankView = (
