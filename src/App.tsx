@@ -358,7 +358,7 @@ function Layout({ active }: { active: boolean }) {
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
       const startSettings = editorRef.current;
-      const ok = await download({ segments: clip.segments, clipId: clip.id });
+      const ok = await download({ segments: clip.segments, clipId: projectName?.trim() || clip.id });
       if (ok) afterSaved(clip.id, clip.label, clip.segments, startSettings, projectName);
       return ok;
     },
