@@ -121,9 +121,26 @@ export default function VideosPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {v.rows.open.map((r) => (
-          <Row key={r.id} row={r} onOpen={() => v.select(r.id)} onDone={() => v.doneVideo(r)} />
-        ))}
+        {v.opening && (
+          <div
+            role="status"
+            className="relative mx-[10px] my-[3px] overflow-hidden rounded-control border border-ice bg-raised p-2 shadow-row"
+          >
+            <div className="flex items-center gap-[10px]">
+              <span aria-hidden="true" className="h-[26px] w-[44px] flex-none rounded-chip bg-hover" />
+              <span className="min-w-0">
+                <span className="block text-body font-medium text-fg">Opening…</span>
+                <span className="mt-0.5 block text-meta text-fg-dim">Preparing</span>
+              </span>
+            </div>
+            <span aria-hidden="true" className="absolute bottom-0 left-0 h-[2px] w-1/3 animate-pulse bg-ice" />
+          </div>
+        )}
+        {v.rows.open
+          .filter((r) => !(v.opening && r.isOpen))
+          .map((r) => (
+            <Row key={r.id} row={r} onOpen={() => v.select(r.id)} onDone={() => v.doneVideo(r)} />
+          ))}
         {v.filtered && v.rows.open.length + doneCount === 0 && (
           <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">No video matches.</p>
         )}
