@@ -58,6 +58,7 @@ import ClipsColumn from "../features/clips/components/ClipsColumn"; // B2/B4, ri
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
 import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
 import CampaignStart from "../features/campaigns/components/CampaignStart";
+import ColdStartScreen from "../features/start/components/ColdStartScreen";
 import { tabDomId, tabPanelDomId } from "../features/workspace/components/WorkspaceTabs";
 import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
 
@@ -398,6 +399,11 @@ function Layout({ active }: { active: boolean }) {
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
+        {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
+        {!info && !(CHANNEL_DATA_BUILT && screen === "channel") ? (
+          <ColdStartScreen />
+        ) : (
+        <>
         <AppHeader
           {...(CHANNEL_DATA_BUILT ? { screen, onScreen: setScreen, channelAvailable } : null)}
           copyOpen={copyOpen}
@@ -451,6 +457,8 @@ function Layout({ active }: { active: boolean }) {
           onPickClipsDir={isElectron ? pickClipsDir : undefined}
           onPickDataDir={isElectron ? pickDataDir : undefined}
         />
+        </>
+        )}
       </main>
       <CampaignStart
         open={active && !campaign && !campaignPromptDismissed}
