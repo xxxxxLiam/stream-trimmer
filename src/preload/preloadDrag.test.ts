@@ -30,7 +30,7 @@ function loadPreload() {
     return origLoad.call(this, request, ...rest);
   };
   try {
-    delete require.cache[require.resolve("./preload.ts")];
+    delete require.cache[require.resolve("./index.ts")];
     require("./index.ts");
   } finally {
     (Module as any)._load = origLoad;
