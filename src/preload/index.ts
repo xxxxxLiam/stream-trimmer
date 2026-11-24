@@ -74,6 +74,11 @@ try {
     // Owner gate. Main hashes the local machine id with the supplied salt and
     // answers with a boolean only; the raw id never crosses the bridge.
     isOwnerMachine: (list: unknown, salt: unknown) => ipcRenderer.invoke(IPC.ownerCheck, list, salt),
+    // Suggested clip names, offline: prepare once per transcript, then suggest per range.
+    clipNames: {
+      prepare: (payload: unknown) => ipcRenderer.invoke(IPC.clipNamesPrepare, payload),
+      suggest: (payload: unknown) => ipcRenderer.invoke(IPC.clipNamesSuggest, payload),
+    },
     // Editor handoff (electron/editorOpen.ts). Paths and small payloads only.
     editor: {
       installed: () => ipcRenderer.invoke(IPC.editorInstalled),
