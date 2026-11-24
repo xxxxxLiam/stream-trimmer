@@ -7,6 +7,7 @@ import { authProbeVerdict } from "../../utils/youtubeAuth";
 import { staleSessionFailure } from "../segments";
 import { withRunCookies } from "../cookies";
 import { probeYouTubeAuth } from "../youtubeAuthProbe";
+import { signIn } from "../../../../shared/utils/signInSignal";
 import { DownloadCtx } from "./jobContext";
 
 /** Resolves true when the response has been sent and the run must stop. */
@@ -53,6 +54,7 @@ export async function verifySession(ctx: DownloadCtx): Promise<boolean> {
       return true;
     }
     if (verdict === "blocked") {
+      signIn.sessionEnded();
       const f = staleSessionFailure(401, "Your marked range is kept.");
       res.status(401).json({
         code: "YOUTUBE_AUTH_REQUIRED",
@@ -73,6 +75,7 @@ export async function verifySession(ctx: DownloadCtx): Promise<boolean> {
       );
     } else {
       ctx.sessionConfirmed = true;
+      signIn.sessionConfirmed();
     }
   }
   return false;

@@ -746,3 +746,32 @@ test("G2-7: uncollected clips are counted in the cache figure, and broken out as
     assert.equal(cleared.skipped, 3);
     assert.equal(cleared.bytes, usage.bytes);
   }));
+
+// --- flow 7: failed clip rows ----------------------------------------------------
+
+test("flow 7: a tool-out-of-date failure with no newer tools is final on its row, tried once, nothing shown to retry", SLOW, () =>
+  withHarness(async (h) => {
+    h.configure({ failDownload: "ERROR: unable to extract player response; please report this issue" });
+    const res = await downloadPath(h, "job_f7_tools", { url: freshUrl(), segments: [{ start: 0.5, end: 3 }] });
+    assert.notEqual(res.status, 200);
+    assert.equal(res.body.row.state, "failed-final");
+    assert.match(res.body.row.reason, /YouTube/);
+  }));
+
+test("flow 7: disk full and private videos get their own row states and never retry the tools", SLOW, () =>
+  withHarness(async (h) => {
+    h.configure({ failDownload: "ERROR: Video unavailable: This video is private" });
+    const priv = await downloadPath(h, "job_f7_private", { url: freshUrl(), segments: [{ start: 0.5, end: 3 }] });
+    assert.equal(priv.body.row.state, "cannot-download");
+    assert.equal(priv.body.row.kind, "private");
+    h.configure({ failDownload: "OSError: [Errno 28] No space left on device" });
+    const disk = await downloadPath(h, "job_f7_disk", { url: freshUrl(), segments: [{ start: 0.5, end: 3 }] });
+    assert.equal(disk.body.row.state, "no-space");
+  }));
+
+test("flow 7: any other failure is a plain failed row that is not retrying", SLOW, () =>
+  withHarness(async (h) => {
+    h.configure({ failDownload: "ERROR: unable to download video data: Connection reset by peer" });
+    const res = await downloadPath(h, "job_f7_net", { url: freshUrl(), segments: [{ start: 0.5, end: 3 }] });
+    assert.deepEqual({ state: res.body.row.state, retrying: res.body.row.retrying }, { state: "failed", retrying: false });
+  }));

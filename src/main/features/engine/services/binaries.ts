@@ -8,6 +8,7 @@ import path from "node:path";
 import { execSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import dargs from "dargs";
 import ffmpegPath from "ffmpeg-static";
+import { isNewer, newestToolFile } from "./toolUpdate";
 
 // When running inside a packaged Electron app, binaries live under
 // `<resources>/bin/`. Prefer those over the dev-time bundled/PATH locations.
@@ -171,19 +172,6 @@ export function ytDlpVersion(binary: string): string | null {
   }
 }
 
-// yt-dlp versions are date-based (YYYY.MM.DD[.N]) so a numeric component
-// compare is a correct ordering.
-function isNewer(a: string, b: string): boolean {
-  const pa = a.split(/[.\-]/).map((n) => Number(n) || 0);
-  const pb = b.split(/[.\-]/).map((n) => Number(n) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] ?? 0;
-    const y = pb[i] ?? 0;
-    if (x !== y) return x > y;
-  }
-  return false;
-}
-
 function systemYtDlp(): string | null {
   try {
     const lookup =
@@ -197,6 +185,18 @@ function systemYtDlp(): string | null {
 
 // Resolve yt-dlp: prefer the bundled binary, but defer to a system install when
 // it reports a newer version (YouTube breaks often; a fresher binary wins).
+/** A yt-dlp the app fetched itself into its tools folder (see toolUpdate.ts), newest wins. */
+function updatedYtDlp(): { path: string; version: string } | null {
+  const dir = process.env.YT_CLIPPER_TOOLS_DIR;
+  if (!dir) return null;
+  try {
+    const best = newestToolFile(fs.readdirSync(dir));
+    return best ? { path: path.join(dir, best.name), version: best.version } : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveYtDlp(): YtResolved | null {
   const packaged = packagedBinary("yt-dlp");
   const devBundled = BIN_DIR
@@ -205,6 +205,16 @@ function resolveYtDlp(): YtResolved | null {
   const bundled =
     packaged ?? (devBundled && fs.existsSync(devBundled) ? devBundled : null);
   const system = systemYtDlp();
+
+  const updated = updatedYtDlp();
+  if (updated) {
+    const bv = bundled ? ytDlpVersion(bundled) : null;
+    const sv = system ? ytDlpVersion(system) : null;
+    if ((!bv || isNewer(updated.version, bv)) && (!sv || isNewer(updated.version, sv))) {
+      console.log(`[server] using the updated yt-dlp ${updated.version}`);
+      return makeRunner(updated.path, `updated (${updated.path})`);
+    }
+  }
 
   if (bundled && system && system !== bundled) {
     const bv = ytDlpVersion(bundled);
@@ -225,6 +235,12 @@ function resolveYtDlp(): YtResolved | null {
 }
 
 export const yt = resolveYtDlp();
+
+/** Picks up a freshly installed yt-dlp in place, so every importer of `yt` sees it. */
+export function reloadYtDlp(): void {
+  const next = resolveYtDlp();
+  if (yt && next) Object.assign(yt, next);
+}
 const packagedFfmpeg = packagedBinary("ffmpeg");
 export const resolvedFfmpeg = packagedFfmpeg || ffmpegPath;
 const ffmpegOk = Boolean(resolvedFfmpeg && fs.existsSync(resolvedFfmpeg));

@@ -77,6 +77,11 @@ export function startToolProbe(): void {
   void probeBinary(denoPath(), "--version").then((p) => (probes.deno = p));
 }
 
+/** After yt-dlp was replaced: read its version again. The old answer stays until the new one lands. */
+export function refreshToolProbe(): void {
+  void probeBinary(yt?.binary ?? null, "--version").then((p) => (probes.ytdlp = p));
+}
+
 export function currentToolStatus(): ToolsStatus {
   startToolProbe();
   return summarize(probes);
