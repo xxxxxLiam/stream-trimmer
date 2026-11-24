@@ -132,7 +132,7 @@ test("Final Cut sub-items appear only when after cutting is Final Cut", () => {
   const items = buildSetupItems(base({ afterCutting: "finalcut" }));
   assert.deepEqual(
     ids(items).filter((i) => i.startsWith("fcp-")),
-    ["fcp-library", "fcp-media-event", "fcp-project-event", "fcp-timeline"],
+    ["fcp-library", "fcp-timeline"],
   );
   for (const i of items.filter((x) => x.id.startsWith("fcp-"))) assert.equal(i.parentId, "after-cutting");
 });
@@ -141,8 +141,6 @@ test("Final Cut sub-items each tick on their own field", () => {
   const fc = { fcpLibrary: "/L/Client.fcpbundle", mediaEvent: "Raw", projectEvent: "", timelineFormat: { width: 1080, height: 1920, fps: "30" } };
   const items = buildSetupItems(base({ afterCutting: "finalcut", finalCut: fc }));
   assert.equal(get(items, "fcp-library").done, true);
-  assert.equal(get(items, "fcp-media-event").done, true);
-  assert.equal(get(items, "fcp-project-event").done, false);
   assert.equal(get(items, "fcp-timeline").done, true);
   const cleared = buildSetupItems(base({ afterCutting: "finalcut", finalCut: { ...fc, fcpLibrary: " " } }));
   assert.equal(get(cleared, "fcp-library").done, false);
@@ -154,8 +152,8 @@ test("Final Cut sub-items sit directly after item 6", () => {
   const order = ids(buildSetupItems(base({ afterCutting: "finalcut", exporter: true })));
   const i = order.indexOf("after-cutting");
   assert.equal(order[i + 1], "fcp-library");
-  assert.equal(order[i + 4], "fcp-timeline");
-  assert.equal(order[i + 5], "data-folder");
+  assert.equal(order[i + 2], "fcp-timeline");
+  assert.equal(order[i + 3], "data-folder");
 });
 
 test("channel data item is hidden when the build lacks the exporter", () => {
@@ -217,7 +215,7 @@ test("ordering is stable regardless of state", () => {
   assert.deepEqual(ids(buildSetupItems(base({ exporter: true }))), canonical);
   const fc = ids(buildSetupItems(base({ exporter: true, afterCutting: "finalcut" })));
   assert.deepEqual(fc, ["sign-in", "campaign", "clips-folder", "length-band", "id-pattern", "after-cutting",
-    "fcp-library", "fcp-media-event", "fcp-project-event", "fcp-timeline", "data-folder", "clip-bank"]);
+    "fcp-library", "fcp-timeline", "data-folder", "clip-bank"]);
   assert.equal(new Set(fc).size, fc.length);
 });
 

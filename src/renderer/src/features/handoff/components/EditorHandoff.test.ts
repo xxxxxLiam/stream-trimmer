@@ -65,7 +65,7 @@ test("D-5: cutting another clip sends every clip of the session, not just the ne
   const out = await H.runAfterCutting(on, ctx(["A-03"]));
   assert.equal(out?.ok, true);
   assert.equal(writes.length, 1);
-  assert.equal((writes[0].contents.match(/<asset-clip /g) ?? []).length, 3, "all three clips are in the document");
+  assert.equal((writes[0].contents.match(/<asset id=/g) ?? []).length, 3, "all three clips are in the document");
   // And a fourth keeps accumulating, with a re-cut id replaced rather than duplicated.
   await H.runAfterCutting(on, ctx(["A-02"]));
   assert.equal((writes[1].contents.match(/<asset id=/g) ?? []).length, 3);

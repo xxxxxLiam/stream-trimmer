@@ -220,7 +220,7 @@ test("settings default to off and coerce junk", () => {
 test("single segment: version, format, rational durations, note", () => {
   const xml = buildFcpxml({ eventName: "Shorts", clips: [clip()] });
   assert.match(xml, /<fcpxml version="1\.10">/);
-  assert.match(xml, /<format id="r1" frameDuration="1001\/30000s" width="1920" height="1080"\/>/);
+  assert.match(xml, /<format id="r1" frameDuration="1001\/30000s" width="1920" height="1080" colorSpace="1-1-1 \(Rec\. 709\)"\/>/);
   // 10.01s at 30000/1001 is 300 frames.
   assert.match(xml, /<asset id="a1" name="M-abc-01 - the hook" start="0s" duration="300300\/30000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48k">/);
   assert.match(xml, /<media-rep kind="original-media" src="file:\/\/\/Users\/me\/Clips\/M-abc-01\.mp4"\/>/);
@@ -354,7 +354,7 @@ test("session batch: ONE document for every clip, bad files reported not dropped
   assert.equal(result.filename, "Shorts.fcpxml");
   assert.equal((result.xml.match(/<event /g) ?? []).length, 1);
   assert.equal((result.xml.match(/<asset-clip /g) ?? []).length, 2);
-  assert.match(result.xml, /<format id="r1" frameDuration="1\/30s" width="1080" height="1920"\/>/);
+  assert.match(result.xml, /<format id="r1" frameDuration="1\/30s" width="1080" height="1920" colorSpace="1-1-1 \(Rec\. 709\)"\/>/);
 });
 
 test("session batch: nothing probeable is an error naming the reason", async () => {

@@ -65,9 +65,9 @@ test("the player fills the column, and the controls under it stay reachable", ()
   assert.doesNotMatch(rule![1], /100vh/, "no viewport-height cap: that is what letterboxed it");
 
   const layout = readFileSync(new URL("../../../modules/layout/components/ThreeColumnLayout.tsx", import.meta.url), "utf8");
-  const host = /className="cols-host[^"]*"/.exec(layout);
+  const host = /className=\{`cols-host[^`]*`\}/.exec(layout);
   assert.ok(host, "the workspace host is present");
-  assert.match(host![0], /overflow-y-auto/, "the workspace scrolls, so a tall player is not a trap");
+  assert.match(host![0], /overflow-y-auto/, "the workspace scrolls when the columns stack, so a tall player is not a trap");
   assert.match(layout, /tabIndex=\{0\}[\s\S]{0,120}cols-host|cols-host[\s\S]{0,120}tabIndex=\{0\}/, "and it is focusable, so the keyboard reaches the controls");
 });
 
