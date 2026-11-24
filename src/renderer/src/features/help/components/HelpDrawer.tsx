@@ -216,7 +216,7 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
             </ol>
 
             {!present && current && current.anchorId && (
-              <p role="status" className="rounded-control border border-accent bg-accent-soft p-3 text-meta text-accent">
+              <p role="status" className="rounded-control border border-error bg-raised p-3 text-meta text-fg">
                 That control is not on screen right now. It may be on another screen or tab, or it
                 appears once a video is loaded.
               </p>

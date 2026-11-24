@@ -110,7 +110,7 @@ export default function UpdateStatus() {
           type="button"
           onClick={action.onClick}
           className="rounded-control px-2 py-1 text-fg"
-          style={{ backgroundColor: "#FF6363", color: "#0B0B0C" }}
+          style={{ backgroundColor: "#FF6363", color: "#0A0D0F" }}
         >
           {action.text}
         </button>
@@ -124,7 +124,7 @@ export default function UpdateStatus() {
           className="rounded-control px-2 py-1 underline hover:text-fg"
           style={
             status.state === "manual"
-              ? { backgroundColor: "#FF6363", color: "#0B0B0C" }
+              ? { backgroundColor: "#FF6363", color: "#0A0D0F" }
               : undefined
           }
         >
