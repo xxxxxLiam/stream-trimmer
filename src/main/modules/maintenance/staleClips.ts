@@ -30,7 +30,7 @@ export function sweepStaleClips() {
       }
     }
     if (removed) logger.log("clip", `swept ${removed} stale temp folder(s)`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.log("clip", `sweep failed: ${logger.describe(err)}`);
   }
 }

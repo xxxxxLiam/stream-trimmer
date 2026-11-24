@@ -36,13 +36,13 @@ export function registerYoutubeHandlers() {
         return { ok: false, cancelled: true };
       }
       return await importCookiesFromFile(res.filePaths[0]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.log("youtube", `cookie import threw: ${logger.describe(err)}`);
       return { ok: false, error: logger.describe(err) };
     }
   });
 
-  ipcMain.handle("youtube:importCookiesText", async (_e: any, text: any) => {
+  ipcMain.handle("youtube:importCookiesText", async (_e: unknown, text: unknown) => {
     if (typeof text !== "string" || text.length > 5_000_000) {
       return { ok: false, error: "That does not look like a cookies.txt file." };
     }

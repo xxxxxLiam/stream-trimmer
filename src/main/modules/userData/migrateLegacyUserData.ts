@@ -36,12 +36,12 @@ export function migrateLegacyUserData() {
       try {
         fs.cpSync(from, to, { recursive: true, errorOnExist: false });
         moved += 1;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`[electron] could not carry over ${entry.name}:`, err);
       }
     }
     if (moved) console.log(`[electron] carried ${moved} item(s) over from "YouTube Clipper"`);
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Never let this stop the app starting: a fresh profile is recoverable,
     // a boot loop is not.
     console.error("[electron] user data migration skipped:", err);

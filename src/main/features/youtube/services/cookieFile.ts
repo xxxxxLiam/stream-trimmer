@@ -30,7 +30,7 @@ import {
  *
  * Returns { ok, reason } — never throws.
  */
-function validateCookieText(text: any) {
+function validateCookieText(text: unknown) {
   const raw = String(text || "");
   if (!raw.trim()) {
     return { ok: false, reason: "That file is empty." };

@@ -10,5 +10,5 @@ import { saveExport } from "../features/exports/services/exportService";
 const { ipcMain } = electron;
 
 export function registerExportHandlers() {
-  ipcMain.handle("export:save", (_e: any, payload: any) => saveExport(payload));
+  ipcMain.handle("export:save", (_e: unknown, payload: unknown) => saveExport(payload));
 }

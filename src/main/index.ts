@@ -52,7 +52,7 @@ app.whenReady().then(async () => {
     sweepStaleClips();
     startCookieChecks();
     setupAutoUpdater();
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.log("app", `failed to start: ${logger.describe(err)}`);
     closeSplash();
     app.quit();

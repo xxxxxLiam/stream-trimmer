@@ -16,5 +16,5 @@ const { app, ipcMain } = electron;
 export function registerSystemHandlers() {
   ipcMain.handle("system:defaultBrowser", () => defaultBrowser(app));
   ipcMain.handle("system:defaultFolders", () => defaultFolders(app));
-  ipcMain.handle("system:browserOrder", (_e: any, saved: any) => browserOrder(app, saved));
+  ipcMain.handle("system:browserOrder", (_e: unknown, saved: unknown) => browserOrder(app, saved));
 }
