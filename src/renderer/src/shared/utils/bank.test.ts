@@ -115,9 +115,9 @@ test("markCut flips status and returns every range", () => {
 test("applyCut appends all ranges to the campaign usedRanges under the clip id", () => {
   const { campaign } = createCampaign([], { name: "Shorts" });
   const r = applyCut(seeded(), { ...campaign, id: C }, V, "T1-A02")!;
-  assert.deepEqual(r.campaign.usedRanges[V], [
-    { start: 120, end: 150, clipId: "T1-A02" },
-    { start: 300, end: 320, clipId: "T1-A02" },
+  assert.deepEqual(r.campaign.usedRanges[V].map(({ at, ...rest }) => ({ ...rest, stamped: typeof at === "number" })), [
+    { start: 120, end: 150, clipId: "T1-A02", stamped: true },
+    { start: 300, end: 320, clipId: "T1-A02", stamped: true },
   ]);
   assert.equal(clipsFor(r.data, C, V).find((c) => c.id === "T1-A02")!.status, "cut");
   assert.equal(applyCut(seeded(), { ...campaign, id: C }, V, "nope"), null);

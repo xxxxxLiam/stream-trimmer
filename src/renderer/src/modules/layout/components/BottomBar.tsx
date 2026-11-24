@@ -1,0 +1,193 @@
+/**
+ * File: BottomBar.tsx
+ * Path: src/renderer/src/modules/layout/components/BottomBar.tsx
+ * Description: The full-width bottom bar (board 03.2.1): the timeline tools on the left, the
+ *   sentence that says what the next Clip makes in the middle ("Makes 2 clips [Original + ES] to
+ *   [~/Clips/Acme]"), and zoom with Fit on the right. Logic-free: the screen passes what to show.
+ *   Spec: plans/export-footer-plan.md. The tools are shared state (useToolState) the timeline reads.
+ */
+import { useState, type ReactElement } from "react";
+import PopoverMenu, { type MenuItem } from "./PopoverMenu";
+import {
+  IconChevronSmall,
+  IconFlag,
+  IconHand,
+  IconPointer,
+  IconScissors,
+  IconZoomTool,
+} from "./BarIcons";
+import { useToolState, type TimelineTool } from "../hooks/useToolState";
+import {
+  audioButtonLabel,
+  makesText,
+  shortenPath,
+  toggleLanguage,
+  type AudioTrackInfo,
+} from "../../../shared/utils/audioLanguages";
+
+const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] = [
+  { tool: "pointer", label: "Pointer", icon: IconPointer },
+  { tool: "clip", label: "Clip tool", icon: IconScissors },
+  { tool: "flag", label: "Flag (M)", icon: IconFlag },
+  { tool: "hand", label: "Hand", icon: IconHand },
+  { tool: "zoom", label: "Zoom tool", icon: IconZoomTool },
+];
+
+const VALUE_BUTTON = "inline-flex h-11 items-center";
+const VALUE_FACE =
+  "inline-flex h-7 items-center gap-1.5 rounded-control border border-hairlineStrong bg-raised px-2.5 text-meta text-fg";
+
+export type BottomBarProps = {
+  /** How many clips the next Clip makes (one per ticked language). */
+  clipCount: number;
+  /** The video's audio tracks. The Audio button shows only when there is a dub besides the original. */
+  tracks?: AudioTrackInfo[];
+  /** Ticked languages, as stored. */
+  selectedLanguages?: string[];
+  onSelectLanguages: (next: string[]) => void;
+  /** The campaign's clips folder (full path). */
+  folder: string;
+  /** Opens the folder picker. Absent in the browser, where the folder cannot be chosen. */
+  onPickFolder?: () => void | Promise<unknown>;
+};
+
+export default function BottomBar({
+  clipCount,
+  tracks,
+  selectedLanguages,
+  onSelectLanguages,
+  folder,
+  onPickFolder,
+}: BottomBarProps) {
+  const { tool, setTool, zoom, setZoom, zoomBy, fit } = useToolState();
+  const hasDubs = !!tracks && tracks.some((t) => t.kind !== "original");
+  const [problem, setProblem] = useState("");
+
+  const audioItems: MenuItem[] = (tracks ?? []).map((t) => {
+    const ticked = t.kind === "original" ? !(selectedLanguages ?? []).includes(`-${t.language}`) : (selectedLanguages ?? []).includes(t.language);
+    const tag = t.kind === "auto-dubbed" ? " · Auto-dubbed" : t.kind === "creator-dub" ? " · Creator dub" : "";
+    return {
+      key: t.language,
+      label: `${t.label}${t.kind === "original" ? " (original)" : ""}${tag}`,
+      checked: ticked,
+      keepOpen: true,
+      onSelect: () => onSelectLanguages(toggleLanguage(tracks ?? [], selectedLanguages, t.language)),
+    };
+  });
+
+  return (
+    <div className="relative m-2 flex h-[52px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-1.5 text-meta text-fg-dim">
+      <div role="toolbar" aria-label="Timeline tools" className="flex">
+        {TOOLS.map(({ tool: t, label, icon: IconFor }) => (
+          <button
+            key={t}
+            type="button"
+            aria-label={label}
+            title={label}
+            aria-pressed={tool === t}
+            onClick={() => setTool(t)}
+            className={`inline-flex h-11 w-10 shrink-0 items-center justify-center rounded-control ${
+              tool === t ? "bg-bg text-ice" : "text-fg-dim hover:bg-hover hover:text-fg"
+            }`}
+          >
+            <IconFor />
+          </button>
+        ))}
+      </div>
+
+      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap" id="ui-export-sentence">
+        <span>{makesText(clipCount)}</span>
+        {hasDubs ? (
+          <PopoverMenu
+            label={`Audio: ${audioButtonLabel(tracks!, selectedLanguages)}`}
+            items={audioItems}
+            side="above"
+            align="start"
+            triggerClassName={VALUE_BUTTON}
+            pressedWhenOpen={false}
+            heading="Make a clip for each ticked language"
+          >
+            <span className={VALUE_FACE}>
+              {audioButtonLabel(tracks!, selectedLanguages)}
+              <IconChevronSmall />
+            </span>
+          </PopoverMenu>
+        ) : null}
+        <span>to</span>
+        <button
+          type="button"
+          id="ui-footer-clips"
+          className={VALUE_BUTTON}
+          aria-label={`Clips folder: ${folder || "not set"}`}
+          title={onPickFolder ? folder || "Choose a folder" : "Browser downloads go to your Downloads folder. Use the desktop app to choose a folder."}
+          aria-disabled={!onPickFolder}
+          onClick={async () => {
+            if (!onPickFolder) return;
+            const r = await onPickFolder();
+            setProblem(typeof r === "string" ? r : "");
+          }}
+        >
+          <span className={`${VALUE_FACE} ${onPickFolder ? "" : "text-disabled"}`}>
+            {folder ? shortenPath(folder) : "Choose a folder"}
+            <IconChevronSmall />
+          </span>
+        </button>
+        {problem ? (
+          <span role="alert" className="text-error">
+            {problem}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="ml-auto flex items-center gap-0.5">
+        <button
+          type="button"
+          aria-label="Zoom out"
+          className="inline-flex h-11 w-8 items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
+          onClick={() => zoomBy(-10)}
+        >
+          −
+        </button>
+        <span
+          role="slider"
+          aria-label="Timeline zoom"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={zoom}
+          tabIndex={0}
+          className="relative mx-1.5 h-[3px] w-24 rounded-[2px] bg-hover"
+          onKeyDown={(e) => {
+            const step = e.shiftKey ? 25 : 10;
+            if (e.key === "ArrowRight" || e.key === "ArrowUp") setZoom(zoom + step);
+            else if (e.key === "ArrowLeft" || e.key === "ArrowDown") setZoom(zoom - step);
+            else if (e.key === "Home") setZoom(0);
+            else if (e.key === "End") setZoom(100);
+            else return;
+            e.preventDefault();
+          }}
+          onPointerDown={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setZoom(((e.clientX - r.left) / r.width) * 100);
+          }}
+        >
+          <span
+            aria-hidden
+            className="absolute -top-[5px] size-[13px] -translate-x-1/2 rounded-full bg-fg"
+            style={{ left: `${zoom}%` }}
+          />
+        </span>
+        <button
+          type="button"
+          aria-label="Zoom in"
+          className="inline-flex h-11 w-8 items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
+          onClick={() => zoomBy(10)}
+        >
+          +
+        </button>
+        <button type="button" className="inline-flex h-11 items-center rounded-control px-2.5 text-meta text-fg-dim hover:bg-hover hover:text-fg" onClick={fit}>
+          Fit
+        </button>
+      </div>
+    </div>
+  );
+}

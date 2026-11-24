@@ -30,16 +30,13 @@ export default function CampaignChip({ menu }: { menu?: ReactNode }) {
       <button
         type="button"
         id="ui-campaign-chip"
-        className="chip"
+        className="inline-flex h-11 max-w-[260px] items-center gap-2 rounded-control border border-hairline bg-raised pl-3 pr-2.5 text-body font-medium text-fg hover:bg-hover"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         title="Campaign this clip will be cut for"
       >
-        <span className="text-fg-dim">Campaign</span>
-        <span className="max-w-[160px] truncate">
-          {active ? active.name : "None yet"}
-        </span>
+        <span className="min-w-0 truncate">{active ? active.name : "No campaign"}</span>
         <IconChevronDown className="shrink-0 text-fg-dim" />
       </button>
       {open && (

@@ -31,6 +31,11 @@ function sameSlot(a: Slot | null, b: Slot): boolean {
   return !!a && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
 }
 
+/** The label an "on" top bar button shows beside its icon. */
+function HelpOnLabel() {
+  return <span className="icon-label ml-2 text-body">Help</span>;
+}
+
 export default function HelpButton({
   open,
   onToggle,
@@ -75,7 +80,9 @@ export default function HelpButton({
 
   return (
     <>
-      <span ref={holder} aria-hidden="true" className="icon-btn pointer-events-none invisible" />
+      <span ref={holder} aria-hidden="true" className="icon-btn pointer-events-none invisible">
+        {open ? <HelpOnLabel /> : null}
+      </span>
       {slot && !gateUp && typeof document !== "undefined"
         ? createPortal(
             <button
@@ -97,6 +104,7 @@ export default function HelpButton({
               }}
             >
               <IconHelp />
+              {open ? <HelpOnLabel /> : null}
             </button>,
             document.body,
           )

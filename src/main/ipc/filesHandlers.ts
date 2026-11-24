@@ -15,6 +15,7 @@ import {
   saveFiles,
   showInFolder,
   startDrag,
+  undoClip,
 } from "../features/files/services/filesService";
 
 const { ipcMain } = electron;
@@ -54,6 +55,8 @@ export function registerFilesHandlers() {
     }
     return saveFiles(payload);
   });
+
+  ipcMain.handle(IPC.fileUndoClip, (_e: unknown, targetPath: unknown) => undoClip(targetPath));
 
   ipcMain.handle(IPC.fileExists, (_e: unknown, targetPath: unknown) => fileExists(targetPath as string));
 

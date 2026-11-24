@@ -85,6 +85,7 @@ export default function VideosPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div
+        id="ui-source-chip"
         role="search"
         className="mx-[10px] mb-[6px] mt-[10px] flex h-target flex-none items-center gap-2 rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
       >
