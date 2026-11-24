@@ -31,8 +31,6 @@ export type SetupItemId =
   | "id-pattern"
   | "after-cutting"
   | "fcp-library"
-  | "fcp-media-event"
-  | "fcp-project-event"
   | "fcp-timeline"
   | "data-folder"
   | "clip-bank";
