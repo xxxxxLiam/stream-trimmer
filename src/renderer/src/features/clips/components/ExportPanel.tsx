@@ -11,6 +11,7 @@ import { validateClipName } from "../utils/clipName";
 import { emptyExportText } from "../utils/exportRows";
 import { useExportController } from "../hooks/useExportController";
 import ImportTimestamps from "./ImportTimestamps";
+import FailedRow from "./FailedRow";
 import MakingRow from "./MakingRow";
 import WaitingRow from "./WaitingRow";
 
@@ -25,6 +26,18 @@ export default function ExportPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
       {c.making && <MakingRow kind="making" {...c.making} />}
+      {c.failed && (
+        <FailedRow
+          failed={c.failed}
+          failure={c.failure}
+          onAction={(a) => {
+            if (a === "retry") c.retry();
+            else if (a === "changeFolder") void c.changeFolder();
+            else if (a === "showInBrowser") c.showInBrowser();
+            else c.saveForLater();
+          }}
+        />
+      )}
       {c.finished && (
         <MakingRow
           kind="finished"

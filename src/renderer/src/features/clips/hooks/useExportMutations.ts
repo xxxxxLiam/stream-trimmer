@@ -4,7 +4,7 @@
  * Description: What the Export panel does: pick a waiting moment (load it on the timeline), make
  *   it, undo the clip just made, remove a moment, and import timestamps.
  */
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
@@ -22,9 +22,9 @@ import type { useExportQueries } from "./useExportQueries";
 
 export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
-  const { cutBanked } = usePanelHost();
+  const { cutBanked, cutSegments } = usePanelHost();
   const { recordUse, forgetUse } = useCampaign();
-  const { removeDownload } = useClipperContext();
+  const { removeDownload, pickSaveDir, saveDir } = useClipperContext();
   const { campaignId, vid } = q;
 
   const select = useCallback(
@@ -42,6 +42,8 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
       // A clip's own label is its name when it is a good one; otherwise the offline suggestion.
       const name = validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip);
       s.setMakingName(name || clip.id);
+      s.setFailed(null);
+      s.attempt.current = { name: name || clip.id, segments: clip.segments, bankId: clip.id };
       s.setNotice("");
       s.setFinished(null);
       try {
@@ -67,6 +69,43 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     });
   }, [s, forgetUse, removeDownload]);
 
+  const retry = useCallback(() => {
+    const f = s.failed;
+    if (!f) return;
+    const clip = f.bankId ? q.clips.find((c) => c.id === f.bankId) : undefined;
+    if (clip) {
+      void make(clip);
+      return;
+    }
+    s.setFailed(null);
+    s.attempt.current = { name: f.name, segments: f.segments };
+    cutSegments(f.segments);
+  }, [s, q.clips, make, cutSegments]);
+
+  // The new folder lands in state after the picker closes, so retry through refs that always hold
+  // the latest render, and only when the folder really changed.
+  const latest = useRef({ retry, saveDir });
+  latest.current = { retry, saveDir };
+  const changeFolder = useCallback(async () => {
+    const before = latest.current.saveDir;
+    await pickSaveDir();
+    await new Promise((r) => window.setTimeout(r, 50));
+    if (latest.current.saveDir !== before) latest.current.retry();
+  }, [pickSaveDir]);
+
+  const showInBrowser = useCallback(() => {
+    if (vid) window.open(`https://www.youtube.com/watch?v=${vid}`, "_blank", "noopener");
+  }, [vid]);
+
+  /** A moment already waiting stays waiting; a marked part that was never banked joins the bank. */
+  const saveForLater = useCallback(() => {
+    const f = s.failed;
+    if (f && !f.bankId && campaignId && vid) {
+      bankStore.importClips(campaignId, vid, [{ line: 1, id: null, label: f.name === "New clip" ? "" : f.name, segments: f.segments }]);
+    }
+    s.setFailed(null);
+  }, [s, campaignId, vid]);
+
   const remove = useCallback(
     (clip: BankedClip) => bankStore.remove(campaignId, vid, clip.id),
     [campaignId, vid],
@@ -80,5 +119,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid, s],
   );
 
-  return { select, make, undo, remove, importClips };
+  return { select, make, undo, remove, importClips, retry, changeFolder, showInBrowser, saveForLater };
 }
