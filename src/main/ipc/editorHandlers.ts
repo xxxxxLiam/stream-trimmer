@@ -14,7 +14,7 @@ import {
   probeMedia,
   reveal,
   writeFcpxml,
-} from "../../../electron/editorOpen";
+} from "../features/editor/services/editorOpen";
 
 const { ipcMain, shell } = electron;
 

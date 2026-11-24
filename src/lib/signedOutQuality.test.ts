@@ -36,7 +36,7 @@ test("what counts as signed out, and as the gate being up", () => {
   assert.equal(isSignInGateUp({ connected: true, restoring: false, skipped: false }), false);
 });
 
-test("the clipper hooks apply the signed-out quality rule", () => {
+test("useClipper applies the signed-out quality rule", () => {
   const src = readFileSync(new URL("../hooks/clipper/useQualityRules.ts", import.meta.url), "utf8");
   assert.match(src, /signedOutQuality\(/);
   assert.match(src, /isSignedOut\(connection\)/);

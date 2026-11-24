@@ -44,7 +44,7 @@ http.createServer = function (...args) {
   capture.server = s;
   return s;
 };
-require(${JSON.stringify(path.resolve(__dirname, "..", "server", "index.ts"))});
+require(${JSON.stringify(path.resolve(__dirname, "..", "src", "main", "features", "engine", "index.ts"))});
 module.exports = capture;
 `;
 
@@ -97,7 +97,7 @@ esbuild
             name: "channel-routes-stub",
             setup(build) {
               build.onResolve({ filter: /(^|\/)channelRoutes$/ }, () => ({
-                path: path.resolve(__dirname, "..", "server", "channelRoutes.stub.ts"),
+                path: path.resolve(__dirname, "..", "src", "main", "features", "engine", "routes", "channelRoutes.stub.ts"),
               }));
             },
           },

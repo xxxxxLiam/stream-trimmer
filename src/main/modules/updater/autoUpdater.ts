@@ -14,8 +14,8 @@ import {
   canInstallInPlace,
   downloadUrl,
   releasesUrl,
-} from "../../../../electron/updater";
-import * as logger from "../../../../electron/logger";
+} from "./updater";
+import * as logger from "../logger/logger";
 import { isDev } from "../../shared/utils/env";
 import { getMainWindow } from "../windows/windows";
 

@@ -10,7 +10,7 @@ import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 import electron from "electron";
-import * as youtubeSession from "../../../../electron/youtubeSession";
+import * as youtubeSession from "../../features/youtube/services/youtubeSession";
 import { isDev } from "../../shared/utils/env";
 
 const { app } = electron;

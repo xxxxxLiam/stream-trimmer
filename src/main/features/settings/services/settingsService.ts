@@ -8,8 +8,8 @@
  */
 import path from "node:path";
 import electron from "electron";
-import { createSettingsStore } from "../../../../../electron/settingsStore";
-import * as logger from "../../../../../electron/logger";
+import { createSettingsStore } from "./settingsStore";
+import * as logger from "../../../modules/logger/logger";
 import { bakedShape } from "../../owner/services/ownerGate";
 
 const { app } = electron;

@@ -7,7 +7,7 @@
  *   in features/, modules/ and ipc/.
  */
 import electron from "electron";
-import * as logger from "../../electron/logger";
+import * as logger from "./modules/logger/logger";
 import { registerHandlers } from "./ipc/registerHandlers";
 import { loadSettings } from "./features/settings/services/settingsService";
 import { migrateLegacyUserData } from "./modules/userData/migrateLegacyUserData";

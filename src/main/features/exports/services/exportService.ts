@@ -8,8 +8,8 @@
  *   out of memory.
  */
 import os from "node:os";
-import { saveExportFiles } from "../../../../../electron/exportSave";
-import * as logger from "../../../../../electron/logger";
+import { saveExportFiles } from "./exportSave";
+import * as logger from "../../../modules/logger/logger";
 import { ownerGate } from "../../owner/services/ownerGate";
 import { saveRoots } from "../../files/services/saveRoots";
 

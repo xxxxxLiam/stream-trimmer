@@ -5,8 +5,8 @@
  *   created once, at load, from what this build was baked with (absent in a public
  *   build). The gate answers a boolean and nothing else.
  */
-import { readMachineId, hashMachineId } from "../../../../../electron/machineId";
-import { createOwnerCheck, readBakedShape } from "../../../../../electron/ownerCheck";
+import { readMachineId, hashMachineId } from "../../../shared/services/machineId";
+import { createOwnerCheck, readBakedShape } from "./ownerCheck";
 
 // Read once, at start: what this build was baked with. Absent in a public build.
 export const bakedShape = readBakedShape(__dirname);

@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { ANY_MACHINE, CHANNEL_DATA_BUILT, decideAccess, parseMachineList } from "./ownerGate";
 
 const require = createRequire(import.meta.url);
-const { hashMachineId, parseIoregOutput, parseRegOutput } = require("../../electron/machineId.ts");
+const { hashMachineId, parseIoregOutput, parseRegOutput } = require("../main/shared/services/machineId.ts");
 
 test("list parsing trims, lowercases and drops blanks", () => {
   assert.deepEqual(parseMachineList(" AB12 , cd34,, "), ["ab12", "cd34"]);

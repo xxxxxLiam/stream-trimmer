@@ -11,7 +11,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { createSettingsStore, migrateSettings } = require("../../electron/settingsStore.ts");
+const { createSettingsStore, migrateSettings } = require("../main/features/settings/services/settingsStore.ts");
 
 test("saveDir becomes clipsDir and dataDir is proposed, unconfirmed", () => {
   const out = migrateSettings({ "clipper.saveDir": "/Users/me/Clips" }, { dataFolderName: "named-by-build" });
@@ -33,10 +33,14 @@ test("E2-1: with no build-supplied name the migration writes no folder name at a
   assert.equal(migrateSettings({ ...out, "clipper.dataDirConfirmed": true })["clipper.dataDirConfirmed"], true);
 });
 
-test("E2-1: no plain-.cjs file under electron/ (shipped in every build) names the exporter's folder", () => {
-  const dir = new URL("../../electron/", import.meta.url);
-  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith(".cjs"))) {
-    assert.doesNotMatch(fs.readFileSync(new URL(f, dir), "utf8"), /channel-data/, f);
+test("E2-1: no main-process source outside the channel exporter (shipped in every build) names the exporter's folder", () => {
+  const walk = (dir: URL): URL[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      if (e.isDirectory()) return e.name === "channelExport" ? [] : walk(new URL(`${e.name}/`, dir));
+      return /\.(ts|cjs)$/.test(e.name) && !/\.test\./.test(e.name) ? [new URL(e.name, dir)] : [];
+    });
+  for (const f of walk(new URL("../main/", import.meta.url))) {
+    assert.doesNotMatch(fs.readFileSync(f, "utf8"), /channel-data/, f.pathname);
   }
 });
 

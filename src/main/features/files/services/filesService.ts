@@ -15,8 +15,8 @@ import {
   moveWithoutOverwrite,
   resolveTarget,
   writeWithoutOverwrite,
-} from "../../../../../electron/pathSafety";
-import * as logger from "../../../../../electron/logger";
+} from "../../../shared/utils/pathSafety";
+import * as logger from "../../../modules/logger/logger";
 import { getDragIcon } from "./dragIcon";
 import { saveRoots } from "./saveRoots";
 

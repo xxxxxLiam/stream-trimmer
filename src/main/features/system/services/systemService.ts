@@ -10,7 +10,7 @@ import path from "node:path";
 import {
   browserCheckOrder,
   detectDefaultBrowser,
-} from "../../../../../electron/defaultBrowser";
+} from "../../youtube/services/defaultBrowser";
 
 /**
  * Returns only the supported browser name. Cookie values remain private to

@@ -6,9 +6,9 @@
  */
 import electron from "electron";
 import { autoUpdater } from "electron-updater";
-import { interpretCheckResult } from "../../../../../electron/updateCheck";
-import { releasesUrl } from "../../../../../electron/updater";
-import * as logger from "../../../../../electron/logger";
+import { interpretCheckResult } from "../../../modules/updater/updateCheck";
+import { releasesUrl } from "../../../modules/updater/updater";
+import * as logger from "../../../modules/logger/logger";
 import { isDev } from "../../../shared/utils/env";
 import { sendUpdateStatus } from "../../../modules/updater/autoUpdater";
 

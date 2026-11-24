@@ -12,8 +12,8 @@
  */
 import fs from "node:fs";
 import os from "node:os";
-import { redact } from "../../../../../electron/redact";
-import * as logger from "../../../../../electron/logger";
+import { redact } from "../../../shared/utils/redact";
+import * as logger from "../../../modules/logger/logger";
 
 export function scrubForDisplay(text: any) {
   return redact(String(text ?? ""), { homeDir: os.homedir() });

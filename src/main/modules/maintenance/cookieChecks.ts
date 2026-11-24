@@ -11,8 +11,8 @@
  *   nothing in the diagnostics saying why. Read-only, and no network call.
  */
 import electron from "electron";
-import * as youtubeSession from "../../../../electron/youtubeSession";
-import * as logger from "../../../../electron/logger";
+import * as youtubeSession from "../../features/youtube/services/youtubeSession";
+import * as logger from "../logger/logger";
 
 const { app } = electron;
 

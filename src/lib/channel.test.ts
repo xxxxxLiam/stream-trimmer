@@ -22,7 +22,7 @@ test("E-5: a given instant and run id name a folder deterministically", () => {
 });
 
 import { rowsToCsv } from "./channel";
-import { csvHeader, csvLine } from "../../server/csv";
+import { csvHeader, csvLine } from "../main/features/engine/services/channelExport/csv";
 
 test("E-7: the client CSV escapes formulas exactly as the server does", () => {
   const cols = ["a", "b", "n"];

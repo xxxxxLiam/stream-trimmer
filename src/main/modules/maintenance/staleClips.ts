@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import * as logger from "../../../../electron/logger";
+import * as logger from "../logger/logger";
 
 export function sweepStaleClips() {
   try {

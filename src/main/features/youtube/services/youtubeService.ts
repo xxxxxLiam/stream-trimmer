@@ -4,8 +4,8 @@
  * Description: What the renderer can ask about, import and clear in the imported
  *   YouTube session (a cookies.txt). The session itself is youtubeSession.ts.
  */
-import * as youtubeSession from "../../../../../electron/youtubeSession";
-import * as logger from "../../../../../electron/logger";
+import * as youtubeSession from "./youtubeSession";
+import * as logger from "../../../modules/logger/logger";
 
 /**
  * Cheap, offline read of the imported cookies.txt. Says whether a session

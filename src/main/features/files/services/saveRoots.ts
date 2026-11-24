@@ -5,7 +5,7 @@
  *   with the folders saved in settings they are the only places the save handlers
  *   write.
  */
-import { allowedRoots } from "../../../../../electron/pathSafety";
+import { allowedRoots } from "../../../shared/utils/pathSafety";
 import { getSettings } from "../../settings/services/settingsService";
 
 const pickedDirs = new Set<string>();

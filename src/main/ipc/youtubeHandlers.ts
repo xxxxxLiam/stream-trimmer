@@ -5,7 +5,7 @@
  *   a picked file or dropped text), disconnect it, and the fallback sign-in page.
  */
 import electron from "electron";
-import * as logger from "../../../electron/logger";
+import * as logger from "../modules/logger/logger";
 import { getMainWindow } from "../modules/windows/windows";
 import {
   disconnect,
