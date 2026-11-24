@@ -143,19 +143,29 @@ function videoId() {
 
 // What the pre-download probe reads to decide which heights YouTube is
 // offering. Only the height matters to the server; the rest is shape.
+const AUDIO_TRACKS = JSON.parse(process.env.FAKE_AUDIO_TRACKS || "[]");
+
 function formats() {
-  return AVAILABLE_HEIGHTS.map((h) => ({
+  const audio = AUDIO_TRACKS.map((t, i) => ({
+    format_id: `a${i}`,
+    vcodec: "none",
+    acodec: "mp4a.40.2",
+    language: t.language,
+    format_note: t.format_note,
+    abr: 128,
+  }));
+  return audio.concat(AVAILABLE_HEIGHTS.map((h) => ({
     format_id: `v${h}`,
     height: h,
     vcodec: "avc1.640028",
     acodec: "none",
     tbr: h * 2,
-  }));
+  })));
 }
 
 function metadata(id) {
   return {
-    ...(AVAILABLE_HEIGHTS.length ? { formats: formats() } : {}),
+    ...(AVAILABLE_HEIGHTS.length || AUDIO_TRACKS.length ? { formats: formats() } : {}),
     id,
     title: titleFor(id),
     description: `Description for ${id} ${TRICKY}`,

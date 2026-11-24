@@ -49,6 +49,12 @@ export const downloadSchema = z.object({
   start: z.number().nonnegative().optional(),
   end: z.number().positive().optional(),
   format: z.enum(["mp4", "mp3"]).default("mp4"),
+  // One audio language per request ("es", "pt-BR"): each language is its own clip, so the caller
+  // makes one request per ticked language. Omitted means the original track.
+  audioLanguage: z
+    .string()
+    .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
+    .optional(),
   quality: z.string().default("best"),
   // How the finished clip is handed back. "stream" sends the media as the
   // response body. "path" returns only its location on disk, for the

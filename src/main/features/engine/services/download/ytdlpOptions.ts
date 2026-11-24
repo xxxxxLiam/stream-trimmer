@@ -5,6 +5,7 @@
  */
 import { sectionArg, type Segment } from "../segments";
 import { resolvedFfmpeg } from "../binaries";
+import { audioSelector } from "../../utils/audioTracks";
 import { DownloadCtx } from "./jobContext";
 import { Workspace } from "./workspace";
 
@@ -42,6 +43,10 @@ export const PLAYER_CLIENTS_FALLBACK =
 
 export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
   const { quality, isAudio } = ctx;
+  // A chosen dub only changes the audio half of each pair; the picture is the same on every track.
+  const lang = ctx.audioLanguageUsed;
+  const aM4a = audioSelector(lang, "[ext=m4a][acodec^=mp4a]");
+  const aAny = audioSelector(lang);
   const { fullPath } = ws;
   // Every tier here used to lead with `protocol*=m3u8`. That was written when
   // SABR had stopped web clients handing out usable DASH URLs and web_safari's
@@ -57,28 +62,31 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
   // ffmpeg is still caught by isForbidden() below, which moves the whole job
   // to the fallback path where yt-dlp fetches the media itself — that path,
   // not an HLS-first selector, is what covers the 403.
-  const videoFormat =
+  const ladder =
     quality === "best"
       ? [
-          "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]",
-          "bestvideo+bestaudio",
+          `bestvideo[ext=mp4][vcodec^=avc1]+${aM4a}`,
+          `bestvideo+${aAny}`,
           // Pre-merged renditions, itag 18 among them, only once no separate
           // video+audio pair exists at all.
           "best[ext=mp4]",
           "best",
-        ].join("/")
+        ]
       : [
           // Exact requested height first, whatever protocol serves it.
-          `bestvideo[height=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]`,
-          `bestvideo[height=${quality}]+bestaudio`,
+          `bestvideo[height=${quality}][ext=mp4][vcodec^=avc1]+${aM4a}`,
+          `bestvideo[height=${quality}]+${aAny}`,
           `best[height=${quality}][ext=mp4]`,
           `best[height=${quality}]`,
           // Then step down.
-          `bestvideo[height<=${quality}][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]`,
-          `bestvideo[height<=${quality}]+bestaudio`,
+          `bestvideo[height<=${quality}][ext=mp4][vcodec^=avc1]+${aM4a}`,
+          `bestvideo[height<=${quality}]+${aAny}`,
           `best[height<=${quality}][ext=mp4]`,
           `best[height<=${quality}]`,
-        ].join("/");
+        ];
+  // Pre-merged renditions carry only the original audio, so a chosen dub never falls onto them:
+  // a missing dub falls back to the original up front (probePhase), not silently here.
+  const videoFormat = (lang ? ladder.filter((f) => f.includes("+")) : ladder).join("/");
 
 
   // Cookie options are deliberately NOT part of this: each yt-dlp run is given
@@ -143,7 +151,7 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
           // the video one: HLS is no longer reliably offered, so asking for it
           // first meant falling through to `best` and transcoding the muxed
           // 360p stream's audio track.
-          format: "bestaudio[ext=m4a]/bestaudio/best",
+          format: `${audioSelector(lang, "[ext=m4a]")}/${aAny}${lang ? "" : "/best"}`,
         }
       : { format: videoFormat, mergeOutputFormat: "mp4" }),
     output: fullPath,

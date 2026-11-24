@@ -18,6 +18,8 @@ export function setDeliveryHeaders(ctx: DownloadCtx, report: DeliveryReport): vo
     if (ctx.chosenFormat) res.setHeader("X-Selected-Format", ctx.chosenFormat);
     if (ctx.availableHeights.length)
       res.setHeader("X-Available-Heights", ctx.availableHeights.join(","));
+    if (ctx.audioLanguageUsed) res.setHeader("X-Audio-Language", ctx.audioLanguageUsed);
+    if (ctx.audioFellBack) res.setHeader("X-Audio-Fallback", "original");
     res.setHeader("X-Auth-Mode", cookieMode);
     res.setHeader("X-Segments", String(segCount));
     if (ctx.joinMethod) res.setHeader("X-Join-Method", ctx.joinMethod);
@@ -39,6 +41,6 @@ export function setDeliveryHeaders(ctx: DownloadCtx, report: DeliveryReport): vo
     );
     res.setHeader(
       "Access-Control-Expose-Headers",
-      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode, X-Quality-Degraded, X-Segments, X-Join-Method, X-Quality-Cause, X-Quality-Message, X-Quality-Action",
+      "X-Delivered-Height, X-Delivered-Audio-Kbps, X-Selected-Format, X-Available-Heights, X-Auth-Mode, X-Quality-Degraded, X-Segments, X-Join-Method, X-Quality-Cause, X-Quality-Message, X-Quality-Action, X-Audio-Language, X-Audio-Fallback",
     );
 }
