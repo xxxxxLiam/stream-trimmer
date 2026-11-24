@@ -29,7 +29,7 @@ export default function UpdatePill() {
       aria-disabled={pill.disabledReason ? true : undefined}
       title={pill.disabledReason}
       onClick={() => {
-        if (!pill.disabledReason) window.electronAPI?.quitAndInstall();
+        if (!pill.disabledReason) window.electronAPI?.restartToUpdate();
       }}
     >
       {pill.label}
