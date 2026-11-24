@@ -12,7 +12,7 @@
  */
 import fs from "node:fs";
 import os from "node:os";
-import { redact } from "../../../shared/utils/redact";
+import { redact } from "../../../../common/utils/redact";
 import * as logger from "../../../modules/logger/logger";
 
 export function scrubForDisplay(text: any) {

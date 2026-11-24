@@ -20,7 +20,7 @@
     "lint": "eslint src",
     "test:renderer": "tsx --test \"src/renderer/**/*.test.ts\" \"src/renderer/**/*.test.tsx\"",
     "check": "npm run typecheck && npm test && npm run test:renderer && npm run lint",
-    "test": "tsx --test \"src/main/**/*.test.ts\" \"src/preload/**/*.test.ts\" \"scripts/*.test.ts\"",
+    "test": "tsx --test \"src/main/**/*.test.ts\" \"src/preload/**/*.test.ts\" \"src/common/**/*.test.ts\" \"scripts/*.test.ts\"",
     "preview": "vite preview",
     "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\"",
     "dev:electron": "cross-env ELECTRON_DEV=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"node scripts/build-main.cjs && wait-on http://localhost:8080 && electron out/main/index.cjs\"",
