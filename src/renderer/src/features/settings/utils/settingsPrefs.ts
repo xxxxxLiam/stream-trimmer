@@ -6,7 +6,10 @@
  *   state hook stores the result. Anything unreadable falls back to the defaults.
  */
 
-export type AppPrefs = { notifyQueueDone: boolean; autoUpdate: boolean };
+export type AppPrefs = { notifyQueueDone: boolean };
+
+/** The ordinary setting the updater reads (Engine): unset means on. */
+export const AUTO_UPDATE_KEY = "clipper.autoUpdate";
 export type ExtraSeconds = 0 | 1 | 2;
 export type CampaignPrefs = { extraSeconds: ExtraSeconds; languages: string[] };
 
@@ -16,7 +19,7 @@ export const DEFAULT_DAILY_QUOTA = 3;
 export const APP_PREFS_KEY = "clipper.appPrefs";
 export const CAMPAIGN_PREFS_KEY = "clipper.campaignPrefs";
 
-export const DEFAULT_APP_PREFS: AppPrefs = { notifyQueueDone: true, autoUpdate: true };
+export const DEFAULT_APP_PREFS: AppPrefs = { notifyQueueDone: true };
 export const DEFAULT_CAMPAIGN_PREFS: CampaignPrefs = { extraSeconds: 1, languages: ["original"] };
 
 export const MAX_CLIPS_PER_DAY = 99;
@@ -38,7 +41,6 @@ export function normalizeAppPrefs(raw: unknown): AppPrefs {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   return {
     notifyQueueDone: typeof r.notifyQueueDone === "boolean" ? r.notifyQueueDone : DEFAULT_APP_PREFS.notifyQueueDone,
-    autoUpdate: typeof r.autoUpdate === "boolean" ? r.autoUpdate : DEFAULT_APP_PREFS.autoUpdate,
   };
 }
 

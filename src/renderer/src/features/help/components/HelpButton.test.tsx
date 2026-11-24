@@ -42,11 +42,11 @@ test("F-3: the help button is drawn above every other z-index in the app", () =>
   assert.ok(HELP_BUTTON_Z > highest, `help button z ${HELP_BUTTON_Z} must exceed ${highest}`);
 });
 
-test("F-3: Symbols, Copy blocks and Help are all the one centred dialog, not three shapes", () => {
+test("F-3: Symbols and Copy blocks are the one centred dialog, not two shapes", () => {
   // They were a right-edge drawer plus two panels pinned under the header, which needed
   // clearance maths between them to avoid overlapping. One shape removes that whole class
   // of bug, so the rule worth protecting is that none of them grows its own overlay again.
-  for (const f of ["features/handoff/components/SymbolPalette.tsx", "features/handoff/components/CopyBlocks.tsx", "features/help/components/HelpDrawer.tsx"]) {
+  for (const f of ["features/handoff/components/SymbolPalette.tsx", "features/handoff/components/CopyBlocks.tsx"]) {
     const src = readFileSync(join(SRC, f), "utf8");
     assert.match(src, /<CentredDialog\b/, `${f} must render the shared dialog`);
     assert.doesNotMatch(src, /className="surface-panel fixed/, `${f} must not pin its own panel`);
@@ -58,11 +58,10 @@ test("F-3: the dialog layer is above the app and below the spotlight", () => {
   assert.ok(dialog > 50 && dialog < 60, `dialog z ${dialog}`);
 });
 
-test("F-3: Help stays non-modal, or its own tutorials become impossible to follow", () => {
-  // A help step spotlights a real control and asks the user to press it. A scrim over the
-  // app would swallow that click, so Help must never become modal.
+test("F-3: Help is a drawer that blocks nothing, never a dialog with a scrim", () => {
   const help = readFileSync(join(SRC, "features/help/components/HelpDrawer.tsx"), "utf8");
-  assert.match(help, /modal=\{false\}/, "Help must pass modal={false}");
+  assert.doesNotMatch(help, /CentredDialog/, "Help must not become modal");
+  assert.match(help, /<Drawer label="Help">/);
 });
 
 test("F-3: the slot stays in the header layout and the button keeps its id", () => {

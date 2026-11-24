@@ -15,13 +15,13 @@ import {
 } from "./settingsPrefs";
 
 test("nothing stored gives the drawn defaults", () => {
-  assert.deepEqual(normalizeAppPrefs(undefined), { notifyQueueDone: true, autoUpdate: true });
+  assert.deepEqual(normalizeAppPrefs(undefined), { notifyQueueDone: true });
   assert.deepEqual(normalizeCampaignPrefs(null), { extraSeconds: 1, languages: ["original"] });
 });
 
 test("bad stored values are repaired, good ones kept", () => {
-  assert.equal(normalizeAppPrefs({ autoUpdate: false }).autoUpdate, false);
-  assert.equal(normalizeAppPrefs({ autoUpdate: "no" }).autoUpdate, true);
+  assert.equal(normalizeAppPrefs({ notifyQueueDone: false }).notifyQueueDone, false);
+  assert.equal(normalizeAppPrefs({ notifyQueueDone: "no" }).notifyQueueDone, true);
   const p = normalizeCampaignPrefs({ extraSeconds: 7, languages: ["es", "es", 4] });
   assert.equal(p.extraSeconds, 1);
   assert.deepEqual(p.languages, ["original", "es"]);

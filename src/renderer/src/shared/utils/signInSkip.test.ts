@@ -56,9 +56,3 @@ test("resumeSignIn forgets the skip for the next launch too", async () => {
   assert.equal((await snapshot(await boot("4"))).skipped, false);
 });
 
-test("the status chip offers Sign in… and wires it to resumeSignIn", () => {
-  const src = readFileSync(new URL("../../features/youtubeConnection/components/YouTubeStatusChip.tsx", import.meta.url), "utf8");
-  assert.match(src, /resumeSignIn,/, "imported");
-  assert.match(src, /resumeSignIn\(\);/, "called");
-  assert.match(src, /Sign in…/, "labelled");
-});

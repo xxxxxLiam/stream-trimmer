@@ -1,232 +1,86 @@
 /**
  * File: HelpDrawer.tsx
  * Path: src/renderer/src/features/help/components/HelpDrawer.tsx
- * Description: Right-side help drawer (BUILD-SPEC section 7). Search a task, pick
- *   it, and a step walker highlights the real control for each step via Spotlight.
- *   It is a flex sibling of the app, never an overlay, so it stays open while you
- *   work. Opened by the header button or Cmd /, closed by Escape (both wired by the
- *   shell; Escape is also handled here).
+ * Description: The Help drawer (Help.dc.html 04.5): 440px on the right, the same pattern as
+ *   Settings, nothing blocked while it is open. Views: Common questions and More, one answer,
+ *   Keyboard shortcuts, Report a problem (with its kept-for-later state), About, and the "Sign in for
+ *   1080p" page the footer pill opens. Focus starts in the search field; Esc closes Help.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CHANNEL_HELP_TASKS, HELP_TASKS, searchTasks, type HelpTask } from "../utils/helpTasks";
-import Spotlight from "./Spotlight";
-import { isSignInGateUp, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
+import { Drawer } from "../../../shared/components/Drawer";
+import HelpAbout from "./HelpAbout";
+import HelpAnswer from "./HelpAnswer";
+import HelpReport from "./HelpReport";
+import HelpShortcuts from "./HelpShortcuts";
+import HelpSignIn from "./HelpSignIn";
+import HelpTop from "./HelpTop";
+import { useHelpController } from "../hooks/useHelpController";
+import { appVersion } from "../utils/appVersion";
 
-import CentredDialog from "../../../shared/components/CentredDialog";
+export type HelpDrawerProps = {
+  open: boolean;
+  onClose: () => void;
+  /** "signin" opens on the Sign in for 1080p page (the footer pill). */
+  startAt?: "signin" | null;
+  /** First-use tips: whether they are on, and replay for the open panel. */
+  tips?: { on: boolean; onReplay: () => void };
+};
 
-export type HelpDrawerProps = { open: boolean; onClose: () => void };
+export default function HelpDrawer({ open, onClose, startAt = null, tips }: HelpDrawerProps) {
+  const c = useHelpController({ open, onClose, startAt });
+  if (!open) return null;
+  const { view } = c;
+  const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
 
-// Static flag: a public build compiles the exporter out, and its help tasks with it.
-const TASKS: HelpTask[] = import.meta.env.VITE_ENABLE_CHANNEL_DATA
-  ? [...HELP_TASKS, ...CHANNEL_HELP_TASKS]
-  : HELP_TASKS;
-
-export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
-  const [query, setQuery] = useState("");
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [step, setStep] = useState(0);
-  const [present, setPresent] = useState(true);
-  // AF2-3: the sign-in gate makes the app inert, this drawer with it. A drawer that stays drawn
-  // over the gate is visible, dead and click-through, so it is closed while the gate is up.
-  const gateUp = isSignInGateUp(useYouTubeConnection());
-  useEffect(() => {
-    if (open && gateUp) onClose();
-  }, [open, gateUp, onClose]);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const asideRef = useRef<HTMLDivElement>(null);
-  const returnTo = useRef<HTMLElement | null>(null);
-
-  const results = useMemo(() => searchTasks(TASKS, query), [query]);
-  const task = taskId ? (TASKS.find((t) => t.id === taskId) ?? null) : null;
-  const current = task?.steps[step] ?? null;
-
-  // Focus the search field on open; give focus back to the trigger on close.
-  useEffect(() => {
-    if (!open) return;
-    returnTo.current = (document.activeElement as HTMLElement | null) ?? null;
-    searchRef.current?.focus();
-    return () => {
-      const aside = asideRef.current;
-      const active = document.activeElement;
-      const lost = !active || active === document.body || (aside && aside.contains(active));
-      if (lost) {
-        const back = returnTo.current?.isConnected
-          ? returnTo.current
-          : document.getElementById("ui-help-button");
-        back?.focus();
-      }
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open || gateUp) return null;
-
-  const pick = (id: string) => {
-    setTaskId(id);
-    setStep(0);
-  };
-  const backToList = () => {
-    setTaskId(null);
-    setStep(0);
-    requestAnimationFrame(() => searchRef.current?.focus());
-  };
-  const last = task ? step >= task.steps.length - 1 : false;
+  let body;
+  if (view.kind === "answer" && c.answer) {
+    body = <HelpAnswer answer={c.answer} onBack={c.top} onClose={onClose} />;
+  } else if (view.kind === "shortcuts") {
+    body = <HelpShortcuts ctrl={!isMac} onBack={c.top} onClose={onClose} />;
+  } else if (view.kind === "report") {
+    body = (
+      <HelpReport
+        note={c.note}
+        onNote={c.setNote}
+        state={c.report.state}
+        copied={c.report.copied}
+        onSend={() => void c.report.send(c.note)}
+        onCopy={() => void c.report.copyDetails(c.note)}
+        onBack={c.top}
+        onClose={onClose}
+      />
+    );
+  } else if (view.kind === "signin") {
+    body = (
+      <HelpSignIn
+        problem={c.cookies.problem}
+        done={c.cookies.done}
+        onFile={(f) => void c.cookies.onFile(f)}
+        onChoose={() => void c.cookies.choose()}
+        onBack={c.top}
+        onClose={onClose}
+      />
+    );
+  } else if (view.kind === "about") {
+    body = <HelpAbout version={appVersion()} onBack={c.top} onClose={onClose} />;
+  } else {
+    body = (
+      <HelpTop
+        query={c.query}
+        onQuery={c.setQuery}
+        results={c.results}
+        version={appVersion()}
+        tipsOn={tips?.on ?? true}
+        onOpenAnswer={c.openAnswer}
+        onOpenMore={c.openMore}
+        onReplayTips={tips?.onReplay ?? (() => {})}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
-    // Non-modal on purpose: a tutorial step spotlights a real control and asks you to press
-    // it, so a scrim over the app would make the step impossible to follow.
-    <CentredDialog
-      open
-      onClose={onClose}
-      title="Help"
-      widthClass="max-w-[720px]"
-      id="ui-help-drawer"
-      modal={false}
-    >
-      <div ref={asideRef} className="flex min-h-0 flex-col">
-
-      <div className="px-4 pb-3">
-        <label htmlFor="help-search" className="mb-1 block text-meta text-fg-dim">
-          What are you trying to do?
-        </label>
-        <input
-          ref={searchRef}
-          id="help-search"
-          type="search"
-          className="field w-full"
-          value={query}
-          placeholder="e.g. cut a clip, change folder"
-          autoComplete="off"
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setTaskId(null);
-            setStep(0);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown") {
-              e.preventDefault();
-              asideRef.current?.querySelector<HTMLElement>("[data-help-result]")?.focus();
-            }
-          }}
-        />
-        <p className="mt-1 text-meta text-fg-dim" role="status" aria-live="polite">
-          {results.length === 0
-            ? "No task matches. Try clip, folder, copy or symbol."
-            : `${results.length} ${results.length === 1 ? "task" : "tasks"}`}
-        </p>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto border-t border-hairline px-4 py-3">
-        {!task ? (
-          <ul className="flex flex-col gap-1" aria-label="Matching tasks">
-            {results.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  data-help-result
-                  className="flex h-row w-full items-center justify-between gap-2 rounded-control border border-transparent px-2 text-left text-body hover:border-hairlineStrong hover:bg-hover"
-                  onClick={() => pick(t.id)}
-                  onKeyDown={(e) => {
-                    const li = e.currentTarget.parentElement;
-                    const to =
-                      e.key === "ArrowDown" ? li?.nextElementSibling
-                      : e.key === "ArrowUp" ? li?.previousElementSibling
-                      : null;
-                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                      e.preventDefault();
-                      if (to) to.querySelector<HTMLElement>("button")?.focus();
-                      else if (e.key === "ArrowUp") searchRef.current?.focus();
-                    }
-                  }}
-                >
-                  <span className="min-w-0 truncate">{t.title}</span>
-                  <span className="shrink-0 text-meta text-fg-dim">{t.steps.length} steps</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <section aria-label={task.title} className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <button type="button" className="link-quiet" onClick={backToList}>
-                All tasks
-              </button>
-            </div>
-            <h3 className="text-section">{task.title}</h3>
-
-            <ol className="flex flex-col gap-2">
-              {task.steps.map((s, i) => {
-                const isCurrent = i === step;
-                return (
-                  <li
-                    key={i}
-                    aria-current={isCurrent ? "step" : undefined}
-                    className={
-                      "flex gap-3 rounded-control border p-3 " +
-                      (isCurrent ? "border-accent bg-raised" : "border-hairline")
-                    }
-                  >
-                    <span
-                      className={
-                        "mt-px flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-meta " +
-                        (isCurrent ? "bg-accent text-accent-on" : "border border-hairlineStrong text-fg-dim")
-                      }
-                    >
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0">
-                      <p className={isCurrent ? "text-body text-fg" : "text-body text-fg-dim"}>{s.do}</p>
-                      {isCurrent && <p className="mt-1 text-meta text-fg-dim">{s.why}</p>}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-
-            {!present && current && current.anchorId && (
-              <p role="status" className="rounded-control border border-error bg-raised p-3 text-meta text-fg">
-                That control is not on screen right now. It may be on another screen or tab, or it
-                appears once a video is loaded.
-              </p>
-            )}
-
-            <div className="flex items-center gap-2">
-              <button type="button" className="btn" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>
-                Back
-              </button>
-              <span className="flex-1 text-center text-meta text-fg-dim" aria-live="polite">
-                Step {step + 1} of {task.steps.length}
-              </span>
-              {last ? (
-                <button type="button" className="btn-primary" onClick={backToList}>
-                  Done
-                </button>
-              ) : (
-                <button type="button" className="btn-primary" onClick={() => setStep((s) => s + 1)}>
-                  Next step
-                </button>
-              )}
-            </div>
-          </section>
-        )}
-      </div>
-
-      {/* Highlight on the live UI. Fixed, non-interactive, no overlay. */}
-      {task && current && (
-        <Spotlight key={`${task.id}:${step}`} anchorId={current.anchorId} n={step + 1} onPresence={setPresent} />
-      )}
-      </div>
-    </CentredDialog>
+    <div id="ui-help-drawer" className="absolute inset-y-0 right-0 z-30 max-w-full overflow-y-auto">
+      <Drawer label="Help">{body}</Drawer>
+    </div>
   );
 }

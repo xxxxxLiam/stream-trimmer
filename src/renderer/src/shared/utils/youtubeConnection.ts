@@ -160,11 +160,16 @@ export function isSignedOut(s: Pick<YouTubeConnectionState, "connected" | "resto
   return !s.connected && !s.restoring;
 }
 
-/** True while the first-run sign-in dialog is the thing on screen (not the launch placeholder, not skipped). */
-export function isSignInGateUp(
-  s: Pick<YouTubeConnectionState, "connected" | "restoring" | "skipped">,
-): boolean {
-  return !s.connected && !s.restoring && !s.skipped;
+/**
+ * The bottom bar's sign-in words. "at 360p" shows whenever requests go out signed out. The "Sign in
+ * for 1080p" pill shows only once the browser sweep has ended without a sign-in, that is, when no
+ * browser sign-in works and the cookies.txt route is the one left.
+ */
+export function signInNotice(
+  s: Pick<YouTubeConnectionState, "connected" | "restoring" | "sweepEnded" | "probed">,
+): { at360: boolean; pill: boolean } {
+  const out = isSignedOut(s);
+  return { at360: out, pill: out && s.probed && s.sweepEnded };
 }
 
 export interface CookiePayload {
