@@ -11,8 +11,8 @@ import { useClipperContext } from "../../clipper/hooks/ClipperContext";
 import { useCampaign } from "../../../features/campaigns/hooks/CampaignContext";
 import CampaignChip from "../../../features/campaigns/components/CampaignChip";
 import HelpButton from "../../../features/help/components/HelpButton";
-import UpdateStatus from "../../../features/updates/components/UpdateStatus";
 import YouTubeStatusChip from "../../../features/youtubeConnection/components/YouTubeStatusChip";
+import UpdatePill from "../../../features/updates/components/UpdatePill";
 import { todayCount } from "../../../shared/utils/campaigns";
 import PanelsMenu from "./PanelsMenu";
 import type { MenuItem } from "./PopoverMenu";
@@ -46,8 +46,9 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
         {info?.title ?? ""}
       </span>
       <div className="relative ml-auto flex items-center gap-0.5">
+        {/* Stays until the Help sign-in page replaces it (then it and its tour anchor go). */}
         <YouTubeStatusChip />
-        <UpdateStatus />
+        <UpdatePill />
         <PanelsMenu extraItems={panelsMenuExtras} />
         <HelpButton open={helpOpen} onToggle={onToggleHelp} />
         <button
