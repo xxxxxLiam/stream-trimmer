@@ -25,3 +25,9 @@ export function shortLink(link: string): string {
 }
 
 export type ToolsStatus = "ready" | "checking" | "broken";
+
+/** Reads the engine's GET /api/tools body. Anything unreadable counts as ready, so a dev browser with no engine is never blocked. */
+export function toolsStatusFrom(body: unknown): ToolsStatus {
+  const o = (body && typeof body === "object" ? (body as { overall?: unknown }).overall : undefined);
+  return o === "checking" || o === "broken" ? o : "ready";
+}

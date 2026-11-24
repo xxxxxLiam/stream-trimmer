@@ -10,16 +10,9 @@
  * unreachable in exactly the moments a new user reaches for it. A placeholder keeps the slot in
  * the header's layout; the live button is drawn on document.body over the placeholder, above those
  * layers and below nothing.
- *
- * AF2-3: the sign-in gate is the one overlay it must NOT sit over. The gate marks the whole app
- * (the help drawer included) inert, so a "?" drawn above it opened a drawer that was fully
- * visible, dead, and click-through onto the gate beneath. While the gate is up the "?" is not
- * offered at all; the gate has its own way out, and help returns the moment it is dismissed. It follows the slot (resize, wrap, DOM changes), so it stays the last
- * item top right wherever the header puts it.
  */
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { isSignInGateUp, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import { IconHelp } from "../../../shared/components/icons";
 
 /** Above every overlay (z-50) and the spotlight ring (z-60). */
@@ -45,7 +38,6 @@ export default function HelpButton({
 }) {
   const holder = useRef<HTMLSpanElement>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
-  const gateUp = isSignInGateUp(useYouTubeConnection());
 
   useLayoutEffect(() => {
     const el = holder.current;
@@ -83,7 +75,7 @@ export default function HelpButton({
       <span ref={holder} aria-hidden="true" className="icon-btn pointer-events-none invisible">
         {open ? <HelpOnLabel /> : null}
       </span>
-      {slot && !gateUp && typeof document !== "undefined"
+      {slot && typeof document !== "undefined"
         ? createPortal(
             <button
               type="button"

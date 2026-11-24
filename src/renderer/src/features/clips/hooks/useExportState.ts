@@ -19,7 +19,6 @@ export function useExportState() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [makingName, setMakingName] = useState("New clip");
   const [notice, setNotice] = useState("");
-  const [importing, setImporting] = useState(false);
   const [finished, setFinished] = useState<FinishedClip | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(UNDO_SECONDS);
   const [failed, setFailed] = useState<FailedClip | null>(null);
@@ -29,7 +28,6 @@ export function useExportState() {
     selectedId, setSelectedId,
     makingName, setMakingName,
     notice, setNotice,
-    importing, setImporting,
     finished, setFinished,
     secondsLeft, setSecondsLeft,
     failed, setFailed, attempt, failCount,

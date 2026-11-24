@@ -172,13 +172,6 @@ export function signInNotice(
   return { at360: out, pill: out && s.probed && s.sweepEnded };
 }
 
-/** True while the first-run sign-in dialog is the thing on screen (not the launch placeholder, not skipped). */
-export function isSignInGateUp(
-  s: Pick<YouTubeConnectionState, "connected" | "restoring" | "skipped">,
-): boolean {
-  return !s.connected && !s.restoring && !s.skipped;
-}
-
 export interface CookiePayload {
   cookiesFromBrowser?: AuthSource;
 }

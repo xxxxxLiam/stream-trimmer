@@ -4,7 +4,7 @@
  * Description: Campaigns list (Settings.dc.html view 2): each campaign with its quota, extra seconds
  *   and languages, an Edit button, and Add campaign.
  */
-import { DrawerHeader, drawerBody, outlineButton } from "./DrawerParts";
+import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 
 export type CampaignRow = { id: string; name: string; summary: string; languages: string | null };
 
@@ -17,7 +17,7 @@ export default function SettingsCampaigns(p: {
 }) {
   return (
     <>
-      <DrawerHeader title="Campaigns" back="Settings" onBack={p.onBack} onClose={p.onClose} />
+      <DrawerHeader closeName="Settings" title="Campaigns" back="Settings" onBack={p.onBack} onClose={p.onClose} />
       <div className={drawerBody}>
       {p.rows.map((r, i) => (
         <div key={r.id} className={`flex items-center gap-3 py-3 ${i < p.rows.length - 1 ? "border-b border-hairline" : ""}`}>

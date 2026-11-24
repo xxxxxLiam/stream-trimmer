@@ -18,23 +18,29 @@ export type WaitingRowProps = {
   suggested: boolean;
   selected: boolean;
   onSelect: () => void;
+  /** Already made: drawn dimmed with a Frost dot, as on the board; it can be loaded again but not remade here. */
+  made?: boolean;
   onMake: () => void;
   onRemove: () => void;
 };
 
 const chip = "rounded-chip border border-hairlineStrong px-1 py-px text-meta text-fg-dim";
 
-export default function WaitingRow({ clip, name, suggested, selected, onSelect, onMake, onRemove }: WaitingRowProps) {
+export default function WaitingRow({ clip, name, suggested, selected, made, onSelect, onMake, onRemove }: WaitingRowProps) {
   const edge = suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
   return (
-    <div className="group relative mx-[6px] my-[2px]">
+    <div className={`group relative mx-[6px] my-[2px] ${made ? "opacity-60" : ""}`}>
       <button
         type="button"
         aria-pressed={selected}
         onClick={onSelect}
         className={`flex min-h-target w-full items-center gap-2 rounded-control border px-2 py-[6px] text-left hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost ${edge}`}
       >
-        <span className="size-[7px] flex-none rounded-full border border-fg-dim" aria-hidden="true" />
+        <span
+          className={`size-[7px] flex-none rounded-full border ${made ? "border-frost bg-frost" : "border-fg-dim"}`}
+          role="img"
+          aria-label={made ? "Made" : "Waiting"}
+        />
         <span className="min-w-0">
           <span className="block whitespace-nowrap text-body font-medium">{name}</span>
           <span className="mt-[2px] block whitespace-nowrap text-meta text-fg-dim">{rangeLine(clip)}</span>
@@ -46,9 +52,11 @@ export default function WaitingRow({ clip, name, suggested, selected, onSelect, 
         </span>
       </button>
       <span className="absolute right-1 top-1/2 hidden -translate-y-1/2 gap-1 rounded-control bg-raised group-focus-within:flex group-hover:flex">
-        <RowIconButton label="Make this clip" onClick={onMake}>
-          <IconMake />
-        </RowIconButton>
+        {!made && (
+          <RowIconButton label="Make this clip" onClick={onMake}>
+            <IconMake />
+          </RowIconButton>
+        )}
         <RowIconButton label="Remove from this video" onClick={onRemove}>
           <IconRemove />
         </RowIconButton>

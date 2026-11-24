@@ -8,6 +8,7 @@ import { useCallback, useState } from "react";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import {
   APP_PREFS_KEY,
+  AUTO_UPDATE_KEY,
   CAMPAIGN_PREFS_KEY,
   DEFAULT_CAMPAIGN_PREFS,
   normalizeAppPrefs,
@@ -43,5 +44,12 @@ export function useSettingsState() {
     });
   }, []);
 
-  return { app, patchApp, prefsFor, patchCampaign };
+  // Read by the updater in the main process, so it lives under its own setting; unset means on.
+  const [autoUpdate, setAutoUpdateState] = useState<boolean>(() => readSetting<unknown>(AUTO_UPDATE_KEY, true) !== false);
+  const setAutoUpdate = useCallback((on: boolean) => {
+    setAutoUpdateState(on);
+    writeSetting(AUTO_UPDATE_KEY, on);
+  }, []);
+
+  return { app, patchApp, autoUpdate, setAutoUpdate, prefsFor, patchCampaign };
 }

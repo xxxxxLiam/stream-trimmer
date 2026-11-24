@@ -151,3 +151,20 @@ testable here, so test it rather than reasoning about it.
 
 Needs a built app and a display: `node node_modules/electron/install.js` once, `npm run build:electron`,
 then `xvfb-run -a npm run parity -- Start`. `--board-only` needs neither.
+
+### Per-board crops, the pending snapshot and the workspace fixture
+
+- `--snapshot pending` reads the one-board-per-state set (Main01Layout … Main14Notes, Segments, FirstClip,
+  Settings, Help) from `design/canvas-pending`; `snapshot` (default) is the frozen 24 Nov canvas; or pass a folder.
+- `--window [n]` crops the board to the n-th app window it draws (the 14px-radius frame, usually 1360 by 760)
+  and sizes the real window's content to match, so the comparison skips the heading and margin. Output goes to
+  `audit/out/parity/<Screen>-window<n>/`.
+- `fixtures/Workspace.json` is the shared workspace: an open video, two campaigns, a bank, three open videos, and
+  `"stub"`: the fake yt-dlp answers the info call (`info`) and the transcript call from `podcast214.vtt`
+  (`vttFile`). The stub answers every link the same way, so other rows share the title. Add a step to a fixture to
+  reach a state (`{"click": "#sel"}`), e.g. open a menu before the shot.
+- A stubbed run links the stub root into `node_modules/electron/dist/resources/bin` for its duration, because the
+  packaged-shape app reads binaries there. Run one stubbed parity at a time. If ffmpeg or deno are not on PATH, point
+  `STUB_BIN_DIR` at a folder holding them.
+
+Example: `STUB_BIN_DIR=/path/to/bin xvfb-run -a npm run parity -- Main01Layout --snapshot pending --window 0 --fixture Workspace`

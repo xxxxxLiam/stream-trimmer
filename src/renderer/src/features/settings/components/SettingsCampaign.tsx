@@ -5,7 +5,7 @@
  *   Languages, Folder with Open, the Final Cut library and event while Final Cut Pro is ticked, and
  *   Delete campaign. No clip id fields, no format or quality.
  */
-import { DrawerHeader, drawerBody, outlineButton } from "./DrawerParts";
+import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
 export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void };
@@ -38,7 +38,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
   const { prefs } = p;
   return (
     <>
-      <DrawerHeader title={p.name} back="Campaigns" onBack={p.onBack} onClose={p.onClose} />
+      <DrawerHeader closeName="Settings" title={p.name} back="Campaigns" onBack={p.onBack} onClose={p.onClose} />
       <div className={drawerBody}>
       <div className="flex h-[52px] items-center gap-2 border-b border-hairline">
         <span className="flex-1 text-body">Clips a day</span>

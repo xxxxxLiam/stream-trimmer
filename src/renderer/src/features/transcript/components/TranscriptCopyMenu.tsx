@@ -49,7 +49,7 @@ export default function TranscriptCopyMenu({ lines }: { lines: readonly Line[] }
     { key: "clip", label: "This clip's words", disabled: !clipWords, onSelect: () => copy(clipWords) },
     { key: "link", label: "Source link", disabled: !url, onSelect: () => copy(url) },
     { kind: "separator", key: "sep" },
-    { key: "symbols", label: "Symbols and phrases ›", onSelect: openSymbols },
+    { key: "symbols", label: "Symbols and phrases ›", onSelect: () => (window.electronAPI?.openSymbols ? void window.electronAPI.openSymbols() : openSymbols()) },
   ];
 
   return (

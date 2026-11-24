@@ -94,6 +94,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
         campaignNames={c.campaignNames}
         clipsFolderLabel={c.clipsFolderLabel}
         app={c.app}
+        autoUpdate={c.autoUpdate}
+        onAutoUpdate={c.setAutoUpdate}
         onPatchApp={c.patchApp}
         onOpenCampaigns={() => c.setView({ kind: "campaigns" })}
         onOpenFolder={() => c.setView({ kind: "folder" })}

@@ -34,18 +34,18 @@ import { readSetting, writeSetting } from "../shared/utils/persist";
 import type { BankedClip } from "../shared/utils/bank";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
-import YouTubeConnectModal from "../features/youtubeConnection/components/YouTubeConnectModal";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
   restoreConnection,
-  signInNotice,
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import type { MenuItem } from "../modules/layout/components/PopoverMenu";
+import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
+import ImportDrawer from "../features/import/components/ImportDrawer";
 import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
 import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
@@ -229,12 +229,15 @@ function Layout({ active }: { active: boolean }) {
     pickDataDir,
   } = useCampaign();
   const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
-  const signIn = signInNotice(useYouTubeConnection());
+  const lowQuality = useSignInSignalEffects();
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [importText, setImportText] = useState<string | null>(null);
+  // The footer's "Sign in for 1080p" opens Help on its sign-in page.
+  const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
   // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
   const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
@@ -286,7 +289,10 @@ function Layout({ active }: { active: boolean }) {
   // blocking comment export.
   const overlayVisible = active && exportingComments;
 
-  const closeHelp = useCallback(() => setHelpOpen(false), []);
+  const closeHelp = useCallback(() => {
+    setHelpOpen(false);
+    setHelpStartAt(null);
+  }, []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeCopy = useCallback(() => setCopyOpen(false), []);
   const closeSettings = useCallback(() => {
@@ -458,6 +464,7 @@ function Layout({ active }: { active: boolean }) {
     cutSegments: (segs) => void cutClip(segs),
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
+    openImport: (text) => setImportText(text ?? ""),
     editorHandoff: {
       settings: editorSettings,
       onChange: setEditorSettings,
@@ -494,6 +501,7 @@ function Layout({ active }: { active: boolean }) {
         setUrl(link);
         flushAutoLoad();
       },
+      onMoments: (text) => setImportText(text),
     },
     { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
   );
@@ -515,6 +523,7 @@ function Layout({ active }: { active: boolean }) {
         <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => {
+            setHelpStartAt(null);
             setSettingsOpen(false);
             setHelpOpen((v) => !v);
           }}
@@ -531,8 +540,9 @@ function Layout({ active }: { active: boolean }) {
           <PanelHostProvider value={panelHost}>
             <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
               <PanelWorkspace />
-              <HelpDrawer open={helpOpen} onClose={closeHelp} />
+              <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} />
               {settingsDrawer}
+              <ImportDrawer text={importText} onClose={() => setImportText(null)} />
             </div>
           </PanelHostProvider>
         ) : (
@@ -543,7 +553,7 @@ function Layout({ active }: { active: boolean }) {
                 {channelAvailable && <ChannelExportPanel />}
               </div>
             </div>
-            <HelpDrawer open={helpOpen} onClose={closeHelp} />
+            <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} />
           </div>
         )}
         <BottomBar
@@ -553,10 +563,14 @@ function Layout({ active }: { active: boolean }) {
           onSelectLanguages={setAudioSel}
           folder={folders.clipsDir || saveDir || ""}
           onPickFolder={isElectron ? pickClipsDir : undefined}
-          at360={signIn.at360}
-          showSignInPill={signIn.pill}
+          at360={lowQuality}
+          showSignInPill={lowQuality}
           // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
-          onSignIn={() => setHelpOpen(true)}
+          onSignIn={() => {
+            setHelpStartAt("signin");
+            setSettingsOpen(false);
+            setHelpOpen(true);
+          }}
         />
         </>
         )}
@@ -575,7 +589,6 @@ function Layout({ active }: { active: boolean }) {
 
 function Shell() {
   const { tabs, activeId, setTabCampaign } = useWorkspace();
-  const connection = useYouTubeConnection();
 
   // No background polling. On launch we read the imported cookies.txt once
   // and verify it silently; after that the user checks when they choose.
@@ -612,7 +625,6 @@ function Shell() {
           );
         })}
       </div>
-      <YouTubeConnectModal open={!connection.connected || connection.restoring} />
     </div>
   );
 }

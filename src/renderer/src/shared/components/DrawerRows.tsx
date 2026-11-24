@@ -1,12 +1,12 @@
 /**
- * File: DrawerParts.tsx
- * Path: src/renderer/src/features/settings/components/DrawerParts.tsx
- * Description: The small pieces every Settings view is built from, as drawn on Settings.dc.html: the
+ * File: DrawerRows.tsx
+ * Path: src/renderer/src/shared/components/DrawerRows.tsx
+ * Description: The small pieces every drawer view (Settings, Help) is built from, as drawn on Settings.dc.html: the
  *   44px header with Back and Close, a section label, a chevron row, a switch row and the outlined
  *   button. Logic-free.
  */
 import type { ReactNode } from "react";
-import { DrawerHeader as SharedHeader } from "../../../shared/components/Drawer";
+import { DrawerHeader as SharedHeader } from "./Drawer";
 
 const Chevron = ({ dir }: { dir: "left" | "right" }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -20,12 +20,12 @@ const CloseIcon = () => (
   </svg>
 );
 
-/** The shared drawer header; every Settings view names its close button "Close Settings". */
-export function DrawerHeader({ title, back, onBack, onClose }: { title: string; back?: string; onBack?: () => void; onClose: () => void }) {
+/** The shared drawer header with its icons. `closeName` is what every view's close button announces. */
+export function DrawerHeader({ title, back, onBack, onClose, closeName }: { title: string; back?: string; onBack?: () => void; onClose: () => void; closeName: string }) {
   return (
     <SharedHeader
       title={title}
-      closeName="Settings"
+      closeName={closeName}
       onClose={onClose}
       closeIcon={<CloseIcon />}
       back={back && onBack ? { label: back, onBack, icon: <Chevron dir="left" /> } : undefined}
@@ -37,16 +37,17 @@ export function SectionLabel({ children, first }: { children: ReactNode; first?:
   return <span className={`pb-1 text-meta text-fg-dim ${first ? "pt-2" : "pt-4"}`}>{children}</span>;
 }
 
-export function ChevronRow({ label, value, onOpen, divider }: { label: string; value: string; onOpen: () => void; divider?: boolean }) {
+export function ChevronRow({ label, value, onOpen, divider, listItem }: { label: string; value: string; onOpen: () => void; divider?: boolean; /** Marks the row for arrow-key movement inside a list. */ listItem?: boolean }) {
   return (
     <button
       type="button"
-      aria-label={`${label}: ${value}`}
+      aria-label={value ? `${label}: ${value}` : label}
+      data-help-item={listItem || undefined}
       onClick={onOpen}
       className={`flex h-target items-center gap-2 bg-transparent text-left text-body text-fg ${divider ? "border-b border-hairline" : ""}`}
     >
       <span className="flex-1">{label}</span>
-      <span className="text-meta text-fg-dim">{value}</span>
+      {value && <span className="text-meta text-fg-dim">{value}</span>}
       <span className="text-fg-dim"><Chevron dir="right" /></span>
     </button>
   );

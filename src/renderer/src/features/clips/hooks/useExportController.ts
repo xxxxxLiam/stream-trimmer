@@ -17,7 +17,7 @@ export function useExportController() {
   const state = useExportState();
   useExportEffects(queries, state);
   const actions = useExportMutations(queries, state);
-  useRetryKey(Boolean(state.failed) && !state.importing, actions.retry);
+  useRetryKey(Boolean(state.failed), actions.retry);
   const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
   const finishedEntry = state.finished ? downloads.find((d) => d.id === state.finished?.entryId) : undefined;
@@ -27,8 +27,6 @@ export function useExportController() {
     ...actions,
     selectedId: state.selectedId,
     notice: state.notice,
-    importing: state.importing,
-    setImporting: state.setImporting,
     making: downloading
       ? { name: state.makingName, percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote) }
       : null,
