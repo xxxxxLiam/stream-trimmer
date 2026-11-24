@@ -7,7 +7,6 @@
  *   screen's one primary action is Cut.
  */
 import { useState } from "react";
-import ClipIdPatternField from "./ClipIdPatternField";
 import CampaignWizard from "./CampaignWizard";
 import { useDataFolderVisibleState } from "../../../shared/hooks/useDataFolderVisibleState";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
@@ -148,22 +147,6 @@ function CampaignForm({
           <input className="field font-mono" inputMode="numeric" value={d.hard} onChange={(e) => set("hard", e.target.value)} />
         </Field>
       </div>
-      <div className="flex gap-2">
-        <Field label="Short code for this client">
-          <input
-            className="field font-mono"
-            value={d.prefix}
-            placeholder="Made from the name"
-            onChange={(e) => set("prefix", e.target.value)}
-          />
-        </Field>
-      </div>
-      <ClipIdPatternField
-        pattern={d.pattern}
-        prefix={d.prefix}
-        campaignName={d.name}
-        onChange={(v) => set("pattern", v)}
-      />
       <Field label="Format">
         <select
           className="field"
@@ -293,10 +276,15 @@ export default function CampaignMenu({
                 <button
                   type="button"
                   className="btn shrink-0"
-                  onClick={() => setMode({ kind: "form", id: c.id })}
-                  aria-label={`Edit ${c.name}`}
+                  onClick={() => {
+                    if (onOpenSettings) {
+                      onOpenSettings(c.id);
+                      onClose?.();
+                    } else setMode({ kind: "form", id: c.id });
+                  }}
+                  aria-label={onOpenSettings ? `${c.name} settings` : `Edit ${c.name}`}
                 >
-                  Edit
+                  {onOpenSettings ? "Settings" : "Edit"}
                 </button>
                 <button
                   type="button"
