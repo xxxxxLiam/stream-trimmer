@@ -8,9 +8,10 @@
 import PanelPlaceholder from "../../modules/layout/components/PanelPlaceholder";
 import { registerPanel } from "../../modules/layout/utils/panelRegistry";
 import { usePanelHost } from "../../modules/layout/hooks/PanelHostContext";
+import VideosPanel from "../workspace/components/VideosPanel";
 import TranscriptColumn from "./components/TranscriptColumn";
 
-registerPanel({ id: "videos", title: "Videos", group: "left", component: () => <PanelPlaceholder title="Videos" /> });
+registerPanel({ id: "videos", title: "Videos", group: "left", component: VideosPanel });
 
 function TranscriptPanel() {
   const { playhead } = usePanelHost();
