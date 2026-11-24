@@ -16,7 +16,7 @@ import LaneLabel from "./LaneLabel";
 
 const BAR = "absolute top-[5px] h-6 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-meta leading-[22px]";
 
-/** No suggested name yet (the engine's suggestion isn't offered to the renderer): a time-based one. */
+/** No suggested name yet (no suggestion yet): a time-based one. */
 export function timeName(start: number): string {
   return `Clip ${clockTime(start)}`;
 }
@@ -32,6 +32,11 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     return { left: x, width: Math.max(6, toX(c.axis, end) - x) };
   };
   // Drawn left to right as they sit in the video; the clip itself plays them in the order locked.
+  // A section that is exactly a banked moment carries that moment's name; otherwise the suggestion.
+  const building = (start: number) => {
+    const banked = c.sections.length === 1 ? c.waiting.find((b) => b.start === c.sections[0].start && b.end === c.sections[0].end) : undefined;
+    return banked?.label ?? c.suggestedName ?? timeName(start);
+  };
   const sections = [...c.sections].sort((a, b) => a.start - b.start);
   return (
     <div className="flex h-[34px] items-center">
@@ -62,7 +67,11 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                     type="button"
                     title={b.label ?? timeName(b.start)}
                     onClick={() => playFrom(b.start)}
-                    className={`${BAR} rounded-chip border border-hairline-strong text-center text-fg-dim`}
+                    className={`${BAR} rounded-chip border text-center ${
+                      c.range && b.start === c.range.start && b.end === c.range.end
+                        ? "border-fg text-fg"
+                        : "border-hairline-strong text-fg-dim"
+                    }`}
                     style={span(b.start, b.end)}
                   >
                     {b.label ?? timeName(b.start)}
@@ -73,9 +82,9 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 <span
                   className={`${BAR} rounded-chip border border-frost text-center font-medium text-fg`}
                   style={span(sections[0].start, sections[0].end)}
-                  title={timeName(sections[0].start)}
+                  title={building(sections[0].start)}
                 >
-                  {timeName(sections[0].start)}
+                  {building(sections[0].start)}
                 </span>
               ) : null}
               {sections.length > 1
@@ -96,9 +105,9 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                         <span
                           className={`${BAR} border border-frost ${first ? "rounded-l-chip font-medium text-fg" : ""} ${last ? "rounded-r-chip text-fg-dim" : ""}`}
                           style={span(s.start, s.end)}
-                          title={first ? timeName(s.start) : undefined}
+                          title={first ? building(s.start) : undefined}
                         >
-                          {first ? timeName(s.start) : last ? `${lengthLabel(c.total)} total` : ""}
+                          {first ? building(s.start) : last ? `${lengthLabel(c.total)} total` : ""}
                         </span>
                       </span>
                     );

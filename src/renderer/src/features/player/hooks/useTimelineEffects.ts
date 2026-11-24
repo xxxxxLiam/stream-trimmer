@@ -10,9 +10,13 @@ import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { setZoom, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
 import type { Range } from "../../../shared/utils/segments";
 import { fitWindow, zoomForSpan, type Win } from "../utils/timelineAxis";
+import { arrivedFromElsewhere } from "../utils/rangeOrigin";
 import { publishTimelineView } from "./useTimelineView";
 
 type Args = {
+  /** The one section being worked on (picked or banked), or null for none or several. */
+  framed: Range | null;
+  seek: (t: number) => void;
   range: Range | null;
   duration: number;
   playhead: number;
@@ -56,6 +60,18 @@ export function useTimelineEffects(a: Args) {
     a.setFocus((w.start + w.end) / 2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.fitRequests]);
+
+  // A range that arrives from elsewhere (a banked moment, an import, a restored session) frames the
+  // timeline on itself, with the playhead inside it. A range marked by hand never moves the ruler.
+  useEffect(() => {
+    const r = a.framed;
+    if (!r || !(a.duration > 0) || !arrivedFromElsewhere()) return;
+    const w = fitWindow(r, a.duration);
+    setZoom(zoomForSpan(a.duration, w.end - w.start));
+    a.setFocus((w.start + w.end) / 2);
+    if (a.playhead < r.start || a.playhead > r.end) a.seek(r.start);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.videoId, a.duration, a.framed?.start, a.framed?.end]);
 
   // Zoomed in, the window follows the playhead once it runs off the edge.
   useEffect(() => {

@@ -5,6 +5,7 @@
  *   shared tools (pointer, scissors, flag, hand, zoom), the zoom window or the fold, and the lanes'
  *   data into one view model with its pointer handlers.
  */
+import { useSuggestedName } from "./useSuggestedName";
 import { useEffect, useMemo, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
@@ -19,6 +20,7 @@ import { axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis } fro
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
+import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
 
 export const DRAG_START_PX = 3;
@@ -48,6 +50,12 @@ export function useTimelineController() {
     [store.segments, range?.start, range?.end],
   );
   const joined = sections.length >= 2;
+  const existingNames = useMemo(
+    () => [...(videoId && active ? (active.usedRanges[videoId] ?? []) : []), ...store.banked].map((r) => (r as { label?: string }).label ?? "").filter(Boolean),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [videoId, active, store.banked],
+  );
+  const suggestedName = useSuggestedName(videoId, clipper.info?.title ?? "", lines, sections, existingNames);
   const total = sectionsLength(sections);
 
   const win = windowFor(duration, tools.zoom, s.focus ?? playhead);
@@ -60,6 +68,8 @@ export function useTimelineController() {
   const waiting = store.banked;
 
   useTimelineEffects({
+    framed: sections.length === 1 ? sections[0] : null,
+    seek: (t: number) => clipper.requestSeek(t),
     range,
     duration,
     playhead,
@@ -87,6 +97,7 @@ export function useTimelineController() {
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
     if (hi - lo < 1) return;
+    markByHand();
     clipper.setStartFromSeconds(snap(lo, "start"));
     clipper.setEndFromSeconds(snap(hi, "end"));
   };
@@ -108,6 +119,7 @@ export function useTimelineController() {
       const step = scissorsClick(s.scissorsStart, t);
       if (step.kind === "start") {
         s.setScissorsStart(step.at);
+        markByHand();
         clipper.setStartFromSeconds(snap(step.at, "start"));
         clipper.setEndText("");
       } else {
@@ -167,6 +179,7 @@ export function useTimelineController() {
     playhead,
     range,
     sections,
+    suggestedName,
     joined,
     total,
     segments: store.segments,
