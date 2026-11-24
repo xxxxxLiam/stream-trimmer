@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DESTINATIONS, availableDestinations, clipReason, clipSections, normalizeDestination, sectionsLength, toAfterCutting } from "./clipDestination";
+import { openInFor, DESTINATIONS, availableDestinations, clipReason, clipSections, normalizeDestination, sectionsLength, toAfterCutting } from "./clipDestination";
 
 test("the menu lists folder first, then the four editors, with no default editor", () => {
   assert.deepEqual(
@@ -27,10 +27,15 @@ test("a stored choice that is no longer offered falls back to folder", () => {
   assert.equal(normalizeDestination("finalcut", ["premiere"]), "folder");
 });
 
-test("only Save to folder and Final Cut have a hand-off that exists today", () => {
+test("Final Cut sends a project; the other editors open with the saved clip; folder does neither", () => {
   assert.equal(toAfterCutting("folder"), "nothing");
   assert.equal(toAfterCutting("finalcut"), "finalcut");
   assert.equal(toAfterCutting("premiere"), "nothing");
+  assert.equal(openInFor("premiere"), "premiere");
+  assert.equal(openInFor("resolve"), "resolve");
+  assert.equal(openInFor("capcut"), "capcut");
+  assert.equal(openInFor("folder"), undefined);
+  assert.equal(openInFor("finalcut"), undefined);
 });
 
 test("Clip says why it can't run", () => {

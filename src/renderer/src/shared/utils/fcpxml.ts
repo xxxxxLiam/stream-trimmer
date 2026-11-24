@@ -76,6 +76,8 @@ export type EventNameSource = "campaign" | "source";
 
 export interface EditorHandoffSettings {
   afterCutting: AfterCutting;
+  /** Set per cut from the Clip arrow menu (never stored): open this editor with the saved clip. */
+  openIn?: "premiere" | "resolve" | "capcut";
   /** Where the FCPXML event name comes from. */
   eventName: EventNameSource;
   /** CapCut has no project import; this is just a folder it can browse. */

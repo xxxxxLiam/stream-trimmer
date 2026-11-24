@@ -54,7 +54,7 @@ import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
 import { getClipDestination } from "../features/player/hooks/useClipDestination";
-import { toAfterCutting } from "../features/player/utils/clipDestination";
+import { openInFor, toAfterCutting } from "../features/player/utils/clipDestination";
 import { buildCopyBlocksInput } from "../features/handoff/utils/copyBlocksInput";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
@@ -67,7 +67,8 @@ import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overl
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
 function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
-  return { ...settings, afterCutting: toAfterCutting(getClipDestination()) };
+  const d = getClipDestination();
+  return { ...settings, afterCutting: toAfterCutting(d), openIn: openInFor(d) };
 }
 
 const EDITOR_KEY = "clipper.editorHandoff";

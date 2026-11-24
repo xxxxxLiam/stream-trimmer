@@ -27,11 +27,7 @@ export function normalizeDestination(raw: unknown, offered?: readonly string[]):
   return hit ? hit.id : "folder";
 }
 
-/**
- * What the existing hand-off can do after a clip is saved. Final Cut has its pipeline; opening
- * Premiere, Resolve or CapCut after a clip waits for the hand-off rebuild (handoff-plan.md), so
- * those fall back to leaving the file in the folder.
- */
+/** Final Cut has its own pipeline (FCPXML); the other editors are opened with the saved clip. */
 export function toAfterCutting(d: ClipDestination): AfterCutting {
   return d === "finalcut" ? "finalcut" : "nothing";
 }
@@ -56,3 +52,8 @@ export function clipSections(segments: readonly Section[], range: Section | null
 }
 
 export const sectionsLength = (s: readonly Section[]) => s.reduce((n, x) => n + Math.max(0, x.end - x.start), 0);
+
+/** The editor to open with the saved clip, for the editors without a project pipeline. */
+export function openInFor(d: ClipDestination): "premiere" | "resolve" | "capcut" | undefined {
+  return d === "premiere" || d === "resolve" || d === "capcut" ? d : undefined;
+}
