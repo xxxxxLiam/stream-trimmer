@@ -3,6 +3,7 @@
  * Path: src/renderer/src/modules/clipper/hooks/useClipDownloadMutations.ts
  * Description: Cuts the clip: progress, cancel, the engine request and saving the result.
  */
+import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { useCallback, useRef, useState } from "react";
 import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl, buildClipFilename, sanitizeFilename, type ClipFormat, type VideoInfo } from "../../../shared/utils/clip";
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
@@ -165,6 +166,7 @@ export function useClipDownloadMutations({
           error?: string;
           code?: string;
           diagnostics?: FailureDiagnostics;
+          row?: ClipRowState;
           cancelled?: boolean;
         };
         const data = await parseJson<FailureBody>(res).catch(
@@ -178,6 +180,7 @@ export function useClipDownloadMutations({
           data.error || "Download failed",
           data.code,
           data.diagnostics,
+          data.row,
         );
       }
       // For `deliver: "path"` the body is a few bytes of JSON naming the
@@ -297,6 +300,7 @@ export function useClipDownloadMutations({
           message,
           code: engineFailure?.code,
           diagnostics: engineFailure?.diagnostics,
+          row: engineFailure?.row,
           attempt: {
             operation: "download clip",
             videoId: extractVideoId(url),
