@@ -8,7 +8,8 @@
 import { useCallback } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
-import { folderChipLabel, pasteKeyLabel, shortLink, youtubeLinkFromText, type ToolsStatus } from "../utils/startUtils";
+import { pasteKeyLabel, shortLink, youtubeLinkFromText, type ToolsStatus } from "../utils/startUtils";
+import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { useStartEffects } from "./useStartEffects";
 import { useToolsStatusQueries } from "./useToolsStatusQueries";
 import type { ColdStartProps } from "../components/ColdStart";

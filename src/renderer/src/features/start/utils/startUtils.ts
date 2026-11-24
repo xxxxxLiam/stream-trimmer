@@ -24,11 +24,4 @@ export function shortLink(link: string): string {
   return bare.length > 36 ? `${bare.slice(0, 36)}…` : bare;
 }
 
-/** Last two folders of a path for the chip: "/Users/a/Downloads/Clipr" reads as "Downloads/Clipr". */
-export function folderChipLabel(dir: string | null | undefined): string {
-  const parts = (dir ?? "").split(/[\\/]+/).filter(Boolean);
-  if (parts.length === 0) return "Downloads/Clipr";
-  return parts.slice(-2).join("/");
-}
-
 export type ToolsStatus = "ready" | "checking" | "broken";

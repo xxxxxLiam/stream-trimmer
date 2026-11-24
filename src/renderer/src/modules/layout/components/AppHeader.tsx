@@ -15,7 +15,6 @@ import BrandMark from "../../../shared/components/BrandMark";
 import CampaignChip from "../../../features/campaigns/components/CampaignChip";
 import HelpButton from "../../../features/help/components/HelpButton";
 import { IconChannel, IconCopy, IconSettings, IconSymbol } from "../../../shared/components/icons";
-import { useDismissEffects } from "../../../shared/hooks/useDismissEffects";
 import { CHANNEL_DATA_BUILT } from "../../../shared/utils/ownerGate";
 
 export type AppHeaderProps = {
@@ -37,7 +36,6 @@ export type AppHeaderProps = {
   /** Body of the campaign popover. TODO(B4). */
   campaignMenu?: ReactNode;
   /** Body of the settings popover. */
-  settingsBody?: ReactNode;
 };
 
 function SourceChip() {
@@ -96,8 +94,6 @@ function SourceChip() {
 }
 
 export default function AppHeader(p: AppHeaderProps) {
-  const settingsRef = useRef<HTMLDivElement>(null);
-  useDismissEffects(settingsRef, p.settingsOpen, p.onCloseSettings);
 
   // Every channel reference is behind the COMPILE-TIME flag, so a public build drops the
   // strings entirely; testing a runtime prop here is what used to leave them in the bundle.
@@ -160,38 +156,17 @@ export default function AppHeader(p: AppHeaderProps) {
       <YouTubeStatusChip />
       <UpdateStatus />
 
-      {/* No settings button until there is something behind it. It previously
-          rendered unconditionally and opened a popover reading "No app settings
-          yet" — a control that never does anything teaches people to distrust
-          the rest of the header. The per-session things it would have held
-          (quality, clips folder, data folder) already live in the footer, by
-          the rule that once-a-session settings stay out of the loop. Pass
-          settingsBody to bring the button back. */}
-      {p.settingsBody && (
-        <div ref={settingsRef} className="relative">
-          <button
-            type="button"
-            id="ui-settings"
-            className="icon-btn"
-            aria-label="Settings"
-            aria-expanded={p.settingsOpen}
-            aria-haspopup="dialog"
-            onClick={p.onToggleSettings}
-            title="Settings (⌘,)"
-          >
-            <IconSettings />
-          </button>
-          {p.settingsOpen && (
-            <div
-              role="dialog"
-              aria-label="Settings"
-              className="popover absolute right-0 top-full z-40 mt-1 w-[280px]"
-            >
-              {p.settingsBody}
-            </div>
-          )}
-        </div>
-      )}
+      <button
+        type="button"
+        id="ui-settings"
+        className="icon-btn"
+        aria-label="Settings"
+        aria-expanded={p.settingsOpen}
+        onClick={p.onToggleSettings}
+        title="Settings (⌘,)"
+      >
+        <IconSettings />
+      </button>
 
       {/* HELP: always the last item, top right, on every screen. */}
       <HelpButton open={p.helpOpen} onToggle={p.onToggleHelp} />

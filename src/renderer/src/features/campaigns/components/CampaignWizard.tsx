@@ -8,7 +8,6 @@
  */
 import { useState } from "react";
 import CentredDialog from "../../../shared/components/CentredDialog";
-import ClipIdPatternField from "./ClipIdPatternField";
 import { useDataFolderVisibleState } from "../../../shared/hooks/useDataFolderVisibleState";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../hooks/CampaignContext";
@@ -21,7 +20,7 @@ import {
   type Campaign,
 } from "../../../shared/utils/campaigns";
 
-type StepId = "name" | "clips" | "data" | "naming" | "length" | "format";
+type StepId = "name" | "clips" | "data" | "length" | "format";
 
 const COPY: Record<StepId, { title: string; why: string }> = {
   name: {
@@ -35,10 +34,6 @@ const COPY: Record<StepId, { title: string; why: string }> = {
   data: {
     title: "Where should research files go?",
     why: "Kept apart from your finished clips so the two never get mixed up. It has to be a different folder from the clips folder.",
-  },
-  naming: {
-    title: "How should clips be named?",
-    why: "Files arrive already named for the client, so there is no renaming pass afterwards.",
   },
   length: {
     title: "How long should clips be?",
@@ -92,7 +87,6 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
     "name",
     ...(isElectron ? (["clips"] as const) : []),
     ...(isElectron && dataVisible ? (["data"] as const) : []),
-    "naming",
     "length",
     "format",
   ];
@@ -100,8 +94,6 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
   const [name, setName] = useState("");
   const [clipsDir, setClipsDir] = useState(folders.clipsDir);
   const [dataDir, setDataDir] = useState(folders.dataDir);
-  const [prefix, setPrefix] = useState("");
-  const [pattern, setPattern] = useState(DEFAULT_PATTERN);
   const [min, setMin] = useState(String(DEFAULT_BAND.targetMinSec));
   const [max, setMax] = useState(String(DEFAULT_BAND.targetMaxSec));
   const [hard, setHard] = useState(String(DEFAULT_BAND.hardMaxSec));
@@ -114,14 +106,13 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
 
   const problemsFor = (id: StepId): string[] => {
     const all = validateCampaign(
-      { name, clipsDir, dataDir: finalDataDir, clipIdPattern: pattern },
+      { name, clipsDir, dataDir: finalDataDir, clipIdPattern: DEFAULT_PATTERN },
       campaigns,
     );
     const mine: Record<StepId, string[]> = {
       name: ["name-empty", "name-taken"],
       clips: ["folders-same"],
       data: ["folders-same"],
-      naming: ["pattern-no-number"],
       length: [],
       format: [],
     };
@@ -150,8 +141,7 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
       targetMinSec: secs(min),
       targetMaxSec: secs(max),
       hardMaxSec: secs(hard),
-      clipIdPattern: pattern.trim(),
-      prefix: prefix.trim() || undefined,
+      clipIdPattern: DEFAULT_PATTERN,
       format,
       quality,
       clipsDir,
@@ -191,21 +181,6 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
 
       {step === "data" && (
         <FolderPick label="Research folder" dir={dataDir} onPick={() => void pickFolder(setDataDir)} />
-      )}
-
-      {step === "naming" && (
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-meta text-fg-dim">Short code for this client</span>
-            <input
-              className="field font-mono"
-              value={prefix}
-              placeholder="Made from the name if left empty"
-              onChange={(e) => setPrefix(e.target.value)}
-            />
-          </label>
-          <ClipIdPatternField pattern={pattern} prefix={prefix} campaignName={name} onChange={setPattern} />
-        </div>
       )}
 
       {step === "length" && (

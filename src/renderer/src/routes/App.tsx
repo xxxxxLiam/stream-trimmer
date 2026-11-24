@@ -58,6 +58,7 @@ import ClipsColumn from "../features/clips/components/ClipsColumn"; // B2/B4, ri
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
 import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
 import CampaignStart from "../features/campaigns/components/CampaignStart";
+import SettingsDrawer from "../features/settings/components/SettingsDrawer";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 import { tabDomId, tabPanelDomId } from "../features/workspace/components/WorkspaceTabs";
 import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
@@ -223,6 +224,8 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
+  const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
   // nobody is nagged: someone who just wants to paste a link and cut once never set a
   // campaign up, and that is a legitimate way to use the app.
@@ -270,7 +273,10 @@ function Layout({ active }: { active: boolean }) {
   const closeHelp = useCallback(() => setHelpOpen(false), []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeCopy = useCallback(() => setCopyOpen(false), []);
-  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    setSettingsStartAt(null);
+  }, []);
 
   // Switching campaign re-points the saving folder, format and quality at once. The clips
   // folder lives on the campaign; the clipper still saves to its own saveDir, so mirror it.
@@ -395,6 +401,15 @@ function Layout({ active }: { active: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
+  const settingsDrawer = (
+    <SettingsDrawer
+      open={settingsOpen}
+      onClose={closeSettings}
+      startAt={settingsStartAt}
+      editor={{ campaignId: campaign?.id ?? null, settings: editorSettings, onChange: setEditorSettings }}
+    />
+  );
+
   return (
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
@@ -411,11 +426,26 @@ function Layout({ active }: { active: boolean }) {
           symbolsOpen={symbolsOpen}
           onToggleSymbols={() => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; })}
           helpOpen={helpOpen}
-          onToggleHelp={() => setHelpOpen((v) => !v)}
+          onToggleHelp={() => {
+            setSettingsOpen(false);
+            setHelpOpen((v) => !v);
+          }}
           settingsOpen={settingsOpen}
-          onToggleSettings={() => setSettingsOpen((v) => !v)}
+          onToggleSettings={() => {
+            setSettingsStartAt(null);
+            setHelpOpen(false);
+            setSettingsOpen((v) => !v);
+          }}
           onCloseSettings={closeSettings}
-          campaignMenu={<CampaignMenu />}
+          campaignMenu={
+            <CampaignMenu
+              onOpenSettings={(id) => {
+                setSettingsStartAt(id);
+                setHelpOpen(false);
+                setSettingsOpen(true);
+              }}
+            />
+          }
         />
         {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
           <ThreeColumnLayout
@@ -440,7 +470,12 @@ function Layout({ active }: { active: boolean }) {
               </>
             }
             clips={<ClipsColumn onCutBanked={cutBanked} />}
-            drawer={<HelpDrawer open={helpOpen} onClose={closeHelp} />}
+            drawer={
+              <>
+                <HelpDrawer open={helpOpen} onClose={closeHelp} />
+                {settingsDrawer}
+              </>
+            }
           />
         ) : (
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">

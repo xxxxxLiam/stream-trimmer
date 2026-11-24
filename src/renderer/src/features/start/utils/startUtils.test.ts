@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { folderChipLabel, pasteKeyLabel, shortLink, youtubeLinkFromText } from "./startUtils";
+import { pasteKeyLabel, shortLink, youtubeLinkFromText } from "./startUtils";
 
 test("paste key is Command V on a Mac and Ctrl V elsewhere", () => {
   assert.equal(pasteKeyLabel("MacIntel"), "⌘V");
@@ -25,7 +25,4 @@ test("only a lone YouTube video link counts as a link", () => {
 test("link and folder read short on the chips", () => {
   assert.equal(shortLink("https://www.youtube.com/watch?v=abc"), "youtube.com/watch?v=abc");
   assert.match(shortLink("https://www.youtube.com/watch?v=" + "x".repeat(60)), /…$/);
-  assert.equal(folderChipLabel("/Users/a/Downloads/Clipr"), "Downloads/Clipr");
-  assert.equal(folderChipLabel("C:\\Users\\a\\Downloads\\Clipr"), "Downloads/Clipr");
-  assert.equal(folderChipLabel(""), "Downloads/Clipr");
 });
