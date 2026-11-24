@@ -16,7 +16,7 @@ const { app, session } = electron;
 import path from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import { validateCookieText } from "./cookieFile";
+import { checkCookieImport } from "./cookieFile";
 import {
   isRelevantDomain,
   parseCookieRows,
@@ -108,18 +108,8 @@ async function importCookieFile(sourcePath: unknown) {
 async function importCookieText(text: unknown) {
   try {
     const raw = String(text || "");
-    // A JSON export is the commonest wrong turn: several extensions offer it
-    // beside the Netscape format. Say so rather than "doesn't look right".
-    if (/^\s*[\[{]/.test(raw)) {
-      return {
-        ok: false,
-        kind: "wrong_format",
-        error:
-          "That file is JSON. Export it again and choose the Netscape (cookies.txt) format.",
-      };
-    }
-    const check = validateCookieText(raw);
-    if (!check.ok) return { ok: false, kind: classify(raw), error: check.reason };
+    const refused = checkCookieImport(raw);
+    if (refused) return { ok: false, kind: refused.kind, error: refused.reason };
 
     const target = cookieFilePath();
     const tmp = `${target}.import-${process.pid}-${Date.now()}`;
@@ -134,21 +124,13 @@ async function importCookieText(text: unknown) {
     } catch {
       /* best effort on Windows */
     }
-    return { ok: true, count: check.count };
+    return { ok: true, count: parseCookieRows(raw).filter((row) => isRelevantDomain(row.domain)).length };
   } catch (err: any) {
     return {
       ok: false,
       error: err && err.message ? err.message : "Could not read that file.",
     };
   }
-}
-
-/** Which of the three ways a cookies.txt can be wrong this one is. */
-function classify(text: unknown) {
-  const rows = parseCookieRows(text);
-  if (!String(text || "").trim() || rows.length === 0) return "wrong_format";
-  if (!rows.some((row) => isRelevantDomain(row.domain))) return "no_youtube_cookies";
-  return "signed_out";
 }
 
 async function clear() {
