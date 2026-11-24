@@ -76,6 +76,10 @@
   --glow-spotlight: radial-gradient(closest-side, rgb(var(--ice-rgb) / 0.13), transparent 70%);
   --glow-mark: 0 0 22px rgb(var(--frost-rgb) / 0.35);
   --flash-saved: 0 0 12px rgb(var(--frost-rgb) / 0.45);
+  /* Component-board glows: the Clip button on hover, the open video row, the just-made row. */
+  --glow-clip-hover: 0 0 14px rgb(var(--ice-rgb) / 0.35);
+  --glow-open: 0 0 10px rgb(var(--ice-rgb) / 0.25);
+  --glow-made: 0 0 12px rgb(var(--frost-rgb) / 0.18);
 
   /* Flat-surface compatibility: the old premium-layer variables are now empty, so every
      "background: var(--g-x), var(--c-y)" resolves to the flat colour. */
