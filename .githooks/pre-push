@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs the project's full local check before every push (typecheck, all tests,
+# lint). Checks run here, not in GitHub Actions. Skip once with --no-verify.
+echo "pre-push: npm run check"
+exec npm run check
