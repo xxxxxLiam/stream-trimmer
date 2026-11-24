@@ -84,7 +84,7 @@ export default function BottomBar({
   });
 
   return (
-    <div className="relative m-2 flex h-[52px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-1.5 text-meta text-fg-dim">
+    <div className="relative m-2 flex h-[54px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-1.5 text-meta text-fg-dim">
       <div role="toolbar" aria-label="Timeline tools" className="flex">
         {TOOLS.map(({ tool: t, label, icon: IconFor }) => (
           <button
