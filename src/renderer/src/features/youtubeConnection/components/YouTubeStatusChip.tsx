@@ -32,9 +32,9 @@ function dotClass(status: SessionStatus): string {
     case "signed_in":
       return "bg-fg";
     case "expiring_soon":
-      return "bg-accent shadow-[0_0_8px_hsl(var(--accent-h)_var(--accent-s)_var(--accent-l)/0.7)]";
+      return "bg-ice shadow-range";
     case "expired":
-      return "border-[1.5px] border-accent bg-transparent";
+      return "border-[1.5px] border-error bg-transparent";
     case "not_signed_in":
       return "border-[1.5px] border-fg-dim bg-transparent";
     default:

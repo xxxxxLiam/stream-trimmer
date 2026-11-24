@@ -28,7 +28,7 @@ export function createSplash() {
     center: true,
     show: false,
     transparent: false,
-    backgroundColor: "#0B0B0C",
+    backgroundColor: "#0A0D0F",
     skipTaskbar: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
@@ -58,7 +58,7 @@ export async function createWindow(port: number) {
     height: 820,
     minWidth: 1160,
     minHeight: 760,
-    backgroundColor: "#0B0B0C",
+    backgroundColor: "#0A0D0F",
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
