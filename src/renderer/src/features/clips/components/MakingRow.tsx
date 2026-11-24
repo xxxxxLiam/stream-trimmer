@@ -8,11 +8,13 @@
 import { motion } from "framer-motion";
 import RowIconButton from "../../../shared/components/RowIconButton";
 import { IconInEditor, IconShowFile } from "../../../shared/components/rowIcons";
+import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
+import { failureCopy } from "../utils/clipFailure";
 import { makingText, undoText } from "../utils/exportRows";
 import UndoRing from "./UndoRing";
 
 export type MakingRowProps =
-  | { kind: "making"; name: string; percent: number; phase: string }
+  | { kind: "making"; name: string; percent: number; phase: string; retrying?: boolean }
   | {
       kind: "finished";
       name: string;
@@ -25,13 +27,20 @@ export type MakingRowProps =
 
 export default function MakingRow(props: MakingRowProps) {
   if (props.kind === "making") {
-    const preparing = props.percent < 1 && props.phase !== "processing";
+    const preparing = props.retrying || (props.percent < 1 && props.phase !== "processing");
     return (
       <div className="relative mx-[10px] mb-[6px] mt-[10px] overflow-hidden rounded-control bg-raised px-[10px] py-[9px]">
         <div className="text-body font-medium">{props.name}</div>
-        <div className="mt-[2px] text-meta text-fg-dim" role="status">
-          {makingText(props.percent, props.phase)}
-        </div>
+        {props.retrying ? (
+          <>
+            <div className="mt-[2px] text-meta text-error">{failureCopy("stopped", 1).reason}</div>
+            <div className="mt-[2px] text-meta text-fg-dim" role="status">{RETRY_SENTENCE}</div>
+          </>
+        ) : (
+          <div className="mt-[2px] text-meta text-fg-dim" role="status">
+            {makingText(props.percent, props.phase)}
+          </div>
+        )}
         {preparing ? (
           <motion.span
             className="absolute bottom-0 left-0 h-[2px] w-1/3 bg-ice"
