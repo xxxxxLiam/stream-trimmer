@@ -61,6 +61,7 @@ import { buildCopyBlocksInput } from "../features/handoff/utils/copyBlocksInput"
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
+import { useDayHost } from "../features/workspace/hooks/useDayHost";
 import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
 import CampaignStart from "../features/campaigns/components/CampaignStart";
 import SettingsDrawer from "../features/settings/components/SettingsDrawer";
@@ -462,6 +463,7 @@ function Layout({ active }: { active: boolean }) {
       editor={{ campaignId: campaign?.id ?? null, settings: editorSettings, onChange: setEditorSettings }}
     />
   );
+  const dayHost = useDayHost();
   const panelHost: PanelHost = {
     playhead,
     cutSegments: (segs) => void cutClip(segs),
@@ -479,8 +481,8 @@ function Layout({ active }: { active: boolean }) {
     },
     // Not wired yet: the videos list (Left panels) provides the next video, and the campaign form
     // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".
-    day: { campaignName: campaign?.name ?? null, next: null, made: 0, quota: null },
-    onNextVideo: () => {},
+    day: dayHost.day,
+    onNextVideo: dayHost.onNextVideo,
     onOpenBank: () => {},
     onOpenVideo: () => {},
   };
