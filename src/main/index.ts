@@ -13,6 +13,7 @@ import { loadSettings } from "./features/settings/services/settingsService";
 import { migrateLegacyUserData } from "./modules/userData/migrateLegacyUserData";
 import { startBackend, stopBackend } from "./modules/engineHost/engineHost";
 import { closeSplash, createSplash, createWindow, getMainWindow } from "./modules/windows/windows";
+import { startSignInSignal } from "./features/youtube/services/signInService";
 import { setupAutoUpdater } from "./modules/updater/autoUpdater";
 import { startCookieChecks, stopCookieChecks } from "./modules/maintenance/cookieChecks";
 import { sweepStaleClips } from "./modules/maintenance/staleClips";
@@ -51,6 +52,7 @@ app.whenReady().then(async () => {
     logger.watchWindow("main", getMainWindow());
     sweepStaleClips();
     startCookieChecks();
+    void startSignInSignal();
     setupAutoUpdater();
   } catch (err: unknown) {
     logger.log("app", `failed to start: ${logger.describe(err)}`);

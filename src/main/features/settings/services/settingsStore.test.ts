@@ -19,6 +19,7 @@ const {
     all: () => Record<string, unknown>;
     set: (key: string, value: unknown) => boolean;
     persist: () => boolean;
+    onChange: (cb: (key: string, value: unknown) => void) => () => boolean;
   };
 } = require("./settingsStore.ts");
 

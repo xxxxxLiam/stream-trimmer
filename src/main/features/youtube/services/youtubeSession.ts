@@ -18,6 +18,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { checkCookiesFile } from "./cookieFile";
 import { resolveAuthState } from "./cookieState";
+import { signIn } from "../../../shared/utils/signInSignal";
 
 // Only ever cleared, never read. See clear().
 const LEGACY_PARTITION = "persist:youtube";
@@ -122,6 +123,7 @@ async function importCookieText(text: unknown) {
     } catch {
       /* best effort on Windows */
     }
+    signIn.setFileUsable(true);
     return { ok: true, count: check.count };
   } catch (err: any) {
     return {
@@ -145,6 +147,7 @@ async function clear() {
   } catch {
     /* ignore */
   }
+  signIn.setFileUsable(false);
   return { ok: true };
 }
 

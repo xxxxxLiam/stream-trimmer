@@ -93,6 +93,14 @@ try {
     getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
     getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 
+    getSignInSignal: () => ipcRenderer.invoke(IPC.signInStatus),
+    reportBrowserSignIn: (usable: boolean) => ipcRenderer.invoke(IPC.signInReportBrowser, usable),
+    onSignInSignal: (cb: (payload: unknown) => void) => {
+      const listener = (_e: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on(IPC.signInSignal, listener);
+      return () => ipcRenderer.removeListener(IPC.signInSignal, listener);
+    },
+
     checkForUpdates: () => ipcRenderer.invoke(IPC.updaterCheck),
     restartToUpdate: () => ipcRenderer.invoke(IPC.updaterRestartToUpdate),
     getUpdateReady: () => ipcRenderer.invoke(IPC.updaterReadyNow),

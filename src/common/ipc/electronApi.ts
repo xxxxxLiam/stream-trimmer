@@ -6,6 +6,7 @@
  * lives in common rather than as an ambient renderer type.
  */
 import type { CookieBrowser } from "../constants/cookieBrowsers";
+import type { CookieCheck, SignInSignal } from "../types/signIn";
 import type { RestartToUpdateResult, UpdateReady } from "../types/updates";
 
 export type UpdateStatusPayload =
@@ -80,12 +81,7 @@ export interface ElectronAPI {
     error?: string;
   }>;
   /** Adopts cookies.txt text (a file dropped on the window). Validated in main. */
-  importYouTubeCookiesText?: (text: string) => Promise<{
-    ok: boolean;
-    count?: number;
-    kind?: string;
-    error?: string;
-  }>;
+  importYouTubeCookiesText?: (text: string) => Promise<CookieCheck & { error?: string }>;
   /**
    * True when this computer's salted id is in `list`. Only a boolean crosses
    * the bridge; the raw machine id stays in the main process.
@@ -144,6 +140,11 @@ export interface ElectronAPI {
     browsers: CookieBrowser[];
   }>;
 
+  /** The footer's "at 360p" and "Sign in for 1080p" pill read this. */
+  getSignInSignal: () => Promise<SignInSignal>;
+  onSignInSignal: (cb: (signal: SignInSignal) => void) => () => void;
+  /** The silent browser sweep's result: true when one browser's YouTube sign-in was usable. */
+  reportBrowserSignIn: (usable: boolean) => Promise<{ ok: boolean }>;
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string;
