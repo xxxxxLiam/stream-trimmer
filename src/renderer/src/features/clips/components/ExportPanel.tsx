@@ -5,12 +5,11 @@
  *   with the suggested next on an Ice edge. Logic-free: everything comes from useExportController.
  */
 import { useEntryActions } from "../../../shared/hooks/useEntryActions";
-import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
+import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { suggestProjectName } from "../utils/projectName";
 import { validateClipName } from "../utils/clipName";
 import { emptyExportText } from "../utils/exportRows";
 import { useExportController } from "../hooks/useExportController";
-import ImportTimestamps from "./ImportTimestamps";
 import FailedRow from "./FailedRow";
 import MakingRow from "./MakingRow";
 import WaitingRow from "./WaitingRow";
@@ -19,7 +18,7 @@ const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platfor
 
 export default function ExportPanel() {
   const c = useExportController();
-  const { duration } = useClipperContext();
+  const host = usePanelHost();
   const actions = useEntryActions();
   const finishedEntry = c.finishedEntry;
 
@@ -84,17 +83,9 @@ export default function ExportPanel() {
       )}
 
       {!c.gate && (
-        <button type="button" onClick={() => c.setImporting(true)} className="mx-[6px] mt-1 h-target rounded-control text-left text-meta text-fg-dim hover:text-fg px-2">
-          Import timestamps
+        <button type="button" onClick={() => host.openImport()} className="mx-[6px] mt-1 h-target rounded-control text-left text-meta text-fg-dim hover:text-fg px-2">
+          Import moments
         </button>
-      )}
-      {c.importing && (
-        <ImportTimestamps
-          duration={duration || undefined}
-          existing={c.clips.map((x) => ({ id: x.id, name: x.label }))}
-          onImport={c.importClips}
-          onCancel={() => c.setImporting(false)}
-        />
       )}
     </div>
   );

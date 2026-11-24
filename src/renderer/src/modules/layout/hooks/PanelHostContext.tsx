@@ -21,6 +21,8 @@ export type PanelHost = {
   editorHandoff: EditorHandoffProps;
   /** Open the Symbols and phrases window. */
   openSymbols: () => void;
+  /** Open Import moments (the + menu in Export), empty or with pasted rows. */
+  openImport: (text?: string) => void;
 };
 
 const PanelHostContext = createContext<PanelHost | null>(null);
