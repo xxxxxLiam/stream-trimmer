@@ -159,6 +159,14 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     return cache;
   }
 
+  const listeners = new Set<(key: string, value: unknown) => void>();
+
+  /** Calls `cb` after each successful write. Returns the way to stop listening. */
+  function onChange(cb: (key: string, value: unknown) => void) {
+    listeners.add(cb);
+    return () => listeners.delete(cb);
+  }
+
   function set(key: unknown, value: unknown) {
     if (typeof key !== "string" || !key) return false;
     // Guard against the startup-order bug: never write from a store that has
@@ -171,10 +179,20 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
       cache[key] = value;
       removed.delete(key);
     }
-    return persist();
+    const saved = persist();
+    if (saved) {
+      for (const cb of listeners) {
+        try {
+          cb(key, value);
+        } catch (err: unknown) {
+          console.error("[electron] settings listener failed:", err);
+        }
+      }
+    }
+    return saved;
   }
 
-  return { load, all, set, persist, path: filePath };
+  return { load, all, set, persist, onChange, path: filePath };
 }
 
 export {

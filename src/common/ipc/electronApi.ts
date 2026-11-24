@@ -6,6 +6,7 @@
  * lives in common rather than as an ambient renderer type.
  */
 import type { CookieBrowser } from "../constants/cookieBrowsers";
+import type { RestartToUpdateResult, UpdateReady } from "../types/updates";
 
 export type UpdateStatusPayload =
   | { state: "checking" }
@@ -148,6 +149,11 @@ export interface ElectronAPI {
     version?: string;
     error?: string;
   }>;
-  quitAndInstall: () => Promise<{ ok: boolean; error?: string }>;
+  /** Restarts into the downloaded update; refuses with reason "busy" while a clip is being made. */
+  restartToUpdate: () => Promise<RestartToUpdateResult>;
+  /** An update that is ready right now (for a window that opened after the event). */
+  getUpdateReady: () => Promise<UpdateReady | null>;
+  /** One event when a version is ready: restart (Windows, Linux) or download (unsigned Mac). */
+  onUpdateReady: (cb: (payload: UpdateReady) => void) => () => void;
   onUpdateStatus: (cb: (payload: UpdateStatusPayload) => void) => () => void;
 }

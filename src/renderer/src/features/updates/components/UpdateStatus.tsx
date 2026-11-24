@@ -49,7 +49,7 @@ export default function UpdateStatus() {
   };
 
   const handleRestart = () => {
-    api.quitAndInstall();
+    api.restartToUpdate();
   };
 
   let label: string | null = null;
