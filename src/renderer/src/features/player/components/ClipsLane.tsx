@@ -31,7 +31,8 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     const x = toX(c.axis, start);
     return { left: x, width: Math.max(6, toX(c.axis, end) - x) };
   };
-  const sections = c.sections;
+  // Drawn left to right as they sit in the video; the clip itself plays them in the order locked.
+  const sections = [...c.sections].sort((a, b) => a.start - b.start);
   return (
     <div className="flex h-[34px] items-center">
       <LaneLabel>Clips</LaneLabel>

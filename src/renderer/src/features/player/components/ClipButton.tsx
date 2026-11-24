@@ -16,7 +16,7 @@ export default function ClipButton({ openUp = false, listenForKey = false }: { o
   const c = useClipController({ listenForKey });
   const tipId = useId();
   return (
-    <span className="group relative inline-flex">
+    <span id="ui-cut" className="group relative inline-flex">
       <SplitButton
         label="Clip"
         onPress={c.clip}

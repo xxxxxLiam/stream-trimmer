@@ -49,6 +49,11 @@ export type BottomBarProps = {
   folder: string;
   /** Opens the folder picker. Absent in the browser, where the folder cannot be chosen. */
   onPickFolder?: () => void | Promise<unknown>;
+  /** Requests go out signed out, so clips are 360p. */
+  at360?: boolean;
+  /** Offer "Sign in for 1080p" (no browser sign-in works). */
+  showSignInPill?: boolean;
+  onSignIn?: () => void;
 };
 
 export default function BottomBar({
@@ -58,6 +63,9 @@ export default function BottomBar({
   onSelectLanguages,
   folder,
   onPickFolder,
+  at360,
+  showSignInPill,
+  onSignIn,
 }: BottomBarProps) {
   const { tool, setTool, zoom, setZoom, zoomBy, fit } = useToolState();
   const hasDubs = !!tracks && tracks.some((t) => t.kind !== "original");
@@ -132,6 +140,17 @@ export default function BottomBar({
             <IconChevronSmall />
           </span>
         </button>
+        {at360 ? <span className="text-error">at 360p</span> : null}
+        {showSignInPill ? (
+          <button
+            type="button"
+            id="ui-sign-in-pill"
+            className="inline-flex h-7 items-center rounded-control border border-ice px-2.5 text-meta text-fg hover:bg-ice-tint-12"
+            onClick={onSignIn}
+          >
+            Sign in for 1080p
+          </button>
+        ) : null}
         {problem ? (
           <span role="alert" className="text-error">
             {problem}

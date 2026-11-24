@@ -7,6 +7,7 @@
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { lengthLabel } from "../hooks/useTimelineController";
+import { findOverlaps } from "../../../shared/utils/segments";
 import ClipButton from "./ClipButton";
 
 function CrossIcon() {
@@ -19,22 +20,33 @@ function CrossIcon() {
 
 export default function TimelineHeader({ c }: { c: TimelineController }) {
   const chips = c.segments;
+  const overlap = c.range ? findOverlaps(c.range, c.used).length > 0 : false;
   return (
     <div className="flex h-[60px] items-center gap-4 px-4">
       {chips.length === 0 ? (
         <>
-          <span className="text-section tabular-nums" aria-label="In">
+          <span id="ui-mark-in" className="text-section tabular-nums" aria-label="In">
             {c.inText}
           </span>
-          <span className="text-section tabular-nums" aria-label="Out">
+          <span id="ui-mark-out" className="text-section tabular-nums" aria-label="Out">
             {c.outText}
           </span>
         </>
       ) : null}
-      <span className="inline-flex items-baseline gap-2">
+      <span id="ui-stitched-total" className="inline-flex items-baseline gap-2">
         <span className="text-cliplength tabular-nums text-ice">{c.lengthText}</span>
         <span className="text-meta text-fg-dim">clip length</span>
       </span>
+      {overlap ? (
+        <span id="ui-overlap-warning" role="status" className="text-meta text-fg-dim">
+          Overlaps a clip already made
+        </span>
+      ) : null}
+      {chips.length > 0 ? (
+        <span id="ui-segment-list" className="sr-only">
+          {chips.length} sections
+        </span>
+      ) : null}
       {chips.map((s, i) => (
         <span
           key={`${s.start}-${s.end}`}
@@ -58,6 +70,7 @@ export default function TimelineHeader({ c }: { c: TimelineController }) {
           type="button"
           disabled={!c.range || c.locked}
           onClick={c.addSection}
+          id="ui-add-segment"
           className="h-target rounded-full border border-hairline-strong bg-raised px-4 text-body text-fg disabled:text-disabled"
         >
           + section

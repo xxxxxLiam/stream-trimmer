@@ -5,7 +5,7 @@
  *   shared tools (pointer, scissors, flag, hand, zoom), the zoom window or the fold, and the lanes'
  *   data into one view model with its pointer handlers.
  */
-import { useMemo, type PointerEvent } from "react";
+import { useEffect, useMemo, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
@@ -13,6 +13,7 @@ import { useToolState } from "../../../modules/layout/hooks/useToolState";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
+import { grabbedEdge, scissorsClick, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
 import { axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
@@ -20,7 +21,6 @@ import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
 import { useTimelineEffects } from "./useTimelineEffects";
 
-export const EDGE_GRAB_PX = 8;
 export const DRAG_START_PX = 3;
 const dash = "–:––:––";
 
@@ -35,6 +35,12 @@ export function useTimelineController() {
   const { duration, videoId } = clipper;
   const playhead = store.playhead;
   const lines = clipper.transcript;
+
+  // The Transcript lane needs the words; load them once for this video.
+  const { ensureTranscript } = clipper;
+  useEffect(() => {
+    if (videoId) ensureTranscript();
+  }, [videoId, ensureTranscript]);
 
   const sections = useMemo(
     () => clipSections(store.segments, range),
@@ -94,26 +100,25 @@ export function useTimelineController() {
     if (tools.tool === "flag") return flagsApi.addFlag(t);
     if (tools.tool === "zoom") {
       s.setFocus(t);
-      return tools.zoomBy(e.altKey ? -20 : 20);
+      return tools.zoomBy(zoomStep(e.altKey));
     }
     if (tools.tool === "hand") return s.setDrag({ kind: "pan", startX: e.clientX, startFocus: s.focus ?? playhead });
     if (tools.tool === "clip") {
       // Scissors only mark: a first click is the start, the second is the end. They never seek.
-      if (s.scissorsStart === null) {
-        s.setScissorsStart(t);
-        clipper.setStartFromSeconds(snap(t, "start"));
+      const step = scissorsClick(s.scissorsStart, t);
+      if (step.kind === "start") {
+        s.setScissorsStart(step.at);
+        clipper.setStartFromSeconds(snap(step.at, "start"));
         clipper.setEndText("");
       } else {
-        setRange(s.scissorsStart, t);
+        setRange(step.start, step.end);
         s.setScissorsStart(null);
       }
       return;
     }
     if (range) {
-      const xs = toX(axis, range.start);
-      const xe = toX(axis, range.end);
-      if (Math.abs(x - xs) <= EDGE_GRAB_PX) return s.setDrag({ kind: "edge", edge: "start" });
-      if (Math.abs(x - xe) <= EDGE_GRAB_PX) return s.setDrag({ kind: "edge", edge: "end" });
+      const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
+      if (edge) return s.setDrag({ kind: "edge", edge });
     }
     s.setDrag({ kind: "range", anchor: t });
     s.setDragOrigin(e.clientX);

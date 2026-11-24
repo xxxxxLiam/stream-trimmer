@@ -8,6 +8,8 @@
 import { motion } from "framer-motion";
 import { BoxArrowUpRight, CameraVideo, ExclamationTriangle } from "react-bootstrap-icons";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
+import { useFlagsState } from "../../../shared/hooks/useFlagsState";
+import { useTimelineView } from "../hooks/useTimelineView";
 import { usePreviewController } from "../hooks/usePreviewController";
 import { clockTime } from "../utils/transport";
 import EndCard from "./EndCard";
@@ -26,6 +28,8 @@ export default function PreviewPanel() {
   const host = usePanelHost();
   const c = usePreviewController(host.onNextVideo);
   const { player, videoId, info } = c;
+  const { flags } = useFlagsState(videoId);
+  const view = useTimelineView();
   const opening = !!videoId && !info && c.loadingInfo;
   const blocked = player.blocked;
   const showEnd = !!videoId && !blocked && player.ended;
@@ -79,7 +83,7 @@ export default function PreviewPanel() {
             <EndCard day={host.day} onNextVideo={host.onNextVideo} onOpenBank={host.onOpenBank} onOpenVideo={host.onOpenVideo} />
           ) : null}
           {c.fullScreen ? (
-            <FullScreenBar c={c} flags={[]} />
+            <FullScreenBar c={c} flags={flags} />
           ) : null}
         </div>
 
@@ -90,8 +94,8 @@ export default function PreviewPanel() {
               duration={c.duration}
               playhead={player.currentTime}
               range={c.range}
-              flags={[]}
-              view={null}
+              flags={flags}
+              view={view}
               onSeek={(t) => player.seekTo(t)}
             />
             <PlayerControls c={c} />

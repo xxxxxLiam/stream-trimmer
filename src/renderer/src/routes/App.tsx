@@ -39,12 +39,15 @@ import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
   restoreConnection,
+  signInNotice,
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import type { MenuItem } from "../modules/layout/components/PopoverMenu";
+import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
+import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
 import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
 import { nameForLanguage, planLanguages } from "../shared/utils/audioLanguages";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
@@ -208,6 +211,8 @@ function Layout({ active }: { active: boolean }) {
     downloads,
     setStartText,
     setEndText,
+    setUrl,
+    flushAutoLoad,
     transcript,
     ensureTranscript,
   } = useClipperContext();
@@ -221,6 +226,7 @@ function Layout({ active }: { active: boolean }) {
     pickDataDir,
   } = useCampaign();
   const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
+  const signIn = signInNotice(useYouTubeConnection());
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
@@ -434,6 +440,7 @@ function Layout({ active }: { active: boolean }) {
     playhead,
     cutSegments: (segs) => void cutClip(segs),
     cutBanked,
+    openSymbols: () => setSymbolsOpen(true),
     editorHandoff: {
       settings: editorSettings,
       onChange: setEditorSettings,
@@ -461,6 +468,18 @@ function Layout({ active }: { active: boolean }) {
   ];
   // The campaign menu's "<Campaign> settings" row calls this. The Start, Settings and Help build
   // swaps in its campaign form here; until then the menu falls back to its own inline form.
+  // One global paste handler: a video link opens it, rows with times and a channel link go to the
+  // Import and Channel data surfaces (wired by the Start, Settings and Help build).
+  usePasteRoutingEffects(
+    active,
+    {
+      onVideo: (link) => {
+        setUrl(link);
+        flushAutoLoad();
+      },
+    },
+    { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
+  );
   const openCampaignSettings: ((campaignId: string) => void) | undefined = undefined;
 
   return (
@@ -500,6 +519,10 @@ function Layout({ active }: { active: boolean }) {
           onSelectLanguages={setAudioSel}
           folder={folders.clipsDir || saveDir || ""}
           onPickFolder={isElectron ? pickClipsDir : undefined}
+          at360={signIn.at360}
+          showSignInPill={signIn.pill}
+          // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
+          onSignIn={() => setHelpOpen(true)}
         />
       </main>
       <CampaignStart

@@ -41,6 +41,8 @@ export function requestFit() {
   set({ zoom: 0, fitRequests: state.fitRequests + 1 });
 }
 /** Tests only. */
+export const getToolStateForTest = () => state;
+/** Tests only. */
 export function resetToolStateForTest() {
   state = INITIAL;
   for (const l of listeners) l();

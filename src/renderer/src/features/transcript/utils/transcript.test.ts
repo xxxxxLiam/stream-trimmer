@@ -352,3 +352,15 @@ describe("used ranges", () => {
     assert.equal(isLineUsed({ start: 12, end: 13, text: "" }, []), false);
   });
 });
+
+it("copy text: the whole transcript and only the words inside a range", async () => {
+  const { wholeTranscriptText, wordsInRanges } = await import("./transcript");
+  const lines = [
+    { start: 0, end: 4, text: "welcome back" },
+    { start: 4, end: 9, text: "that is a pricing problem" },
+    { start: 9, end: 15, text: "nobody wants to hear this" },
+  ];
+  assert.equal(wholeTranscriptText(lines), "welcome back\nthat is a pricing problem\nnobody wants to hear this");
+  assert.equal(wordsInRanges(lines, [{ start: 5, end: 10 }]), "that is a pricing problem\nnobody wants to hear this");
+  assert.equal(wordsInRanges(lines, []), "");
+});

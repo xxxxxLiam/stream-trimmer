@@ -37,6 +37,8 @@ export type PanelHost = {
   onOpenBank: () => void;
   /** Go to the link box to open a video. */
   onOpenVideo: () => void;
+  /** Open the Symbols and phrases window. */
+  openSymbols: () => void;
 };
 
 const PanelHostContext = createContext<PanelHost | null>(null);

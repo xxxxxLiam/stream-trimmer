@@ -62,7 +62,7 @@ test("sections far apart fold the skipped part into a marked strip", () => {
   assert.ok(a < b && b < f!.fold[0].x && f!.fold[0].x + 100 <= c && c < d);
   assert.ok(Math.abs((b - a) / 18 - (d - c) / 16) < 1e-9);
   // A pixel inside a section maps back to its time; inside the fold it maps to nothing.
-  assert.ok(Math.abs(toT(f!.axis, b) - 82) < 1e-6);
+  assert.ok(Math.abs((toT(f!.axis, b) ?? NaN) - 82) < 1e-6);
   assert.equal(toT(f!.axis, f!.fold[0].x + 50), null);
   // The axis fills the width.
   assert.ok(Math.abs(f!.axis.width - 1200) < 1e-6);
