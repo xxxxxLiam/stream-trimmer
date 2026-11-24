@@ -93,6 +93,24 @@ export interface ElectronAPI {
    */
   isOwnerMachine?: (list: string[], salt: string) => Promise<boolean>;
   /**
+   * Suggested clip names, offline. `prepare` builds the phrase table once when a transcript loads;
+   * `suggest` names a range (or several, for a joined clip). `skip` walks down the list for refresh.
+   * With no transcript prepared, the name is the video title plus a number.
+   */
+  clipNames?: {
+    prepare: (payload: {
+      videoId: string;
+      lines: { start: number; end: number; text: string }[];
+    }) => Promise<{ ok: boolean; error?: string }>;
+    suggest: (payload: {
+      videoId: string;
+      ranges: { start: number; end: number }[];
+      videoTitle: string;
+      existing: string[];
+      skip?: number;
+    }) => Promise<{ ok: boolean; name?: string; error?: string }>;
+  };
+  /**
    * Editor handoff, implemented in electron/editorOpen.ts. Every call
    * resolves; failures are { ok: false, error } in plain words.
    */

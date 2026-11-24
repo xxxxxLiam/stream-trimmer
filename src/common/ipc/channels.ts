@@ -6,6 +6,8 @@
  *   type error instead of a silent hang.
  */
 export const IPC = {
+  clipNamesPrepare: "clipNames:prepare",
+  clipNamesSuggest: "clipNames:suggest",
   clipSave: "clip:save",
   diagnosticsCopy: "diagnostics:copy",
   diagnosticsRead: "diagnostics:read",
