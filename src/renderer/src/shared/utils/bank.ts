@@ -152,6 +152,7 @@ export function importClips(
       if (p.category) clip.category = p.category;
       if (p.tier) clip.tier = p.tier;
       if (p.note) clip.note = p.note;
+      if (typeof p.rating === "number") clip.rating = p.rating;
       return clip;
     };
     if (idx >= 0) {

@@ -2,14 +2,13 @@
  * File: useExportMutations.ts
  * Path: src/renderer/src/features/clips/hooks/useExportMutations.ts
  * Description: What the Export panel does: pick a waiting moment (load it on the timeline), make
- *   it, undo the clip just made, remove a moment, and import timestamps.
+ *   it, undo the clip just made, remove a moment.
  */
 import { useCallback, useRef } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { bankStore, type BankedClip } from "../../../shared/utils/bank";
-import type { ParsedClip } from "../../../shared/utils/bankImport";
 import { getDownloads } from "../../../shared/utils/downloads";
 import { playFrom } from "../../../shared/utils/playFrom";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
@@ -113,13 +112,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid],
   );
 
-  const importClips = useCallback(
-    (parsed: ParsedClip[]) => {
-      bankStore.importClips(campaignId, vid, parsed);
-      s.setImporting(false);
-    },
-    [campaignId, vid, s],
-  );
-
-  return { select, make, undo, remove, importClips, retry, changeFolder, showInBrowser, saveForLater };
+  return { select, make, undo, remove, retry, changeFolder, showInBrowser, saveForLater };
 }

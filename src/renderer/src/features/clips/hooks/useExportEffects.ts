@@ -17,14 +17,13 @@ import type { useExportQueries } from "./useExportQueries";
 export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
   const { downloading, downloadPhase, error, failure } = useClipperContext();
-  const { setSelectedId, setNotice, setImporting, setFinished, setSecondsLeft } = s;
+  const { setSelectedId, setNotice, setFinished, setSecondsLeft } = s;
 
   // New video or campaign: the selection and notices do not carry over.
   useEffect(() => {
     setSelectedId(null);
-    setImporting(false);
     setNotice("");
-  }, [q.campaignId, q.vid, setSelectedId, setImporting, setNotice]);
+  }, [q.campaignId, q.vid, setSelectedId, setNotice]);
 
   // Paint the plan on the timeline. syncVideo clears it on a video change, so reapply when it is empty.
   const appliedKey = useRef("");

@@ -45,6 +45,7 @@ import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
+import ImportDrawer from "../features/import/components/ImportDrawer";
 import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
 import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
@@ -226,6 +227,7 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [importText, setImportText] = useState<string | null>(null);
   // The footer's "Sign in for 1080p" opens Help on its sign-in page.
   const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
   // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
@@ -454,6 +456,7 @@ function Layout({ active }: { active: boolean }) {
     cutSegments: (segs) => void cutClip(segs),
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
+    openImport: (text) => setImportText(text ?? ""),
     editorHandoff: {
       settings: editorSettings,
       onChange: setEditorSettings,
@@ -484,6 +487,7 @@ function Layout({ active }: { active: boolean }) {
         setUrl(link);
         flushAutoLoad();
       },
+      onMoments: (text) => setImportText(text),
     },
     { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
   );
@@ -524,6 +528,7 @@ function Layout({ active }: { active: boolean }) {
               <PanelWorkspace />
               <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} />
               {settingsDrawer}
+              <ImportDrawer text={importText} onClose={() => setImportText(null)} />
             </div>
           </PanelHostProvider>
         ) : (
