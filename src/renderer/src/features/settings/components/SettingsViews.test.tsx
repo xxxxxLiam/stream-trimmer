@@ -20,7 +20,7 @@ const read = (f: string) => readFileSync(join(process.cwd(), "src/renderer/src",
 
 test("top list: Your work rows, two switches, nothing about editor, quality or crashes", () => {
   const h = renderToStaticMarkup(
-    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true, autoUpdate: false }} onPatchApp={noop} onOpenCampaigns={noop} onOpenFolder={noop} onClose={noop} />,
+    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onOpenFolder={noop} onClose={noop} />,
   );
   assert.match(h, /aria-label="Campaigns: Acme, Nova"/);
   assert.match(h, /aria-label="Clips folder: Downloads\/Clipr"/);

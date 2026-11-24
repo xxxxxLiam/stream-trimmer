@@ -12,6 +12,7 @@ interface ImportMetaEnv {
 
 /** Baked by vite.config.ts. Prefer these over reading import.meta.env. */
 declare const __CHANNEL_DATA__: boolean;
+declare const __APP_VERSION__: string;
 declare const __OWNER_MACHINES__: string;
 declare const __OWNER_SALT__: string;x
 
