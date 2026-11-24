@@ -45,6 +45,8 @@ import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
+import TipCard from "../features/tips/components/TipCard";
+import { useTipsController } from "../features/tips/hooks/useTipsController";
 import ImportDrawer from "../features/import/components/ImportDrawer";
 import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
@@ -227,6 +229,7 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const tips = useTipsController(!!info);
   const [importText, setImportText] = useState<string | null>(null);
   // The footer's "Sign in for 1080p" opens Help on its sign-in page.
   const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
@@ -526,9 +529,10 @@ function Layout({ active }: { active: boolean }) {
           <PanelHostProvider value={panelHost}>
             <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
               <PanelWorkspace />
-              <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} />
+              <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
               {settingsDrawer}
               <ImportDrawer text={importText} onClose={() => setImportText(null)} />
+              {tips.card && importText === null && !helpOpen && <TipCard {...tips.card} />}
             </div>
           </PanelHostProvider>
         ) : (
@@ -539,7 +543,7 @@ function Layout({ active }: { active: boolean }) {
                 {channelAvailable && <ChannelExportPanel />}
               </div>
             </div>
-            <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} />
+            <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
           </div>
         )}
         <BottomBar
