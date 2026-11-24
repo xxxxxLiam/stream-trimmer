@@ -9,13 +9,22 @@
 
 export type CookieReason = { reason: string; fix: string };
 
-/** The engine's refusal: `reason` is a key, `message` and `fix` are the sentences. */
-export type CookieRefusal = { ok: boolean; reason?: string; message?: string; fix?: string };
+/**
+ * The engine's refusal. Today `reason` is the key and `message` and `fix` are the sentences; an
+ * older shape used `kind` and `error`. Both are read.
+ */
+export type CookieRefusal = { ok: boolean; reason?: string; kind?: string; message?: string; error?: string; fix?: string };
+
+/** Keys arrive as "wrong-site" or "wrong_site", and "too_old" is the same case as "session-ended". */
+function keyOf(res: CookieRefusal | undefined): string {
+  const raw = (res?.reason ?? res?.kind ?? "").replace(/_/g, "-");
+  return raw === "too-old" || raw === "wrong-format" ? (raw === "too-old" ? "session-ended" : "not-a-cookies-file") : raw;
+}
 
 const FALLBACK: Record<string, CookieReason> = {
   "wrong-site": {
-    reason: "This file was made on google.com, not youtube.com.",
-    fix: "Open youtube.com, then export the cookies from that page.",
+    reason: "This file has no YouTube cookies in it.",
+    fix: "Open youtube.com while signed in, then export the cookies from that page.",
   },
   "signed-out": {
     reason: "You were signed out when this file was exported.",
@@ -33,6 +42,6 @@ const FALLBACK: Record<string, CookieReason> = {
 
 /** The two sentences for a refusal. Anything unrecognised reads as "not a cookies file". */
 export function cookieReason(res: CookieRefusal | undefined): CookieReason {
-  const base = (res?.reason && FALLBACK[res.reason]) || FALLBACK["not-a-cookies-file"];
-  return { reason: res?.message?.trim() || base.reason, fix: res?.fix?.trim() || base.fix };
+  const base = FALLBACK[keyOf(res)] || FALLBACK["not-a-cookies-file"];
+  return { reason: (res?.message ?? res?.error)?.trim() || base.reason, fix: res?.fix?.trim() || base.fix };
 }

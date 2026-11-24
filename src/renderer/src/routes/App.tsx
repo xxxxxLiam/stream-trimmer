@@ -34,7 +34,6 @@ import { readSetting, writeSetting } from "../shared/utils/persist";
 import type { BankedClip } from "../shared/utils/bank";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
-import YouTubeConnectModal from "../features/youtubeConnection/components/YouTubeConnectModal";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
@@ -227,6 +226,8 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The footer's "Sign in for 1080p" opens Help on its sign-in page.
+  const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
   // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
   const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
@@ -278,7 +279,10 @@ function Layout({ active }: { active: boolean }) {
   // blocking comment export.
   const overlayVisible = active && exportingComments;
 
-  const closeHelp = useCallback(() => setHelpOpen(false), []);
+  const closeHelp = useCallback(() => {
+    setHelpOpen(false);
+    setHelpStartAt(null);
+  }, []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeCopy = useCallback(() => setCopyOpen(false), []);
   const closeSettings = useCallback(() => {
@@ -501,6 +505,7 @@ function Layout({ active }: { active: boolean }) {
         <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => {
+            setHelpStartAt(null);
             setSettingsOpen(false);
             setHelpOpen((v) => !v);
           }}
@@ -517,7 +522,7 @@ function Layout({ active }: { active: boolean }) {
           <PanelHostProvider value={panelHost}>
             <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
               <PanelWorkspace />
-              <HelpDrawer open={helpOpen} onClose={closeHelp} />
+              <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} />
               {settingsDrawer}
             </div>
           </PanelHostProvider>
@@ -529,7 +534,7 @@ function Layout({ active }: { active: boolean }) {
                 {channelAvailable && <ChannelExportPanel />}
               </div>
             </div>
-            <HelpDrawer open={helpOpen} onClose={closeHelp} />
+            <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} />
           </div>
         )}
         <BottomBar
@@ -542,7 +547,11 @@ function Layout({ active }: { active: boolean }) {
           at360={signIn.at360}
           showSignInPill={signIn.pill}
           // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
-          onSignIn={() => setHelpOpen(true)}
+          onSignIn={() => {
+            setHelpStartAt("signin");
+            setSettingsOpen(false);
+            setHelpOpen(true);
+          }}
         />
         </>
         )}
@@ -561,7 +570,6 @@ function Layout({ active }: { active: boolean }) {
 
 function Shell() {
   const { tabs, activeId, setTabCampaign } = useWorkspace();
-  const connection = useYouTubeConnection();
 
   // No background polling. On launch we read the imported cookies.txt once
   // and verify it silently; after that the user checks when they choose.
@@ -598,7 +606,6 @@ function Shell() {
           );
         })}
       </div>
-      <YouTubeConnectModal open={!connection.connected || connection.restoring} />
     </div>
   );
 }
