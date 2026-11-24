@@ -7,12 +7,14 @@
  *   Delete closes, Alt+arrows reorder.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ThreeDots, Plus, X } from "react-bootstrap-icons";
+import { ThreeDots, Plus } from "react-bootstrap-icons";
 import PopoverMenu, { type MenuItem } from "./PopoverMenu";
 import type { PanelDefinition, PanelId } from "../utils/panelRegistry";
 
 export const tabDomId = (id: PanelId) => `panel-tab-${id}`;
 export const panelBodyDomId = (id: PanelId) => `panel-body-${id}`;
+
+const STRIP_BUTTON = "inline-flex h-11 w-9 items-center justify-center rounded-control text-fg-dim hover:text-fg";
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -102,52 +104,39 @@ export default function PanelTabStrip({
           role="tablist"
           aria-label={label}
           onScroll={measure}
-          className="flex h-full min-w-0 items-stretch overflow-x-auto overflow-y-hidden"
+          className="flex h-full min-w-0 items-stretch gap-[18px] overflow-x-auto overflow-y-hidden pl-3.5"
         >
           {tabs.map((t) => {
             const selected = t.id === active;
             return (
-              <div key={t.id} className="flex shrink-0 items-center" role="presentation">
-                <button
-                  type="button"
-                  role="tab"
-                  id={tabDomId(t.id)}
-                  aria-selected={selected}
-                  aria-controls={panelBodyDomId(t.id)}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => onActivate(t.id)}
-                  onKeyDown={(e) => onKeyDown(e, t.id, t.closable !== false)}
-                  className={`flex h-full items-center whitespace-nowrap border-b-2 px-3 text-body ${
-                    selected ? "border-ice text-fg" : "border-transparent text-fg-dim hover:text-fg"
-                  }`}
-                >
-                  {t.title}
-                </button>
-                {selected && t.closable !== false ? (
-                  <button
-                    type="button"
-                    className="icon-btn -ml-2 mr-1"
-                    aria-label={`Close ${t.title}`}
-                    title={`Close ${t.title}`}
-                    tabIndex={-1}
-                    onClick={() => onClose(t.id)}
-                  >
-                    <X size={16} />
-                  </button>
-                ) : null}
-              </div>
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                id={tabDomId(t.id)}
+                aria-selected={selected}
+                aria-controls={panelBodyDomId(t.id)}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => onActivate(t.id)}
+                onKeyDown={(e) => onKeyDown(e, t.id, t.closable !== false)}
+                className={`inline-flex h-full shrink-0 items-center whitespace-nowrap text-body ${
+                  selected ? "text-fg shadow-[inset_0_-2px_0_var(--ice)]" : "text-fg-dim hover:text-fg"
+                }`}
+              >
+                {t.title}
+              </button>
             );
           })}
         </div>
         {fade.start ? <span aria-hidden data-fade="start" className="tab-fade pointer-events-none absolute inset-y-0 left-0 w-6" /> : null}
         {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-6" /> : null}
       </div>
-      <div className="flex shrink-0 items-center gap-1 px-1">
-        <PopoverMenu label={`Add a panel to ${label.toLowerCase()}`} items={addItems} pressedWhenOpen={false}>
-          <Plus size={16} />
+      <div className="flex shrink-0 items-center pr-1">
+        <PopoverMenu label={`Add a panel to ${label.toLowerCase()}`} items={addItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
+          <Plus size={14} />
         </PopoverMenu>
-        <PopoverMenu label={`${label} menu`} items={menuItems} pressedWhenOpen={false}>
-          <ThreeDots size={16} />
+        <PopoverMenu label={`${label} menu`} items={menuItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
+          <ThreeDots size={14} />
         </PopoverMenu>
       </div>
     </div>

@@ -20,6 +20,8 @@ export interface VideoInfo {
   duration: number;
   thumbnail?: string;
   bitrates?: Bitrates;
+  /** Audio tracks the video has (language and original / dub tag). Present when the engine read them. */
+  audioTracks?: { language: string; label: string; kind: "original" | "auto-dubbed" | "creator-dub" }[];
 }
 
 export interface TranscriptWord {

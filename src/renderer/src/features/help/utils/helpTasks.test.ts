@@ -42,7 +42,6 @@ test("ids are unique and every anchor is a known, prefixed id", () => {
   // build carries no trace of them), so they are allowed by name here.
   const known = new Set<string>([
     ...Object.values(ANCHORS),
-    "ui-channel-link",
     "ui-channel-start",
     "ui-channel-stop",
   ]);
@@ -153,13 +152,11 @@ function literalIds(): Map<string, string[]> {
  * `templated` is for ids built from a list (`clips-tab-${t.id}`).
  */
 const WHERE: Record<string, { file: string; state: string; opener?: string; templated?: RegExp }> = {
-  "ui-source-chip": { file: "modules/layout/components/AppHeader.tsx", state: "workspace screen" },
+  "ui-source-chip": { file: "features/transcript/panels.tsx", state: "workspace screen" },
   "ui-campaign-chip": { file: "features/campaigns/components/CampaignChip.tsx", state: "always" },
-  "ui-copy-blocks": { file: "modules/layout/components/AppHeader.tsx", state: "always" },
-  "ui-symbols": { file: "modules/layout/components/AppHeader.tsx", state: "always" },
-  "ui-footer-clips": { file: "modules/layout/components/AppFooter.tsx", state: "always" },
-  "ui-footer-data": { file: "modules/layout/components/AppFooter.tsx", state: "always" },
-  "ui-footer-format": { file: "modules/layout/components/AppFooter.tsx", state: "always" },
+  "ui-panels-menu": { file: "modules/layout/components/PanelsMenu.tsx", state: "always" },
+  "ui-footer-clips": { file: "modules/layout/components/BottomBar.tsx", state: "always" },
+  "ui-campaign-settings": { file: "features/campaigns/components/CampaignMenu.tsx", state: "campaign menu open", opener: "ui-campaign-chip" },
   "ui-panels-left": { file: "modules/layout/components/PanelWorkspace.tsx", state: "workspace screen" },
   "ui-panels-centre": { file: "modules/layout/components/PanelWorkspace.tsx", state: "workspace screen" },
   "ui-mark-in": { file: "features/clips/components/MarkBar.tsx", state: "workspace screen" },
@@ -168,8 +165,8 @@ const WHERE: Record<string, { file: string; state: string; opener?: string; temp
   "ui-stitched-total": { file: "features/clips/components/MarkBar.tsx", state: "workspace screen" },
   "ui-overlap-warning": { file: "features/clips/components/MarkBar.tsx", state: "a marked range overlaps a used one" },
   "ui-cut": { file: "features/clips/components/MarkBar.tsx", state: "workspace screen" },
-  "ui-copy-block-transcript": { file: "features/handoff/components/CopyBlocks.tsx", state: "Copy blocks open", opener: "ui-copy-blocks", templated: /id=\{`ui-copy-block-\$\{b\.id\}`\}/ },
-  "ui-copy-block-script": { file: "features/handoff/components/CopyBlocks.tsx", state: "Copy blocks open", opener: "ui-copy-blocks", templated: /id=\{`ui-copy-block-\$\{b\.id\}`\}/ },
+  "ui-copy-block-transcript": { file: "features/handoff/components/CopyBlocks.tsx", state: "Copy blocks open", opener: "ui-panels-menu", templated: /id=\{`ui-copy-block-\$\{b\.id\}`\}/ },
+  "ui-copy-block-script": { file: "features/handoff/components/CopyBlocks.tsx", state: "Copy blocks open", opener: "ui-panels-menu", templated: /id=\{`ui-copy-block-\$\{b\.id\}`\}/ },
   "clips-tab-all": { file: "features/clips/components/ClipsColumn.tsx", state: "workspace screen", templated: /id=\{`clips-tab-\$\{t\.id\}`\}/ },
   "clips-panel": { file: "features/clips/components/ClipsColumn.tsx", state: "workspace screen", opener: "clips-tab-all" },
   "help-anchor-youtube-status": { file: "features/youtubeConnection/components/YouTubeStatusChip.tsx", state: "always (header)" },
@@ -179,12 +176,11 @@ const WHERE: Record<string, { file: string; state: string; opener?: string; temp
   "ui-transcript-search": { file: "features/transcript/components/TranscriptColumn.tsx", state: "workspace screen" },
   "ui-transcript-lines": { file: "features/transcript/components/TranscriptColumn.tsx", state: "workspace screen" },
   "ui-campaign-list": { file: "features/campaigns/components/CampaignMenu.tsx", state: "campaign menu open", opener: "ui-campaign-chip" },
-  "ui-symbol-list": { file: "features/handoff/components/SymbolPalette.tsx", state: "Symbols open", opener: "ui-symbols" },
+  "ui-symbol-list": { file: "features/handoff/components/SymbolPalette.tsx", state: "Symbols open", opener: "ui-panels-menu" },
   "ui-saved-clip": { file: "features/downloads/components/DownloadsPanel.tsx", state: "All saved tab, at least one clip saved", opener: "clips-tab-all", templated: /id=\{rowIndex === 0 \? "ui-saved-clip" : undefined\}/ },
   // Channel screens, present only in a build with the exporter.
   "ui-channel-start": { file: "features/channelExport/components/ChannelExportPanel.tsx", state: "channel exporter open, not running" },
   "ui-channel-stop": { file: "features/channelExport/components/ChannelExportPanel.tsx", state: "channel export running" },
-  "ui-channel-link": { file: "modules/layout/components/AppHeader.tsx", state: "channel exporter built in" },
 };
 
 const used = (): { task: HelpTask; index: number; id: string }[] =>

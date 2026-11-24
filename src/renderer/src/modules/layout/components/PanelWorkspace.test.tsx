@@ -38,7 +38,7 @@ test("the workspace mounts a registered panel in its group, and a replaced panel
   assert.doesNotMatch(html, /first body/);
 });
 
-test("the tab strip is a tablist with one tab in the tab order and Close only on the shown tab", () => {
+test("the tab strip is a tablist with one tab in the tab order and no close button on the tabs", () => {
   const C = () => null;
   const tabs = [
     { id: "a", title: "A", group: "left" as const, component: C },
@@ -60,7 +60,6 @@ test("the tab strip is a tablist with one tab in the tab order and Close only on
   assert.match(html, /role="tablist"/);
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   assert.equal((html.match(/tabindex="0"/g) ?? []).length, 1, "roving tabindex");
-  assert.match(html, /aria-label="Close B"/);
-  assert.doesNotMatch(html, /aria-label="Close A"/);
+  assert.doesNotMatch(html, /aria-label="Close/, "no close buttons on the tabs; Close is in the group menu and on Delete");
   assert.match(html, /aria-label="Add a panel to left panels"/);
 });

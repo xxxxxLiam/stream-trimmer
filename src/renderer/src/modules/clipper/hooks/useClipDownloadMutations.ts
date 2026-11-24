@@ -154,6 +154,7 @@ export function useClipDownloadMutations({
             ...(segs.length > 1 ? { segments: segs } : { start: cutStart, end: cutEnd }),
             format,
             quality,
+            ...(opts?.audioLanguage ? { audioLanguage: opts.audioLanguage } : {}),
             deliver: deliverPath ? "path" : "stream",
             ...cookiePayload(),
           }),
