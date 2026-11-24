@@ -43,9 +43,9 @@ test("main.ts reads the raw log in exactly one place, and it scrubs", () => {
 });
 
 test("diagnostics:read and diagnostics:copy both use the scrubbed reader", () => {
-  const through: Record<string, string> = { "diagnostics:read": "readDiagnostics", "diagnostics:copy": "copyLog" };
+  const through: Record<string, string> = { diagnosticsRead: "readDiagnostics", diagnosticsCopy: "copyLog" };
   for (const channel of Object.keys(through)) {
-    const start = handlers.indexOf(`ipcMain.handle("${channel}"`);
+    const start = handlers.indexOf(`ipcMain.handle(IPC.${channel}`);
     assert.ok(start > 0, `${channel} missing`);
     const line = handlers.slice(start, handlers.indexOf(";", start));
     assert.ok(line.includes(`${through[channel]}(`), `${channel} does not call ${through[channel]}()`);

@@ -5,6 +5,7 @@
  *   for a hidden folder. Every reader goes through diagnosticsService, which
  *   scrubs the text before it leaves.
  */
+import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import {
   copyLog,
@@ -15,7 +16,7 @@ import {
 const { clipboard, ipcMain, shell } = electron;
 
 export function registerDiagnosticsHandlers() {
-  ipcMain.handle("diagnostics:read", () => readDiagnostics());
-  ipcMain.handle("diagnostics:reveal", () => revealLog(shell));
-  ipcMain.handle("diagnostics:copy", () => copyLog(clipboard));
+  ipcMain.handle(IPC.diagnosticsRead, () => readDiagnostics());
+  ipcMain.handle(IPC.diagnosticsReveal, () => revealLog(shell));
+  ipcMain.handle(IPC.diagnosticsCopy, () => copyLog(clipboard));
 }

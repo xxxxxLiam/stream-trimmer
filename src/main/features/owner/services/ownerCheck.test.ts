@@ -59,7 +59,7 @@ test("E2-2: nothing the renderer sends can change the verdict, before or after",
 
 test("main.ts does not register owner:check with the renderer's arguments", () => {
   const src = readFileSync(new URL("../../../ipc/ownerHandlers.ts", import.meta.url), "utf8");
-  const line = src.split("\n").find((l) => l.includes('ipcMain.handle("owner:check"')) ?? "";
+  const line = src.split("\n").find((l) => l.includes("ipcMain.handle(IPC.ownerCheck")) ?? "";
   assert.ok(line, "owner:check handler missing");
   assert.doesNotMatch(line, /\(_e,\s*\w+/, "owner:check must not take renderer arguments");
   assert.doesNotMatch(line, /check\([^)]+\)/, "owner:check must not forward arguments to the gate");
@@ -80,7 +80,7 @@ test("readBakedShape: no sidecar means no owner; a sidecar's list is what main u
 
 test("export:save checks the owner before it touches any file", () => {
   const handler = readFileSync(new URL("../../../ipc/exportHandlers.ts", import.meta.url), "utf8");
-  const start = handler.indexOf('ipcMain.handle("export:save"');
+  const start = handler.indexOf("ipcMain.handle(IPC.exportSave");
   assert.ok(start > 0);
   assert.ok(handler.slice(start, handler.indexOf(";", start)).includes("saveExport("), "export:save must go through saveExport()");
   const body = readFileSync(new URL("../../exports/services/exportService.ts", import.meta.url), "utf8");

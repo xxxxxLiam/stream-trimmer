@@ -5,6 +5,7 @@
  *   checks the payload's shape and calls filesService; the folder confinement is
  *   in the service (saveRoots.ts, pathSafety.ts).
  */
+import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import { getMainWindow } from "../modules/windows/windows";
 import {
@@ -19,7 +20,7 @@ import {
 const { ipcMain } = electron;
 
 export function registerFilesHandlers() {
-  ipcMain.handle("clip:save", async (_e: any, payload: any) => {
+  ipcMain.handle(IPC.clipSave, async (_e: any, payload: any) => {
     if (
       !payload ||
       typeof payload.tempPath !== "string" ||
@@ -31,7 +32,7 @@ export function registerFilesHandlers() {
     return saveClip(payload);
   });
 
-  ipcMain.handle("file:save", async (_e: any, payload: any) => {
+  ipcMain.handle(IPC.fileSave, async (_e: any, payload: any) => {
     if (
       !payload ||
       typeof payload.dirPath !== "string" ||
@@ -42,7 +43,7 @@ export function registerFilesHandlers() {
     return saveFile(payload);
   });
 
-  ipcMain.handle("file:saveFiles", async (_e: any, payload: any) => {
+  ipcMain.handle(IPC.fileSaveFiles, async (_e: any, payload: any) => {
     if (
       !payload ||
       typeof payload.dirPath !== "string" ||
@@ -54,11 +55,11 @@ export function registerFilesHandlers() {
     return saveFiles(payload);
   });
 
-  ipcMain.handle("file:exists", (_e: any, targetPath: any) => fileExists(targetPath));
+  ipcMain.handle(IPC.fileExists, (_e: any, targetPath: any) => fileExists(targetPath));
 
   // Native OS drag-out. Must be ipcMain.on (not handle): startDrag has to run
   // synchronously inside the drag gesture or the OS drops it.
-  ipcMain.on("file:startDrag", (event: any, targetPath: any) => {
+  ipcMain.on(IPC.fileStartDrag, (event: any, targetPath: any) => {
     try {
       // Only the app's own window, and only a real file inside the folders the
       // user chose. (The preload also refuses unless a genuine dragstart just
@@ -75,7 +76,7 @@ export function registerFilesHandlers() {
     }
   });
 
-  ipcMain.handle("file:showInFolder", (_e: any, targetPath: any) => {
+  ipcMain.handle(IPC.fileShowInFolder, (_e: any, targetPath: any) => {
     if (typeof targetPath !== "string" || !targetPath) {
       return { ok: false, error: "No path" };
     }

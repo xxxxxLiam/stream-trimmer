@@ -5,6 +5,7 @@
  *   writeFcpxml / openWith / reveal / copyFiles / pathExists. Failures come back
  *   as { ok:false, error }; the logic is in electron/editorOpen.ts.
  */
+import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import {
   copyFiles,
@@ -26,11 +27,11 @@ export function registerEditorHandlers() {
       return { ok: false, error: err && err.message ? err.message : String(err) };
     }
   };
-  ipcMain.handle("editor:installed", guard(async () => ({ ok: true, apps: installedApps() })));
-  ipcMain.handle("editor:probe", guard((file: any) => probeMedia(file)));
-  ipcMain.handle("editor:writeFcpxml", guard((payload: any) => writeFcpxml(payload || {})));
-  ipcMain.handle("editor:openWith", guard((payload: any) => openWithApp(payload || {})));
-  ipcMain.handle("editor:reveal", guard((target: any) => reveal(target, { shell })));
-  ipcMain.handle("editor:copyFiles", guard((payload: any) => copyFiles(payload || {})));
-  ipcMain.handle("editor:pathExists", guard((target: any) => pathExists(target)));
+  ipcMain.handle(IPC.editorInstalled, guard(async () => ({ ok: true, apps: installedApps() })));
+  ipcMain.handle(IPC.editorProbe, guard((file: any) => probeMedia(file)));
+  ipcMain.handle(IPC.editorWriteFcpxml, guard((payload: any) => writeFcpxml(payload || {})));
+  ipcMain.handle(IPC.editorOpenWith, guard((payload: any) => openWithApp(payload || {})));
+  ipcMain.handle(IPC.editorReveal, guard((target: any) => reveal(target, { shell })));
+  ipcMain.handle(IPC.editorCopyFiles, guard((payload: any) => copyFiles(payload || {})));
+  ipcMain.handle(IPC.editorPathExists, guard((target: any) => pathExists(target)));
 }

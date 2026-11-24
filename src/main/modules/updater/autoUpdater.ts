@@ -8,6 +8,7 @@
  *   app is signed, mac users must download new versions manually; we handle
  *   the resulting error gracefully instead of crashing.
  */
+import { IPC } from "../../../common/ipc/channels";
 import electron from "electron";
 import { autoUpdater } from "electron-updater";
 import {
@@ -28,7 +29,7 @@ export const canInstall = canInstallInPlace(process.platform);
 export function sendUpdateStatus(payload: any) {
   const mainWindow = getMainWindow();
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("updater:status", payload);
+    mainWindow.webContents.send(IPC.updaterStatus, payload);
   }
 }
 
