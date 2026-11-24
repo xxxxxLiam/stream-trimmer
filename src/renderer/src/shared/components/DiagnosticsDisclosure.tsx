@@ -33,7 +33,9 @@ export function CopyFailureDiagnostics({
   message,
   attempt,
   diagnostics,
+  label = "Copy diagnostics",
 }: {
+  label?: string;
   code?: string;
   message: string;
   attempt?: FailureAttempt;
@@ -70,7 +72,7 @@ export function CopyFailureDiagnostics({
         style={state === "copied" ? { borderColor: "var(--accent)" } : undefined}
       >
         <Clipboard size={12} />
-        {state === "copied" ? "Copied" : "Copy diagnostics"}
+        {state === "copied" ? "Copied" : label}
       </button>
       {state === "failed" ? (
         <span role="status" className="text-meta text-fg-dim">
