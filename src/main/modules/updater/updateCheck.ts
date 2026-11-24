@@ -14,7 +14,7 @@
  * @returns {{ kind: "error", message: string } | { kind: "none" } | { kind: "pending", version: string }}
  *   "pending": an update exists; the updater's own events report it.
  */
-function interpretCheckResult(result: any, currentVersion: any) {
+function interpretCheckResult(result: any, currentVersion: unknown) {
   const info = result && result.updateInfo;
   const version = info && typeof info.version === "string" ? info.version : "";
   if (!result || !info || !version) {

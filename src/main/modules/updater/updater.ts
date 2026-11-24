@@ -37,7 +37,7 @@ const ASSETS: Record<string, string> = {
  * Windows (NSIS) and Linux (AppImage) update in place unsigned, so they keep
  * the real thing.
  */
-function canInstallInPlace(platform: any) {
+function canInstallInPlace(platform: unknown) {
   return platform !== "darwin";
 }
 
@@ -47,7 +47,7 @@ function assetName(platform: any) {
 }
 
 /** Direct download for a released version — one click, no page to read. */
-function downloadUrl(platform: any, version: any) {
+function downloadUrl(platform: unknown, version: unknown) {
   const asset = assetName(platform);
   const tag = releaseTag(version);
   if (!asset || !tag) return releasesUrl();
@@ -59,7 +59,7 @@ function releasesUrl() {
 }
 
 // Releases are tagged `v<version>`; electron-updater reports the bare version.
-function releaseTag(version: any) {
+function releaseTag(version: unknown) {
   const text = String(version ?? "").trim();
   if (!/^v?\d+\.\d+\.\d+/.test(text)) return null;
   return text.startsWith("v") ? text : `v${text}`;

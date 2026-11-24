@@ -10,8 +10,8 @@ import { isDev } from "../../shared/utils/env";
 
 const { BrowserWindow, shell } = electron;
 
-let mainWindow: any = null;
-let splashWindow: any = null;
+let mainWindow: Electron.BrowserWindow | null = null;
+let splashWindow: Electron.BrowserWindow | null = null;
 
 /** The main window, or null before createWindow() has run. */
 export function getMainWindow(): any {
@@ -87,7 +87,7 @@ export async function createWindow(port: number) {
   // already let the page handle it first. Cmd+Shift+W is left alone as the way to close
   // the window, matching browsers.
   if (process.platform === "darwin") {
-    mainWindow.webContents.on("before-input-event", (event: any, input: any) => {
+    mainWindow.webContents.on("before-input-event", (event: Electron.Event, input: Electron.Input) => {
       if (
         input.type === "keyDown" &&
         input.meta &&
@@ -102,7 +102,7 @@ export async function createWindow(port: number) {
   }
 
   // Open external links in the user's browser, not inside the app.
-  mainWindow.webContents.setWindowOpenHandler(({ url }: any) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }: Electron.HandlerDetails) => {
     shell.openExternal(url);
     return { action: "deny" };
   });
@@ -112,7 +112,7 @@ export async function createWindow(port: number) {
   } else {
     try {
       await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Emergency fallback — the app still works, minus the video preview.
       console.error("[electron] http load failed, falling back to file://", err);
       await mainWindow.loadFile(

@@ -20,7 +20,7 @@ export function loadSettings() {
   settings = createSettingsStore(
     path.join(app.getPath("userData"), "settings.json"),
     {
-      log: (message: any) => logger.log("settings", message),
+      log: (message: unknown) => logger.log("settings", message),
       // Null in a public build, so the migration never names the exporter's folder.
       dataFolderName: bakedShape ? bakedShape.dataFolderName || null : null,
     },

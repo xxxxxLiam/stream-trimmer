@@ -26,7 +26,7 @@ const { dialog } = electron;
 // a download. See electron/updater.ts.
 export const canInstall = canInstallInPlace(process.platform);
 
-export function sendUpdateStatus(payload: any) {
+export function sendUpdateStatus(payload: unknown) {
   const mainWindow = getMainWindow();
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(IPC.updaterStatus, payload);
@@ -86,7 +86,7 @@ export function setupAutoUpdater() {
         detail: "Restart the app to apply the update.",
       });
       if (res.response === 0) autoUpdater.quitAndInstall();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[updater] restart dialog failed:", err);
     }
   });
@@ -99,7 +99,7 @@ export function setupAutoUpdater() {
   });
 
   // Fire the initial check shortly after window is ready.
-  autoUpdater.checkForUpdatesAndNotify().catch((err: any) => {
+  autoUpdater.checkForUpdatesAndNotify().catch((err: unknown) => {
     console.error("[updater] initial check failed:", err);
   });
 }

@@ -9,12 +9,12 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 
-function parseIoregOutput(text: any) {
+function parseIoregOutput(text: unknown) {
   const m = /"IOPlatformUUID"\s*=\s*"([0-9A-Fa-f-]{8,})"/.exec(String(text || ""));
   return m ? m[1] : null;
 }
 
-function parseRegOutput(text: any) {
+function parseRegOutput(text: unknown) {
   const m = /MachineGuid\s+REG_SZ\s+([0-9A-Fa-f-]{8,})/.exec(String(text || ""));
   return m ? m[1] : null;
 }
@@ -64,7 +64,7 @@ async function readMachineId(platform = process.platform) {
 }
 
 /** sha256 of "salt:id" (id trimmed and lowercased), lowercase hex. */
-function hashMachineId(id: any, salt: any) {
+function hashMachineId(id: unknown, salt: unknown) {
   return createHash("sha256")
     .update(`${String(salt)}:${String(id).trim().toLowerCase()}`)
     .digest("hex");

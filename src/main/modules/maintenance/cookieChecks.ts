@@ -38,7 +38,7 @@ function checkCookieFile(why: string) {
         }`,
       ),
     )
-    .catch((err: any) =>
+    .catch((err: unknown) =>
       logger.log("youtube", `cookie check (${why}) failed: ${logger.describe(err)}`),
     );
 }

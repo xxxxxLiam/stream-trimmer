@@ -14,7 +14,7 @@ import path from "node:path";
  * existing ancestor) is real, follows symlinks, so a link inside a chosen
  * folder cannot lead out of it.
  */
-function canonical(p: any) {
+function canonical(p: unknown) {
   const abs = path.resolve(String(p));
   const tail = [];
   let cur = abs;
@@ -31,7 +31,7 @@ function canonical(p: any) {
 }
 
 /** True when `target` is `root` itself or somewhere beneath it. */
-function isInside(root: any, target: any, { allowRoot = true } = {}) {
+function isInside(root: unknown, target: unknown, { allowRoot = true } = {}) {
   const rel = path.relative(canonical(root), canonical(target));
   if (rel === "") return allowRoot;
   return rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
@@ -41,10 +41,10 @@ function isInside(root: any, target: any, { allowRoot = true } = {}) {
  * Folders the app has been told about: the ones in settings plus any the user
  * picked in this session through the native dialog.
  */
-function allowedRoots(settingsObj: any, picked: string[] = []) {
-  const s = settingsObj || {};
-  const out = new Set();
-  const add = (v: any) => {
+function allowedRoots(settingsObj: Record<string, unknown> | null | undefined, picked: string[] = []): string[] {
+  const s: Record<string, any> = settingsObj || {};
+  const out = new Set<string>();
+  const add = (v: unknown) => {
     if (typeof v === "string" && v.trim() && path.isAbsolute(v)) out.add(v);
   };
   for (const key of ["clipper.saveDir", "clipper.clipsDir", "clipper.dataDir"]) add(s[key]);
@@ -59,7 +59,9 @@ function allowedRoots(settingsObj: any, picked: string[] = []) {
  * inside one of `roots` (when `roots` is given). Returns { ok, target } or
  * { ok:false, error }.
  */
-function resolveTarget({ dirPath, name, roots }: any) {
+type ResolvedTarget = { ok: true; target: string; name: string } | { ok: false; error: string };
+
+function resolveTarget({ dirPath, name, roots }: { dirPath: unknown; name: unknown; roots?: string[] | null }): ResolvedTarget {
   if (typeof dirPath !== "string" || !path.isAbsolute(dirPath)) {
     return { ok: false, error: "Unexpected save location" };
   }
@@ -68,7 +70,7 @@ function resolveTarget({ dirPath, name, roots }: any) {
   if (!safeName || !isInside(dirPath, target, { allowRoot: false })) {
     return { ok: false, error: "Unexpected save location" };
   }
-  if (roots && !roots.some((r: any) => isInside(r, target, { allowRoot: false }))) {
+  if (roots && !roots.some((r: unknown) => isInside(r, target, { allowRoot: false }))) {
     return { ok: false, error: "Unexpected save location" };
   }
   return { ok: true, target, name: safeName };
@@ -78,12 +80,12 @@ function resolveTarget({ dirPath, name, roots }: any) {
  * A path the renderer may ask the OS to drag out: an existing regular file
  * inside one of the folders the app knows about. Returns the real path or null.
  */
-function dragTarget(targetPath: any, roots: any) {
+function dragTarget(targetPath: unknown, roots: string[]): string | null {
   if (typeof targetPath !== "string" || !path.isAbsolute(targetPath)) return null;
   try {
     const real = fs.realpathSync(targetPath);
     if (!fs.statSync(real).isFile()) return null;
-    if (!roots.some((r: any) => isInside(r, real, { allowRoot: false }))) return null;
+    if (!roots.some((r: unknown) => isInside(r, real, { allowRoot: false }))) return null;
     return real;
   } catch {
     return null;
@@ -91,7 +93,7 @@ function dragTarget(targetPath: any, roots: any) {
 }
 
 /** `a.mp4` -> `a 2.mp4`, `a 3.mp4`, ... (same convention as editorOpen.ts). */
-function numberedPath(target: any, n: any) {
+function numberedPath(target: string, n: number): string {
   const ext = path.extname(target);
   return `${target.slice(0, target.length - ext.length)} ${n}${ext}`;
 }
@@ -102,17 +104,17 @@ function numberedPath(target: any, n: any) {
  * candidate is taken; that is what makes this safe against a race, not an
  * existsSync check beforehand. Returns the path that was used.
  */
-async function createWithoutOverwrite(desired: any, create: any) {
+async function createWithoutOverwrite(desired: string, create: (candidate: string) => Promise<unknown>): Promise<string> {
   for (let n = 1; n < 1000; n += 1) {
     const candidate = n === 1 ? desired : numberedPath(desired, n);
     try {
       await create(candidate);
       return candidate;
-    } catch (err: any) {
-      if (!err || err.code !== "EEXIST") throw err;
+    } catch (err) {
+      if (!err || (err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     }
   }
-  const err: any = new Error("Too many files with that name");
+  const err: NodeJS.ErrnoException = new Error("Too many files with that name");
   err.code = "EEXIST";
   throw err;
 }
@@ -122,12 +124,12 @@ async function createWithoutOverwrite(desired: any, create: any) {
  * EEXIST rather than replacing; where links are unavailable (another device,
  * exFAT) it falls back to an exclusive copy.
  */
-async function moveWithoutOverwrite(source: any, desired: any) {
-  const used = await createWithoutOverwrite(desired, async (candidate: any) => {
+async function moveWithoutOverwrite(source: string, desired: string): Promise<string> {
+  const used = await createWithoutOverwrite(desired, async (candidate) => {
     try {
       await fsp.link(source, candidate);
-    } catch (err: any) {
-      if (!err || err.code === "EEXIST") throw err;
+    } catch (err) {
+      if (!err || (err as NodeJS.ErrnoException).code === "EEXIST") throw err;
       await fsp.copyFile(source, candidate, fs.constants.COPYFILE_EXCL);
     }
   });
@@ -136,8 +138,8 @@ async function moveWithoutOverwrite(source: any, desired: any) {
 }
 
 /** Writes `data` to `desired` without overwriting (flag "wx"). */
-async function writeWithoutOverwrite(desired: any, data: any) {
-  return createWithoutOverwrite(desired, (candidate: any) =>
+async function writeWithoutOverwrite(desired: string, data: string | NodeJS.ArrayBufferView): Promise<string> {
+  return createWithoutOverwrite(desired, (candidate) =>
     fsp.writeFile(candidate, data, { flag: "wx" }),
   );
 }

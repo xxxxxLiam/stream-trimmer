@@ -12,11 +12,11 @@ const { ipcMain } = electron;
 
 export function registerSettingsHandlers() {
   // Synchronous snapshot so the renderer can seed state before first paint.
-  ipcMain.on(IPC.settingsAll, (e: any) => {
+  ipcMain.on(IPC.settingsAll, (e: Electron.IpcMainEvent) => {
     const settings = getSettings();
     e.returnValue = settings ? settings.all() : {};
   });
-  ipcMain.handle(IPC.settingsSet, (_e: any, key: any, value: any) => {
+  ipcMain.handle(IPC.settingsSet, (_e: unknown, key: unknown, value: unknown) => {
     const settings = getSettings();
     if (!settings) return { ok: false };
     return { ok: settings.set(key, value) };

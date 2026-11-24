@@ -32,7 +32,7 @@ export async function saveExport(payload: any) {
         : `refused: ${result.error}`,
     );
     return result;
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.log("export", `save failed: ${logger.describe(err)}`);
     return { ok: false, error: logger.describe(err) };
   }

@@ -56,7 +56,7 @@ export async function saveClip(payload: any) {
     await fsp.rm(path.dirname(source), { recursive: true, force: true });
     logger.log("clip", `saved ${path.basename(target)}`);
     return { ok: true, path: target };
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.log("clip", `save failed: ${logger.describe(err)}`);
     return { ok: false, error: logger.describe(err) };
   }
@@ -142,19 +142,18 @@ export function fileExists(targetPath: string): boolean {
  * Native OS drag-out, for a real file inside the folders the user chose. Must
  * run synchronously inside the drag gesture or the OS drops it.
  */
-export function startDrag(sender: any, targetPath: string) {
+export function startDrag(sender: Electron.WebContents, targetPath: unknown) {
   const real = dragTarget(targetPath, saveRoots());
   if (!real) {
     logger.log("drag", "refused drag of a path outside the chosen folders");
     return;
   }
-  targetPath = real;
 
   // Windows silently cancels a drag with a missing/empty icon, so always
   // hand over a real image. Per-file thumbnails are deliberately not used:
   // nativeImage.createThumbnailFromPath is async and startDrag must resolve
   // its icon synchronously inside the gesture. The app icon is cached once.
-  sender.startDrag({ file: targetPath, icon: getDragIcon() });
+  sender.startDrag({ file: real, icon: getDragIcon() });
 }
 
 /**

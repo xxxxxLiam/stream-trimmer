@@ -62,7 +62,7 @@ function rotate(target: any) {
 }
 
 /** Appends one timestamped line. Never throws. */
-function log(scope: any, message: any) {
+function log(scope: unknown, message: unknown) {
   const text = String(message);
   const line = `${new Date().toISOString()} [${scope}] ${
     text.length > MAX_LINE ? `${text.slice(0, MAX_LINE)}…` : text
@@ -73,7 +73,7 @@ function log(scope: any, message: any) {
 }
 
 /** Appends one already-formatted line. Never throws. */
-function writeLine(line: any) {
+function writeLine(line: unknown) {
   const target = resolveLogFile();
   if (!target) return;
   try {
@@ -91,7 +91,7 @@ function writeLine(line: any) {
  * the one thing needed to explain a session that exists but will not verify.
  */
 function captureConsole() {
-  const forward = (level: any) => (...args: any[]) => {
+  const forward = (level: any) => (...args: unknown[]) => {
     (nativeConsole as any)[level](...args);
     try {
       const text = args
@@ -139,7 +139,7 @@ function installCrashHandlers() {
       `child-process-gone type=${details && details.type} reason=${details && details.reason}`,
     );
   });
-  (app as any).on("gpu-process-crashed", (_event: any, killed: any) => {
+  (app as any).on("gpu-process-crashed", (_event: unknown, killed: unknown) => {
     log("crash", `gpu-process-crashed killed=${killed}`);
   });
   // Distinguishes "the app decided to quit" from "the app was killed". Without
@@ -157,11 +157,11 @@ function installCrashHandlers() {
 }
 
 /** Attaches per-window diagnostics (unresponsive / renderer death). */
-function watchWindow(name: any, win: any) {
+function watchWindow(name: unknown, win: Electron.BrowserWindow) {
   if (!win || win.isDestroyed()) return;
   win.on("unresponsive", () => log("window", `${name} unresponsive`));
   win.on("responsive", () => log("window", `${name} responsive again`));
-  win.webContents.on("render-process-gone", (_e: any, details: any) => {
+  win.webContents.on("render-process-gone", (_e: unknown, details: Electron.RenderProcessGoneDetails) => {
     log(
       "window",
       `${name} renderer gone reason=${details && details.reason}`,

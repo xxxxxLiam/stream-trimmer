@@ -14,7 +14,7 @@ const SUPPORTED_BROWSERS = [
   "chromium",
 ];
 
-function mapBrowserName(value: any) {
+function mapBrowserName(value: unknown) {
   const name = String(value || "").toLowerCase();
   if (name.includes("brave")) return "brave";
   if (name.includes("firefox")) return "firefox";
@@ -52,7 +52,7 @@ function detectDefaultBrowser(app: any) {
   return null;
 }
 
-function browserCheckOrder(defaultBrowser: any, savedBrowser: any) {
+function browserCheckOrder(defaultBrowser: unknown, savedBrowser: any) {
   return [...new Set([defaultBrowser, savedBrowser, ...SUPPORTED_BROWSERS])].filter(
     (browser) => SUPPORTED_BROWSERS.includes(browser),
   );

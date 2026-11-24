@@ -20,7 +20,7 @@ import {
 const { ipcMain, shell } = electron;
 
 export function registerEditorHandlers() {
-  const guard = (fn: any) => async (_e: any, payload: any) => {
+  const guard = (fn: any) => async (_e: unknown, payload: unknown) => {
     try {
       return await fn(payload);
     } catch (err: any) {
@@ -28,10 +28,10 @@ export function registerEditorHandlers() {
     }
   };
   ipcMain.handle(IPC.editorInstalled, guard(async () => ({ ok: true, apps: installedApps() })));
-  ipcMain.handle(IPC.editorProbe, guard((file: any) => probeMedia(file)));
-  ipcMain.handle(IPC.editorWriteFcpxml, guard((payload: any) => writeFcpxml(payload || {})));
-  ipcMain.handle(IPC.editorOpenWith, guard((payload: any) => openWithApp(payload || {})));
-  ipcMain.handle(IPC.editorReveal, guard((target: any) => reveal(target, { shell })));
-  ipcMain.handle(IPC.editorCopyFiles, guard((payload: any) => copyFiles(payload || {})));
-  ipcMain.handle(IPC.editorPathExists, guard((target: any) => pathExists(target)));
+  ipcMain.handle(IPC.editorProbe, guard((file: unknown) => probeMedia(file)));
+  ipcMain.handle(IPC.editorWriteFcpxml, guard((payload: unknown) => writeFcpxml(payload || {})));
+  ipcMain.handle(IPC.editorOpenWith, guard((payload: unknown) => openWithApp(payload || {})));
+  ipcMain.handle(IPC.editorReveal, guard((target: unknown) => reveal(target, { shell })));
+  ipcMain.handle(IPC.editorCopyFiles, guard((payload: unknown) => copyFiles(payload || {})));
+  ipcMain.handle(IPC.editorPathExists, guard((target: unknown) => pathExists(target)));
 }
