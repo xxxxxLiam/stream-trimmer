@@ -1,109 +1,66 @@
 /**
  * File: PlayerControls.tsx
  * Path: src/renderer/src/features/player/components/PlayerControls.tsx
- * Description: Playhead readout, set start/end buttons and looped selection playback.
+ * Description: Transport A: loop and speed on the left, back 5, play and forward 5 in the middle,
+ *   volume and full screen on the right. Hover labels carry the keys.
  */
-import { useEffect } from "react";
+import type { PreviewController } from "../hooks/usePreviewController";
+import { hoverLabel, isMacLike } from "../utils/transport";
+import TransportButton from "./TransportButton";
 import {
-  PlayFill,
-  PauseFill,
-  ChevronBarLeft,
-  ChevronBarRight,
-  Repeat,
-} from "react-bootstrap-icons";
-import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
-import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
-import { formatTimestamp } from "../../../shared/utils/clip";
-import type { YouTubePlayerApi } from "../hooks/useYouTubePlayerController";
+  BackIcon,
+  ForwardIcon,
+  FullScreenIcon,
+  LoopIcon,
+  PauseIcon,
+  PlayIcon,
+  VolumeIcon,
+} from "./TransportIcons";
 
-export default function PlayerControls({
-  player,
-  loopSelection,
-  onToggleLoop,
-}: {
-  player: YouTubePlayerApi;
-  loopSelection: boolean;
-  onToggleLoop: () => void;
-}) {
-  const { info, start, duration, setStartFromSeconds, setEndFromSeconds } = useClipperContext();
-  const isTabActive = useIsTabActive();
-  const { currentTime, playing, play, pause, seekTo, ready } = player;
-
-  const setIn = () => setStartFromSeconds(Math.floor(currentTime));
-  const setOut = () => setEndFromSeconds(Math.ceil(currentTime));
-
-  // I / O keyboard shortcuts, ignored while typing in a field.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (!isTabActive || !info || e.metaKey || e.ctrlKey || e.altKey) return;
-      const el = e.target as HTMLElement | null;
-      if (el && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return;
-      if (e.key === "i" || e.key === "I") {
-        e.preventDefault();
-        setIn();
-      } else if (e.key === "o" || e.key === "O") {
-        e.preventDefault();
-        setOut();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  // The selection and playhead are drawn once, on the Timeline below the video.
+export default function PlayerControls({ c }: { c: PreviewController }) {
+  const { player } = c;
+  const mac = isMacLike();
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={() => (playing ? pause() : play())}
-        disabled={!ready}
-        className="btn"
-        aria-label={playing ? "Pause" : "Play"}
-      >
-        {playing ? <PauseFill size={12} /> : <PlayFill size={12} />}
-        <span>{playing ? "Pause" : "Play"}</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={setIn}
-        disabled={!info}
-        className="btn"
-        title="Start the clip at the playhead (I)"
-      >
-        <ChevronBarLeft size={12} />
-        <span>Set start</span>
-        <span className="kbd">I</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={setOut}
-        disabled={!info}
-        className="btn"
-        title="End the clip at the playhead (O)"
-      >
-        <ChevronBarRight size={12} />
-        <span>Set end</span>
-        <span className="kbd">O</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => {
-          onToggleLoop();
-          if (!loopSelection) seekTo(start, true);
-        }}
-        disabled={!ready || !info}
-        className={"btn" + (loopSelection ? " border-accent/60 text-accent" : "")}
-        title="Play only the range between start and end, on repeat"
-      >
-        <Repeat size={12} />
-        <span>{loopSelection ? "Stop looping" : "Loop clip"}</span>
-      </button>
-
-      <span className="ml-auto text-meta tabular-nums text-fg-dim">
-        {formatTimestamp(currentTime)} / {formatTimestamp(duration)}
+    <div className="relative flex flex-none items-center justify-between">
+      <span className="flex gap-2.5">
+        <TransportButton
+          label={hoverLabel("loop", mac)}
+          name="Loop"
+          active={c.loop}
+          pressed={c.loop}
+          disabled={!player.ready || !c.range}
+          onClick={c.toggleLoop}
+        >
+          <LoopIcon />
+        </TransportButton>
+        <TransportButton label={hoverLabel("speed", mac)} name="Speed" onClick={c.cycleSpeed}>
+          {player.speed}x
+        </TransportButton>
+      </span>
+      <span className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3.5">
+        <TransportButton look="ghost" label={hoverLabel("back", mac)} name="Back 5 seconds" onClick={() => c.step(-1)}>
+          <BackIcon />
+        </TransportButton>
+        <TransportButton
+          look="play"
+          label={hoverLabel("play", mac)}
+          name={player.playing ? "Pause" : "Play"}
+          disabled={!player.ready}
+          onClick={c.togglePlay}
+        >
+          {player.playing ? <PauseIcon /> : <PlayIcon />}
+        </TransportButton>
+        <TransportButton look="ghost" label={hoverLabel("forward", mac)} name="Forward 5 seconds" onClick={() => c.step(1)}>
+          <ForwardIcon />
+        </TransportButton>
+      </span>
+      <span className="flex gap-2.5">
+        <TransportButton label={hoverLabel("volume", mac)} name="Volume" pressed={player.muted} onClick={player.toggleMute}>
+          <VolumeIcon muted={player.muted} />
+        </TransportButton>
+        <TransportButton label={hoverLabel("fullscreen", mac)} name="Full screen" onClick={c.toggleFullScreen}>
+          <FullScreenIcon />
+        </TransportButton>
       </span>
     </div>
   );

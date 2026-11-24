@@ -401,6 +401,12 @@ function Layout({ active }: { active: boolean }) {
       clipsDir: folders.clipsDir || saveDir || undefined,
       clips: sessionClips,
     },
+    // Not wired yet: the videos list (Left panels) provides the next video, and the campaign form
+    // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".
+    day: { campaignName: campaign?.name ?? null, next: null, made: 0, quota: null },
+    onNextVideo: () => {},
+    onOpenBank: () => {},
+    onOpenVideo: () => {},
   };
 
   return (

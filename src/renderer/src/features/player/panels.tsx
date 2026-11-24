@@ -12,14 +12,7 @@ import DownloadBar from "../downloads/components/DownloadBar";
 import PreviewPanel from "./components/PreviewPanel";
 import Timeline from "./components/Timeline";
 
-function PreviewSlot() {
-  return (
-    <div tabIndex={0} aria-label="Preview" className="min-h-0 flex-1 overflow-y-auto">
-      <PreviewPanel />
-    </div>
-  );
-}
-registerPanel({ id: "preview", title: "Preview", group: "centre", component: PreviewSlot });
+registerPanel({ id: "preview", title: "Preview", group: "centre", component: PreviewPanel });
 
 function TimelineSlot() {
   const { cutSegments, editorHandoff } = usePanelHost();

@@ -46,6 +46,9 @@ interface YTPlayer {
   pauseVideo(): void;
   getCurrentTime(): number;
   getPlayerState(): number;
+  setPlaybackRate(rate: number): void;
+  mute(): void;
+  unMute(): void;
 }
 
 interface YTNamespace {
@@ -91,10 +94,16 @@ export interface YouTubePlayerApi {
   ready: boolean;
   blocked: boolean;
   playing: boolean;
+  /** True once the video has played to its end, until it plays or is sought again. */
+  ended: boolean;
   currentTime: number;
   seekTo: (seconds: number, autoplay?: boolean) => void;
   play: () => void;
   pause: () => void;
+  speed: number;
+  setSpeed: (rate: number) => void;
+  muted: boolean;
+  toggleMute: () => void;
 }
 
 export function useYouTubePlayerController(videoId: string | null): YouTubePlayerApi {
@@ -104,7 +113,10 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
   const [ready, setReady] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [ended, setEnded] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [speed, setSpeedState] = useState(1);
+  const [muted, setMuted] = useState(false);
   // Set while a seek is in flight; see acceptPolledTime.
   const pendingSeek = useRef<PendingSeek>(null);
 
@@ -118,6 +130,10 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
   const lastTime = useRef<{ videoId: string; time: number } | null>(null);
   const readyRef = useRef(false);
   readyRef.current = ready;
+  const speedRef = useRef(1);
+  speedRef.current = speed;
+  const mutedRef = useRef(false);
+  mutedRef.current = muted;
 
   useEffect(() => {
     if (tabActive) {
@@ -173,10 +189,21 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
             ...(startAt > 0 ? { start: startAt } : null),
           },
           events: {
-            onReady: () => !cancelled && setReady(true),
+            onReady: () => {
+              if (cancelled) return;
+              // A rebuilt player keeps the speed and mute the clipper chose.
+              try {
+                playerRef.current?.setPlaybackRate(speedRef.current);
+                if (mutedRef.current) playerRef.current?.mute();
+              } catch {
+                /* the player is not ready to take settings */
+              }
+              setReady(true);
+            },
             onStateChange: (e: { data: number }) => {
               if (cancelled) return;
               setPlaying(e.data === 1);
+              setEnded(e.data === 0);
             },
             onError: (e: { data: number }) => {
               if (cancelled) return;
@@ -254,5 +281,39 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
     }
   }, []);
 
-  return { containerRef, ready, blocked, playing, currentTime, seekTo, play, pause };
+  const setSpeed = useCallback((rate: number) => {
+    setSpeedState(rate);
+    try {
+      playerRef.current?.setPlaybackRate(rate);
+    } catch {
+      /* applied when the player is ready */
+    }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const next = !mutedRef.current;
+    setMuted(next);
+    try {
+      if (next) playerRef.current?.mute();
+      else playerRef.current?.unMute();
+    } catch {
+      /* applied when the player is ready */
+    }
+  }, []);
+
+  return {
+    containerRef,
+    ready,
+    blocked,
+    playing,
+    ended,
+    currentTime,
+    seekTo,
+    play,
+    pause,
+    speed,
+    setSpeed,
+    muted,
+    toggleMute,
+  };
 }
