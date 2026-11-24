@@ -89,6 +89,7 @@ export default {
         panel: "14px",
         control: "8px",
         chip: "5px",
+        pill: "22px",
       },
       spacing: {
         // Fixed control sizes. target = the 44px minimum hit area from the Type board.
@@ -109,6 +110,9 @@ export default {
         box: "var(--glow-box)",
         mark: "var(--glow-mark)",
         saved: "var(--flash-saved)",
+        "clip-hover": "var(--glow-clip-hover)",
+        open: "var(--glow-open)",
+        made: "var(--glow-made)",
         // Legacy names, now flat or mapped to a named glow.
         panel: "none",
         raised: "none",
