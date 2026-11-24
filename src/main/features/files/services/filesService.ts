@@ -19,6 +19,7 @@ import {
 import * as logger from "../../../modules/logger/logger";
 import { getDragIcon } from "./dragIcon";
 import { saveRoots } from "./saveRoots";
+import { undoClipFile } from "./undoClip";
 
 const { shell } = electron;
 
@@ -170,4 +171,9 @@ export function showInFolder(targetPath: string) {
       error: err && err.message ? err.message : "Failed to reveal",
     };
   }
+}
+
+/** Undo of a just-made clip: its file goes to the Trash / Recycle Bin. */
+export function undoClip(targetPath: unknown) {
+  return undoClipFile(targetPath, saveRoots(), (file) => shell.trashItem(file));
 }
