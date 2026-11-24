@@ -9,16 +9,15 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import type { Range } from "../../../shared/utils/segments";
+import { usePickedRange } from "./usePickedRange";
 import { useYouTubePlayerController } from "./useYouTubePlayerController";
 import { usePreviewState } from "./usePreviewState";
 import { usePreviewEffects } from "./usePreviewEffects";
+import { clipSections } from "../utils/clipDestination";
 import { nextSpeed, stepTarget, STEP_SECONDS } from "../utils/transport";
 
-const validRange = (start: number, end: number): Range | null =>
-  Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
-
 export function usePreviewController(onNextVideo: () => void) {
-  const { info, loadingInfo, videoId, start, end, duration, seekRequest, setStartFromSeconds, setEndFromSeconds } =
+  const { info, loadingInfo, videoId, duration, seekRequest, setStartFromSeconds, setEndFromSeconds } =
     useClipperContext();
   const tabActive = useIsTabActive();
   const player = useYouTubePlayerController(videoId);
@@ -26,12 +25,12 @@ export function usePreviewController(onNextVideo: () => void) {
   const { segments } = useSegmentsState();
   const frameRef = useRef<HTMLDivElement | null>(null);
 
-  const range = validRange(start, end);
+  const range = usePickedRange();
   // A joined clip plays its sections in order; otherwise the marked range.
   const sections = useMemo<readonly Range[]>(
-    () => (segments.length > 0 ? segments : range ? [range] : []),
+    () => clipSections(segments, range),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [segments, start, end],
+    [segments, range?.start, range?.end],
   );
 
   const toggleLoop = () => {

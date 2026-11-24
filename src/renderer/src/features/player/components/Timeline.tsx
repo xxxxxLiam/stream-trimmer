@@ -1,246 +1,47 @@
 /**
  * File: Timeline.tsx
  * Path: src/renderer/src/features/player/components/Timeline.tsx
- * Description: Centre column, under the video. The scrub track: each segment of the clip
- *   being built as a numbered accent block, already-published ranges as grey hatch, banked
- *   ranges as hollow outlines (click one to play from its start), the pending in/out mark,
- *   and the playhead. Every position is a percentage of the video duration so the track
- *   stays fluid at any width.
+ * Description: The timeline panel: header, ruler and the three lanes (Transcript, Source, Clips),
+ *   full width under the preview. The tools and zoom come from the bottom bar's shared state.
  */
-import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
-import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
-import { useCampaign } from "../../campaigns/hooks/CampaignContext";
-import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
-import { playFrom } from "../../../shared/utils/playFrom";
-import {
-  checkRange,
-  formatTimecode,
-  type NamedRange,
-  type Range,
-  type Segment,
-} from "../../../shared/utils/segments";
+import { useLayoutEffect, useRef } from "react";
+import { useTimelineController } from "../hooks/useTimelineController";
+import { useTranscriptLane } from "../hooks/useTranscriptLane";
+import ClipsLane from "./ClipsLane";
+import SourceLane from "./SourceLane";
+import TimelineHeader from "./TimelineHeader";
+import TimelineRuler from "./TimelineRuler";
+import TranscriptLane from "./TranscriptLane";
 
-export type TimelineProps = {
-  className?: string;
-  /** Overrides, mainly for tests and previews. Defaults come from the contexts. */
-  duration?: number;
-  segments?: readonly Segment[];
-  used?: readonly NamedRange[];
-  banked?: readonly NamedRange[];
-  playhead?: number;
-  onSeek?: (seconds: number) => void;
-  /** Clicking a banked block. Defaults to playing the video from that block's start. */
-  onPlayBanked?: (range: NamedRange) => void;
-};
+const LABEL_WIDTH = 96;
 
-const HATCH = "repeating-linear-gradient(45deg, #3A3A3D 0 3px, #252527 3px 6px)";
+export default function Timeline() {
+  const c = useTimelineController();
+  const laneBox = useRef<HTMLDivElement>(null);
+  const transcriptLane = useTranscriptLane();
+  const { setWidth } = c;
 
-function pct(value: number, duration: number): number {
-  if (!(duration > 0)) return 0;
-  return Math.min(100, Math.max(0, (value / duration) * 100));
-}
-
-function spanStyle(r: Range, duration: number): CSSProperties {
-  const left = pct(r.start, duration);
-  const right = pct(r.end, duration);
-  return { left: `${left}%`, width: `${Math.max(0, right - left)}%` };
-}
-
-export default function Timeline({
-  className,
-  duration: durationProp,
-  segments: segmentsProp,
-  used: usedProp,
-  banked: bankedProp,
-  playhead: playheadProp,
-  onSeek,
-  onPlayBanked,
-}: TimelineProps) {
-  const clipper = useClipperContext();
-  const { active } = useCampaign();
-  const store = useSegmentsState();
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  const duration = durationProp ?? clipper.duration;
-  const segments = segmentsProp ?? store.segments;
-  const videoId = clipper.videoId;
-  const used: readonly NamedRange[] =
-    usedProp ?? (videoId && active ? (active.usedRanges[videoId] ?? []) : []);
-  const banked = bankedProp ?? store.banked;
-  const playhead = playheadProp ?? store.playhead;
-  const seek = onSeek ?? clipper.requestSeek;
-  const playBanked = onPlayBanked ?? ((r: NamedRange) => playFrom(r.start));
-  const enabled = duration > 0;
-
-  // The pending mark is only drawn once the user has typed or set one.
-  const marked = clipper.startText.trim() !== "" || clipper.endText.trim() !== "";
-  const pending: Range = { start: clipper.start, end: clipper.end };
-  const showPending = enabled && marked && checkRange(pending, duration).ok;
-
-  const seekFromPointer = (e: PointerEvent<HTMLDivElement>) => {
-    const el = trackRef.current;
-    if (!el || !enabled) return;
-    const rect = el.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    const f = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    seek(Math.round(f * duration));
-  };
-
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!enabled) return;
-    let next: number | null = null;
-    if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = duration;
-    else if (e.key === "PageUp") next = playhead - 30;
-    else if (e.key === "PageDown") next = playhead + 30;
-    if (next === null) return;
-    e.preventDefault();
-    seek(Math.min(duration, Math.max(0, next)));
-  };
-
-  const hasUsed = used.some((u) => checkRange(u).ok);
-  const hasBanked = banked.some((b) => checkRange(b).ok);
+  useLayoutEffect(() => {
+    const el = laneBox.current;
+    if (!el) return;
+    const measure = () => setWidth(Math.max(0, el.clientWidth - LABEL_WIDTH));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [setWidth]);
 
   return (
-    <div id="ui-timeline" className={`surface-panel flex flex-col gap-2 p-4 ${className ?? ""}`}>
-      <div
-        ref={trackRef}
-        role="slider"
-        tabIndex={enabled ? 0 : -1}
-        aria-label="Video timeline"
-        aria-orientation="horizontal"
-        aria-valuemin={0}
-        aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(Math.min(playhead, duration || playhead))}
-        aria-valuetext={formatTimecode(playhead)}
-        aria-disabled={!enabled}
-        onKeyDown={onKeyDown}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture?.(e.pointerId);
-          seekFromPointer(e);
-        }}
-        onPointerMove={(e) => {
-          if (e.buttons === 1) seekFromPointer(e);
-        }}
-        className="relative h-row w-full touch-none select-none overflow-hidden rounded-chip border border-hairline"
-        style={{
-          background: "var(--c-raised)",
-          cursor: enabled ? "pointer" : "default",
-        }}
-      >
-        {enabled &&
-          used.map((u, i) =>
-            checkRange(u).ok ? (
-              <div
-                key={`used-${i}-${u.start}-${u.end}`}
-                className="pointer-events-none absolute inset-y-0"
-                style={{ ...spanStyle(u, duration), backgroundImage: HATCH, minWidth: 2 }}
-                title={`Already used${u.clipId ? ` by ${u.clipId}` : ""}: ${formatTimecode(u.start)} to ${formatTimecode(u.end)}`}
-              />
-            ) : null,
-          )}
-
-        {/* Banked ranges: click one (or focus it and press Enter) to play from its start.
-            Pointer events stop here so the track underneath does not also seek. */}
-        {enabled &&
-          banked.map((b, i) =>
-            checkRange(b).ok ? (
-              <div
-                key={`bank-${i}-${b.start}-${b.end}`}
-                role="button"
-                tabIndex={0}
-                aria-label={`Play banked clip${b.label ? ` ${b.label}` : ""} from ${formatTimecode(b.start)}`}
-                className="absolute inset-y-0 cursor-pointer rounded-chip hover:bg-hover"
-                style={{
-                  ...spanStyle(b, duration),
-                  minWidth: 6,
-                  boxShadow: "inset 0 0 0 1.5px var(--c-fg-dim)",
-                }}
-                title={`Banked${b.label ? `: ${b.label}` : ""} ${formatTimecode(b.start)} to ${formatTimecode(b.end)}. Click to play from the start.`}
-                onPointerDown={(e) => e.stopPropagation()}
-                onPointerMove={(e) => e.stopPropagation()}
-                onClick={() => playBanked(b)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    playBanked(b);
-                  }
-                }}
-              />
-            ) : null,
-          )}
-
-        {showPending && (
-          <div
-            className="pointer-events-none absolute inset-y-0 border-x"
-            style={{
-              ...spanStyle(pending, duration),
-              minWidth: 2,
-              background: "var(--accent-18)",
-              borderColor: "var(--accent)",
-            }}
-            title={`Marked ${formatTimecode(pending.start)} to ${formatTimecode(pending.end)}`}
-          />
-        )}
-
-        {enabled &&
-          segments.map((s, i) =>
-            checkRange(s).ok ? (
-              <div
-                key={`seg-${i}-${s.start}-${s.end}`}
-                role="img"
-                aria-label={`Segment ${i + 1}, ${formatTimecode(s.start)} to ${formatTimecode(s.end)}`}
-                title={`Segment ${i + 1}: ${formatTimecode(s.start)} to ${formatTimecode(s.end)}`}
-                className="pointer-events-none absolute inset-y-1 flex items-center justify-center overflow-hidden rounded-chip bg-range-fill text-meta font-medium text-accent-on"
-                style={{ ...spanStyle(s, duration), minWidth: 4 }}
-              >
-                <span className="font-mono">{i + 1}</span>
-              </div>
-            ) : null,
-          )}
-
-        {enabled && (
-          <div
-            className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2"
-            style={{ left: `${pct(playhead, duration)}%`, background: "var(--c-fg)" }}
-            aria-hidden="true"
-          />
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-meta text-fg-dim">
-        <span className="font-mono">{formatTimecode(0)}</span>
-        <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {segments.length > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-block h-2 w-4 rounded-chip bg-range-fill" aria-hidden="true" />
-              This clip
-            </span>
-          )}
-          {hasUsed && (
-            <span className="inline-flex items-center gap-1">
-              <span
-                className="inline-block h-2 w-4 rounded-chip"
-                style={{ backgroundImage: HATCH }}
-                aria-hidden="true"
-              />
-              Used
-            </span>
-          )}
-          {hasBanked && (
-            <span className="inline-flex items-center gap-1">
-              <span
-                className="inline-block h-2 w-4 rounded-chip"
-                style={{ boxShadow: "inset 0 0 0 1.5px var(--c-fg-dim)" }}
-                aria-hidden="true"
-              />
-              Banked, click to play
-            </span>
-          )}
-        </span>
-        <span className="font-mono">{formatTimecode(duration)}</span>
-      </div>
+    <div id="ui-timeline" ref={laneBox} className="relative flex min-w-0 flex-1 flex-col border-y border-hairline bg-panel pb-2.5">
+      <TimelineHeader c={c} />
+      <TimelineRuler c={c} />
+      {transcriptLane ? <TranscriptLane c={c} /> : null}
+      <SourceLane c={c} />
+      <ClipsLane c={c} />
+      {c.folded && c.fold[0] ? (
+        <div className="absolute bottom-2 right-4 text-meta text-fg-dim">Zoom: 52 s each side of the fold</div>
+      ) : null}
     </div>
   );
 }

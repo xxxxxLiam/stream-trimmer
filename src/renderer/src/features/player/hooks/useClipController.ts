@@ -9,11 +9,13 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
-import { availableDestinations, clipReason } from "../utils/clipDestination";
+import { availableDestinations, clipReason, clipSections } from "../utils/clipDestination";
+import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
 
 export function useClipController(opts: { listenForKey?: boolean } = {}) {
-  const { start, end, downloading } = useClipperContext();
+  const { downloading } = useClipperContext();
+  const range = usePickedRange();
   const host = usePanelHost();
   const { segments } = useSegmentsState();
   const tabActive = useIsTabActive();
@@ -32,9 +34,9 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     };
   }, []);
 
-  const hasRange = Number.isFinite(start) && Number.isFinite(end) && end > start;
+  const hasRange = range !== null;
   const reason = clipReason({ hasRange, segments: segments.length, busy: !!downloading });
-  const toCut = segments.length > 0 ? segments : hasRange ? [{ start, end }] : [];
+  const toCut = clipSections(segments, range);
 
   const clip = () => {
     if (!reason) host.cutSegments(toCut);

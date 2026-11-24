@@ -41,3 +41,18 @@ export function clipReason(s: { hasRange: boolean; segments: number; busy: boole
   if (!s.hasRange && s.segments === 0) return "Set an end first: click the timeline or press O";
   return null;
 }
+
+type Section = { start: number; end: number };
+
+/**
+ * What Clip makes: the locked sections in order, then the part currently marked (if it is a real
+ * range and not already the last locked section).
+ */
+export function clipSections(segments: readonly Section[], range: Section | null): Section[] {
+  const out = segments.map((s) => ({ start: s.start, end: s.end }));
+  const last = out[out.length - 1];
+  if (range && range.end > range.start && !(last && last.start === range.start && last.end === range.end)) out.push({ ...range });
+  return out;
+}
+
+export const sectionsLength = (s: readonly Section[]) => s.reduce((n, x) => n + Math.max(0, x.end - x.start), 0);

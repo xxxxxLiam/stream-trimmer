@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DESTINATIONS, availableDestinations, clipReason, normalizeDestination, toAfterCutting } from "./clipDestination";
+import { DESTINATIONS, availableDestinations, clipReason, clipSections, normalizeDestination, sectionsLength, toAfterCutting } from "./clipDestination";
 
 test("the menu lists folder first, then the four editors, with no default editor", () => {
   assert.deepEqual(
@@ -47,4 +47,15 @@ test("the choice is sticky and shared by every Clip button", async () => {
   setClipDestination("capcut");
   assert.equal(getClipDestination(), "capcut");
   setClipDestination("folder");
+});
+
+test("Clip makes the locked sections then the marked part; a repeat of the last is not added twice", () => {
+  const a = { start: 10, end: 28 };
+  const b = { start: 600, end: 616 };
+  assert.deepEqual(clipSections([a], b), [a, b]);
+  assert.deepEqual(clipSections([a], a), [a]);
+  assert.deepEqual(clipSections([], b), [b]);
+  assert.deepEqual(clipSections([a], null), [a]);
+  assert.deepEqual(clipSections([], { start: 5, end: 5 }), []);
+  assert.equal(sectionsLength([a, b]), 34);
 });
