@@ -25,6 +25,7 @@ export type Win = { from: number; to: number };
 export function normalizeTranscript(raw: readonly Line[] | null | undefined): Line[] {
   if (!raw || raw.length === 0) return [];
   const out = raw.map((l) => ({
+    ...l,
     start: Number.isFinite(l.start) ? l.start : 0,
     end: Number.isFinite(l.end) ? Math.max(l.end, l.start) : l.start,
     text: l.text,

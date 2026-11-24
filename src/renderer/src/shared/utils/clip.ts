@@ -22,15 +22,25 @@ export interface VideoInfo {
   bitrates?: Bitrates;
 }
 
-export interface TranscriptLine {
+export interface TranscriptWord {
   start: number;
   end: number;
   text: string;
 }
 
+export interface TranscriptLine {
+  start: number;
+  end: number;
+  text: string;
+  /** Per-word times; absent when the captions don't carry them. */
+  words?: TranscriptWord[];
+}
+
 export interface TranscriptResponse {
   lines: TranscriptLine[];
   available: boolean;
+  /** True when lines carry word times, so word snapping is possible for this video. */
+  wordTimings?: boolean;
   note?: string;
 }
 
