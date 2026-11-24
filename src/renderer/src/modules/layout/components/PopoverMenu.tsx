@@ -126,7 +126,7 @@ export default function PopoverMenu({
                 }}
               >
                 {item.checked === undefined ? null : (
-                  <span className="flex w-4 shrink-0 justify-center text-accent">{item.checked ? <Check size={16} /> : null}</span>
+                  <span className="flex w-4 shrink-0 justify-center text-ice">{item.checked ? <Check size={16} /> : null}</span>
                 )}
                 <span>{item.label}</span>
               </button>

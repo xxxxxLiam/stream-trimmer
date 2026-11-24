@@ -118,7 +118,7 @@ export default function PanelTabStrip({
                   onClick={() => onActivate(t.id)}
                   onKeyDown={(e) => onKeyDown(e, t.id, t.closable !== false)}
                   className={`flex h-full items-center whitespace-nowrap border-b-2 px-3 text-body ${
-                    selected ? "border-accent text-fg" : "border-transparent text-fg-dim hover:text-fg"
+                    selected ? "border-ice text-fg" : "border-transparent text-fg-dim hover:text-fg"
                   }`}
                 >
                   {t.title}

@@ -439,10 +439,10 @@
   background: var(--c-hairline-strong);
 }
 .panel-handle:active::after {
-  background: var(--accent);
+  background: var(--ice);
 }
 .panel-handle:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ice);
   outline-offset: 0;
 }
 /* Tabs scroll sideways with no scrollbar; a fade shows on a side that has hidden tabs. */
