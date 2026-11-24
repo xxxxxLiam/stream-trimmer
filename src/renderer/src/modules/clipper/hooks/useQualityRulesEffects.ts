@@ -1,6 +1,6 @@
 /**
- * File: useQualityRules.ts
- * Path: src/renderer/src/modules/clipper/hooks/useQualityRules.ts
+ * File: useQualityRulesEffects.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useQualityRulesEffects.ts
  * Description: Keeps the quality valid for the format and holds it at 360p while signed out.
  */
 import { useEffect, useRef } from "react";
@@ -8,7 +8,7 @@ import { type ClipFormat } from "../../../shared/utils/clip";
 import { isSignedOut, signedOutQuality, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import { AUDIO_QUALITIES, VIDEO_QUALITIES } from "../utils/clipperTypes";
 
-export function useQualityRules({
+export function useQualityRulesEffects({
   connection,
   format,
   quality,

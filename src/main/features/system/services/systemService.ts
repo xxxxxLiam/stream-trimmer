@@ -22,7 +22,7 @@ export function defaultBrowser(app: unknown) {
 
 /**
  * Somewhere to put clips on a fresh install, so nobody has to decide before
- * their first cut. With no clips folder set, useClipper's deliverPath gate is
+ * their first cut. With no clips folder set, useClipperController's deliverPath gate is
  * false and the whole finished file streams through the renderer into
  * ~/Downloads instead of the main process moving it — slower, and the clips
  * scatter. The folders are created here because clip:save does not create its

@@ -1,6 +1,6 @@
 /**
- * File: useClipper.ts
- * Path: src/renderer/src/modules/clipper/hooks/useClipper.ts
+ * File: useClipperController.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useClipperController.ts
  * Description: Central clipper state — URL, info, range, format/quality, transcript, download.
  * Composes the hooks in ./clipper; the shared values (url, info, range text,
  * format, quality, error) live here and are handed to them.
@@ -8,14 +8,14 @@
 import { useMemo, useState } from "react";
 import { extractVideoId, estimateBytes, type ClipFormat, type VideoInfo } from "../../../shared/utils/clip";
 import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
-import { useClipDownload } from "./useClipDownload";
-import { useClipRange } from "./useClipRange";
-import { useComments } from "./useComments";
-import { useQualityRules } from "./useQualityRules";
-import { useSaveLocations } from "./useSaveLocations";
-import { useSavedFiles } from "./useSavedFiles";
-import { useTranscript } from "./useTranscript";
-import { useVideoInfo } from "./useVideoInfo";
+import { useClipDownloadMutations } from "./useClipDownloadMutations";
+import { useClipRangeState } from "./useClipRangeState";
+import { useCommentsMutations } from "./useCommentsMutations";
+import { useQualityRulesEffects } from "./useQualityRulesEffects";
+import { useSaveLocationsState } from "./useSaveLocationsState";
+import { useSavedFilesState } from "./useSavedFilesState";
+import { useTranscriptQueries } from "./useTranscriptQueries";
+import { useVideoInfoQueries } from "./useVideoInfoQueries";
 
 export {
   AUDIO_QUALITIES,
@@ -32,7 +32,7 @@ export {
   videoUrlProblem,
 } from "../utils/downloadErrors";
 
-export function useClipper() {
+export function useClipperController() {
   const [url, setUrl] = useState("");
   const [info, setInfo] = useState<VideoInfo | null>(null);
   const [startText, setStartText] = useState("");
@@ -47,16 +47,16 @@ export function useClipper() {
   const isElectron =
     typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
 
-  const saveLocations = useSaveLocations();
+  const saveLocations = useSaveLocationsState();
   const { saveDir } = saveLocations;
-  const savedFiles = useSavedFiles(isElectron);
+  const savedFiles = useSavedFilesState(isElectron);
   const { setLastSavedPath, setSavedNotice } = savedFiles;
 
   const videoId = useMemo(() => extractVideoId(url), [url]);
-  const range = useClipRange({ url, info, startText, endText, setStartText, setEndText, setError });
+  const range = useClipRangeState({ url, info, startText, endText, setStartText, setEndText, setError });
   const { duration, start, end, validationError } = range;
-  useQualityRules({ connection, format, quality, setQuality });
-  const transcript = useTranscript({
+  useQualityRulesEffects({ connection, format, quality, setQuality });
+  const transcript = useTranscriptQueries({
     url,
     videoId,
     start,
@@ -65,8 +65,8 @@ export function useClipper() {
     setStartText,
     setEndText,
   });
-  const videoInfo = useVideoInfo({ url, videoId, setInfo, setStartText, setEndText, setError });
-  const comments = useComments({
+  const videoInfo = useVideoInfoQueries({ url, videoId, setInfo, setStartText, setEndText, setError });
+  const comments = useCommentsMutations({
     info,
     url,
     isElectron,
@@ -75,7 +75,7 @@ export function useClipper() {
     setLastSavedPath,
     setSavedNotice,
   });
-  const clipDownload = useClipDownload({
+  const clipDownload = useClipDownloadMutations({
     info,
     url,
     start,
@@ -174,4 +174,4 @@ export function useClipper() {
   };
 }
 
-export type ClipperState = ReturnType<typeof useClipper>;
+export type ClipperState = ReturnType<typeof useClipperController>;

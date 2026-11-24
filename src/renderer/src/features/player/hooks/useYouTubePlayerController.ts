@@ -1,6 +1,6 @@
 /**
- * File: useYouTubePlayer.ts
- * Path: src/renderer/src/features/player/hooks/useYouTubePlayer.ts
+ * File: useYouTubePlayerController.ts
+ * Path: src/renderer/src/features/player/hooks/useYouTubePlayerController.ts
  * Description: Loads the YouTube IFrame API and exposes playhead + transport controls.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -97,7 +97,7 @@ export interface YouTubePlayerApi {
   pause: () => void;
 }
 
-export function useYouTubePlayer(videoId: string | null): YouTubePlayerApi {
+export function useYouTubePlayerController(videoId: string | null): YouTubePlayerApi {
   const playerRef = useRef<YTPlayer | null>(null);
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const [mountKey, setMountKey] = useState(0);

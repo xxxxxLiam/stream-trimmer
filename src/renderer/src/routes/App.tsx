@@ -37,7 +37,7 @@ import PreviewPanel from "../features/player/components/PreviewPanel";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
 import YouTubeConnectModal from "../features/youtubeConnection/components/YouTubeConnectModal";
-import { useSegments } from "../shared/hooks/useSegments";
+import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
   restoreConnection,
@@ -216,7 +216,7 @@ function Layout({ active }: { active: boolean }) {
     pickClipsDir,
     pickDataDir,
   } = useCampaign();
-  const { playhead, segments: tabSegments, clear: clearSegments } = useSegments();
+  const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);

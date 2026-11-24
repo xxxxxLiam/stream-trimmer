@@ -1,6 +1,6 @@
 /**
- * File: useClipper.test.ts
- * Path: src/renderer/src/modules/clipper/hooks/useClipper.test.ts
+ * File: useClipperController.test.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useClipperController.test.ts
  * Description: B-5 (a link with no video id is not a source) and B-6 (Cancel tells the engine).
  */
 import assert from "node:assert/strict";
@@ -12,7 +12,7 @@ import {
   isQuietCancel,
   requestEngineCancel,
   videoUrlProblem,
-} from "./useClipper";
+} from "./useClipperController";
 
 test("B-5: channel, playlist and handle links are refused with a reason; video links pass", () => {
   for (const u of [

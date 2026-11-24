@@ -1,6 +1,6 @@
 /**
- * File: useSegments.ts
- * Path: src/renderer/src/shared/hooks/useSegments.ts
+ * File: useSegmentsState.ts
+ * Path: src/renderer/src/shared/hooks/useSegmentsState.ts
  * Description: The clip being built (a list of segments), shared by the Timeline and the
  *   MarkBar without props. Each workspace tab owns its OWN store (created by the
  *   TabActiveProvider that wraps the tab, provided through SegmentStoreContext), because
@@ -10,7 +10,7 @@
  *
  *   The old module-level functions (setPlayhead, setBankedRanges, clearSegments, ...) are
  *   kept for callers that have no hook in hand; they act on the ACTIVE tab's store. Code
- *   that runs on behalf of a particular tab should use the bound methods that useSegments()
+ *   that runs on behalf of a particular tab should use the bound methods that useSegmentsState()
  *   returns instead.
  */
 import { createContext, useContext, useSyncExternalStore } from "react";
@@ -185,7 +185,7 @@ export function useSegmentStore(): SegmentStore {
   return useContext(SegmentStoreContext) ?? defaultStore;
 }
 
-export function useSegments() {
+export function useSegmentsState() {
   const store = useSegmentStore();
   const snap = useSyncExternalStore(store.subscribe, store.get, store.get);
   return {

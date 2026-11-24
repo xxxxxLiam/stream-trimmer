@@ -22,9 +22,9 @@ import {
   SegmentStoreContext,
   createSegmentStore,
   setActiveSegmentStore,
-  useSegments,
+  useSegmentsState,
   type SegmentStore,
-} from "../../../shared/hooks/useSegments";
+} from "../../../shared/hooks/useSegmentsState";
 import { activeAfterClose, indexForDigit, moveItem, stepIndex } from "../../../shared/utils/tabOps";
 
 const STORE_KEY = "clipper.workspaces";
@@ -440,7 +440,7 @@ function TabBridge({
 }) {
   const clipper = useOptionalClipper();
   const ws = useOptionalWorkspace();
-  const { segments } = useSegments();
+  const { segments } = useSegmentsState();
   const id = tabId ?? (active ? ws?.activeId : undefined);
   const url = clipper?.url ?? "";
   const downloading = clipper?.downloading ?? false;

@@ -1,11 +1,11 @@
 /**
- * File: useDismiss.ts
- * Path: src/renderer/src/shared/hooks/useDismiss.ts
+ * File: useDismissEffects.ts
+ * Path: src/renderer/src/shared/hooks/useDismissEffects.ts
  * Description: Closes a popover on outside mousedown or Escape.
  */
 import { useEffect, type RefObject } from "react";
 
-export function useDismiss(
+export function useDismissEffects(
   ref: RefObject<HTMLElement | null>,
   open: boolean,
   onClose: () => void,

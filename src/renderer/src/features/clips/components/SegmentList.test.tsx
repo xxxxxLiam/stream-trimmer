@@ -8,7 +8,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import SegmentList from "./SegmentList";
-import { SegmentStoreContext, createSegmentStore } from "../../../shared/hooks/useSegments";
+import { SegmentStoreContext, createSegmentStore } from "../../../shared/hooks/useSegmentsState";
 
 function render(locked: boolean) {
   const store = createSegmentStore();

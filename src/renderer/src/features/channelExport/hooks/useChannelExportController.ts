@@ -1,6 +1,6 @@
 /**
- * File: useChannelExport.ts
- * Path: src/renderer/src/features/channelExport/hooks/useChannelExport.ts
+ * File: useChannelExportController.ts
+ * Path: src/renderer/src/features/channelExport/hooks/useChannelExportController.ts
  * Description: State for the channel profile exporter — form, SSE progress, CSV writing.
  */
 import { useCallback, useRef, useState } from "react";
@@ -34,7 +34,7 @@ export interface ChannelExportResult {
   cancelled: boolean;
 }
 
-export function useChannelExport(options: {
+export function useChannelExportController(options: {
   isElectron: boolean;
   saveDir: string | null;
 }) {
@@ -279,4 +279,4 @@ export function useChannelExport(options: {
   };
 }
 
-export type ChannelExportState = ReturnType<typeof useChannelExport>;
+export type ChannelExportState = ReturnType<typeof useChannelExportController>;

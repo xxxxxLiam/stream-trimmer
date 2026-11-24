@@ -1,15 +1,15 @@
 /**
- * File: useComments.ts
- * Path: src/renderer/src/modules/clipper/hooks/useComments.ts
+ * File: useCommentsMutations.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useCommentsMutations.ts
  * Description: Exports the video's comments as a CSV.
  */
 import { useCallback, useState } from "react";
 import { normalizeYouTubeUrl, parseJson, apiUrl, commentsToCsv, sanitizeFilename, type VideoInfo, type CommentsResponse } from "../../../shared/utils/clip";
 import { addDownload } from "../../../shared/utils/downloads";
-import { type SavedFiles } from "./useSavedFiles";
+import { type SavedFiles } from "./useSavedFilesState";
 import { cookiePayload } from "../../../shared/utils/youtubeConnection";
 
-export function useComments({
+export function useCommentsMutations({
   info,
   url,
   isElectron,

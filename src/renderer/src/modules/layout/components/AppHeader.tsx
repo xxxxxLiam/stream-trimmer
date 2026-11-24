@@ -15,7 +15,7 @@ import BrandMark from "../../../shared/components/BrandMark";
 import CampaignChip from "../../../features/campaigns/components/CampaignChip";
 import HelpButton from "../../../features/help/components/HelpButton";
 import { IconChannel, IconCopy, IconSettings, IconSymbol } from "../../../shared/components/icons";
-import { useDismiss } from "../../../shared/hooks/useDismiss";
+import { useDismissEffects } from "../../../shared/hooks/useDismissEffects";
 import { CHANNEL_DATA_BUILT } from "../../../shared/utils/ownerGate";
 
 export type AppHeaderProps = {
@@ -97,7 +97,7 @@ function SourceChip() {
 
 export default function AppHeader(p: AppHeaderProps) {
   const settingsRef = useRef<HTMLDivElement>(null);
-  useDismiss(settingsRef, p.settingsOpen, p.onCloseSettings);
+  useDismissEffects(settingsRef, p.settingsOpen, p.onCloseSettings);
 
   // Every channel reference is behind the COMPILE-TIME flag, so a public build drops the
   // strings entirely; testing a runtime prop here is what used to leave them in the bundle.

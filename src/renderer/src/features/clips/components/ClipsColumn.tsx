@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
-import { useSegments } from "../../../shared/hooks/useSegments";
+import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import {
   bankStore,
   bankedRanges,
@@ -126,7 +126,7 @@ export function finishBankedCut(args: {
 export default function ClipsColumn({ className, onCutBanked }: ClipsColumnProps) {
   const { videoId, duration } = useClipperContext();
   const { active, recordUse, usedFor } = useCampaign();
-  const seg = useSegments();
+  const seg = useSegmentsState();
   const data = useBankData();
 
   const [tab, setTab] = useState<Tab>("bank");

@@ -1,12 +1,12 @@
 /**
- * File: useSegments.test.ts
- * Path: src/renderer/src/shared/hooks/useSegments.test.ts
+ * File: useSegmentsState.test.ts
+ * Path: src/renderer/src/shared/hooks/useSegmentsState.test.ts
  * Description: Pins the per-tab clip store: B-2 (tabs share nothing), C-1 (a banked-range
  *   write by one tab cannot disturb or loop with another) and B-7 (no edits mid-cut).
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSegmentStore } from "./useSegments";
+import { createSegmentStore } from "./useSegmentsState";
 
 const seg = (start: number, end: number) => ({ start, end });
 

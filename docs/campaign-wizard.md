@@ -11,7 +11,7 @@ footer reads `Clips Not set` and `Data Not set`, and the app will let them cut
 anyway. It works, but:
 
 - The clip goes to `~/Downloads` instead of a client folder.
-- It takes the slow delivery path. `useClipper.ts` gates on
+- It takes the slow delivery path. `useClipperController.ts` gates on
   `deliverPath = Boolean(isElectron && window.electronAPI?.saveClip && saveDir)`.
   With no folder set that is `false`, so the whole finished file is buffered
   as a Blob through the renderer instead of the main process moving a file on

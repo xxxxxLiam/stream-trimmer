@@ -4,7 +4,7 @@
  * Description: Format (mp4/mp3) and Quality selects; quality options swap by format.
  */
 import { useClipperContext } from "../hooks/ClipperContext";
-import { AUDIO_QUALITIES, VIDEO_QUALITIES } from "../hooks/useClipper";
+import { AUDIO_QUALITIES, VIDEO_QUALITIES } from "../hooks/useClipperController";
 import { QUALITY_LABELS } from "../utils/clipperTypes";
 
 export default function FormatQualityFields() {

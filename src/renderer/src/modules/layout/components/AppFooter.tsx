@@ -11,9 +11,9 @@ import { useCampaign } from "../../../features/campaigns/hooks/CampaignContext";
 import FormatQualityFields from "../../clipper/components/FormatQualityFields";
 import { QUALITY_LABELS } from "../../clipper/utils/clipperTypes";
 import { IconChevronDown, IconFolder } from "../../../shared/components/icons";
-import { useDismiss } from "../../../shared/hooks/useDismiss";
+import { useDismissEffects } from "../../../shared/hooks/useDismissEffects";
 import { CHANNEL_DATA_BUILT } from "../../../shared/utils/ownerGate";
-import { useDataFolderVisible } from "../../../shared/hooks/useDataFolderVisible";
+import { useDataFolderVisibleState } from "../../../shared/hooks/useDataFolderVisibleState";
 
 function baseName(dir: string): string {
   return dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
@@ -24,7 +24,7 @@ function FormatChip() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
-  useDismiss(ref, open, close);
+  useDismissEffects(ref, open, close);
   return (
     <div ref={ref} className="relative">
       <button
@@ -111,7 +111,7 @@ function DataChip({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
-  useDismiss(ref, open, close);
+  useDismissEffects(ref, open, close);
 
   if (confirmed || !dir) {
     return (
@@ -194,7 +194,7 @@ export default function AppFooter({ onPickClipsDir, onPickDataDir }: AppFooterPr
   const { saveDir, downloads } = useClipperContext();
   const [problem, setProblem] = useState("");
   // Only the channel exporter uses the Data folder; without it the chip would ask for nothing.
-  const showData = useDataFolderVisible();
+  const showData = useDataFolderVisibleState();
 
   const wrap = (pick?: Pick): Pick | undefined =>
     pick
