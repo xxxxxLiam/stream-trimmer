@@ -55,7 +55,9 @@ export const downloadSchema = z.object({
     .string()
     .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
     .optional(),
-  quality: z.string().default("best"),
+  // Liam's card (2026-11-24): clips are MP4 at 1080p, or the highest the video has below that, with
+  // no quality choice on screen. A request that names no quality gets that; the ladder steps down.
+  quality: z.string().optional(),
   // How the finished clip is handed back. "stream" sends the media as the
   // response body. "path" returns only its location on disk, for the
   // desktop app, whose main process can move the file itself — the media
@@ -67,4 +69,8 @@ export const downloadSchema = z.object({
   cookiesFromBrowser: authSourceSchema.optional(),
 });
 
-export type DownloadInput = z.infer<typeof downloadSchema>;
+/** MP3 keeps its bitrate meaning; video defaults to the 1080p ladder. */
+export const DEFAULT_VIDEO_QUALITY = "1080";
+export const DEFAULT_AUDIO_QUALITY = "192";
+
+export type DownloadInput = Omit<z.infer<typeof downloadSchema>, "quality"> & { quality: string };

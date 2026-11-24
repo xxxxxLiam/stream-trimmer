@@ -294,3 +294,26 @@ test("the original's own language, or one the video lacks, adds no filter", asyn
   assert.doesNotMatch(String((await execWithLanguage("en")).format), /language=/);
   assert.doesNotMatch(String((await execWithLanguage("hi")).format), /language=/);
 });
+
+test("a request with no quality gets MP4 at 1080p, stepping down below it (never the bare best ladder)", async () => {
+  const harness = await startHarness({ availableHeights: [1080, 720] });
+  try {
+    const res = await fetch(`${harness.baseUrl}/api/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: "https://www.youtube.com/watch?v=lf000001",
+        start: 0,
+        end: 10,
+        cookiesFromBrowser: "app",
+      }),
+    });
+    assert.equal(res.status, 500);
+    const line = harness.log().split("\n").filter((l) => l.includes("/api/download exec ")).pop()!;
+    const tiers = String((JSON.parse(line.replace(/^.*?options=/, "")) as { format: string }).format).split("/");
+    assert.ok(tiers[0].includes("[height=1080]"), tiers[0]);
+    assert.equal(tiers[tiers.length - 1], "best[height<=1080]");
+  } finally {
+    await harness.stop();
+  }
+});

@@ -9,7 +9,7 @@ import { binariesOk } from "../binaries";
 import { cookieModeFor, resolveCookieOptions } from "../cookies";
 import { MAX_CLIP_SECONDS } from "../../utils/engineConfig";
 import { binaryError } from "../../utils/errors";
-import { DownloadInput, downloadSchema } from "../../utils/schemas";
+import { DEFAULT_AUDIO_QUALITY, DEFAULT_VIDEO_QUALITY, DownloadInput, downloadSchema } from "../../utils/schemas";
 
 export interface DownloadRequest {
   url: string;
@@ -39,8 +39,9 @@ export function parseDownloadRequest(req: Request, res: Response): DownloadReque
     return null;
   }
 
-  const { url, format, quality, audioLanguage, deliver, cookiesFromBrowser }: DownloadInput =
-    parsed.data;
+  const { url, format, audioLanguage, deliver, cookiesFromBrowser } = parsed.data;
+  const quality: string =
+    parsed.data.quality ?? (format === "mp3" ? DEFAULT_AUDIO_QUALITY : DEFAULT_VIDEO_QUALITY);
   // A clip is a list of ranges. The old single start/end is one segment.
   const resolvedSegments = resolveSegments(parsed.data, MAX_CLIP_SECONDS);
   if (!resolvedSegments.ok) {
