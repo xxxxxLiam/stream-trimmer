@@ -5,6 +5,7 @@
  *   Only renders inside the packaged Electron app.
  */
 import { useEffect, useRef, useState } from "react";
+import type { UpdateStatusPayload } from "../../../../../common/ipc/electronApi";
 
 const RELEASES_URL =
   "https://github.com/xxxxxLiam/stream-trimmer/releases/latest";

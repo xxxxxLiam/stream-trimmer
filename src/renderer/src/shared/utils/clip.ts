@@ -35,16 +35,8 @@ export interface TranscriptResponse {
 }
 
 // Browsers yt-dlp can read a logged-in YouTube session from.
-export const COOKIE_BROWSERS = [
-  "chrome",
-  "safari",
-  "edge",
-  "firefox",
-  "brave",
-  "chromium",
-] as const;
-
-export type CookieBrowser = (typeof COOKIE_BROWSERS)[number];
+export { COOKIE_BROWSERS, type CookieBrowser };
+import { COOKIE_BROWSERS, type CookieBrowser } from "../../../../common/constants/cookieBrowsers";
 
 // Where a verified YouTube session comes from. "app" is the cookies.txt the
 // user imported (a file only yt-dlp reads); a browser name is the secondary

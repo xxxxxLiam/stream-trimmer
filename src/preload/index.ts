@@ -103,5 +103,5 @@ try {
 } catch {
   // contextBridge unavailable in some contexts — fall back to a direct set.
   // eslint-disable-next-line no-undef
-  window.__API_BASE__ = apiBase;
+  (window as unknown as { __API_BASE__?: string }).__API_BASE__ = apiBase;
 }
