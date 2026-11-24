@@ -19,6 +19,8 @@ export type PanelHost = {
   cutBanked: (clip: BankedClip, projectName?: string) => Promise<boolean>;
   /** The "after cutting" hand-off settings for the open campaign. */
   editorHandoff: EditorHandoffProps;
+  /** Open the Symbols and phrases window. */
+  openSymbols: () => void;
 };
 
 const PanelHostContext = createContext<PanelHost | null>(null);
