@@ -20,6 +20,7 @@
     "lint": "eslint src",
     "test:renderer": "tsx --test \"src/renderer/**/*.test.ts\" \"src/renderer/**/*.test.tsx\"",
     "check": "npm run typecheck && npm test && npm run lint",
+    "prepare": "git config core.hooksPath .githooks || true",
     "test": "tsx --test \"src/main/**/*.test.ts\" \"src/main/**/*.test.cjs\" \"src/preload/**/*.test.ts\" \"src/common/**/*.test.ts\" \"scripts/*.test.ts\" \"src/renderer/**/*.test.ts\" \"src/renderer/**/*.test.tsx\"",
     "preview": "vite preview",
     "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\"",
