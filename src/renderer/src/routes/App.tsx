@@ -47,6 +47,8 @@ import AppFooter from "../modules/layout/components/AppFooter";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
+import { getClipDestination } from "../features/player/hooks/useClipDestination";
+import { toAfterCutting } from "../features/player/utils/clipDestination";
 import { buildCopyBlocksInput } from "../features/handoff/utils/copyBlocksInput";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
@@ -54,6 +56,11 @@ import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right dr
 import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
 import CampaignStart from "../features/campaigns/components/CampaignStart";
 import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
+
+/** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
+function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
+  return { ...settings, afterCutting: toAfterCutting(getClipDestination()) };
+}
 
 const EDITOR_KEY = "clipper.editorHandoff";
 
@@ -332,7 +339,7 @@ function Layout({ active }: { active: boolean }) {
     async (segments: Segment[]) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
-      const startSettings = editorRef.current;
+      const startSettings = withDestination(editorRef.current);
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
       const clipId = campaign ? nextClipId(videoId, taken) : null;
       const ok = await download({ segments, clipId: clipId ?? undefined });
@@ -351,7 +358,7 @@ function Layout({ active }: { active: boolean }) {
   const cutBanked = useCallback(
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
-      const startSettings = editorRef.current;
+      const startSettings = withDestination(editorRef.current);
       const ok = await download({ segments: clip.segments, clipId: projectName?.trim() || clip.id });
       if (ok) afterSaved(clip.id, clip.label, clip.segments, startSettings, projectName);
       return ok;

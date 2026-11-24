@@ -8,11 +8,11 @@
 import { motion } from "framer-motion";
 import { BoxArrowUpRight, CameraVideo, ExclamationTriangle } from "react-bootstrap-icons";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
-import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { usePreviewController } from "../hooks/usePreviewController";
 import { clockTime } from "../utils/transport";
 import EndCard from "./EndCard";
 import FullScreenBar from "./FullScreenBar";
+import PreparingLine from "./PreparingLine";
 import PlayerControls from "./PlayerControls";
 import Scrubber from "./Scrubber";
 
@@ -25,11 +25,10 @@ function openExternal(id: string) {
 export default function PreviewPanel() {
   const host = usePanelHost();
   const c = usePreviewController(host.onNextVideo);
-  const { segments } = useSegmentsState();
   const { player, videoId, info } = c;
+  const opening = !!videoId && !info && c.loadingInfo;
   const blocked = player.blocked;
   const showEnd = !!videoId && !blocked && player.ended;
-  const clipReason = c.range || segments.length > 0 ? null : "Set an end first: click the timeline or press O";
 
   return (
     <motion.div
@@ -65,6 +64,11 @@ export default function PreviewPanel() {
               </div>
             </div>
           )}
+          {opening && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-6 text-center">
+              <span className="text-body text-fg-dim">Opening the video… the transcript follows.</span>
+            </div>
+          )}
           {!videoId && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg-dim">
               <CameraVideo size={22} />
@@ -75,16 +79,11 @@ export default function PreviewPanel() {
             <EndCard day={host.day} onNextVideo={host.onNextVideo} onOpenBank={host.onOpenBank} onOpenVideo={host.onOpenVideo} />
           ) : null}
           {c.fullScreen ? (
-            <FullScreenBar
-              c={c}
-              flags={[]}
-              clipReason={clipReason}
-              onClip={() => host.cutSegments(segments.length > 0 ? segments : c.range ? [c.range] : [])}
-              onClipMenu={() => {}}
-            />
+            <FullScreenBar c={c} flags={[]} />
           ) : null}
         </div>
 
+        {opening ? <PreparingLine /> : null}
         {videoId && !blocked ? (
           <>
             <Scrubber

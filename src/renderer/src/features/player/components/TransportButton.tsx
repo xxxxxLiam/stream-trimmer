@@ -5,6 +5,7 @@
  *   it does and carries its key, so nothing is printed under the buttons.
  */
 import type { ReactNode } from "react";
+import Tooltip from "../../../shared/components/Tooltip";
 
 export type TransportButtonProps = {
   label: string;
@@ -45,6 +46,7 @@ export default function TransportButton({
         : look === "tile"
           ? "border-transparent text-fg-dim hover:text-fg"
           : "text-fg-dim hover:text-fg";
+  const [text, key] = label.split("  ");
   return (
     <span className="group relative inline-flex">
       <button
@@ -57,12 +59,12 @@ export default function TransportButton({
       >
         {children}
       </button>
-      <span
-        role="tooltip"
-        className={`pointer-events-none absolute left-1/2 z-20 hidden -translate-x-1/2 whitespace-nowrap rounded-control border border-hairline-strong bg-raised px-2 py-1 text-meta text-fg group-focus-within:block group-hover:block ${labelBelow ? "top-full mt-1" : "bottom-full mb-1"}`}
+      <Tooltip
+        className={`pointer-events-none absolute left-1/2 z-20 hidden -translate-x-1/2 group-focus-within:inline-flex group-hover:inline-flex ${labelBelow ? "top-full mt-1" : "bottom-full mb-1"}`}
+        keyHint={key}
       >
-        {label}
-      </span>
+        {text}
+      </Tooltip>
     </span>
   );
 }

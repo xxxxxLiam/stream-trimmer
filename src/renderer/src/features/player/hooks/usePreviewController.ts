@@ -18,7 +18,7 @@ const validRange = (start: number, end: number): Range | null =>
   Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
 
 export function usePreviewController(onNextVideo: () => void) {
-  const { info, videoId, start, end, duration, seekRequest, setStartFromSeconds, setEndFromSeconds } =
+  const { info, loadingInfo, videoId, start, end, duration, seekRequest, setStartFromSeconds, setEndFromSeconds } =
     useClipperContext();
   const tabActive = useIsTabActive();
   const player = useYouTubePlayerController(videoId);
@@ -67,6 +67,7 @@ export function usePreviewController(onNextVideo: () => void) {
 
   return {
     info,
+    loadingInfo,
     videoId,
     player,
     duration,

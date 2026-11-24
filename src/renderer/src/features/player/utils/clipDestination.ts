@@ -1,0 +1,43 @@
+/**
+ * File: clipDestination.ts
+ * Path: src/renderer/src/features/player/utils/clipDestination.ts
+ * Description: Where clips go. The Clip arrow menu is the only place an editor is chosen; the choice
+ *   sticks and nothing is chosen for the user (Save to folder is the baseline). Also the reason
+ *   Clip is dimmed, which shows on hover and on focus.
+ */
+import type { AfterCutting } from "../../../shared/utils/fcpxml";
+
+export type ClipDestination = "folder" | "premiere" | "finalcut" | "resolve" | "capcut";
+
+export const DESTINATIONS: readonly { id: ClipDestination; label: string }[] = [
+  { id: "folder", label: "Save to folder" },
+  { id: "premiere", label: "Premiere Pro" },
+  { id: "finalcut", label: "Final Cut Pro" },
+  { id: "resolve", label: "DaVinci Resolve" },
+  { id: "capcut", label: "CapCut" },
+];
+
+/** The editors this system offers (Final Cut is not offered on Windows); undefined = all. */
+export function availableDestinations(offered: readonly string[] | undefined) {
+  return DESTINATIONS.filter((d) => d.id === "folder" || !offered || offered.includes(d.id));
+}
+
+export function normalizeDestination(raw: unknown, offered?: readonly string[]): ClipDestination {
+  const hit = availableDestinations(offered).find((d) => d.id === raw);
+  return hit ? hit.id : "folder";
+}
+
+/**
+ * What the existing hand-off can do after a clip is saved. Final Cut has its pipeline; opening
+ * Premiere, Resolve or CapCut after a clip waits for the hand-off rebuild (handoff-plan.md), so
+ * those fall back to leaving the file in the folder.
+ */
+export function toAfterCutting(d: ClipDestination): AfterCutting {
+  return d === "finalcut" ? "finalcut" : "nothing";
+}
+
+export function clipReason(s: { hasRange: boolean; segments: number; busy: boolean }): string | null {
+  if (s.busy) return "A clip is being made. Clip is ready when it's done.";
+  if (!s.hasRange && s.segments === 0) return "Set an end first: click the timeline or press O";
+  return null;
+}

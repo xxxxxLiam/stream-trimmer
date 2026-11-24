@@ -6,7 +6,7 @@
  */
 import type { PreviewController } from "../hooks/usePreviewController";
 import { clockTime, hoverLabel, isMacLike } from "../utils/transport";
-import ClipPill from "./ClipPill";
+import ClipButton from "./ClipButton";
 import Scrubber from "./Scrubber";
 import TransportButton from "./TransportButton";
 import {
@@ -22,12 +22,9 @@ import {
 type Props = {
   c: PreviewController;
   flags: readonly number[];
-  clipReason: string | null;
-  onClip: () => void;
-  onClipMenu: () => void;
 };
 
-export default function FullScreenBar({ c, flags, clipReason, onClip, onClipMenu }: Props) {
+export default function FullScreenBar({ c, flags }: Props) {
   const { player } = c;
   const mac = isMacLike();
   return (
@@ -68,7 +65,7 @@ export default function FullScreenBar({ c, flags, clipReason, onClip, onClipMenu
           </TransportButton>
         </span>
         <span className="ml-auto flex items-center gap-2.5">
-          <ClipPill onClip={onClip} onMenu={onClipMenu} reason={clipReason} />
+          <ClipButton openUp />
           <TransportButton look="ghost" label="Exit full screen  Esc" name="Exit full screen (Esc)" onClick={c.toggleFullScreen}>
             <ExitFullScreenIcon />
           </TransportButton>
