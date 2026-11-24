@@ -41,6 +41,8 @@ test("a frame maps to its sheet and cell", () => {
   assert.deepEqual(frameAt(sb1, 0), { url: sb1.sheets[0].url, col: 0, row: 0 });
   assert.deepEqual(frameAt(sb1, 50), { url: sb1.sheets[1].url, col: 0, row: 0 });
   assert.deepEqual(frameAt(sb1, 52), { url: sb1.sheets[1].url, col: 1, row: 0 });
+  // Between frames the earlier one shows: t=51 s is still frame 25, not 26.
+  assert.deepEqual(frameAt(sb1, 51), { url: sb1.sheets[1].url, col: 0, row: 0 });
   assert.deepEqual(frameAt(sb1, 58), { url: sb1.sheets[1].url, col: 4, row: 0 });
   assert.deepEqual(frameAt(sb1, 60), { url: sb1.sheets[1].url, col: 0, row: 1 });
   // Past the end clamps to the last sheet's last cell rather than throwing.
