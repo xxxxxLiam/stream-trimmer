@@ -554,7 +554,7 @@ export default function EditorHandoff({
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
-          className="surface-panel fixed left-1/2 top-1/2 z-[60] flex max-h-[calc(100%_-_32px)] w-[min(560px,calc(100%_-_32px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-6 overflow-y-auto rounded-panel border border-hairline p-6 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
+          className="surface-panel fixed left-1/2 top-1/2 z-[60] flex max-h-[calc(100%_-_32px)] w-[min(560px,calc(100%_-_32px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-6 overflow-y-auto rounded-panel border border-hairline p-6 shadow-[0_0_0_9999px_var(--bg-overlay-60)]"
         >
           <div className="flex items-center gap-3">
             <h2 id={titleId} className="text-section m-0 min-w-0 flex-1 font-medium text-fg">

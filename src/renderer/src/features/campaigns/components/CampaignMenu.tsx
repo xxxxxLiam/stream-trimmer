@@ -7,7 +7,6 @@
  *   screen's one primary action is Cut.
  */
 import { useState } from "react";
-import ClipIdPatternField from "./ClipIdPatternField";
 import CampaignWizard from "./CampaignWizard";
 import { useDataFolderVisibleState } from "../../../shared/hooks/useDataFolderVisibleState";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
@@ -148,22 +147,6 @@ function CampaignForm({
           <input className="field font-mono" inputMode="numeric" value={d.hard} onChange={(e) => set("hard", e.target.value)} />
         </Field>
       </div>
-      <div className="flex gap-2">
-        <Field label="Short code for this client">
-          <input
-            className="field font-mono"
-            value={d.prefix}
-            placeholder="Made from the name"
-            onChange={(e) => set("prefix", e.target.value)}
-          />
-        </Field>
-      </div>
-      <ClipIdPatternField
-        pattern={d.pattern}
-        prefix={d.prefix}
-        campaignName={d.name}
-        onChange={(v) => set("pattern", v)}
-      />
       <Field label="Format">
         <select
           className="field"
@@ -215,7 +198,17 @@ function CampaignForm({
   );
 }
 
-export default function CampaignMenu({ onClose }: { onClose?: () => void }) {
+export default function CampaignMenu({
+  onClose,
+  onOpenSettings,
+}: {
+  onClose?: () => void;
+  /**
+   * Opens the campaign form for the active campaign. The workspace screen passes it (the Start,
+   * Settings and Help build owns the form); without it the menu's own inline form is used.
+   */
+  onOpenSettings?: (campaignId: string) => void;
+}) {
   const { campaigns, activeId, setActiveId, remove } = useCampaign();
   const [mode, setMode] = useState<{ kind: "list" } | { kind: "form"; id: string | null }>({
     kind: "list",
@@ -236,8 +229,24 @@ export default function CampaignMenu({ onClose }: { onClose?: () => void }) {
     );
   }
 
+  const current = campaigns.find((c) => c.id === activeId);
   return (
     <div className="flex flex-col gap-2">
+      {current ? (
+        <button
+          type="button"
+          id="ui-campaign-settings"
+          className="btn justify-start"
+          onClick={() => {
+            if (onOpenSettings) {
+              onOpenSettings(current.id);
+              onClose?.();
+            } else setMode({ kind: "form", id: current.id });
+          }}
+        >
+          {current.name} settings
+        </button>
+      ) : null}
       {campaigns.length === 0 ? (
         <p className="m-0 text-meta text-fg-dim">
           No campaigns yet. A campaign remembers, for one client, how long clips should be, how
@@ -267,10 +276,15 @@ export default function CampaignMenu({ onClose }: { onClose?: () => void }) {
                 <button
                   type="button"
                   className="btn shrink-0"
-                  onClick={() => setMode({ kind: "form", id: c.id })}
-                  aria-label={`Edit ${c.name}`}
+                  onClick={() => {
+                    if (onOpenSettings) {
+                      onOpenSettings(c.id);
+                      onClose?.();
+                    } else setMode({ kind: "form", id: c.id });
+                  }}
+                  aria-label={onOpenSettings ? `${c.name} settings` : `Edit ${c.name}`}
                 >
-                  Edit
+                  {onOpenSettings ? "Settings" : "Edit"}
                 </button>
                 <button
                   type="button"

@@ -25,6 +25,7 @@ export const IPC = {
   fileSaveFiles: "file:saveFiles",
   fileShowInFolder: "file:showInFolder",
   fileStartDrag: "file:startDrag",
+  fileUndoClip: "file:undoClip",
   ownerCheck: "owner:check",
   settingsAll: "settings:all",
   settingsSet: "settings:set",

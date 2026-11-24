@@ -46,7 +46,7 @@ export default function LookEditor({ settings, onChange }: LookEditorProps) {
         </label>
         <textarea
           id={areaId}
-          className="field h-40 resize-y py-2 font-mono text-meta"
+          className="field h-40 resize-y py-2 text-meta"
           spellCheck={false}
           placeholder="Paste the text of Info.fcpxml here"
           value={text}

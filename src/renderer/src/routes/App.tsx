@@ -28,7 +28,7 @@ import {
   type EditorHandoffSettings,
   type SessionClip,
 } from "../shared/utils/fcpxml";
-import { getDownloads } from "../shared/utils/downloads";
+import { annotateDownload, getDownloads } from "../shared/utils/downloads";
 import { addSessionClip, sessionClipsFor, type SessionClipsByCampaign } from "../shared/utils/handoff";
 import { readSetting, writeSetting } from "../shared/utils/persist";
 import type { BankedClip } from "../shared/utils/bank";
@@ -39,11 +39,17 @@ import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
   restoreConnection,
+  signInNotice,
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
-import AppHeader from "../modules/layout/components/AppHeader";
-import AppFooter from "../modules/layout/components/AppFooter";
+import TopBar from "../modules/layout/components/TopBar";
+import BottomBar from "../modules/layout/components/BottomBar";
+import type { MenuItem } from "../modules/layout/components/PopoverMenu";
+import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
+import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
+import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
+import { nameForLanguage, planLanguages } from "../shared/utils/audioLanguages";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
@@ -53,6 +59,8 @@ import CampaignMenu from "../features/campaigns/components/CampaignMenu";
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
 import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
 import CampaignStart from "../features/campaigns/components/CampaignStart";
+import SettingsDrawer from "../features/settings/components/SettingsDrawer";
+import ColdStartScreen from "../features/start/components/ColdStartScreen";
 import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
 
 const EDITOR_KEY = "clipper.editorHandoff";
@@ -198,6 +206,8 @@ function Layout({ active }: { active: boolean }) {
     downloads,
     setStartText,
     setEndText,
+    setUrl,
+    flushAutoLoad,
     transcript,
     ensureTranscript,
   } = useClipperContext();
@@ -211,11 +221,14 @@ function Layout({ active }: { active: boolean }) {
     pickDataDir,
   } = useCampaign();
   const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
+  const signIn = signInNotice(useYouTubeConnection());
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
+  const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
   // nobody is nagged: someone who just wants to paste a link and cut once never set a
   // campaign up, and that is a legitimate way to use the app.
@@ -246,6 +259,11 @@ function Layout({ active }: { active: boolean }) {
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
 
   const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
+  // Which audio languages the next Clip makes, remembered per campaign. No dubs: one plain clip.
+  const [audioSel, setAudioSel] = useAudioLanguageState(campaign?.id ?? null);
+  const languagePlans = useMemo(() => planLanguages(info?.audioTracks, audioSel), [info?.audioTracks, audioSel]);
+  const languagePlansRef = useRef(languagePlans);
+  languagePlansRef.current = languagePlans;
   // Clips cut this session, kept per campaign: the panel's Export / Send all / Copy file path read
   // only the ACTIVE campaign's list, so another client's clips are never offered, or sent.
   const [sessionByCampaign, setSessionByCampaign] = useState<SessionClipsByCampaign<SessionClip>>({});
@@ -263,7 +281,10 @@ function Layout({ active }: { active: boolean }) {
   const closeHelp = useCallback(() => setHelpOpen(false), []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeCopy = useCallback(() => setCopyOpen(false), []);
-  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    setSettingsStartAt(null);
+  }, []);
 
   // Switching campaign re-points the saving folder, format and quality at once. The clips
   // folder lives on the campaign; the clipper still saves to its own saveDir, so mirror it.
@@ -303,6 +324,19 @@ function Layout({ active }: { active: boolean }) {
   // the new campaign's "After cutting" choice to this campaign's clip.
   const afterSaved = useCallback(
     (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string) => {
+      const newest = getDownloads().find((d) => d.kind === "clip");
+      if (newest) {
+        annotateDownload(newest.id, {
+          campaign: campaign?.name,
+          campaignId: campaign?.id,
+          clipId,
+          segments: segments.map((s) => ({ start: s.start, end: s.end })),
+          seconds: segments.reduce((sum, s) => sum + (s.end - s.start), 0),
+          videoId: videoId ?? undefined,
+          videoTitle: info?.title,
+          startSec: segments[0]?.start,
+        });
+      }
       const saved = getDownloads().find((d) => d.kind === "clip" && d.path);
       if (!saved) return; // browser download: no file path to hand on
       const clip: SessionClip = {
@@ -335,15 +369,23 @@ function Layout({ active }: { active: boolean }) {
       const startSettings = editorRef.current;
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
       const clipId = campaign ? nextClipId(videoId, taken) : null;
-      const ok = await download({ segments, clipId: clipId ?? undefined });
-      if (!ok) return;
-      if (cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
-      afterSaved(clipId ?? `clip-${Date.now()}`, undefined, segments, startSettings);
+      // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
+      let madeAny = false;
+      for (const plan of languagePlansRef.current) {
+        const base = clipId ?? (plan.suffix ? info?.title || "clip" : undefined);
+        const name = base ? nameForLanguage(base, plan) : undefined;
+        const ok = await download({ segments, clipId: name, audioLanguage: plan.language });
+        if (!ok) break;
+        if (!madeAny && cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
+        madeAny = true;
+        afterSaved(name ?? `clip-${Date.now()}`, undefined, segments, startSettings);
+      }
+      if (!madeAny) return;
       clearSegments();
       setStartText("");
       setEndText("");
     },
-    [videoId, campaign, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
+    [videoId, campaign, info?.title, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
   );
 
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
@@ -352,9 +394,15 @@ function Layout({ active }: { active: boolean }) {
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
       const startSettings = editorRef.current;
-      const ok = await download({ segments: clip.segments, clipId: projectName?.trim() || clip.id });
-      if (ok) afterSaved(clip.id, clip.label, clip.segments, startSettings, projectName);
-      return ok;
+      const baseId = projectName?.trim() || clip.id;
+      let madeAny = false;
+      for (const plan of languagePlansRef.current) {
+        const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
+        if (!ok) break;
+        madeAny = true;
+        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName);
+      }
+      return madeAny;
     },
     [download, afterSaved],
   );
@@ -388,10 +436,20 @@ function Layout({ active }: { active: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
+  const settingsDrawer = (
+    <SettingsDrawer
+      open={settingsOpen}
+      onClose={closeSettings}
+      startAt={settingsStartAt}
+      tracks={info?.audioTracks}
+      editor={{ campaignId: campaign?.id ?? null, settings: editorSettings, onChange: setEditorSettings }}
+    />
+  );
   const panelHost: PanelHost = {
     playhead,
     cutSegments: (segs) => void cutClip(segs),
     cutBanked,
+    openSymbols: () => setSymbolsOpen(true),
     editorHandoff: {
       settings: editorSettings,
       onChange: setEditorSettings,
@@ -403,29 +461,64 @@ function Layout({ active }: { active: boolean }) {
     },
   };
 
+  // Overlays that are not panels. They stay one key (and one Panels menu row) away.
+  const overlayItems: MenuItem[] = [
+    { key: "copy", label: "Copy blocks", onSelect: () => setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; }) },
+    { key: "symbols", label: "Symbols", onSelect: () => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; }) },
+    ...(CHANNEL_DATA_BUILT && channelAvailable
+      ? [{ key: "channel", label: screen === "channel" ? "Back to workspace" : "Channel data", onSelect: () => setScreen(screen === "channel" ? "workspace" : "channel") } as MenuItem]
+      : []),
+  ];
+  // The campaign menu's "<Campaign> settings" row calls this. The Start, Settings and Help build
+  // swaps in its campaign form here; until then the menu falls back to its own inline form.
+  // One global paste handler: a video link opens it, rows with times and a channel link go to the
+  // Import and Channel data surfaces (wired by the Start, Settings and Help build).
+  usePasteRoutingEffects(
+    active,
+    {
+      onVideo: (link) => {
+        setUrl(link);
+        flushAutoLoad();
+      },
+    },
+    { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
+  );
+  const openCampaignSettings = (campaignId: string) => {
+    setSettingsStartAt(campaignId);
+    setHelpOpen(false);
+    setSettingsOpen(true);
+  };
+
   return (
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
-        <AppHeader
-          {...(CHANNEL_DATA_BUILT ? { screen, onScreen: setScreen, channelAvailable } : null)}
-          copyOpen={copyOpen}
-          onToggleCopy={() => setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; })}
-          symbolsOpen={symbolsOpen}
-          onToggleSymbols={() => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; })}
+        {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
+        {!info && !(CHANNEL_DATA_BUILT && screen === "channel") ? (
+          <ColdStartScreen />
+        ) : (
+        <>
+        <TopBar
           helpOpen={helpOpen}
-          onToggleHelp={() => setHelpOpen((v) => !v)}
+          onToggleHelp={() => {
+            setSettingsOpen(false);
+            setHelpOpen((v) => !v);
+          }}
           settingsOpen={settingsOpen}
-          onToggleSettings={() => setSettingsOpen((v) => !v)}
-          onCloseSettings={closeSettings}
-          campaignMenu={<CampaignMenu />}
-          panelsMenu={<PanelsMenu triggerClassName="icon-btn" />}
+          onToggleSettings={() => {
+            setSettingsStartAt(null);
+            setHelpOpen(false);
+            setSettingsOpen((v) => !v);
+          }}
+          campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
+          panelsMenuExtras={overlayItems}
         />
         {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
           <PanelHostProvider value={panelHost}>
             <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
               <PanelWorkspace />
               <HelpDrawer open={helpOpen} onClose={closeHelp} />
+              {settingsDrawer}
             </div>
           </PanelHostProvider>
         ) : (
@@ -439,13 +532,23 @@ function Layout({ active }: { active: boolean }) {
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
           </div>
         )}
-        <AppFooter
-          onPickClipsDir={isElectron ? pickClipsDir : undefined}
-          onPickDataDir={isElectron ? pickDataDir : undefined}
+        <BottomBar
+          clipCount={languagePlans.length}
+          tracks={info?.audioTracks}
+          selectedLanguages={audioSel}
+          onSelectLanguages={setAudioSel}
+          folder={folders.clipsDir || saveDir || ""}
+          onPickFolder={isElectron ? pickClipsDir : undefined}
+          at360={signIn.at360}
+          showSignInPill={signIn.pill}
+          // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
+          onSignIn={() => setHelpOpen(true)}
         />
+        </>
+        )}
       </main>
       <CampaignStart
-        open={active && !campaign && !campaignPromptDismissed}
+        open={active && !!info && !campaign && !campaignPromptDismissed}
         onClose={() => setCampaignPromptDismissed(true)}
         onChosen={() => setCampaignPromptDismissed(true)}
       />

@@ -266,3 +266,14 @@ export function isLineUsed(line: Line, ranges: readonly TimeRange[]): boolean {
   for (const r of ranges) if (lineOverlaps(line, r)) return true;
   return false;
 }
+
+/** The whole transcript as plain text, one caption line per row. */
+export function wholeTranscriptText(lines: readonly Line[]): string {
+  return lines.map((l) => l.text.trim()).filter(Boolean).join("\n");
+}
+
+/** The words said inside the given time ranges, in order, one caption line per row. */
+export function wordsInRanges(lines: readonly Line[], ranges: readonly TimeRange[]): string {
+  const picked = lines.filter((l) => ranges.some((r) => lineOverlaps(l, r)));
+  return wholeTranscriptText(picked);
+}

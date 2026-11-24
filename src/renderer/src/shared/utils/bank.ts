@@ -21,6 +21,8 @@ export type BankedClip = {
   status: BankStatus;
   category?: string;
   tier?: string;
+  /** Rating from the import, 0 to 10. */
+  rating?: number;
   note?: string;
 };
 
@@ -66,6 +68,7 @@ export function normalizeBank(raw: unknown): BankData {
         };
         if (typeof r.category === "string" && r.category) clip.category = r.category;
         if (typeof r.tier === "string" && r.tier) clip.tier = r.tier;
+        if (typeof r.rating === "number" && Number.isFinite(r.rating)) clip.rating = r.rating;
         if (typeof r.note === "string" && r.note) clip.note = r.note;
         if (!clips.some((x) => x.id === r.id)) clips.push(clip);
       }
