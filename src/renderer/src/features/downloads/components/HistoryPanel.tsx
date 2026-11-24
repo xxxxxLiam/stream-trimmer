@@ -9,13 +9,14 @@ import RowIconButton from "../../../shared/components/RowIconButton";
 import { IconInEditor, IconJumpToSource, IconShowFile } from "../../../shared/components/rowIcons";
 import { clipTitle } from "../../../shared/utils/downloads";
 import { useHistoryController } from "../hooks/useHistoryController";
+import { cacheNote } from "../utils/cacheText";
 import { rowMeta } from "../utils/historyRows";
 
 export default function HistoryPanel() {
   const h = useHistoryController();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div id="clips-panel" className="flex min-h-0 flex-1 flex-col">
       <PillSearch placeholder="Search clips, campaigns, videos" pills={h.pills} onPillsChange={h.setPills} count={h.count} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {h.total === 0 ? (
@@ -59,6 +60,19 @@ export default function HistoryPanel() {
               ))}
             </section>
           ))
+        )}
+        {h.cache.bytes > 0 && (
+          <div className="mx-[6px] my-2 flex items-center gap-2 px-2 text-meta text-fg-dim">
+            <span className="min-w-0">{cacheNote(h.cache.bytes)}</span>
+            <button
+              type="button"
+              disabled={h.cache.clearing}
+              onClick={() => void h.cache.clear()}
+              className="h-target shrink-0 rounded-control px-2 text-fg hover:bg-hover disabled:text-disabled"
+            >
+              {h.cache.clearing ? "Clearing…" : "Clear unfinished"}
+            </button>
+          </div>
         )}
       </div>
     </div>

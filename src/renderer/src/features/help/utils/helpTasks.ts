@@ -62,7 +62,7 @@ export const ANCHORS = {
   cut: "ui-cut",
   copyTranscript: "ui-copy-block-transcript",
   copyScript: "ui-copy-block-script",
-  clipsTabAll: "clips-tab-all",
+  clipsTabAll: "panel-tab-history",
   clipsPanel: "clips-panel",
   /** The YouTube sign-in chip's button in the header. */
   youtubeStatus: "help-anchor-youtube-status",
@@ -216,9 +216,9 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Re-cut a saved clip",
     aliases: ["recut", "redo", "edit clip", "change clip", "adjust saved", "reopen", "fix clip"],
     steps: [
-      { do: "Open the All saved tab in the clips column.", why: "Lists every clip you have cut.", anchorId: A.clipsTabAll },
-      { do: "Click the clip to load its segments.", why: "They return to the mark bar for adjusting.", anchorId: A.savedClip },
-      { do: "Adjust, then press Cut as one file.", why: "Writes a new file from the new ranges.", anchorId: A.cut },
+      { do: "Open the History tab on the right.", why: "Lists every clip you have made, newest first.", anchorId: A.clipsTabAll },
+      { do: "Press Jump to source on the clip.", why: "The video goes to where it was cut.", anchorId: A.savedClip },
+      { do: "Mark the new range, then press Clip.", why: "Makes a new file from the new range.", anchorId: A.cut },
     ],
   },
 ];

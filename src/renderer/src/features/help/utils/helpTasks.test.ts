@@ -50,7 +50,7 @@ test("ids are unique and every anchor is a known, prefixed id", () => {
     for (const s of t.steps) {
       if (s.anchorId === null) continue;
       assert.ok(known.has(s.anchorId), `${t.id}: unknown anchor ${s.anchorId}`);
-      assert.match(s.anchorId, /^(ui-[a-z0-9-]+|clips-[a-z-]+|help-anchor-[a-z-]+)$/);
+      assert.match(s.anchorId, /^(ui-[a-z0-9-]+|clips-[a-z-]+|panel-tab-[a-z]+|help-anchor-[a-z-]+)$/);
     }
 });
 
@@ -170,17 +170,17 @@ const WHERE: Record<string, { file: string; state: string; opener?: string; temp
   "ui-cut": { file: "features/clips/components/MarkBar.tsx", state: "workspace screen" },
   "ui-copy-block-transcript": { file: "features/handoff/components/CopyBlocks.tsx", state: "Copy blocks open", opener: "ui-copy-blocks", templated: /id=\{`ui-copy-block-\$\{b\.id\}`\}/ },
   "ui-copy-block-script": { file: "features/handoff/components/CopyBlocks.tsx", state: "Copy blocks open", opener: "ui-copy-blocks", templated: /id=\{`ui-copy-block-\$\{b\.id\}`\}/ },
-  "clips-tab-all": { file: "features/clips/components/ClipsColumn.tsx", state: "workspace screen", templated: /id=\{`clips-tab-\$\{t\.id\}`\}/ },
-  "clips-panel": { file: "features/clips/components/ClipsColumn.tsx", state: "workspace screen", opener: "clips-tab-all" },
+  "panel-tab-history": { file: "modules/layout/components/PanelTabStrip.tsx", state: "workspace screen", templated: /`panel-tab-\$\{id\}`/ },
+  "clips-panel": { file: "features/downloads/components/HistoryPanel.tsx", state: "workspace screen", opener: "panel-tab-history" },
   "help-anchor-youtube-status": { file: "features/youtubeConnection/components/YouTubeStatusChip.tsx", state: "always (header)" },
-  "help-anchor-clips-tabs": { file: "features/clips/components/ClipsColumn.tsx", state: "workspace screen" },
+  "help-anchor-clips-tabs": { file: "features/clips/components/ExportPanel.tsx", state: "workspace screen" },
   "ui-segment-list": { file: "features/clips/components/SegmentList.tsx", state: "at least one segment added" },
   "ui-timeline": { file: "features/player/components/Timeline.tsx", state: "workspace screen" },
   "ui-transcript-search": { file: "features/transcript/components/TranscriptColumn.tsx", state: "workspace screen" },
   "ui-transcript-lines": { file: "features/transcript/components/TranscriptColumn.tsx", state: "workspace screen" },
   "ui-campaign-list": { file: "features/campaigns/components/CampaignMenu.tsx", state: "campaign menu open", opener: "ui-campaign-chip" },
   "ui-symbol-list": { file: "features/handoff/components/SymbolPalette.tsx", state: "Symbols open", opener: "ui-symbols" },
-  "ui-saved-clip": { file: "features/downloads/components/DownloadsPanel.tsx", state: "All saved tab, at least one clip saved", opener: "clips-tab-all", templated: /id=\{rowIndex === 0 \? "ui-saved-clip" : undefined\}/ },
+  "ui-saved-clip": { file: "features/downloads/components/HistoryPanel.tsx", state: "History tab, at least one clip saved", opener: "panel-tab-history", templated: /id=\{g === h\.groups\[0\] && e === g\.entries\[0\] \? "ui-saved-clip" : undefined\}/ },
   // Channel screens, present only in a build with the exporter.
   "ui-channel-start": { file: "features/channelExport/components/ChannelExportPanel.tsx", state: "channel exporter open, not running" },
   "ui-channel-stop": { file: "features/channelExport/components/ChannelExportPanel.tsx", state: "channel export running" },
@@ -262,7 +262,7 @@ test("item 10: every precise id T8 asked for now exists, so the pending list is 
   // SetupChecklist (F-18) clicks these two by id; they must exist for it to work.
   const literals = literalIds();
   assert.ok((literals.get("help-anchor-youtube-status") ?? []).includes("features/youtubeConnection/components/YouTubeStatusChip.tsx"));
-  assert.ok((literals.get("help-anchor-clips-tabs") ?? []).includes("features/clips/components/ClipsColumn.tsx"));
+  assert.ok((literals.get("help-anchor-clips-tabs") ?? []).includes("features/clips/components/ExportPanel.tsx"));
   const checklist = FILES.find((f) => f.path === "features/help/components/SetupChecklist.tsx")!.text;
   assert.match(checklist, /getElementById\("help-anchor-youtube-status"\)/);
   assert.match(checklist, /getElementById\("help-anchor-clips-tabs"\)/);
