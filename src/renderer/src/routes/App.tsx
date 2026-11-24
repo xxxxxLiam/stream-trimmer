@@ -28,7 +28,7 @@ import {
   type EditorHandoffSettings,
   type SessionClip,
 } from "../shared/utils/fcpxml";
-import { getDownloads } from "../shared/utils/downloads";
+import { annotateDownload, getDownloads } from "../shared/utils/downloads";
 import { addSessionClip, sessionClipsFor, type SessionClipsByCampaign } from "../shared/utils/handoff";
 import { readSetting, writeSetting } from "../shared/utils/persist";
 import type { BankedClip } from "../shared/utils/bank";
@@ -303,6 +303,19 @@ function Layout({ active }: { active: boolean }) {
   // the new campaign's "After cutting" choice to this campaign's clip.
   const afterSaved = useCallback(
     (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string) => {
+      const newest = getDownloads().find((d) => d.kind === "clip");
+      if (newest) {
+        annotateDownload(newest.id, {
+          campaign: campaign?.name,
+          campaignId: campaign?.id,
+          clipId,
+          segments: segments.map((s) => ({ start: s.start, end: s.end })),
+          seconds: segments.reduce((sum, s) => sum + (s.end - s.start), 0),
+          videoId: videoId ?? undefined,
+          videoTitle: info?.title,
+          startSec: segments[0]?.start,
+        });
+      }
       const saved = getDownloads().find((d) => d.kind === "clip" && d.path);
       if (!saved) return; // browser download: no file path to hand on
       const clip: SessionClip = {
