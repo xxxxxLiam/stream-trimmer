@@ -133,3 +133,21 @@ Say **not provable here** rather than passing these:
 Everything else — the whole UI, all persistence, all server endpoints and
 validation, the ffmpeg cutting pipeline, the owner gate, accessibility — is
 testable here, so test it rather than reasoning about it.
+
+## Parity against the canvas
+
+`npm run parity -- <Screen> [--fixture name] [--threshold 0.1] [--board-only]`
+
+1. Renders `<Screen>.dc.html` from the canvas snapshot (`PARITY_SNAPSHOT` overrides the folder, default
+   `/mnt/project-files/design/canvas-snapshot-2026-11-24/project`). The snapshot has no `support.js`,
+   so `scripts/parity/boardRender.cjs` stands in for it: it expands `<sc-for>`, `<sc-if>` and `{{path}}`
+   from the board's own `renderVals()` and screenshots at the frame size in `canvas.json`. Boards that
+   call `setState` render their initial state.
+2. Launches the real app through `app.cjs` with `fixtures/<fixture>.json` (default: the screen name):
+   `{ "seed": {settings.json}, "waitFor": "css selector", "steps": [{"click":sel},{"fill":[sel,text]},{"press":key},{"waitFor":sel},{"wait":ms},{"eval":"js"}] }`.
+   Seed campaigns, videos, transcript, markers and bank rows through the settings keys in `audit/inventory.md`.
+3. Writes `board.png`, `app.png`, `diff.png` and `side-by-side.png` (board | app | diff) to
+   `audit/out/parity/<Screen>/`. pixelmatch ignores anti-aliasing; exit code 1 when pixels differ.
+
+Needs a built app and a display: `node node_modules/electron/install.js` once, `npm run build:electron`,
+then `xvfb-run -a npm run parity -- Start`. `--board-only` needs neither.
