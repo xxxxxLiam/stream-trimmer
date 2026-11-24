@@ -9,7 +9,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CHANNEL_HELP_TASKS, HELP_TASKS, searchTasks, type HelpTask } from "../utils/helpTasks";
-import SetupChecklist from "./SetupChecklist";
 import Spotlight from "./Spotlight";
 import { isSignInGateUp, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 
@@ -27,7 +26,6 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [present, setPresent] = useState(true);
-  const [setupOpen, setSetupOpen] = useState(false);
   // AF2-3: the sign-in gate makes the app inert, this drawer with it. A drawer that stays drawn
   // over the gate is visible, dead and click-through, so it is closed while the gate is up.
   const gateUp = isSignInGateUp(useYouTubeConnection());
@@ -97,25 +95,6 @@ export default function HelpDrawer({ open, onClose }: HelpDrawerProps) {
       modal={false}
     >
       <div ref={asideRef} className="flex min-h-0 flex-col">
-
-      <div className="px-4 pb-3">
-        <button
-          type="button"
-          id="help-setup-toggle"
-          className="btn w-full justify-between"
-          aria-expanded={setupOpen}
-          aria-controls="help-setup-panel"
-          onClick={() => setSetupOpen((v) => !v)}
-        >
-          <span>Setup checklist</span>
-          <span className="text-meta text-fg-dim">{setupOpen ? "Hide" : "Optional"}</span>
-        </button>
-        {setupOpen && (
-          <div id="help-setup-panel" className="mt-3 max-h-[50vh] overflow-y-auto">
-            <SetupChecklist />
-          </div>
-        )}
-      </div>
 
       <div className="px-4 pb-3">
         <label htmlFor="help-search" className="mb-1 block text-meta text-fg-dim">
