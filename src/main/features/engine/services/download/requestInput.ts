@@ -15,6 +15,7 @@ export interface DownloadRequest {
   url: string;
   format: DownloadInput["format"];
   quality: DownloadInput["quality"];
+  audioLanguage: DownloadInput["audioLanguage"];
   deliver: DownloadInput["deliver"];
   cookiesFromBrowser: DownloadInput["cookiesFromBrowser"];
   segs: Segment[];
@@ -38,7 +39,7 @@ export function parseDownloadRequest(req: Request, res: Response): DownloadReque
     return null;
   }
 
-  const { url, format, quality, deliver, cookiesFromBrowser }: DownloadInput =
+  const { url, format, quality, audioLanguage, deliver, cookiesFromBrowser }: DownloadInput =
     parsed.data;
   // A clip is a list of ranges. The old single start/end is one segment.
   const resolvedSegments = resolveSegments(parsed.data, MAX_CLIP_SECONDS);
@@ -61,6 +62,7 @@ export function parseDownloadRequest(req: Request, res: Response): DownloadReque
     url,
     format,
     quality,
+    audioLanguage,
     deliver,
     cookiesFromBrowser,
     segs,

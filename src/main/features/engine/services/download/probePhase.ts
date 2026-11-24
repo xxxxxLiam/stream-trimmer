@@ -9,6 +9,7 @@ import { withRunCookies } from "../cookies";
 import { CancelledError } from "../downloadJobs";
 import { publishProgress } from "../progressChannel";
 import { cookieErrorMessage, fullErrMessage, isCookieError, logYtError, sendFailure } from "../../utils/errors";
+import { audioTracksOf, resolveAudioLanguage } from "../../utils/audioTracks";
 import { DownloadCtx } from "./jobContext";
 
 /** Resolves true when the response has been sent and the run must stop. */
@@ -51,6 +52,9 @@ export async function probeSource(ctx: DownloadCtx): Promise<boolean> {
           .filter((h: number) => h > 0),
       ),
     ).sort((a, b) => (b as number) - (a as number)) as number[];
+    const resolved = resolveAudioLanguage(ctx.audioLanguage, audioTracksOf(info));
+    ctx.audioLanguageUsed = resolved.language;
+    ctx.audioFellBack = resolved.fellBack;
     console.log(
       `[server] /api/download available heights=${ctx.availableHeights.join(",") || "unknown"}`,
     );

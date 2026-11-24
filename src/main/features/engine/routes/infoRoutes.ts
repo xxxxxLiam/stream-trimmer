@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { binariesOk, childEnv, resolvedFfmpeg, yt } from "../services/binaries";
 import { cookieModeFor, resolveCookieOptions, withRunCookies } from "../services/cookies";
+import { audioTracksOf } from "../utils/audioTracks";
 import { computeBitrates } from "../utils/bitrates";
 import { binaryError, fullErrMessage, logYtError } from "../utils/errors";
 import { infoSchema } from "../utils/schemas";
@@ -51,6 +52,7 @@ export function registerInfoRoutes(app: Express): void {
         duration: info.duration,
         thumbnail: info.thumbnail,
         bitrates: computeBitrates(info),
+        audioTracks: audioTracksOf(info),
       });
     } catch (e) {
       logYtError("/api/info", parsed.data.url, options, e);

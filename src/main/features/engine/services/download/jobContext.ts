@@ -33,6 +33,9 @@ export interface DownloadCtx extends DownloadRequest {
   /** True only when the probe confirmed a signed-in session. */
   sessionConfirmed: boolean;
   availableHeights: number[];
+  /** The language filter in use (null = original), and whether a missing language fell back to it. */
+  audioLanguageUsed: string | null;
+  audioFellBack: boolean;
   probeOptions: Record<string, unknown>;
   /** The yt-dlp options of the attempt in flight, for the failure log. */
   options: Record<string, unknown>;
@@ -108,6 +111,8 @@ export function createDownloadCtx(req: Request, res: Response, input: DownloadRe
     sendCancelled,
     sessionConfirmed: false,
     availableHeights: [],
+    audioLanguageUsed: null,
+    audioFellBack: false,
     probeOptions: {},
     options: {},
     lastReported: 0,

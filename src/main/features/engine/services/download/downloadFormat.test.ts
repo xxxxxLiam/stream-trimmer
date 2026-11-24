@@ -250,3 +250,47 @@ test("a video that genuinely has no better rendition is downloaded once", async 
   assert.equal(res.headers.get("X-Quality-Degraded"), null);
   assert.equal(clientsUsed(harness).length, 1);
 });
+
+const DUBBED = [
+  { language: "en", format_note: "English (original) (default)" },
+  { language: "es", format_note: "Spanish (dubbed-auto)" },
+];
+
+async function execWithLanguage(audioLanguage: string | undefined) {
+  const harness = await startHarness({ audioTracks: DUBBED, availableHeights: [1080, 720] });
+  try {
+    const res = await fetch(`${harness.baseUrl}/api/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: "https://www.youtube.com/watch?v=lf000001",
+        start: 0,
+        end: 10,
+        quality: "best",
+        audioLanguage,
+        cookiesFromBrowser: "app",
+      }),
+    });
+    assert.equal(res.status, 500);
+    const line = harness.log().split("\n").filter((l) => l.includes("/api/download exec ")).pop()!;
+    return JSON.parse(line.replace(/^.*?options=/, "")) as Record<string, unknown>;
+  } finally {
+    await harness.stop();
+  }
+}
+
+test("a chosen dub reaches the audio half of the format ladder and never a pre-merged stream", async () => {
+  const format = String((await execWithLanguage("es")).format);
+  assert.match(format, /\+bestaudio\[language=es\]/);
+  assert.ok(format.split("/").every((t) => t.includes("+")), `pre-merged tier would play the original: ${format}`);
+});
+
+test("with no language chosen the ladder is unchanged and carries no language filter", async () => {
+  const format = String((await execWithLanguage(undefined)).format);
+  assert.doesNotMatch(format, /language=/);
+});
+
+test("the original's own language, or one the video lacks, adds no filter", async () => {
+  assert.doesNotMatch(String((await execWithLanguage("en")).format), /language=/);
+  assert.doesNotMatch(String((await execWithLanguage("hi")).format), /language=/);
+});

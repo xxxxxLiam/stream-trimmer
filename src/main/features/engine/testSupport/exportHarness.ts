@@ -64,6 +64,8 @@ export interface FakeChannel {
    * tests see it.
    */
   availableHeights?: number[];
+  /** Audio tracks the probe lists, as yt-dlp tags them ("Spanish (dubbed-auto)"). */
+  audioTracks?: { language: string; format_note: string }[];
   /**
    * The height a clip download actually comes back at, per player-client
    * list: `primary` for the server's first attempt, `fallback` for the retry
@@ -177,6 +179,7 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
       FAKE_TRANSCRIPT_LINES: String(channel.transcriptLines ?? 2),
       FAKE_CHANNEL_NAME: channel.channelName ?? "Test Channel",
       FAKE_NO_COMMENTS: (channel.noComments ?? []).join(","),
+      FAKE_AUDIO_TRACKS: JSON.stringify(channel.audioTracks ?? []),
       FAKE_AVAILABLE_HEIGHTS: (channel.availableHeights ?? []).join(","),
       FAKE_HEIGHT_PRIMARY: String(channel.deliveredHeights?.primary ?? 0),
       FAKE_HEIGHT_FALLBACK: String(channel.deliveredHeights?.fallback ?? 0),
