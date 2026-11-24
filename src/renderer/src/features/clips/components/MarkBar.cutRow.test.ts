@@ -59,20 +59,22 @@ test("the player fills the column, and the controls under it stay reachable", ()
   // What still has to hold is the reason the cap existed: the controls must remain
   // reachable. They are, because the workspace scrolls and is focusable, which is also
   // what the hidden-scrollbar rule requires of anything scrollable.
-  const rule = /\.cols-centre \.aspect-video\s*\{([^}]*)\}/.exec(css);
+  const rule = /\.panel-centre \.aspect-video\s*\{([^}]*)\}/.exec(css);
   assert.ok(rule, "the player box still has a rule");
   assert.match(rule![1], /max-width:\s*100%/, "the player fills the centre column");
   assert.doesNotMatch(rule![1], /100vh/, "no viewport-height cap: that is what letterboxed it");
 
-  const layout = readFileSync(new URL("../../../modules/layout/components/ThreeColumnLayout.tsx", import.meta.url), "utf8");
-  const host = /className=\{`cols-host[^`]*`\}/.exec(layout);
-  assert.ok(host, "the workspace host is present");
-  assert.match(host![0], /overflow-y-auto/, "the workspace scrolls when the columns stack, so a tall player is not a trap");
-  assert.match(layout, /tabIndex=\{0\}[\s\S]{0,120}cols-host|cols-host[\s\S]{0,120}tabIndex=\{0\}/, "and it is focusable, so the keyboard reaches the controls");
+  const slots = readFileSync(new URL("../../player/panels.tsx", import.meta.url), "utf8");
+  for (const slot of ["Preview", "Timeline"]) {
+    assert.match(
+      slots,
+      new RegExp(`tabIndex=\\{0\\} aria-label="${slot}" className="[^"]*overflow-y-auto`),
+      `${slot} scrolls inside itself and is focusable, so the keyboard reaches everything in it`,
+    );
+  }
 });
 
 test("no visible scrollbar is introduced, and the rule is stated once", () => {
   assert.match(css, /::-webkit-scrollbar\s*\{\s*width:\s*0;\s*height:\s*0;?\s*\}/);
   assert.equal((css.match(/::-webkit-scrollbar\s*\{/g) ?? []).length, 1);
-  assert.equal((css.match(/@container \(min-width: 840px\)/g) ?? []).length, 1, "one copy of the container block");
 });

@@ -386,20 +386,7 @@
   background: var(--g-ground), var(--c-bg);
 }
 
-/* ---- Workspace columns ------------------------------------------------ */
-/* The columns respond to the width of their own area (the help drawer is a 400px sibling),
-   not the window. 840 = THREE_COLUMN_MIN_PX in ThreeColumnLayout.tsx: the default window
-   (1100) keeps three columns through one zoom step (880 at 125%), and the 900px minimum
-   gets them too. Below that the columns wrap, with the mark column FIRST so In, Out, Add
-   and Cut are what you see. Unlayered on purpose so these beat the max-h / max-w
-   utilities on the same elements. */
-.cols-host {
-  container-type: inline-size;
-}
-.cols-centre {
-  order: -1;
-}
-
+/* ---- Workspace panels ------------------------------------------------- */
 /* The player fills the centre column.
    It used to be capped by height — max-width: min(80vh, (100vh - 440px) * 16/9) — so that
    In/Out, Add and Cut stayed below the fold without scrolling. The cost was a letterboxed
@@ -408,7 +395,7 @@
    little and watch a bigger picture, which is the right trade for the one thing you stare
    at all session. The workspace area scrolls and is focusable, so the controls stay
    reachable by wheel, trackpad and keyboard with the bar hidden. */
-.cols-centre .aspect-video {
+.panel-centre .aspect-video {
   max-width: 100%;
 }
 
@@ -422,150 +409,46 @@
   margin: -2px;
 }
 
-/* ---- Resizable side columns --------------------------------------------- */
-/* ThreeColumnLayout sets --col-t / --col-c on .cols-row and data-sized once a width has
-   been dragged. They are read ONLY inside the wide container query, so stacked columns
-   never carry a width, and the handles do not exist (or show) below it either. */
-.col-handle,
-.col-pill,
-.col-rail {
-  display: none;
+/* ---- Panel handles and tab strips ---------------------------------------- */
+/* A thin hit area between two areas, with a 2px line drawn in it on hover and focus. */
+.panel-handle {
+  position: relative;
+  touch-action: none;
+  border-radius: 5px;
 }
-
-@container (min-width: 840px) {
-  .cols-row {
-    height: 100%;
-    flex-wrap: nowrap;
-  }
-  .cols-side {
-    max-height: none;
-    max-width: 400px;
-  }
-  .cols-transcript {
-    flex-basis: 240px;
-  }
-  .cols-clips {
-    max-width: 360px;
-    flex-basis: 220px;
-  }
-  .cols-centre {
-    order: 0;
-    min-height: 0;
-    overflow-y: auto;
-  }
-  /* Resizable side columns (see the note above this block). */
-  .cols-row[data-sized] .cols-transcript {
-    flex: 0 0 var(--col-t);
-    max-width: none;
-  }
-  .cols-row[data-sized] .cols-clips {
-    flex: 0 0 var(--col-c);
-    max-width: none;
-  }
-  /* A 12px hit area centred in the 8px gap, with a 2px line drawn in it. */
-  .col-handle {
-    display: block;
-    position: absolute;
-    top: 8px;
-    bottom: 8px;
-    width: 12px;
-    cursor: col-resize;
-    touch-action: none;
-    border-radius: 5px;
-    z-index: 1;
-  }
-  .col-handle::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 5px;
-    width: 2px;
-    border-radius: 1px;
-    background: transparent;
-  }
-  .col-handle:hover::after,
-  .col-handle:focus-visible::after {
-    background: var(--c-hairline-strong);
-  }
-  .col-handle:active::after {
-    background: var(--accent);
-  }
-  .col-handle:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 0;
-  }
-  .col-handle-transcript {
-    left: calc(8px + var(--col-t) + 4px - 6px);
-  }
-  .col-handle-clips {
-    right: calc(8px + var(--col-c) + 4px - 6px);
-  }
-  /* Hide / show. A hidden column is display:none (out of the tab order too) and a slim
-     labelled rail takes its place, so the way back is always visible and says what it
-     reopens. 32px = RAIL_PX in columnSizes.ts. The centre grows into the freed width. */
-  .cols-row[data-hide-transcript] .cols-transcript,
-  .cols-row[data-hide-clips] .cols-clips {
-    display: none;
-  }
-  .col-rail {
-    display: flex;
-    flex: 0 0 32px;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 0;
-    min-height: 0;
-    color: var(--c-fg-dim);
-    cursor: pointer;
-  }
-  .col-rail:hover {
-    background: var(--c-hover);
-    color: var(--c-fg);
-  }
-  .col-rail:focus-visible,
-  .col-pill:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 0;
-    color: var(--c-fg);
-  }
-  .col-rail-label {
-    writing-mode: vertical-rl;
-    font-size: 12px;
-    letter-spacing: 0.04em;
-  }
-  .col-pill {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 16px;
-    width: 16px;
-    height: 32px;
-    padding: 0;
-    z-index: 2;
-    cursor: pointer;
-    color: var(--c-fg-dim);
-    background: var(--c-raised);
-    border: 1px solid var(--c-hairline-strong);
-    border-radius: 5px;
-  }
-  .col-pill:hover {
-    background: var(--c-hover);
-    color: var(--c-fg);
-  }
-  .col-pill-transcript {
-    left: calc(8px + var(--col-t) + 4px - 8px);
-  }
-  .col-pill-clips {
-    right: calc(8px + var(--col-c) + 4px - 8px);
-  }
+.panel-handle::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  border-radius: 1px;
 }
-@container (min-width: 1040px) {
-  .cols-transcript {
-    flex-basis: 280px;
-  }
-  .cols-clips {
-    flex-basis: 260px;
-  }
+.panel-handle-v::after {
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+}
+.panel-handle-h::after {
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 2px;
+}
+.panel-handle:hover::after,
+.panel-handle:focus-visible::after {
+  background: var(--c-hairline-strong);
+}
+.panel-handle:active::after {
+  background: var(--ice);
+}
+.panel-handle:focus-visible {
+  outline: 2px solid var(--ice);
+  outline-offset: 0;
+}
+/* Tabs scroll sideways with no scrollbar; a fade shows on a side that has hidden tabs. */
+.tab-fade {
+  background: linear-gradient(to right, var(--c-panel), transparent);
+}
+.tab-fade-end {
+  background: linear-gradient(to left, var(--c-panel), transparent);
 }
