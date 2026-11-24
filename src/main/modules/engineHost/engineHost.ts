@@ -42,6 +42,8 @@ export async function startBackend() {
   // Where the imported cookies.txt lives. The backend resolves the path from
   // here and never accepts it from the renderer.
   process.env.YT_CLIPPER_COOKIE_FILE = youtubeSession.cookieFilePath();
+  // Where the app keeps a yt-dlp it fetched itself (silent tool updates).
+  process.env.YT_CLIPPER_TOOLS_DIR = path.join(app.getPath("userData"), "tools");
 
   // Serve the built UI from the same local server so the window loads over
   // http://127.0.0.1 instead of file://. YouTube embeds refuse to render in a

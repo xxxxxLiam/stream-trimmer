@@ -16,6 +16,7 @@ import { closeSplash, createSplash, createWindow, getMainWindow } from "./module
 import { startSignInSignal } from "./features/youtube/services/signInService";
 import { setupAutoUpdater } from "./modules/updater/autoUpdater";
 import { startCookieChecks, stopCookieChecks } from "./modules/maintenance/cookieChecks";
+import { startToolChecks, stopToolChecks } from "./modules/maintenance/toolChecks";
 import { sweepStaleClips } from "./modules/maintenance/staleClips";
 
 const { app } = electron;
@@ -52,6 +53,7 @@ app.whenReady().then(async () => {
     logger.watchWindow("main", getMainWindow());
     sweepStaleClips();
     startCookieChecks();
+    startToolChecks();
     void startSignInSignal();
     setupAutoUpdater();
   } catch (err: unknown) {
@@ -77,5 +79,6 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   stopCookieChecks();
+  stopToolChecks();
   stopBackend();
 });
