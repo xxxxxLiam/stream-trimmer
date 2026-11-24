@@ -9,7 +9,7 @@
 import { useState } from "react";
 import CentredDialog from "../../../shared/components/CentredDialog";
 import ClipIdPatternField from "./ClipIdPatternField";
-import { useDataFolderVisible } from "../../../shared/hooks/useDataFolderVisible";
+import { useDataFolderVisibleState } from "../../../shared/hooks/useDataFolderVisibleState";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../hooks/CampaignContext";
 import {
@@ -86,7 +86,7 @@ function FolderPick({
 function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Campaign) => void }) {
   const { create, campaigns, folders } = useCampaign();
   const { isElectron, quality } = useClipperContext();
-  const dataVisible = useDataFolderVisible();
+  const dataVisible = useDataFolderVisibleState();
 
   const steps: StepId[] = [
     "name",

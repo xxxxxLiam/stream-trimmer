@@ -1,6 +1,6 @@
 /**
- * File: useTranscriptWindow.ts
- * Path: src/renderer/src/features/transcript/hooks/useTranscriptWindow.ts
+ * File: useTranscriptWindowState.ts
+ * Path: src/renderer/src/features/transcript/hooks/useTranscriptWindowState.ts
  * Description: Windowing hook for the transcript column (BUILD-SPEC section 6). Holds the whole
  *   transcript indexed in memory, exposes ~40 lines around the playhead, grows on loadEarlier /
  *   loadLater, searches the entire transcript, and re-centres when a match is jumped to.
@@ -61,7 +61,7 @@ export type TranscriptWindow = {
 
 type State = { win: Win; idx: number; lines: Line[] };
 
-export function useTranscriptWindow({
+export function useTranscriptWindowState({
   lines: raw,
   playhead,
   size = WINDOW_SIZE,

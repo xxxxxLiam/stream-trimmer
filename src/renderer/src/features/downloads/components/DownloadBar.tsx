@@ -8,10 +8,10 @@
 import { motion } from "framer-motion";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { formatBytes } from "../../../shared/utils/clip";
-import { useSegments } from "../../../shared/hooks/useSegments";
+import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { CopyFailureDiagnostics } from "../../../shared/components/DiagnosticsDisclosure";
 import { redact } from "../../../shared/utils/diagnostics";
-import type { DownloadFailureInfo } from "../../../modules/clipper/hooks/useClipper";
+import type { DownloadFailureInfo } from "../../../modules/clipper/hooks/useClipperController";
 
 /**
  * The engine's text can carry its raw stderr: cookie rows, bearer tokens, the user's email, home
@@ -56,7 +56,7 @@ export default function DownloadBar() {
     error,
     failure,
   } = useClipperContext();
-  const { segments } = useSegments();
+  const { segments } = useSegmentsState();
   const hasSegments = segments.length > 0;
   const needsSaveDir = isElectron && !saveDir;
 

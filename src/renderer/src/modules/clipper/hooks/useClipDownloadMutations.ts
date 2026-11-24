@@ -1,6 +1,6 @@
 /**
- * File: useClipDownload.ts
- * Path: src/renderer/src/modules/clipper/hooks/useClipDownload.ts
+ * File: useClipDownloadMutations.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useClipDownloadMutations.ts
  * Description: Cuts the clip: progress, cancel, the engine request and saving the result.
  */
 import { useCallback, useRef, useState } from "react";
@@ -10,9 +10,9 @@ import { cookiePayload, markDisconnected, useYouTubeConnection } from "../../../
 import { addDownload } from "../../../shared/utils/downloads";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
 import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, videoUrlProblem } from "../utils/downloadErrors";
-import { type SavedFiles } from "./useSavedFiles";
+import { type SavedFiles } from "./useSavedFilesState";
 
-export function useClipDownload({
+export function useClipDownloadMutations({
   info,
   url,
   start,

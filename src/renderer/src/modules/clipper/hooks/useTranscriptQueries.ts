@@ -1,13 +1,13 @@
 /**
- * File: useTranscript.ts
- * Path: src/renderer/src/modules/clipper/hooks/useTranscript.ts
+ * File: useTranscriptQueries.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useTranscriptQueries.ts
  * Description: The transcript: on-demand load, search, the range view, copy and click-to-set-range.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatTimestamp, normalizeYouTubeUrl, parseJson, apiUrl, type TranscriptLine, type TranscriptResponse } from "../../../shared/utils/clip";
 import { cookiePayload } from "../../../shared/utils/youtubeConnection";
 
-export function useTranscript({
+export function useTranscriptQueries({
   url,
   videoId,
   start,

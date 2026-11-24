@@ -1,13 +1,13 @@
 /**
- * File: useSaveLocations.ts
- * Path: src/renderer/src/modules/clipper/hooks/useSaveLocations.ts
+ * File: useSaveLocationsState.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useSaveLocationsState.ts
  * Description: Saved destination folders: the list, the active one and their nicknames.
  */
 import { useCallback, useState } from "react";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { displayDirName, readSaveDirNames, writeSaveDirNames } from "../../../shared/utils/downloads";
 
-export function useSaveLocations() {
+export function useSaveLocationsState() {
   // Saved locations: a small user-managed list with one active destination.
   // Persisted via the settings store so they survive app restarts.
   const [saveDirs, setSaveDirsState] = useState<string[]>(() =>

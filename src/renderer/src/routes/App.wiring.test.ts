@@ -14,6 +14,6 @@ test("B-2: each tab's provider is told which tab it is", () => {
 });
 
 test("C-1: a cut clears ITS tab's store, never the module-level active one", () => {
-  assert.ok(!/import \{[^}]*\bclearSegments\b[^}]*\} from "\.\/hooks\/useSegments"/.test(app));
-  assert.match(app, /clear: clearSegments\s*\} = useSegments\(\)/);
+  assert.ok(!/import \{[^}]*\bclearSegments\b[^}]*\} from "\.\/hooks\/useSegmentsState"/.test(app));
+  assert.match(app, /clear: clearSegments\s*\} = useSegmentsState\(\)/);
 });

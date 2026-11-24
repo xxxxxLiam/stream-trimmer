@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
-import { useSegments } from "../../../shared/hooks/useSegments";
+import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import SegmentList from "./SegmentList";
 import {
   bandStatus,
@@ -105,7 +105,7 @@ export default function MarkBar({ className, onCut, used: usedProp, onShowUsed }
   const clipper = useClipperContext();
   const { active } = useCampaign();
   const tabActive = useIsTabActive();
-  const store = useSegments();
+  const store = useSegmentsState();
   const {
     info,
     videoId,

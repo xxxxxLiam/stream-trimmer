@@ -136,7 +136,7 @@ export function lowQualityExplanation(
  * without signing in (360p)" only works if the quality the app asks for is 360p. A fresh install
  * defaults to Best, which made a skipped user's first Cut fail. While signed out the quality is
  * held at 360p and the user's own choice is remembered, then put back on sign-in. Pure so the
- * rule is testable; useClipper owns the state it is applied to.
+ * rule is testable; useClipperController owns the state it is applied to.
  */
 export function signedOutQuality(input: {
   signedOut: boolean;

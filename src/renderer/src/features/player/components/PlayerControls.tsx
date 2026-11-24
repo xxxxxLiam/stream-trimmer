@@ -14,7 +14,7 @@ import {
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { formatTimestamp } from "../../../shared/utils/clip";
-import type { YouTubePlayerApi } from "../hooks/useYouTubePlayer";
+import type { YouTubePlayerApi } from "../hooks/useYouTubePlayerController";
 
 export default function PlayerControls({
   player,

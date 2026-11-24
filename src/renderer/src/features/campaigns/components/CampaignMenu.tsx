@@ -9,7 +9,7 @@
 import { useState } from "react";
 import ClipIdPatternField from "./ClipIdPatternField";
 import CampaignWizard from "./CampaignWizard";
-import { useDataFolderVisible } from "../../../shared/hooks/useDataFolderVisible";
+import { useDataFolderVisibleState } from "../../../shared/hooks/useDataFolderVisibleState";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../hooks/CampaignContext";
 import {
@@ -87,7 +87,7 @@ function CampaignForm({
 }) {
   const { create, update, folders, campaigns } = useCampaign();
   const { isElectron, format, quality } = useClipperContext();
-  const dataVisible = useDataFolderVisible();
+  const dataVisible = useDataFolderVisibleState();
   const [d, setD] = useState<Draft>(() => toDraft(editing, folders));
   const [problems, setProblems] = useState<string[]>([]);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));

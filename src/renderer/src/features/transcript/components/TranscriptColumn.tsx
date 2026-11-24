@@ -27,7 +27,7 @@ import {
   snapRangeByIndex,
   type TimeRange,
 } from "../utils/transcript";
-import { useTranscriptWindow } from "../hooks/useTranscriptWindow";
+import { useTranscriptWindowState } from "../hooks/useTranscriptWindowState";
 
 import { Icon } from "../../../shared/components/icons";
 export type TranscriptColumnProps = {
@@ -133,7 +133,7 @@ export default function TranscriptColumn({
   const campaignRanges = videoId ? campaign?.usedRanges[videoId] : undefined;
   const used: readonly TimeRange[] = usedRanges ?? campaignRanges ?? NO_RANGES;
 
-  const w = useTranscriptWindow({ lines: transcript, playhead: head });
+  const w = useTranscriptWindowState({ lines: transcript, playhead: head });
 
   // ---- scrolling -------------------------------------------------------------------------
   const scrollRef = useRef<HTMLDivElement | null>(null);

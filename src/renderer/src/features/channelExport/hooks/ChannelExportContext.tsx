@@ -5,9 +5,9 @@
  */
 import { createContext, useContext, type ReactNode } from "react";
 import {
-  useChannelExport,
+  useChannelExportController,
   type ChannelExportState,
-} from "./useChannelExport";
+} from "./useChannelExportController";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 
@@ -17,7 +17,7 @@ export function ChannelExportProvider({ children }: { children: ReactNode }) {
   const { isElectron } = useClipperContext();
   // Exported CSVs go to the campaign's DATA folder, never the clips folder.
   const { folders } = useCampaign();
-  const state = useChannelExport({ isElectron, saveDir: folders.dataDir || null });
+  const state = useChannelExportController({ isElectron, saveDir: folders.dataDir || null });
   return (
     <ChannelExportContext.Provider value={state}>
       {children}

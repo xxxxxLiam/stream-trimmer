@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { extractVideoId, normalizeYouTubeUrl } from "./clip";
-import { videoUrlProblem } from "../../modules/clipper/hooks/useClipper";
+import { videoUrlProblem } from "../../modules/clipper/hooks/useClipperController";
 
 const ID = "mmmmmmmmmmm";
 

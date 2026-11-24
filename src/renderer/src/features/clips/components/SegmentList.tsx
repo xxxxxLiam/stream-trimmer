@@ -6,7 +6,7 @@
  *   Each row shows its range, its length and the transcript text at its start.
  */
 import { useState } from "react";
-import { useSegments } from "../../../shared/hooks/useSegments";
+import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { Icon } from "../../../shared/components/icons";
 import {
   formatLength,
@@ -58,7 +58,7 @@ export default function SegmentList({
   const [announce, setAnnounce] = useState("");
   // While a cut runs the list is frozen: the cut was launched with a snapshot, so a row
   // removed now would still be in the file (B-7). The store refuses the edit as well.
-  const { locked } = useSegments();
+  const { locked } = useSegmentsState();
 
   if (segments.length === 0) return null;
 

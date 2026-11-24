@@ -1,12 +1,12 @@
 /**
- * File: useClipRange.ts
- * Path: src/renderer/src/modules/clipper/hooks/useClipRange.ts
+ * File: useClipRangeState.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useClipRangeState.ts
  * Description: The in/out range: parsed start and end, their validation and the helpers that set them.
  */
 import { useCallback, useEffect, useMemo } from "react";
 import { MAX_CLIP_SECONDS, formatTimestamp, parseTimestamp, type VideoInfo } from "../../../shared/utils/clip";
 
-export function useClipRange({
+export function useClipRangeState({
   url,
   info,
   startText,

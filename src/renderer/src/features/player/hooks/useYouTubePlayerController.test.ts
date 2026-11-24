@@ -1,6 +1,6 @@
 /**
- * File: useYouTubePlayer.test.ts
- * Path: src/renderer/src/features/player/hooks/useYouTubePlayer.test.ts
+ * File: useYouTubePlayerController.test.ts
+ * Path: src/renderer/src/features/player/hooks/useYouTubePlayerController.test.ts
  * Description: The playhead double-jump on every timeline click. Seeking is asynchronous, so
  *   for a tick or two getCurrentTime() still reports where the video WAS; believing that
  *   reading drags the playhead back and then forward again. acceptPolledTime decides which
@@ -13,7 +13,7 @@ import {
   SEEK_TIMEOUT_MS,
   acceptPolledTime,
   type PendingSeek,
-} from "./useYouTubePlayer";
+} from "./useYouTubePlayerController";
 
 const NOW = 1_000_000;
 const pendingAt = (target: number, now = NOW): PendingSeek => ({

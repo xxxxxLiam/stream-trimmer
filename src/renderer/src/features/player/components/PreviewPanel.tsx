@@ -11,8 +11,8 @@ import {
   BoxArrowUpRight,
 } from "react-bootstrap-icons";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
-import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
-import { setPlayhead } from "../../../shared/hooks/useSegments";
+import { useYouTubePlayerController } from "../hooks/useYouTubePlayerController";
+import { setPlayhead } from "../../../shared/hooks/useSegmentsState";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { PLAY_FROM_EVENT } from "../../../shared/utils/playFrom";
 import PlayerControls from "./PlayerControls";
@@ -26,7 +26,7 @@ function openExternal(id: string) {
 export default function PreviewPanel() {
   const { info, videoId, start, end, seekRequest } = useClipperContext();
   // YouTube IFrame API player — drives scrubbing and in/out points.
-  const player = useYouTubePlayer(videoId);
+  const player = useYouTubePlayerController(videoId);
   const embedBlocked = player.blocked;
   const [loopSelection, setLoopSelection] = useState(false);
 

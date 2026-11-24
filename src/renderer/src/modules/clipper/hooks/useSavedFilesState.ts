@@ -1,6 +1,6 @@
 /**
- * File: useSavedFiles.ts
- * Path: src/renderer/src/modules/clipper/hooks/useSavedFiles.ts
+ * File: useSavedFilesState.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useSavedFilesState.ts
  * Description: The last saved file, the save confirmation notice and the download history list.
  */
 import { useCallback, useState, useSyncExternalStore } from "react";
@@ -12,7 +12,7 @@ import {
   type DownloadEntry,
 } from "../../../shared/utils/downloads";
 
-export function useSavedFiles(isElectron: boolean) {
+export function useSavedFilesState(isElectron: boolean) {
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
   // Confirmation notice for a completed save (clip or comments CSV).
   const [savedNotice, setSavedNotice] = useState<{
@@ -68,4 +68,4 @@ export function useSavedFiles(isElectron: boolean) {
   };
 }
 
-export type SavedFiles = ReturnType<typeof useSavedFiles>;
+export type SavedFiles = ReturnType<typeof useSavedFilesState>;

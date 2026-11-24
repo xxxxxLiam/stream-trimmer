@@ -16,14 +16,14 @@ import {
 import { useCampaign } from "../hooks/CampaignContext";
 import CampaignMenu from "./CampaignMenu";
 import { IconChevronDown } from "../../../shared/components/icons";
-import { useDismiss } from "../../../shared/hooks/useDismiss";
+import { useDismissEffects } from "../../../shared/hooks/useDismissEffects";
 
 export default function CampaignChip({ menu }: { menu?: ReactNode }) {
   const { active } = useCampaign();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
-  useDismiss(ref, open, close);
+  useDismissEffects(ref, open, close);
 
   return (
     <div ref={ref} className="relative">

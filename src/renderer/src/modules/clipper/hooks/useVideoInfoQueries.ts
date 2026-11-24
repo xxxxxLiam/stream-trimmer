@@ -1,6 +1,6 @@
 /**
- * File: useVideoInfo.ts
- * Path: src/renderer/src/modules/clipper/hooks/useVideoInfo.ts
+ * File: useVideoInfoQueries.ts
+ * Path: src/renderer/src/modules/clipper/hooks/useVideoInfoQueries.ts
  * Description: Loads video info for the pasted link, automatically (debounced) or on demand.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,7 +8,7 @@ import { MAX_CLIP_SECONDS, formatTimestamp, normalizeYouTubeUrl, parseJson, apiU
 import { videoUrlProblem } from "../utils/downloadErrors";
 import { cookiePayload } from "../../../shared/utils/youtubeConnection";
 
-export function useVideoInfo({
+export function useVideoInfoQueries({
   url,
   videoId,
   setInfo,

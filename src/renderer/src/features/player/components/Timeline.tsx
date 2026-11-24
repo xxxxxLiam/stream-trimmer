@@ -10,7 +10,7 @@
 import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
-import { useSegments } from "../../../shared/hooks/useSegments";
+import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { playFrom } from "../../../shared/utils/playFrom";
 import {
   checkRange,
@@ -58,7 +58,7 @@ export default function Timeline({
 }: TimelineProps) {
   const clipper = useClipperContext();
   const { active } = useCampaign();
-  const store = useSegments();
+  const store = useSegmentsState();
   const trackRef = useRef<HTMLDivElement>(null);
 
   const duration = durationProp ?? clipper.duration;
