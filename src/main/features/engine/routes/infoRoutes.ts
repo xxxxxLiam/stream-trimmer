@@ -12,7 +12,7 @@ import { cookieModeFor, resolveCookieOptions, withRunCookies } from "../services
 import { computeBitrates } from "../utils/bitrates";
 import { binaryError, fullErrMessage, logYtError } from "../utils/errors";
 import { infoSchema } from "../utils/schemas";
-import { parseVtt } from "../utils/vtt";
+import { parseVttTranscript } from "../utils/vtt";
 
 export function registerInfoRoutes(app: Express): void {
   app.post("/api/info", async (req: Request, res: Response) => {
@@ -114,8 +114,8 @@ export function registerInfoRoutes(app: Express): void {
       const raw = fs.readFileSync(path.join(tempDir, vtt), "utf8");
       cleanup();
 
-      const lines = parseVtt(raw);
-      res.json({ lines, available: lines.length > 0 });
+      const { lines, wordTimings } = parseVttTranscript(raw);
+      res.json({ lines, available: lines.length > 0, wordTimings });
     } catch (e) {
       logYtError("/api/transcript", parsed.data.url, options, e);
       cleanup();
