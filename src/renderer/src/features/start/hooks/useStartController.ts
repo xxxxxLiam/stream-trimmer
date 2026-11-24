@@ -1,7 +1,7 @@
 /**
  * File: useStartController.ts
  * Path: src/renderer/src/features/start/hooks/useStartController.ts
- * Description: The one hook ColdStartScreen calls. Puts a link in (typed, pasted anywhere, Paste
+ * Description: The one hook ColdStartScreen calls. Puts a link in (typed, the Paste
  *   button, or the copied-link offer), opens the video through the clipper context, and opens the
  *   save folder from the folder chip.
  */
@@ -29,7 +29,7 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
     [flushAutoLoad, setUrl],
   );
 
-  const { copied } = useStartEffects({ active: !url, onPasted: openLink });
+  const { copied } = useStartEffects({ active: !url });
 
   const onPasteButton = useCallback(() => {
     navigator.clipboard

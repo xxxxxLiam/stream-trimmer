@@ -20,16 +20,19 @@ import {
 } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
-import { formatTimestamp } from "../../../shared/utils/clip";
+import { formatTimestamp, parseTimestamp } from "../../../shared/utils/clip";
+import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import {
   WINDOW_SIZE,
   isLineUsed,
+  lineOverlaps,
   snapRangeByIndex,
   type TimeRange,
 } from "../utils/transcript";
 import { useTranscriptWindowState } from "../hooks/useTranscriptWindowState";
 
-import { Icon } from "../../../shared/components/icons";
+import { IconChevronDown, IconChevronUp, IconSearch } from "../../../shared/components/PanelIcons";
+import TranscriptCopyMenu from "./TranscriptCopyMenu";
 export type TranscriptColumnProps = {
   className?: string;
   /** Playhead seconds. Defaults to the last seek the transcript asked for. */
@@ -42,28 +45,7 @@ export type TranscriptColumnProps = {
   onRangeChange?: (start: number, end: number) => void;
 };
 
-/** Spec section 6: grey hatch for used material. */
-const HATCH: CSSProperties = {
-  backgroundImage: "repeating-linear-gradient(45deg, #3A3A3D 0 3px, #252527 3px 6px)",
-};
 const NO_RANGES: readonly TimeRange[] = [];
-
-const IconSearch = () => (
-  <Icon>
-    <circle cx="7" cy="7" r="4.25" />
-    <path d="M10.2 10.2L13.5 13.5" />
-  </Icon>
-);
-const IconUp = () => (
-  <Icon>
-    <path d="M4 10l4-4 4 4" />
-  </Icon>
-);
-const IconDown = () => (
-  <Icon>
-    <path d="M4 6l4 4 4-4" />
-  </Icon>
-);
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -80,7 +62,7 @@ function highlight(text: string, q: string): ReactNode {
     if (hit < 0) break;
     if (hit > at) out.push(text.slice(at, hit));
     out.push(
-      <mark key={hit} className="rounded-chip bg-accent-soft text-fg">
+      <mark key={hit} className="rounded-chip bg-ice-tint-30 text-fg">
         {text.slice(hit, hit + needle.length)}
       </mark>,
     );
@@ -99,6 +81,10 @@ function highlight(text: string, q: string): ReactNode {
  */
 export function pickActiveMatch<T>(matches: readonly T[], active: number): T | null {
   return active >= 0 && active < matches.length ? matches[active] : null;
+}
+
+function isInMarkedRange(line: Parameters<typeof lineOverlaps>[0], ranges: readonly TimeRange[]): boolean {
+  return ranges.some((r) => lineOverlaps(line, r));
 }
 
 export default function TranscriptColumn({
@@ -132,6 +118,15 @@ export default function TranscriptColumn({
   );
   const campaignRanges = videoId ? campaign?.usedRanges[videoId] : undefined;
   const used: readonly TimeRange[] = usedRanges ?? campaignRanges ?? NO_RANGES;
+
+  const { segments: markedSegments } = useSegmentsState();
+  const inSec = parseTimestamp(clipper.startText);
+  const outSec = parseTimestamp(clipper.endText);
+  const marked = useMemo<readonly TimeRange[]>(() => {
+    const out: TimeRange[] = markedSegments.map((s) => ({ start: s.start, end: s.end }));
+    if (inSec != null && outSec != null && outSec > inSec) out.push({ start: inSec, end: outSec });
+    return out;
+  }, [markedSegments, inSec, outSec]);
 
   const w = useTranscriptWindowState({ lines: transcript, playhead: head });
 
@@ -230,6 +225,7 @@ export default function TranscriptColumn({
         const line = w.all[d.a];
         if (line) {
           lastAnchor.current = d.a;
+          setFollow(true);
           seek(line.start);
         }
         return;
@@ -280,6 +276,7 @@ export default function TranscriptColumn({
       return;
     }
     lastAnchor.current = i;
+    setFollow(true);
     seek(line.start);
   };
 
@@ -308,32 +305,13 @@ export default function TranscriptColumn({
 
   return (
     <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ""}`}>
-      <header className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-4">
-        <h2 className="text-body font-medium text-fg">Transcript</h2>
-        <span className="min-w-0 flex-1 truncate font-mono text-meta text-fg-dim" aria-live="polite">
-          {hasTranscript
-            ? `${fmt(w.total)} lines · ${fmt(w.drawn)} drawn`
-            : loadingTranscript
-              ? "loading…"
-              : ""}
-        </span>
-        <button
-          type="button"
-          className="chip aria-pressed:border-accent"
-          aria-pressed={follow}
-          onClick={() => setFollow((v) => !v)}
-          title="Keep the current line in view while the video plays"
+      <div className="mx-[10px] mb-[6px] mt-[10px] flex flex-none items-center gap-1">
+        <label
+          htmlFor="ui-transcript-search"
+          className="flex h-target min-w-0 flex-1 items-center gap-2 rounded-[22px] bg-raised px-[14px] text-fg-dim"
         >
-          Follow
-        </button>
-      </header>
-
-      <div className="flex shrink-0 items-center gap-1 px-4 pb-2">
-        <label htmlFor="ui-transcript-search" className="relative min-w-0 flex-1">
           <span className="sr-only">Search the transcript</span>
-          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-fg-dim">
-            <IconSearch />
-          </span>
+          <IconSearch />
           <input
             id="ui-transcript-search"
             ref={searchRef}
@@ -342,50 +320,42 @@ export default function TranscriptColumn({
             onChange={(e) => w.setQuery(e.target.value)}
             onKeyDown={onSearchKey}
             disabled={!hasTranscript}
-            placeholder="Find what was said"
+            placeholder="Search, or click a line"
             autoComplete="off"
             spellCheck={false}
-            className="surface-raised h-btn w-full rounded-control border border-hairline pl-8 pr-2 text-body text-fg outline-none placeholder:text-fg-dim hover:border-hairlineStrong focus-visible:border-accent disabled:text-disabled disabled:placeholder:text-disabled"
+            className="min-w-0 flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim disabled:text-disabled disabled:placeholder:text-disabled"
           />
+          {w.counter && (
+            <span className="flex-none text-meta text-fg-dim" aria-live="polite" aria-label={`Match ${w.counter}`}>
+              {w.counter}
+            </span>
+          )}
+          {w.matches.length > 0 && (
+            <>
+              <button type="button" className="flex-none text-fg-dim hover:text-fg" aria-label="Previous match" title="Previous match (Shift+Enter)" onClick={w.prevMatch}>
+                <IconChevronUp />
+              </button>
+              <button type="button" className="flex-none text-fg-dim hover:text-fg" aria-label="Next match" title="Next match (Enter)" onClick={w.nextMatch}>
+                <IconChevronDown />
+              </button>
+            </>
+          )}
         </label>
-        <span
-          className="w-12 shrink-0 text-right font-mono text-meta text-fg-dim"
-          aria-live="polite"
-          aria-label={w.counter ? `Match ${w.counter}` : undefined}
-        >
-          {w.counter}
-        </span>
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Previous match"
-          title="Previous match (Shift+Enter)"
-          disabled={w.matches.length === 0}
-          onClick={w.prevMatch}
-        >
-          <IconUp />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Next match"
-          title="Next match (Enter)"
-          disabled={w.matches.length === 0}
-          onClick={w.nextMatch}
-        >
-          <IconDown />
-        </button>
+        <TranscriptCopyMenu lines={w.all} />
       </div>
 
       <div
         id="ui-transcript-lines"
         ref={scrollRef}
-        className="relative min-h-0 flex-1 overflow-y-auto border-t border-hairline px-2 py-2"
+        tabIndex={0}
+        aria-label="Transcript lines"
+        onWheel={() => setFollow(false)}
+        className="relative min-h-0 flex-1 overflow-y-auto outline-none"
       >
         {loadingTranscript ? (
-          <p className="px-2 py-2 text-body text-fg-dim">Loading transcript…</p>
+          <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">Loading transcript…</p>
         ) : !hasTranscript ? (
-          <p className="px-2 py-2 text-body text-fg-dim">
+          <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">
             {transcript && transcript.length === 0
               ? "No transcript available for this video."
               : info
@@ -394,16 +364,14 @@ export default function TranscriptColumn({
           </p>
         ) : (
           <>
-            {w.hasEarlier ? (
-              <button type="button" className="btn mb-2 w-full" onClick={loadEarlier}>
+            {w.hasEarlier && (
+              <button type="button" className="mx-[10px] mb-1 h-8 w-[calc(100%-20px)] text-meta text-fg-dim hover:text-fg" onClick={loadEarlier}>
                 Earlier in the video
               </button>
-            ) : (
-              <p className="px-2 pb-2 text-meta text-fg-dim">Start of the transcript</p>
             )}
 
             {noMatches && (
-              <p className="px-2 pb-2 text-meta text-fg-dim">
+              <p className="m-0 px-[14px] pb-2 text-meta text-fg-dim">
                 No lines match “{w.query.trim()}” anywhere in the transcript.
               </p>
             )}
@@ -416,13 +384,7 @@ export default function TranscriptColumn({
                 const inDrag = selected !== null && i >= selected.first && i <= selected.last;
                 const isActiveMatch =
                   activeMatch !== null && i >= activeMatch.line && i <= activeMatch.endLine;
-                const surface = inDrag
-                  ? "bg-accent-soft"
-                  : isUsed
-                    ? ""
-                    : isCurrent
-                      ? "bg-row-wash"
-                      : "hover:bg-hover";
+                const inRange = inDrag || (!isUsed && isInMarkedRange(line, marked));
                 return (
                   <li key={i} className="m-0 p-0">
                     <button
@@ -432,27 +394,21 @@ export default function TranscriptColumn({
                       onPointerDown={(e) => onRowPointerDown(e, i)}
                       onPointerEnter={() => onRowPointerEnter(i)}
                       onClick={(e) => onRowClick(e, i)}
-                      style={isUsed && !inDrag ? HATCH : undefined}
                       className={
-                        "flex w-full select-none items-start gap-3 rounded-chip px-2 py-1 text-left text-body text-fg transition-colors " +
-                        surface +
-                        (isCurrent ? " shadow-[inset_2px_0_0_var(--accent)]" : "") +
-                        (isActiveMatch ? " ring-1 ring-inset ring-accent" : "")
+                        "mx-[10px] my-[3px] flex min-h-target w-[calc(100%-20px)] select-none items-baseline gap-2 rounded-control px-[10px] py-2 text-left text-body text-fg " +
+                        (inRange ? "bg-ice-tint-10" : "bg-raised") +
+                        (isCurrent ? " shadow-[inset_2px_0_0_var(--frost)]" : "") +
+                        (isActiveMatch ? " ring-1 ring-inset ring-ice" : "")
                       }
                     >
-                      <span
-                        className={
-                          "w-[68px] shrink-0 pt-px font-mono text-meta " +
-                          (isCurrent ? "text-accent" : isUsed ? "text-fg" : "text-fg-dim")
-                        }
-                      >
+                      <span className="flex-none text-meta tabular-nums text-fg-dim">
                         {formatTimestamp(line.start)}
                       </span>
-                      <span className="min-w-0 flex-1">
+                      <span className={"min-w-0 flex-1 " + (isUsed ? "text-fg-dim" : "")}>
                         {matchLines.has(i) ? highlight(line.text, w.query) : line.text}
                       </span>
                       {isUsed && (
-                        <span className="shrink-0 rounded-chip border border-hairlineStrong bg-bg px-1.5 text-meta text-fg-dim">
+                        <span className="flex-none rounded-chip border border-hairlineStrong px-1.5 text-meta text-fg-dim">
                           used
                         </span>
                       )}
@@ -464,12 +420,12 @@ export default function TranscriptColumn({
 
             {w.hasLater ? (
               <div ref={sentinelRef} className="mt-2">
-                <button type="button" className="btn w-full text-fg-dim" onClick={loadLater}>
-                  drawing the next {WINDOW_SIZE} lines
+                <button type="button" className="mx-[10px] h-8 w-[calc(100%-20px)] text-meta text-fg-dim hover:text-fg" onClick={loadLater}>
+                  Later in the video
                 </button>
               </div>
             ) : (
-              <p className="px-2 pt-2 text-meta text-fg-dim">
+              <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">
                 End of the transcript. Auto-generated by YouTube, may contain errors.
               </p>
             )}
