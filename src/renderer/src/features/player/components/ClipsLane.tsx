@@ -32,7 +32,11 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     return { left: x, width: Math.max(6, toX(c.axis, end) - x) };
   };
   // Drawn left to right as they sit in the video; the clip itself plays them in the order locked.
-  const building = (start: number) => c.suggestedName ?? timeName(start);
+  // A section that is exactly a banked moment carries that moment's name; otherwise the suggestion.
+  const building = (start: number) => {
+    const banked = c.sections.length === 1 ? c.waiting.find((b) => b.start === c.sections[0].start && b.end === c.sections[0].end) : undefined;
+    return banked?.label ?? c.suggestedName ?? timeName(start);
+  };
   const sections = [...c.sections].sort((a, b) => a.start - b.start);
   return (
     <div className="flex h-[34px] items-center">
@@ -63,7 +67,11 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                     type="button"
                     title={b.label ?? timeName(b.start)}
                     onClick={() => playFrom(b.start)}
-                    className={`${BAR} rounded-chip border border-hairline-strong text-center text-fg-dim`}
+                    className={`${BAR} rounded-chip border text-center ${
+                      c.range && b.start === c.range.start && b.end === c.range.end
+                        ? "border-fg text-fg"
+                        : "border-hairline-strong text-fg-dim"
+                    }`}
                     style={span(b.start, b.end)}
                   >
                     {b.label ?? timeName(b.start)}

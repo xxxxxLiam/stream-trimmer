@@ -20,6 +20,7 @@ import { axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis } fro
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
+import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
 
 export const DRAG_START_PX = 3;
@@ -67,6 +68,8 @@ export function useTimelineController() {
   const waiting = store.banked;
 
   useTimelineEffects({
+    framed: sections.length === 1 ? sections[0] : null,
+    seek: (t: number) => clipper.requestSeek(t),
     range,
     duration,
     playhead,
@@ -94,6 +97,7 @@ export function useTimelineController() {
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
     if (hi - lo < 1) return;
+    markByHand();
     clipper.setStartFromSeconds(snap(lo, "start"));
     clipper.setEndFromSeconds(snap(hi, "end"));
   };
@@ -115,6 +119,7 @@ export function useTimelineController() {
       const step = scissorsClick(s.scissorsStart, t);
       if (step.kind === "start") {
         s.setScissorsStart(step.at);
+        markByHand();
         clipper.setStartFromSeconds(snap(step.at, "start"));
         clipper.setEndText("");
       } else {

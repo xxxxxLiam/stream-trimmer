@@ -4,6 +4,7 @@
  * Description: The only hook the preview components call. Joins the player, the open video's range,
  *   the clip being built and the preview's own switches into one view model.
  */
+import { markByHand } from "../utils/rangeOrigin";
 import { useMemo, useRef } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
@@ -53,8 +54,8 @@ export function usePreviewController(onNextVideo: () => void) {
     frameRef,
     toggleLoop,
     onNextVideo,
-    setIn: () => info && setStartFromSeconds(Math.floor(player.currentTime)),
-    setOut: () => info && setEndFromSeconds(Math.ceil(player.currentTime)),
+    setIn: () => info && (markByHand(), setStartFromSeconds(Math.floor(player.currentTime))),
+    setOut: () => info && (markByHand(), setEndFromSeconds(Math.ceil(player.currentTime))),
   });
 
   const toggleFullScreen = () => {
