@@ -6,6 +6,7 @@
  *   place, Back shows the parent's name, X and Escape close.
  */
 import { useState } from "react";
+import { Drawer } from "../../../shared/components/Drawer";
 import CampaignWizard from "../../campaigns/components/CampaignWizard";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsCampaigns from "./SettingsCampaigns";
@@ -96,8 +97,8 @@ export default function SettingsDrawer({ open, onClose, startAt, editor }: Setti
   }
 
   return (
-    <aside id="ui-settings-drawer" role="dialog" aria-label="Settings" className="absolute inset-y-0 right-0 z-30 flex w-[440px] max-w-full flex-col overflow-y-auto bg-bg p-2">
-      {body}
+    <div id="ui-settings-drawer" className="absolute inset-y-0 right-0 z-30 max-w-full overflow-y-auto">
+      <Drawer label="Settings">{body}</Drawer>
       <CampaignWizard
         open={c.adding}
         onClose={() => c.setAdding(false)}
@@ -106,6 +107,6 @@ export default function SettingsDrawer({ open, onClose, startAt, editor }: Setti
           c.setView({ kind: "campaign", id: made.id });
         }}
       />
-    </aside>
+    </div>
   );
 }

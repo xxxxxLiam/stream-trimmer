@@ -5,7 +5,7 @@
  *   link box, the No ads / No account chips and the folder chip. One job: get a link in. Logic-free;
  *   useStartController feeds it. States: empty, link already copied, checking tools, tool cannot be fixed.
  */
-import StartLogo from "./StartLogo";
+import { BrandLockup } from "../../../shared/components/BrandMark";
 import type { ToolsStatus } from "../utils/startUtils";
 
 export type ColdStartProps = {
@@ -55,7 +55,7 @@ export default function ColdStart(p: ColdStartProps) {
       style={{ backgroundImage: "var(--glow-spotlight)", backgroundSize: "640px 420px", backgroundPosition: "50% 36%" }}
     >
       <div className="flex w-[680px] max-w-full flex-col items-center gap-8">
-        <StartLogo />
+        <BrandLockup size={56} glow />
         <h1 className="m-0 text-center text-[36px] font-medium leading-[1.1] tracking-[-0.02em]">Only the seconds you need</h1>
         <div className="mt-4 flex w-full flex-col gap-12">
           <div className="flex flex-col gap-2">

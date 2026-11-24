@@ -4,7 +4,7 @@
  * Description: Campaigns list (Settings.dc.html view 2): each campaign with its quota, extra seconds
  *   and languages, an Edit button, and Add campaign.
  */
-import { DrawerHeader, drawerFrame, outlineButton } from "./DrawerParts";
+import { DrawerHeader, drawerBody, outlineButton } from "./DrawerParts";
 
 export type CampaignRow = { id: string; name: string; summary: string; languages: string | null };
 
@@ -16,8 +16,9 @@ export default function SettingsCampaigns(p: {
   onClose: () => void;
 }) {
   return (
-    <div className={drawerFrame}>
+    <>
       <DrawerHeader title="Campaigns" back="Settings" onBack={p.onBack} onClose={p.onClose} />
+      <div className={drawerBody}>
       {p.rows.map((r, i) => (
         <div key={r.id} className={`flex items-center gap-3 py-3 ${i < p.rows.length - 1 ? "border-b border-hairline" : ""}`}>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -34,6 +35,7 @@ export default function SettingsCampaigns(p: {
         Add campaign
       </button>
       <p className="m-0 mt-3 text-meta text-fg-dim">Each campaign shows its quota, extra seconds and languages. Edit opens that campaign.</p>
-    </div>
+      </div>
+    </>
   );
 }

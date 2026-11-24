@@ -6,6 +6,7 @@
  *   button. Logic-free.
  */
 import type { ReactNode } from "react";
+import { DrawerHeader as SharedHeader } from "../../../shared/components/Drawer";
 
 const Chevron = ({ dir }: { dir: "left" | "right" }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -13,22 +14,22 @@ const Chevron = ({ dir }: { dir: "left" | "right" }) => (
   </svg>
 );
 
+const CloseIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+);
+
+/** The shared drawer header; every Settings view names its close button "Close Settings". */
 export function DrawerHeader({ title, back, onBack, onClose }: { title: string; back?: string; onBack?: () => void; onClose: () => void }) {
   return (
-    <div className="flex h-target items-center gap-2">
-      {back && (
-        <button type="button" aria-label={`Back to ${back}`} onClick={onBack} className="-ml-2 inline-flex h-target items-center gap-1 rounded-control px-2 text-meta text-fg-dim hover:bg-hover">
-          <Chevron dir="left" />
-          <span>{back}</span>
-        </button>
-      )}
-      <h2 className="m-0 flex-1 truncate text-drawer-title">{title}</h2>
-      <button type="button" aria-label="Close Settings" onClick={onClose} className="-mr-3 inline-flex h-target w-target items-center justify-center rounded-control text-fg-dim hover:bg-hover">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
-      </button>
-    </div>
+    <SharedHeader
+      title={title}
+      closeName="Settings"
+      onClose={onClose}
+      closeIcon={<CloseIcon />}
+      back={back && onBack ? { label: back, onBack, icon: <Chevron dir="left" /> } : undefined}
+    />
   );
 }
 
@@ -72,4 +73,4 @@ export function SwitchRow({ label, on, onFlip, divider }: { label: string; on: b
 export const outlineButton =
   "h-target rounded-control border border-hairlineStrong bg-raised px-4 text-body text-fg hover:bg-hover";
 
-export const drawerFrame = "flex flex-col gap-1 rounded-panel border border-hairline bg-panel px-4 pb-5 pt-4";
+export const drawerBody = "flex flex-col gap-1 px-5 pb-5 pt-3";

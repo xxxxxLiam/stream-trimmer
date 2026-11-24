@@ -483,7 +483,7 @@ function Layout({ active }: { active: boolean }) {
         )}
       </main>
       <CampaignStart
-        open={active && !campaign && !campaignPromptDismissed}
+        open={active && !!info && !campaign && !campaignPromptDismissed}
         onClose={() => setCampaignPromptDismissed(true)}
         onChosen={() => setCampaignPromptDismissed(true)}
       />

@@ -73,3 +73,8 @@ test("App shows the cold start while no video is open", () => {
   const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
   assert.match(app, /!info && !\(CHANNEL_DATA_BUILT && screen === "channel"\) \? \(\s*<ColdStartScreen \/>/);
 });
+
+test("the new-campaign offer waits for a video, so nothing covers the cold start", () => {
+  const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
+  assert.match(app, /open=\{active && !!info && !campaign && !campaignPromptDismissed\}/);
+});

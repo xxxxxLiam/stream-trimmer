@@ -5,7 +5,7 @@
  *   Languages, Folder with Open, the Final Cut library and event while Final Cut Pro is ticked, and
  *   Delete campaign. No clip id fields, no format or quality.
  */
-import { DrawerHeader, drawerFrame, outlineButton } from "./DrawerParts";
+import { DrawerHeader, drawerBody, outlineButton } from "./DrawerParts";
 import { DUB_LANGUAGES, EXTRA_SECONDS_CHOICES, type CampaignPrefs } from "../utils/settingsPrefs";
 
 export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void };
@@ -32,8 +32,9 @@ const fieldInput = "h-target min-w-0 rounded-control border border-hairlineStron
 export default function SettingsCampaign(p: SettingsCampaignProps) {
   const { prefs } = p;
   return (
-    <div className={drawerFrame}>
+    <>
       <DrawerHeader title={p.name} back="Campaigns" onBack={p.onBack} onClose={p.onClose} />
+      <div className={drawerBody}>
       <div className="flex h-[52px] items-center gap-2 border-b border-hairline">
         <span className="flex-1 text-body">Clips a day</span>
         <button type="button" aria-label="One fewer clip a day" disabled={prefs.clipsPerDay <= 1} onClick={() => p.onPatch({ clipsPerDay: prefs.clipsPerDay - 1 })} className={stepButton}>−</button>
@@ -116,6 +117,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
       <button type="button" aria-label={`Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-2 h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
         {p.confirmingDelete ? `Click again to delete ${p.name}` : "Delete campaign"}
       </button>
-    </div>
+      </div>
+    </>
   );
 }
