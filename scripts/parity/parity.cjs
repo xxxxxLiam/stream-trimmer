@@ -17,17 +17,18 @@ const REPO = path.resolve(__dirname, "..", "..");
 
 function args() {
   const a = process.argv.slice(2);
-  const out = { screen: null, fixture: null, threshold: 0.1, boardOnly: false, window: undefined };
+  const out = { screen: null, fixture: null, threshold: 0.1, boardOnly: false, window: undefined, el: undefined };
   for (let i = 0; i < a.length; i++) {
     if (a[i] === "--fixture") out.fixture = a[++i];
     else if (a[i] === "--threshold") out.threshold = Number(a[++i]);
     else if (a[i] === "--board-only") out.boardOnly = true;
     else if (a[i] === "--window") out.window = /^\d+$/.test(a[i + 1] || "") ? Number(a[++i]) : 0;
+    else if (a[i] === "--el") out.el = Number(a[++i]);
     else if (a[i] === "--snapshot") process.env.PARITY_SNAPSHOT = a[++i];
     else if (!out.screen) out.screen = a[i];
   }
   if (!out.screen) {
-    console.error("usage: npm run parity -- <Screen> [--window [n]] [--snapshot pending|snapshot|<dir>] [--fixture name] [--threshold 0.1] [--board-only]");
+    console.error("usage: npm run parity -- <Screen> [--window [n] | --el n] [--snapshot pending|snapshot|<dir>] [--fixture name] [--threshold 0.1] [--board-only]");
     process.exit(2);
   }
   out.fixture = out.fixture || out.screen;
@@ -38,7 +39,8 @@ function args() {
 function loadFixture(name) {
   const f = path.join(REPO, "audit", "harness", "fixtures", `${name}.json`);
   if (!fs.existsSync(f)) return { seed: {}, steps: [] };
-  return JSON.parse(fs.readFileSync(f, "utf8"));
+  // "$NOW" in a fixture becomes the current time in ms, so "made today" counts stay today.
+  return JSON.parse(fs.readFileSync(f, "utf8").replace(/"\$NOW"/g, String(Date.now())));
 }
 
 async function runSteps(win, steps) {
@@ -66,7 +68,25 @@ function makeStubRoot(fx) {
   return root;
 }
 
-async function screenshotApp(screen, frame, fx) {
+/**
+ * What to capture of the app. --window: the board's visible part of the window frame (frame.clip).
+ * --el: fixture.region, a selector or a rect, since a board drawing a drawer or a menu says nothing
+ * about where that piece sits in the real window.
+ */
+async function appRegion(win, frame, fx, useWindow) {
+  const r = fx.region;
+  if (r && r.selector) {
+    const box = await win.locator(r.selector).first().boundingBox();
+    if (!box) throw new Error(`region selector ${r.selector} not found in the app`);
+    return { x: Math.floor(box.x), y: Math.floor(box.y), width: Math.round(box.width), height: Math.round(box.height) };
+  }
+  if (r) return r;
+  if (!useWindow) throw new Error("--el needs a fixture region (selector or x, y, width, height)");
+  return frame.clip;
+}
+
+async function screenshotApp(screen, frame, fx, useWindow) {
+  const win0 = fx.window || (useWindow ? { width: frame.width, height: frame.height } : { width: 1360, height: 760 });
   const { launchApp } = require("../../audit/harness/app.cjs");
   // The packaged-shape app looks for binaries in <electron>/dist/resources/bin, not under cwd, so a
   // stub root is linked there for the run and removed after. One stubbed parity run at a time.
@@ -87,16 +107,16 @@ async function screenshotApp(screen, frame, fx) {
         win.setMinimumSize(1, 1);
         win.setContentSize(w, h);
       }
-    }, [frame.width, frame.height]);
+    }, [win0.width, win0.height]);
     await a.win.waitForTimeout(300);
     const inner = await a.win.evaluate(() => [innerWidth, innerHeight]);
-    if (inner[0] !== frame.width || inner[1] !== frame.height) {
-      console.warn(`window content is ${inner.join("x")}, wanted ${frame.width}x${frame.height}`);
+    if (inner[0] !== win0.width || inner[1] !== win0.height) {
+      console.warn(`window content is ${inner.join("x")}, wanted ${win0.width}x${win0.height}`);
     }
     await a.win.waitForSelector(fx.waitFor || "#root *");
     await runSteps(a.win, fx.steps);
     await a.win.waitForTimeout(400);
-    return await a.win.screenshot({ clip: { x: 0, y: 0, width: frame.width, height: frame.shotHeight || frame.height } });
+    return await a.win.screenshot({ clip: await appRegion(a.win, frame, fx, useWindow) });
   } finally {
     await a.close();
     if (link) fs.rmSync(link, { recursive: true, force: true });
@@ -105,18 +125,31 @@ async function screenshotApp(screen, frame, fx) {
 
 (async () => {
   const o = args();
-  const outDir = path.join(REPO, "audit", "out", "parity", o.screen + (o.window !== undefined ? `-window${o.window}` : ""));
+  const outDir = path.join(REPO, "audit", "out", "parity", o.screen + (o.window !== undefined ? `-window${o.window}` : o.el !== undefined ? `-el${o.el}` : ""));
   fs.mkdirSync(outDir, { recursive: true });
-  const { png: boardPng, frame } = await renderBoard(o.screen, { window: o.window });
+  const { png: boardPng, frame } = await renderBoard(o.screen, { window: o.window, el: o.el });
   fs.writeFileSync(path.join(outDir, "board.png"), boardPng);
   console.log(`board: ${frame.title} (${frame.width}x${frame.height})`);
   if (o.boardOnly) return;
 
-  const appPng = await screenshotApp(o.screen, frame, loadFixture(o.fixture));
+  const fixture = loadFixture(o.fixture);
+  const appPng = await screenshotApp(o.screen, frame, fixture, o.window !== undefined);
   fs.writeFileSync(path.join(outDir, "app.png"), appPng);
   const b = PNG.sync.read(boardPng);
   const p = PNG.sync.read(appPng);
   if (b.width !== p.width || b.height !== p.height) throw new Error(`size mismatch: board ${b.width}x${b.height}, app ${p.width}x${p.height}`);
+  // Regions neither side can honestly show (the video picture, which needs YouTube): painted the same
+  // flat colour on both, so they never count as a difference. Rects are relative to the compared image.
+  for (const m of fixture.mask || []) {
+    for (const img of [b, p]) {
+      for (let y = m.y; y < Math.min(img.height, m.y + m.height); y++) {
+        for (let x = m.x; x < Math.min(img.width, m.x + m.width); x++) {
+          const i = (img.width * y + x) << 2;
+          img.data[i] = 40; img.data[i + 1] = 40; img.data[i + 2] = 40; img.data[i + 3] = 255;
+        }
+      }
+    }
+  }
   const diff = new PNG({ width: b.width, height: b.height });
   const bad = pixelmatch(b.data, p.data, diff.data, b.width, b.height, { threshold: o.threshold, includeAA: false });
   fs.writeFileSync(path.join(outDir, "diff.png"), PNG.sync.write(diff));
