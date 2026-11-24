@@ -15,6 +15,7 @@ dist
 dist-ssr
 dist-electron
 electron/dist
+out
 .output
 .vinxi
 .tanstack/**

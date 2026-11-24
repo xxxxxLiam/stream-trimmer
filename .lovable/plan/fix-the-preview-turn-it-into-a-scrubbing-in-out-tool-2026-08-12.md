@@ -27,10 +27,10 @@ All existing behaviour (transcript, download, comment export, 10-minute cap) sta
 
 - `electron/main.cjs`: add a static handler for `dist/` on the existing Express server; `createWindow` loads `http://127.0.0.1:${port}` in production. Keep `loadFile` as an emergency fallback if the server is unreachable.
 - `vite.config.ts`: `base` stays relative-safe; served over HTTP so absolute paths work either way.
-- New `src/hooks/useYouTubePlayer.ts`: loads `https://www.youtube.com/iframe_api`, creates the player, exposes `seekTo`, `getCurrentTime`, `play/pause`, and an error callback for 101/150/153.
-- New `src/components/PlayerControls.tsx`: playhead, set-in/set-out, play-selection.
-- `src/components/PreviewPanel.tsx`: replace the raw iframe + postMessage handshake with the hook; add thumbnail fallback (`https://img.youtube.com/vi/<id>/hqdefault.jpg`).
-- `src/hooks/useClipper.ts`: expose `setStartFromSeconds` / `setEndFromSeconds` and a seek request channel so transcript clicks drive the player.
+- New `src/renderer/src/features/player/hooks/useYouTubePlayer.ts`: loads `https://www.youtube.com/iframe_api`, creates the player, exposes `seekTo`, `getCurrentTime`, `play/pause`, and an error callback for 101/150/153.
+- New `src/renderer/src/features/player/components/PlayerControls.tsx`: playhead, set-in/set-out, play-selection.
+- `src/renderer/src/features/player/components/PreviewPanel.tsx`: replace the raw iframe + postMessage handshake with the hook; add thumbnail fallback (`https://img.youtube.com/vi/<id>/hqdefault.jpg`).
+- `src/renderer/src/modules/clipper/hooks/useClipDownload.ts`: expose `setStartFromSeconds` / `setEndFromSeconds` and a seek request channel so transcript clicks drive the player.
 - Bump `package.json` version.
 
 ## Verification

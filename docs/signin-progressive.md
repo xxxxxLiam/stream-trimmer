@@ -72,17 +72,17 @@ working.
 
 ## Build notes
 
-- `src/components/YouTubeConnectModal.tsx` — the modal. The content for all
+- `src/renderer/src/features/youtubeConnection/components/YouTubeConnectModal.tsx` — the modal. The content for all
   three states already exists here; the work is gating it, not writing it.
-- `src/lib/youtubeConnection.ts` — the state machine, 750 lines, already
+- `src/renderer/src/shared/utils/youtubeConnection.ts` — the state machine, 750 lines, already
   tracks everything the gating needs: `restoring`, `busy`, `step`,
   `expired`, and a `signInEpoch` that makes a late browser sweep stand down
   rather than overwrite a sign-in made meanwhile (lines 233–235, 517).
   **Do not add a parallel notion of "which step are we on" beside it** — the
   existing state should be what decides which panel renders.
-- `src/components/DiagnosticsDisclosure.tsx` — the Copy diagnostics control
+- `src/renderer/src/shared/components/DiagnosticsDisclosure.tsx` — the Copy diagnostics control
   for state 3. Reuse it; do not build a second one.
-- `src/lib/setupTasks.ts` — the Setup checklist also narrates sign-in. Keep
+- `src/renderer/src/features/help/utils/setupTasks.ts` — the Setup checklist also narrates sign-in. Keep
   the two in agreement, or the checklist will describe a step the modal is
   no longer showing.
 - `signedOutQuality.test.ts` pins that the help button and drawer withdraw

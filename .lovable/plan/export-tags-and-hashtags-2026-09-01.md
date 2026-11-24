@@ -25,5 +25,5 @@ Matching allows letters, digits, underscore and non-Latin scripts, strips traili
 ## Technical notes
 
 - `server/index.ts`: in the metadata row builder (~line 1691), add a small `extractHashtags(meta)` helper and emit `tag_count`, `hashtags`, `hashtags_in_title` alongside the existing `tags`.
-- `src/lib/channel.ts`: add the three new keys to `VIDEO_COLUMNS` so they are written to the CSV in order.
+- `src/renderer/src/features/channelExport/utils/channel.ts`: add the three new keys to `VIDEO_COLUMNS` so they are written to the CSV in order.
 - No UI change needed; the exporter panel text already says tags are included.

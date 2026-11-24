@@ -29,17 +29,17 @@ The existing browser-cookie path stays as a fallback (surfaced inside the modal 
 
 ## Technical notes
 
-- **New Electron main-process module** `electron/youtubeSession.cjs`:
+- **New Electron main-process module** `src/main/features/youtube/services/youtubeSession.ts`:
   - `openLoginWindow()` — `BrowserWindow` with `session.fromPartition("persist:youtube")`, loading the YouTube sign-in URL. Polls that session's cookies for the auth cookies (`SID`/`__Secure-3PSID`) on `did-navigate` / an interval; on detection, writes cookies and closes the window.
   - `exportCookieFile()` — serialises `session.cookies.get({})` for `.youtube.com`/`.google.com` into Netscape `cookies.txt` at `app.getPath("userData")/yt-cookies.txt`, mode `0600`.
   - `probe()` — returns `{ connected, path }` based on presence of the auth cookies (no network call needed for the fast path).
   - `clear()` — clears the partition and deletes the file.
-  - IPC: `youtube:connect`, `youtube:probe`, `youtube:disconnect`; exposed on `electronAPI` in `electron/preload.cjs` and typed in `src/vite-env.d.ts`. Cookie *values* are never returned to the renderer or logged — only booleans and the file path.
-- **Backend** (`server/index.ts`): the clip/info/export request bodies accept `cookieFile` alongside the existing `cookieBrowser`; when present, yt-dlp gets `--cookies <file>` and the browser flag is skipped. Path is validated to live inside the app's userData dir. `server/youtubeAuth.ts` classification is unchanged and still used for the browser fallback.
+  - IPC: `youtube:connect`, `youtube:probe`, `youtube:disconnect`; exposed on `electronAPI` in `src/preload/index.ts` and typed in `src/renderer/src/vite-env.d.ts`. Cookie *values* are never returned to the renderer or logged — only booleans and the file path.
+- **Backend** (`server/index.ts`): the clip/info/export request bodies accept `cookieFile` alongside the existing `cookieBrowser`; when present, yt-dlp gets `--cookies <file>` and the browser flag is skipped. Path is validated to live inside the app's userData dir. `src/main/features/engine/utils/youtubeAuth.ts` classification is unchanged and still used for the browser fallback.
 - **Renderer state** moves out of `FormatQualityFields.tsx` into `useClipper`:
   - `ytAuth` gains `mode: "app" | "browser"`; new `connectYouTube()` (Electron path) and existing `checkYouTubeAuth()` (browser fallback).
-  - A mount effect runs the silent probe once per tab-independent app session (guarded by a module-level flag in `src/lib/persist.ts`-backed state so multiple workspace tabs don't each probe).
+  - A mount effect runs the silent probe once per tab-independent app session (guarded by a module-level flag in `src/renderer/src/shared/utils/persist.ts`-backed state so multiple workspace tabs don't each probe).
   - `clipper.ytPromptDismissed` persisted via the existing settings layer for "Don't ask again".
-- **New components**: `src/components/YouTubeConnectModal.tsx` (the prompt + connect flow + browser fallback section) and `src/components/YouTubeStatusChip.tsx` (top-bar chip, opens the modal on click). `YouTubeSignInRow` is deleted from `FormatQualityFields.tsx`, leaving just Format and Quality there.
+- **New components**: `src/renderer/src/features/youtubeConnection/components/YouTubeConnectModal.tsx` (the prompt + connect flow + browser fallback section) and `src/renderer/src/features/youtubeConnection/components/YouTubeStatusChip.tsx` (top-bar chip, opens the modal on click). `YouTubeSignInRow` is deleted from `FormatQualityFields.tsx`, leaving just Format and Quality there.
 - The chip lives in the mode bar next to `UpdateStatus`, and the modal renders once at the app shell level (not per workspace tab), since the connection is shared across tabs.
 - Browser (non-Electron) build: the chip and modal show only the existing browser-cookie flow; the in-app login button is hidden.

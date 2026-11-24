@@ -8,7 +8,7 @@
  *   the cutting pipeline stays genuine — only the network part is faked.
  *
  *   Pass the resulting root as `cwd` to launchApp(); the server resolves
- *   binaries from `<cwd>/resources/bin` (server/index.ts: resolveBinDir).
+ *   binaries from `<cwd>/resources/bin` (src/main/features/engine/services/binaries.ts: resolveBinDir).
  *
  * Usage:  node audit/harness/make-stub-root.cjs <rootDir> [scriptFile]
  *
@@ -78,7 +78,7 @@ async function main() {
   if (cfg.delayMs) await new Promise((r) => setTimeout(r, cfg.delayMs));
   if (cfg.exitCode) return fail();
 
-  // Far-future version on purpose: server/index.ts prefers whichever of the
+  // Far-future version on purpose: src/main/features/engine/services/binaries.ts prefers whichever of the
   // bundled and system binaries reports the newer version, and a real yt-dlp
   // on PATH would otherwise win and reach for the network.
   if (has("--version")) { process.stdout.write("2099.12.31\\n"); return; }

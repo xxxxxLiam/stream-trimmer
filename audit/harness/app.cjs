@@ -9,13 +9,13 @@
  *   - Each launch gets a fresh `--user-data-dir`. Electron holds a
  *     single-instance lock per user-data dir, so without this a second helper
  *     silently hands its work to the first one's window.
- *   - The app picks its own free HTTP port (electron/main.cjs: pickFreePort),
+ *   - The app picks its own free HTTP port (src/main/modules/engineHost/engineHost.ts: pickFreePort),
  *     so nothing needs coordinating ports.
  *   - `cwd` decides where the server finds yt-dlp/ffmpeg
- *     (server/index.ts: resolveBinDir falls back to `<cwd>/resources/bin`).
+ *     (src/main/features/engine/services/binaries.ts: resolveBinDir falls back to `<cwd>/resources/bin`).
  *     Point it at a stub root to script yt-dlp's behaviour offline.
  *
- * Seeding: state lives in `<userData>/settings.json` (src/lib/persist.ts reads
+ * Seeding: state lives in `<userData>/settings.json` (src/renderer/src/shared/utils/persist.ts reads
  * it through the preload snapshot), so `seed` is written before launch and the
  * app boots already in that state.
  */
@@ -54,7 +54,7 @@ async function launchApp(opts = {}) {
   const app = await electron.launch({
     executablePath: ELECTRON_BIN,
     args: [
-      path.join(REPO, "electron", "main.cjs"),
+      path.join(REPO, "out", "main", "index.cjs"),
       `--user-data-dir=${userDataDir}`,
       "--no-sandbox",
       "--disable-gpu",

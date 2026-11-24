@@ -15,5 +15,5 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["src", "server", "vite.config.ts", "tailwind.config.ts"]
+  "include": ["src", "scripts/*.ts", "vite.config.ts", "tailwind.config.ts"]
 }

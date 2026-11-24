@@ -41,12 +41,12 @@ Backend (`server/index.ts`):
 - `POST /api/channel/export/cancel` — aborts spawned children, flushes partial rows.
 - Zod schemas for all inputs; the existing `cookiesFromBrowser` option is threaded through so a signed-in session can be used when available.
 
-Shared (`src/lib/clip.ts`):
+Shared (`src/renderer/src/shared/utils/clip.ts`):
 - `parseChannelUrl`, `isShort(durationSeconds)` (<= 60s), and `rowsToCsv` generalized from the existing `commentsToCsv`.
 
 Frontend:
-- New `src/hooks/useChannelExport.ts` (state, SSE subscription, cancel) and `src/components/ChannelExportPanel.tsx` (form + progress + result).
-- Mode switch in `src/App.tsx` between "Clip" and "Channel export"; existing clipper UI untouched.
+- New `src/renderer/src/features/channelExport/hooks/useChannelExport.ts` (state, SSE subscription, cancel) and `src/renderer/src/features/channelExport/components/ChannelExportPanel.tsx` (form + progress + result).
+- Mode switch in `src/renderer/src/routes/App.tsx` between "Clip" and "Channel export"; existing clipper UI untouched.
 - Electron path writes the CSV folder via a new `saveFiles` IPC that reuses the existing directory picker; browser fallback downloads the CSVs individually.
 
 Version bump to 1.4.0.

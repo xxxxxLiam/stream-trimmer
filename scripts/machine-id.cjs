@@ -1,10 +1,10 @@
 // Prints this computer's salted machine hash, for VITE_OWNER_MACHINES.
 //   VITE_OWNER_SALT=<your salt> npm run machine-id
-// (the salt may also live in .env). Append the printed hash, comma-separated,
+// (the salt may also live in .env). Runs under tsx, because machineId is TypeScript. Append the printed hash, comma-separated,
 // to VITE_OWNER_MACHINES in the build that should recognise this device.
 const fs = require("node:fs");
 const path = require("node:path");
-const { readMachineId, hashMachineId } = require("../electron/machineId.cjs");
+const { readMachineId, hashMachineId } = require("../src/main/shared/services/machineId.ts");
 
 function fromDotEnv(key) {
   try {

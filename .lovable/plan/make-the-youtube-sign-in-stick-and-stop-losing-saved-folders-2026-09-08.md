@@ -58,7 +58,7 @@ plan holds either way, but this tells us exactly what your machine is hitting.
 Stop reading the browser's cookie jar. Sign in **once inside the app**, in its
 own private window, and keep that session in the app forever.
 
-The app already contains this code (`electron/youtubeSession.cjs`) from an
+The app already contains this code (`src/main/features/youtube/services/youtubeSession.ts`) from an
 earlier version — it opens a real Google/YouTube login window in an isolated,
 persistent app session and writes the resulting cookies to a `yt-cookies.txt`
 file in the app's data folder. yt-dlp then runs with `--cookies <that file>`,
@@ -105,12 +105,12 @@ Connect screen: one button, "Sign in to YouTube"
 | File | Change |
 | --- | --- |
 | `electron/main.cjs` | Reorder startup (settings + IPC before window); atomic, merging settings writes; re-register `youtube:connect` / `youtube:probe` / `youtube:disconnect` IPC |
-| `electron/youtubeSession.cjs` | Already present; refresh the cookie file on launch and after each download so the session rolls forward |
-| `electron/preload.cjs` | Re-expose `youtubeConnect`, `youtubeProbe`, `youtubeDisconnect` |
-| `src/vite-env.d.ts` | Type declarations for those three |
-| `src/lib/youtubeConnection.ts` | Cookie-file session becomes the primary path; browser-cookie check demoted to fallback; remembered connection state persisted; no timer-based re-checks |
-| `src/components/YouTubeConnectModal.tsx` | Single "Sign in to YouTube" button; failure shows the real yt-dlp reason; secondary "use my browser session" disclosure with the dropdown |
-| `src/components/YouTubeStatusChip.tsx` | Adds a "Sign out of YouTube" action |
+| `src/main/features/youtube/services/youtubeSession.ts` | Already present; refresh the cookie file on launch and after each download so the session rolls forward |
+| `src/preload/index.ts` | Re-expose `youtubeConnect`, `youtubeProbe`, `youtubeDisconnect` |
+| `src/renderer/src/vite-env.d.ts` | Type declarations for those three |
+| `src/renderer/src/shared/utils/youtubeConnection.ts` | Cookie-file session becomes the primary path; browser-cookie check demoted to fallback; remembered connection state persisted; no timer-based re-checks |
+| `src/renderer/src/features/youtubeConnection/components/YouTubeConnectModal.tsx` | Single "Sign in to YouTube" button; failure shows the real yt-dlp reason; secondary "use my browser session" disclosure with the dropdown |
+| `src/renderer/src/features/youtubeConnection/components/YouTubeStatusChip.tsx` | Adds a "Sign out of YouTube" action |
 | `server/index.ts` | Prefer the app cookie file over browser cookies; return the raw failure reason on a rejected check |
 
 ## Edge cases

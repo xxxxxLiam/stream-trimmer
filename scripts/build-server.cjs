@@ -26,10 +26,10 @@ function ownerSetting(name) {
   }
 }
 
-// BUILD_SERVER_OUT lets a test build into a scratch folder instead of electron/dist.
+// BUILD_SERVER_OUT lets a test build into a scratch folder instead of out/main.
 const outFile = process.env.BUILD_SERVER_OUT
   ? path.resolve(process.env.BUILD_SERVER_OUT)
-  : path.join(__dirname, "..", "electron", "dist", "server.cjs");
+  : path.join(__dirname, "..", "out", "main", "engine.cjs");
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 
 // Wrap the server so main.cjs can grab the http.Server handle for clean
@@ -44,15 +44,15 @@ http.createServer = function (...args) {
   capture.server = s;
   return s;
 };
-require(${JSON.stringify(path.resolve(__dirname, "..", "server", "index.ts"))});
+require(${JSON.stringify(path.resolve(__dirname, "..", "src", "main", "features", "engine", "index.ts"))});
 module.exports = capture;
 `;
 
 // The main process cannot see Vite's defines, so an owner build also writes what
-// it was baked with to a sidecar next to the server bundle (electron/ownerCheck.cjs
+// it was baked with to a sidecar next to the server bundle (electron/ownerCheck.ts
 // reads it; its keys are deliberately plain, that file ships in every build). A public build writes nothing and removes any stale one a previous
 // owner build left behind, so "no sidecar" means "no exporter". The folder name
-// is the same one src/lib/campaigns.ts uses when the exporter is built.
+// is the same one src/renderer/src/shared/utils/campaigns.ts uses when the exporter is built.
 const shapeFile = path.join(path.dirname(outFile), "build-shape.json");
 if (channelData) {
   fs.writeFileSync(
@@ -97,7 +97,7 @@ esbuild
             name: "channel-routes-stub",
             setup(build) {
               build.onResolve({ filter: /(^|\/)channelRoutes$/ }, () => ({
-                path: path.resolve(__dirname, "..", "server", "channelRoutes.stub.ts"),
+                path: path.resolve(__dirname, "..", "src", "main", "features", "engine", "routes", "channelRoutes.stub.ts"),
               }));
             },
           },

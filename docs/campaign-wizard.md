@@ -65,7 +65,7 @@ A wizard earns its place only if each step says *why*, not just *what*:
 
 ## The good news: the data model is already complete
 
-`Campaign` in `src/lib/campaigns.ts` already holds every field a wizard would
+`Campaign` in `src/renderer/src/shared/utils/campaigns.ts` already holds every field a wizard would
 collect. No schema work is needed.
 
 | Field | Wizard step | Why it matters to the user |
@@ -80,13 +80,13 @@ collect. No schema work is needed.
 
 ## Build notes
 
-- `src/lib/campaigns.ts` — `Campaign`, `CampaignInput`, `createCampaign`,
+- `src/renderer/src/shared/utils/campaigns.ts` — `Campaign`, `CampaignInput`, `createCampaign`,
   `DEFAULT_PATTERN`. Reuse as-is.
-- `src/context/CampaignContext.tsx:216` — new campaigns already start from the
+- `src/renderer/src/features/campaigns/hooks/CampaignContext.tsx:216` — new campaigns already start from the
   last folder chosen. Keep that; it makes campaign two onwards fast.
-- `src/components/CampaignMenu.tsx` — the existing form. The wizard should
+- `src/renderer/src/features/campaigns/components/CampaignMenu.tsx` — the existing form. The wizard should
   drive the same create path, not a parallel one.
-- `src/lib/setupTasks.ts:166` — already has the task entry; wire it to launch
+- `src/renderer/src/features/help/utils/setupTasks.ts:166` — already has the task entry; wire it to launch
   the wizard rather than open the menu.
 - Tab state is where the real new work is: a tab needs to remember its
   campaign, and the binding must survive a restart.

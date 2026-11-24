@@ -45,7 +45,7 @@ On the Clip tab, the right column (currently just the preview) becomes a stacked
 
 ## Technical notes
 
-- Add a `parseYouTubeUrl` helper (reuses existing shorts normalisation) in `src/lib/clip.ts`; `useClipper.ts` gets an effect that debounces `url`, compares the parsed video id against the last-loaded id, and calls `loadInfo()` when it changes. Loads already in flight are guarded by `loadingInfo`.
+- Add a `parseYouTubeUrl` helper (reuses existing shorts normalisation) in `src/renderer/src/shared/utils/clip.ts`; `useClipper.ts` gets an effect that debounces `url`, compares the parsed video id against the last-loaded id, and calls `loadInfo()` when it changes. Loads already in flight are guarded by `loadingInfo`.
 - `UrlBar.tsx` adds an `onPaste` fast-path that skips the debounce.
 - `App.tsx`: drop `"transcript"` from the `Mode` union and `ModeTabs`; render `<TranscriptPanel />` under `<PreviewPanel />` in the right column, wrapped in a new collapsible/expandable shell (`src/components/TranscriptDock.tsx`) that owns the collapsed and modal states.
 - `TranscriptPanel.tsx` stays the same component (it already handles search, jump, copy, in/out); it gains a `compact` prop for the docked variant. The modal uses the same instance rendered into a portal-style overlay with the existing panel/hairline/accent tokens and framer-motion fade.
