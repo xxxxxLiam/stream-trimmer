@@ -8,6 +8,7 @@ import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import * as logger from "../modules/logger/logger";
 import { getMainWindow } from "../modules/windows/windows";
+import { getSignInSignal, reportBrowserSignIn } from "../features/youtube/services/signInService";
 import {
   disconnect,
   importCookiesFromFile,
@@ -51,6 +52,9 @@ export function registerYoutubeHandlers() {
   });
 
   ipcMain.handle(IPC.youtubeDisconnect, () => disconnect());
+
+  ipcMain.handle(IPC.signInStatus, () => getSignInSignal());
+  ipcMain.handle(IPC.signInReportBrowser, (_e: unknown, usable: unknown) => reportBrowserSignIn(usable));
 
   ipcMain.handle(IPC.shellOpenYouTubeSignIn, () => openSignInPage(shell));
 }

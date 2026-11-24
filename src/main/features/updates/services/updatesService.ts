@@ -10,7 +10,8 @@ import { interpretCheckResult } from "../../../modules/updater/updateCheck";
 import { releasesUrl } from "../../../modules/updater/updater";
 import * as logger from "../../../modules/logger/logger";
 import { isDev } from "../../../shared/utils/env";
-import { sendUpdateStatus } from "../../../modules/updater/autoUpdater";
+import type { RestartToUpdateResult } from "../../../../common/types/updates";
+import { getUpdateController, sendUpdateStatus } from "../../../modules/updater/autoUpdater";
 
 const { app } = electron;
 
@@ -42,14 +43,11 @@ export async function checkForUpdate() {
   }
 }
 
-export function quitAndInstall() {
-  try {
-    autoUpdater.quitAndInstall();
-    return { ok: true };
-  } catch (err: any) {
-    return {
-      ok: false,
-      error: err && err.message ? err.message : "Install failed",
-    };
-  }
+/** Restarts into the update unless a clip is being made. Never opens a dialog. */
+export function restartToUpdate(): RestartToUpdateResult {
+  return getUpdateController()?.restartToUpdate() ?? { ok: false, reason: "nothing-ready" };
+}
+
+export function pendingUpdateReady() {
+  return getUpdateController()?.pendingReady() ?? null;
 }
