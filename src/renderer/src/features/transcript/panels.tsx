@@ -5,9 +5,9 @@
  *   Owned by the Left panels build: swap a placeholder for the real component here.
  *   Panels take no props; read the screen's state with usePanelHost() or a feature context.
  */
-import PanelPlaceholder from "../../modules/layout/components/PanelPlaceholder";
 import { registerPanel } from "../../modules/layout/utils/panelRegistry";
 import { usePanelHost } from "../../modules/layout/hooks/PanelHostContext";
+import MarkersPanel from "../markers/components/MarkersPanel";
 import VideosPanel from "../workspace/components/VideosPanel";
 import TranscriptColumn from "./components/TranscriptColumn";
 
@@ -19,4 +19,4 @@ function TranscriptPanel() {
 }
 registerPanel({ id: "transcript", title: "Transcript", group: "left", component: TranscriptPanel });
 
-registerPanel({ id: "markers", title: "Markers", group: "left", component: () => <PanelPlaceholder title="Markers" /> });
+registerPanel({ id: "markers", title: "Markers", group: "left", component: MarkersPanel });

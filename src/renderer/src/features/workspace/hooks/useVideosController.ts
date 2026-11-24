@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { bankStore } from "../../../shared/utils/bank";
 import { extractVideoId } from "../../../shared/utils/clip";
+import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
 import { looksLikeLink, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
@@ -26,6 +27,9 @@ export type VideoRow = {
 
 export function useVideosController() {
   const ws = useWorkspace();
+  const { loadingInfo, info } = useClipperContext();
+  /** The open video is still being read: its row says "Opening…" until the title arrives. */
+  const opening = loadingInfo && !info;
   const { campaigns } = useCampaign();
   const bank = useSyncExternalStore(bankStore.subscribe, bankStore.get, bankStore.get);
   const [pills, setPills] = useState<string[]>([]);
@@ -97,6 +101,7 @@ export function useVideosController() {
   }, [text, ws]);
 
   return {
+    opening,
     rows,
     pills,
     text,
