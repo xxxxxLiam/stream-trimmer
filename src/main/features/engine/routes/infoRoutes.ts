@@ -11,6 +11,7 @@ import { binariesOk, childEnv, resolvedFfmpeg, yt } from "../services/binaries";
 import { cookieModeFor, resolveCookieOptions, withRunCookies } from "../services/cookies";
 import { audioTracksOf } from "../utils/audioTracks";
 import { computeBitrates } from "../utils/bitrates";
+import { storyboardsOf } from "../utils/storyboards";
 import { binaryError, fullErrMessage, logYtError } from "../utils/errors";
 import { infoSchema } from "../utils/schemas";
 import { parseVttTranscript } from "../utils/vtt";
@@ -53,6 +54,7 @@ export function registerInfoRoutes(app: Express): void {
         thumbnail: info.thumbnail,
         bitrates: computeBitrates(info),
         audioTracks: audioTracksOf(info),
+        storyboards: storyboardsOf(info),
       });
     } catch (e) {
       logYtError("/api/info", parsed.data.url, options, e);
