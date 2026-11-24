@@ -83,7 +83,7 @@ async function probe() {
  * Exporting from inside the browser sidesteps both, because the browser does
  * its own decryption.
  */
-async function importCookieFile(sourcePath: any) {
+async function importCookieFile(sourcePath: unknown) {
   try {
     if (typeof sourcePath !== "string" || !sourcePath) {
       return { ok: false, error: "No file chosen." };
@@ -105,7 +105,7 @@ async function importCookieFile(sourcePath: any) {
  * The same canonical path as ever: userData/yt-cookies.txt. A crash mid-write
  * can never leave a half file, because rename() is atomic.
  */
-async function importCookieText(text: any) {
+async function importCookieText(text: unknown) {
   try {
     const raw = String(text || "");
     // A JSON export is the commonest wrong turn: several extensions offer it
@@ -144,7 +144,7 @@ async function importCookieText(text: any) {
 }
 
 /** Which of the three ways a cookies.txt can be wrong this one is. */
-function classify(text: any) {
+function classify(text: unknown) {
   const rows = parseCookieRows(text);
   if (!String(text || "").trim() || rows.length === 0) return "wrong_format";
   if (!rows.some((row) => isRelevantDomain(row.domain))) return "no_youtube_cookies";

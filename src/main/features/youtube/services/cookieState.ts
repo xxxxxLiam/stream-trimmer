@@ -18,7 +18,7 @@ const COLUMNS = 7;
  * 1970" — reading it as a date would retire a perfectly good sign-in.
  * Returns seconds, or null when there is no usable expiry.
  */
-function expirySeconds(raw: any) {
+function expirySeconds(raw: unknown) {
   const seconds = Number(raw);
   if (!Number.isFinite(seconds) || seconds <= 0) return null;
   return Math.floor(seconds);
@@ -29,7 +29,7 @@ function expirySeconds(raw: any) {
  * that is not a full tab-separated cookie line. Never throws — the input is a
  * file the user picked, so it can be anything at all.
  */
-function parseCookieRows(text: any) {
+function parseCookieRows(text: unknown) {
   return String(text || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -54,7 +54,7 @@ function parseCookieRows(text: any) {
  * domain boundary so notyoutube.com, which merely ends in the right letters,
  * is not mistaken for the real thing.
  */
-function isRelevantDomain(domain: any) {
+function isRelevantDomain(domain: unknown) {
   return /(^|\.)(youtube\.com|google\.com)$/i.test(String(domain || ""));
 }
 
@@ -71,7 +71,7 @@ function isAuthRow(row: any) {
  * caller compares it against Date.now() — and is null when the sign-in rests
  * entirely on session cookies, which carry no expiry to report.
  */
-function readCookieFileState(text: any, now = Date.now()) {
+function readCookieFileState(text: unknown, now = Date.now()) {
   const rows = parseCookieRows(text);
   const relevant = rows.filter((row) => isRelevantDomain(row.domain));
   const auth = relevant.filter(isAuthRow);

@@ -21,7 +21,7 @@ export async function probeSession() {
       expiresAt: result.expiresAt ?? null,
       expired: !!result.expired,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.log("youtube", `probe: threw ${logger.describe(err)}`);
     return { connected: false, error: logger.describe(err) };
   }
@@ -49,7 +49,7 @@ export async function importCookiesFromText(text: string) {
       `cookie drop ok=${result.ok}${result.ok ? ` cookies=${result.count}` : `: ${result.error}`}`,
     );
     return result;
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.log("youtube", `cookie drop threw: ${logger.describe(err)}`);
     return { ok: false, error: logger.describe(err) };
   }
@@ -60,7 +60,7 @@ export async function disconnect() {
     await youtubeSession.clear();
     logger.log("youtube", "disconnect: cleared");
     return { ok: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.log("youtube", `disconnect: threw ${logger.describe(err)}`);
     return { ok: false };
   }
@@ -70,7 +70,7 @@ export async function disconnect() {
  * Fallback path only: opens YouTube in the user's default browser so
  * yt-dlp can read that browser's session instead.
  */
-export async function openSignInPage(shell: any) {
+export async function openSignInPage(shell: Electron.Shell) {
   try {
     await shell.openExternal("https://www.youtube.com/signin");
     return { ok: true };

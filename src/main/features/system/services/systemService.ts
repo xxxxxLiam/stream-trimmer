@@ -16,7 +16,7 @@ import {
  * Returns only the supported browser name. Cookie values remain private to
  * the browser and are read directly by the local yt-dlp process.
  */
-export function defaultBrowser(app: any) {
+export function defaultBrowser(app: unknown) {
   return { browser: detectDefaultBrowser(app) };
 }
 
@@ -31,7 +31,7 @@ export function defaultBrowser(app: any) {
  *
  * This never overwrites a choice: the renderer only asks when nothing is set.
  */
-export async function defaultFolders(app: any) {
+export async function defaultFolders(app: Electron.App) {
   try {
     const base = path.join(app.getPath("videos"), "Clipr");
     const clipsDir = path.join(base, "Clips");
@@ -52,7 +52,7 @@ export async function defaultFolders(app: any) {
  * rather than a single name is what lets the app check them itself instead
  * of making the user pick one at a time from a dropdown.
  */
-export function browserOrder(app: any, saved: unknown) {
+export function browserOrder(app: unknown, saved: unknown) {
   return {
     browsers: browserCheckOrder(
       detectDefaultBrowser(app),

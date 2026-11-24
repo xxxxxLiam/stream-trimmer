@@ -53,7 +53,7 @@ function migrateSettings(input: any, { dataFolderName }: any = {}) {
  *  - "empty":   blank file (nothing to lose)
  *  - "invalid": anything else — not JSON, or not an object
  */
-function parseSettingsText(text: any) {
+function parseSettingsText(text: unknown) {
   const body = String(text).replace(/^\uFEFF/, "").trim();
   if (!body) return { status: "empty", data: {} };
   try {
@@ -90,7 +90,7 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
         if (log) log(`settings.json could not be parsed; original kept at ${dest}`);
       }
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[electron] could not preserve unreadable settings:", err);
       return false;
     }
@@ -149,7 +149,7 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
       fs.writeFileSync(tmp, JSON.stringify(cache, null, 2));
       fs.renameSync(tmp, filePath);
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[electron] failed to persist settings:", err);
       return false;
     }
@@ -159,7 +159,7 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     return cache;
   }
 
-  function set(key: any, value: any) {
+  function set(key: unknown, value: unknown) {
     if (typeof key !== "string" || !key) return false;
     // Guard against the startup-order bug: never write from a store that has
     // not read the file yet, or the first write blanks every saved key.

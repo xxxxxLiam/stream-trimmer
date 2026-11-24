@@ -21,28 +21,30 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 
 /** The only applications this module will launch. Names never come from the UI. */
-const APPS: Record<string, any> = {
+type AppDef = { label: string; match: (name: string) => boolean; folder?: (name: string) => boolean };
+
+const APPS: Record<string, AppDef> = {
   finalcut: {
     label: "Final Cut Pro",
-    match: (name: any) => /^Final Cut Pro( Creator Studio| Trial)?\.app$/.test(name),
+    match: (name: string) => /^Final Cut Pro( Creator Studio| Trial)?\.app$/.test(name),
   },
   premiere: {
     label: "Adobe Premiere Pro",
     // Versioned: "Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app".
-    match: (name: any) => /^Adobe Premiere Pro.*\.app$/.test(name),
-    folder: (name: any) => /^Adobe Premiere Pro/.test(name),
+    match: (name: string) => /^Adobe Premiere Pro.*\.app$/.test(name),
+    folder: (name: string) => /^Adobe Premiere Pro/.test(name),
   },
   capcut: {
     label: "CapCut",
-    match: (name: any) => /^CapCut\.app$/.test(name),
+    match: (name: string) => /^CapCut\.app$/.test(name),
   },
 };
 
-function appDirs(home: any) {
+function appDirs(home: string): string[] {
   return ["/Applications", path.join(home, "Applications")];
 }
 
-function readDir(dir: any, fsImpl: any) {
+function readDir(dir: string, fsImpl: Pick<typeof fs, "readdirSync">): string[] {
   try {
     return fsImpl.readdirSync(dir);
   } catch {
@@ -51,12 +53,12 @@ function readDir(dir: any, fsImpl: any) {
 }
 
 /** Highest number wins, so "2025" beats "2024" and "10" beats "9". */
-function byVersionDesc(a: any, b: any) {
+function byVersionDesc(a: string, b: string): number {
   return b.localeCompare(a, undefined, { numeric: true });
 }
 
 /** Absolute path of an installed app, or null. macOS only. */
-function findApp(key: any, { platform = process.platform, fsImpl = fs, home = os.homedir() } = {}) {
+function findApp(key: string, { platform = process.platform, fsImpl = fs, home = os.homedir() } = {}) {
   const app = APPS[key];
   if (!app || platform !== "darwin") return null;
   for (const dir of appDirs(home)) {
@@ -76,7 +78,7 @@ function findApp(key: any, { platform = process.platform, fsImpl = fs, home = os
   return null;
 }
 
-function installedApps(opts?: any) {
+function installedApps(opts?: Parameters<typeof findApp>[1]) {
   return {
     finalcut: findApp("finalcut", opts) !== null,
     premiere: findApp("premiere", opts) !== null,
@@ -84,7 +86,7 @@ function installedApps(opts?: any) {
   };
 }
 
-function isAbsolutePath(p: any) {
+function isAbsolutePath(p: unknown): p is string {
   return typeof p === "string" && p.length > 0 && path.isAbsolute(p);
 }
 
@@ -93,10 +95,10 @@ function isAbsolutePath(p: any) {
  * Missing app: { ok:false, missing:"<name>", error } and the file stays put.
  */
 function openWithApp(
-  { app, file }: any,
+  { app, file }: { app?: unknown; file?: unknown },
   { platform = process.platform, fsImpl = fs, home = os.homedir(), exec = execFile } = {},
 ) {
-  const def = APPS[app];
+  const def = APPS[app as string];
   if (!def) return Promise.resolve({ ok: false, error: "That editor is not one this app can open." });
   const saved = file ? ` The file is saved at ${file}.` : "";
   if (platform !== "darwin") {
@@ -111,7 +113,7 @@ function openWithApp(
   if (file && !fsImpl.existsSync(file)) {
     return Promise.resolve({ ok: false, error: `The file is not there any more: ${file}` });
   }
-  const appPath = findApp(app, { platform, fsImpl, home });
+  const appPath = findApp(app as string, { platform, fsImpl, home });
   if (!appPath) {
     return Promise.resolve({
       ok: false,
@@ -133,7 +135,7 @@ function openWithApp(
 }
 
 /** First executable `name` in the given dirs, else null. */
-function resolveBinary(name: any, dirs: any, fsImpl = fs, platform = process.platform) {
+function resolveBinary(name: string, dirs: Array<string | null | undefined>, fsImpl = fs, platform = process.platform) {
   const file = platform === "win32" ? `${name}.exe` : name;
   for (const dir of dirs) {
     if (!dir) continue;
@@ -163,7 +165,7 @@ function binaryDirs(extra = []) {
  * parser: { ok, kind:"ffprobe", json } or { ok, kind:"ffmpeg", text }. The app
  * does not bundle ffprobe, so ffmpeg's stream summary is the fallback.
  */
-function probeMedia(file: any, { dirs = binaryDirs(), fsImpl = fs, exec = execFile } = {}) {
+function probeMedia(file: unknown, { dirs = binaryDirs(), fsImpl = fs, exec = execFile } = {}) {
   if (!isAbsolutePath(file)) {
     return Promise.resolve({ ok: false, error: "The clip path is not an absolute path." });
   }
@@ -209,7 +211,7 @@ function probeMedia(file: any, { dirs = binaryDirs(), fsImpl = fs, exec = execFi
   });
 }
 
-function safeFilename(name: any, ext: any) {
+function safeFilename(name: unknown, ext: string): string {
   const base = path
     .basename(String(name || ""))
     .replace(/[\\/:*?"<>|\u0000-\u001F]/g, " ")
@@ -221,7 +223,7 @@ function safeFilename(name: any, ext: any) {
 }
 
 /** Write the generated document into `dirPath`. Returns { ok, path }. */
-async function writeFcpxml({ dirPath, filename, contents }: any, { fsp: fsImpl = fsp } = {}) {
+async function writeFcpxml({ dirPath, filename, contents }: { dirPath?: unknown; filename?: unknown; contents?: unknown }, { fsp: fsImpl = fsp } = {}) {
   if (!isAbsolutePath(dirPath)) {
     return { ok: false, error: "Choose a folder to save the editor file in." };
   }
@@ -239,7 +241,7 @@ async function writeFcpxml({ dirPath, filename, contents }: any, { fsp: fsImpl =
 }
 
 /** A path that does not exist yet, adding " 2", " 3" before the extension. */
-function uniquePath(target: any, fsImpl = fs) {
+function uniquePath(target: string, fsImpl = fs): string {
   if (!fsImpl.existsSync(target)) return target;
   const ext = path.extname(target);
   const stem = target.slice(0, target.length - ext.length);
@@ -251,7 +253,7 @@ function uniquePath(target: any, fsImpl = fs) {
 }
 
 /** Copy finished clips into a folder (the CapCut drop folder). Never overwrites. */
-async function copyFiles({ dirPath, files }: any, { fsp: fsImpl = fsp, fsSync = fs } = {}) {
+async function copyFiles({ dirPath, files }: { dirPath?: unknown; files?: unknown }, { fsp: fsImpl = fsp, fsSync = fs } = {}) {
   if (!isAbsolutePath(dirPath)) {
     return { ok: false, error: "Choose a drop folder first." };
   }
@@ -283,7 +285,7 @@ async function copyFiles({ dirPath, files }: any, { fsp: fsImpl = fsp, fsSync = 
 }
 
 /** Reveal a file in the file manager, or open a folder. */
-async function reveal(target: any, { shell, fsImpl = fs }: any) {
+async function reveal(target: unknown, { shell, fsImpl = fs }: any) {
   if (!isAbsolutePath(target)) return { ok: false, error: "The path is not an absolute path." };
   let stat;
   try {
@@ -307,7 +309,7 @@ async function reveal(target: any, { shell, fsImpl = fs }: any) {
  * typo would silently produce a stray library rather than fail. A .fcpbundle is
  * a package, which is a directory on disk, so isDirectory is the useful answer.
  */
-function pathExists(target: any, fsImpl = fs) {
+function pathExists(target: unknown, fsImpl = fs) {
   if (!isAbsolutePath(target)) {
     return { ok: false, error: "Needs an absolute path." };
   }

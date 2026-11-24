@@ -30,7 +30,7 @@ function readBakedShape(distDir: any) {
 }
 
 function createOwnerCheck({ readMachineId, hashMachineId, getBaked }: any) {
-  let localMachineId: any;
+  let localMachineId: unknown;
 
   async function compute() {
     const baked = typeof getBaked === "function" ? getBaked() : null;
@@ -54,7 +54,7 @@ function createOwnerCheck({ readMachineId, hashMachineId, getBaked }: any) {
   return {
     // Arguments are accepted so the renderer's call shape keeps working, and
     // ignored: the answer never depends on what the page says.
-    check: (_list?: any, _salt?: any) => isOwner(),
+    check: (_list?: unknown, _salt?: unknown) => isOwner(),
     isOwner,
   };
 }

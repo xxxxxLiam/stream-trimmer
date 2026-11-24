@@ -15,7 +15,7 @@ import os from "node:os";
 import { redact } from "../../../../common/utils/redact";
 import * as logger from "../../../modules/logger/logger";
 
-export function scrubForDisplay(text: any) {
+export function scrubForDisplay(text: unknown) {
   return redact(String(text ?? ""), { homeDir: os.homedir() });
 }
 export function readLogScrubbed(lines = 500) {
@@ -29,7 +29,7 @@ export function readDiagnostics() {
   };
 }
 
-export function revealLog(shell: any) {
+export function revealLog(shell: Electron.Shell) {
   try {
     const target = logger.logFilePath();
     if (!target || !fs.existsSync(target)) {
@@ -37,19 +37,19 @@ export function revealLog(shell: any) {
     }
     shell.showItemInFolder(target);
     return { ok: true, path: target };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return { ok: false, error: logger.describe(err) };
   }
 }
 
-export function copyLog(clipboard: any) {
+export function copyLog(clipboard: Electron.Clipboard) {
   try {
     // The log can hold cookie rows, bearer tokens, signed URLs, the user's
     // email and home path. Scrub it here, in the process that owns the
     // clipboard, so no caller can put the raw text there.
     clipboard.writeText(readLogScrubbed());
     return { ok: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return { ok: false, error: logger.describe(err) };
   }
 }
