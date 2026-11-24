@@ -1,10 +1,10 @@
 /**
  * File: redact.ts
  * Path: src/main/shared/utils/redact.ts
- * Description: Main-process copy of redact() from src/lib/diagnostics.ts, so
+ * Description: Main-process copy of redact() from src/renderer/src/shared/utils/diagnostics.ts, so
  * the log that "Copy log" puts on the clipboard is scrubbed before it leaves
  * the process. The main process cannot import the renderer's TypeScript, so
- * the rules are duplicated here; electron/redact.test.ts fails if the two
+ * the rules are duplicated here; src/main/shared/utils/redact.test.ts fails if the two
  * ever disagree on a planted-secret corpus.
  */
 

@@ -7,7 +7,7 @@
  *   Every reader of the log goes through readLogScrubbed(). The log can hold
  *   cookie rows, bearer tokens, signed URLs, an email and the home path, so no
  *   handler reads the raw file text (logger.tail) itself;
- *   electron/diagnosticsPath.test.ts fails if one does. A new reader calls
+ *   src/main/features/diagnostics/services/diagnosticsPath.test.ts fails if one does. A new reader calls
  *   readLogScrubbed() and is safe by default.
  */
 import fs from "node:fs";

@@ -19,12 +19,12 @@ A real OAuth redirect flow does not work for this app's purpose, even setting co
 - No cookie values are ever logged or returned — only the browser name crosses the API, as today.
 - Guard with `binariesOk` like the other routes.
 
-### 2. Electron: open the sign-in page — `electron/main.cjs`, `electron/preload.cjs`, `src/vite-env.d.ts`
+### 2. Electron: open the sign-in page — `electron/main.cjs`, `src/preload/index.ts`, `src/renderer/src/vite-env.d.ts`
 - New IPC handler `shell:openYouTubeSignIn` calling `shell.openExternal("https://www.youtube.com/signin")` (YouTube redirects to Google sign-in).
 - Preload exposes `openYouTubeSignIn()` on `window.electronAPI`; type added to `ElectronAPI`.
 - Browser/dev fallback: `window.open(url, "_blank")` (works there too since the server is still local).
 
-### 3. Front-end: guided sign-in UI — `src/hooks/useClipper.ts`, `src/components/FormatQualityFields.tsx`
+### 3. Front-end: guided sign-in UI — `src/renderer/src/modules/clipper/hooks/useClipDownload.ts`, `src/renderer/src/modules/clipper/components/FormatQualityFields.tsx`
 - New state: `ytAuth: { status: "idle" | "checking" | "signed_in" | "signed_out" | "unreadable" | "unknown", message?: string }`.
 - `beginYouTubeSignIn()`: opens the sign-in page (IPC or `window.open`), then polls `POST /api/auth/youtube/status` every 3s for up to 2 minutes. Stops on `signed_in`/`unreadable`, timeout, or unmount.
 - On `signed_in`: automatically enable `useBrowserCookies` so subsequent downloads reuse the session, and show a success pill: "Signed in via Chrome — higher quality enabled".
@@ -32,7 +32,7 @@ A real OAuth redirect flow does not work for this app's purpose, even setting co
 - The manual checkbox + browser picker stay as a fallback underneath; the picker drives which browser the probe checks.
 - Copy note: Firefox is the most reliable cookie source; Chrome on Windows can block cookie reads entirely (app-bound encryption) — the `unreadable` state surfaces this instead of failing silently at download time.
 
-### 4. Small type additions — `src/lib/clip.ts`
+### 4. Small type additions — `src/renderer/src/shared/utils/clip.ts`
 - `YouTubeAuthStatus` response type for the new endpoint.
 
 ## Out of scope / unchanged

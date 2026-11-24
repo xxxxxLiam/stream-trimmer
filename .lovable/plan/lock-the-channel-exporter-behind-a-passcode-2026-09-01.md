@@ -34,8 +34,8 @@ conflicts with the app's fully-local, free design.
   `isLockConfigured()`, `verifyPasscode()`, and localStorage helpers for the
   `clipper.channelUnlocked` flag (stores the hash, not the passcode).
 - New `src/components/ChannelLockGate.tsx`: unlock card, wraps
-  `ChannelExportPanel` in `src/App.tsx`.
-- `src/App.tsx`: mode tabs render the "Channel export" tab only when
+  `ChannelExportPanel` in `src/renderer/src/routes/App.tsx`.
+- `src/renderer/src/routes/App.tsx`: mode tabs render the "Channel export" tab only when
   `isLockConfigured()` is true; the panel renders behind the gate.
 - Backend parity in `server/index.ts`: `/api/channel/export` requires an
   `X-Channel-Key` header equal to the same hash when

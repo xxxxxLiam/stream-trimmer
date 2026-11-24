@@ -89,7 +89,7 @@ reset) and the same clamping rules.
 - Keep the container-query stacking exactly as it is. Sizes are CSS
   variables read only inside the wide query; a layout must never leave an
   inline width on a stacked panel.
-- Per-campaign storage touches `src/lib/campaigns.ts` and
+- Per-campaign storage touches `src/renderer/src/shared/utils/campaigns.ts` and
   `CampaignContext.tsx`, which other work is changing. Coordinate first.
 - Read-back must be defensive: a settings file written by a newer or older
   version may hold unknown panels or nonsense sizes. Fall back to the default

@@ -48,7 +48,7 @@ is signed out and only receives 360p.
 
 ## Technical notes
 
-- `electron/youtubeSession.cjs`: `probe()` and `openLoginWindow()` currently call
+- `src/main/features/youtube/services/youtubeSession.ts`: `probe()` and `openLoginWindow()` currently call
   `hasAuth()`, which only tests for `SID`, `__Secure-3PSID`, or
   `__Secure-1PSID`. Keep this as a fast preliminary signal, not proof of a
   connection.
@@ -56,11 +56,11 @@ is signed out and only receives 360p.
   app-managed cookie-file path as an alternative to `browser`, then run yt-dlp's
   auth probe with `--cookies`. Reuse the existing sanitized status classifier
   and path safety checks.
-- `src/lib/youtubeConnection.ts`: after `youtubeConnect()`/`youtubeProbe()`, call
+- `src/renderer/src/shared/utils/youtubeConnection.ts`: after `youtubeConnect()`/`youtubeProbe()`, call
   the server validation before setting `connected: true`; revalidation must also
   cover browser-mode sessions rather than returning early.
 - `server/index.ts` `/api/download`: remove the current app-cookie failure path
   that falls through to no cookies. Return an authentication-required response
   so the client invalidates connection state and opens the modal.
-- `src/hooks/useClipper.ts`: recognize that authentication response, mark the
+- `src/renderer/src/modules/clipper/hooks/useClipDownload.ts`: recognize that authentication response, mark the
   shared YouTube connection disconnected, and do not save the downgraded file.

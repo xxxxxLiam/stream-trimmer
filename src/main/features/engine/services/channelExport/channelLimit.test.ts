@@ -11,7 +11,7 @@ import {
   CHANNEL_LIMIT_MIN,
   describeChannelLimit,
   parseChannelLimit,
-} from "../../../../../lib/channel";
+} from "../../../../../renderer/src/features/channelExport/utils/channel";
 
 test("a plain count is taken as written", () => {
   assert.deepEqual(parseChannelLimit("250"), { ok: true, limit: 250 });

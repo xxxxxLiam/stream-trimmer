@@ -5,7 +5,7 @@
 // call `owner:check` with any list and salt it likes and gets back the same
 // answer main already had. Only booleans leave this module. Fails closed: no
 // baked list, no owner.
-// A device check, not a security boundary — see src/lib/ownerGate.ts.
+// A device check, not a security boundary — see src/renderer/src/shared/utils/ownerGate.ts.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -28,7 +28,7 @@ function readBakedShape(distDir: any) {
   }
 }
 
-/** "a, B ,," -> ["a","b"]. Same rule as parseMachineList in src/lib/ownerGate.ts. */
+/** "a, B ,," -> ["a","b"]. Same rule as parseMachineList in src/renderer/src/shared/utils/ownerGate.ts. */
 function parseList(raw: any) {
   return String(raw ?? "")
     .split(",")

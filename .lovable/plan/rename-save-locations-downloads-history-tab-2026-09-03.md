@@ -32,8 +32,8 @@ In the browser (non-Electron) the list still records entries but the View button
 
 ## Technical notes
 
-- Persistence uses the existing settings layer (`src/lib/persist.ts`) — `userData/settings.json` in Electron, localStorage in the browser. New keys: `clipper.saveDirNames`, `clipper.downloads` (capped at ~200 entries).
-- State and actions (`renameSaveDir`, `downloads`, `revealDownload`, `removeDownload`, `clearDownloads`) live in `src/hooks/useClipper.ts` and are exposed through `ClipperContext`.
+- Persistence uses the existing settings layer (`src/renderer/src/shared/utils/persist.ts`) — `userData/settings.json` in Electron, localStorage in the browser. New keys: `clipper.saveDirNames`, `clipper.downloads` (capped at ~200 entries).
+- State and actions (`renameSaveDir`, `downloads`, `revealDownload`, `removeDownload`, `clearDownloads`) live in `src/renderer/src/modules/clipper/hooks/useClipDownload.ts` and are exposed through `ClipperContext`.
 - History entries are pushed at the same points that currently set `savedNotice` (clip download and export saves).
-- New component `src/components/DownloadsPanel.tsx`; `DestinationSelector.tsx` gains inline rename; `App.tsx` gains the fourth tab.
+- New component `src/renderer/src/features/downloads/components/DownloadsPanel.tsx`; `DestinationSelector.tsx` gains inline rename; `App.tsx` gains the fourth tab.
 - No backend or Electron main-process changes needed — existing `file:showInFolder` and settings IPC cover it.

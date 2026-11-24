@@ -4,7 +4,7 @@
 // scripts/machine-id.cjs (so the owner can add a device). The raw id never
 // leaves the main process; only the boolean result is sent to the renderer.
 //
-// This is a device check, not a security boundary. See src/lib/ownerGate.ts.
+// This is a device check, not a security boundary. See src/renderer/src/shared/utils/ownerGate.ts.
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import fs from "node:fs";

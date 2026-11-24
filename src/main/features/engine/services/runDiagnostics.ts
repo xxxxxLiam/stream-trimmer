@@ -53,7 +53,7 @@ let cachedYtDlpVersion: string | null | undefined;
 
 /**
  * What the renderer needs to describe one failed run. Raw on purpose: the one
- * redactor lives in src/lib/diagnostics.ts and runs over the finished report.
+ * redactor lives in src/renderer/src/shared/utils/diagnostics.ts and runs over the finished report.
  */
 export function buildRunDiagnostics(jobId: string, stderrRaw: string) {
   if (cachedYtDlpVersion === undefined) {

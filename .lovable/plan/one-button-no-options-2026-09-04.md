@@ -30,11 +30,11 @@ out.
 
 ## Technical notes
 
-- `src/components/YouTubeConnectModal.tsx`: delete `showFallback` state, the
+- `src/renderer/src/features/youtubeConnection/components/YouTubeConnectModal.tsx`: delete `showFallback` state, the
   browser `<select>`, the "Open YouTube" / "Check session" buttons, and the
   fallback section. Render one `btn-primary` plus `state.message`, driven by a
   new `connect()` action and a `state.step` label.
-- `src/lib/youtubeConnection.ts`: add `connect()` orchestrating the sequence —
+- `src/renderer/src/shared/utils/youtubeConnection.ts`: add `connect()` orchestrating the sequence —
   `connectInApp()` when `window.electronAPI.youtubeConnect` exists, then
   `checkBrowserSession()` iterated across the `BROWSERS` allowlist, stopping at
   the first `signed_in`; sets `mode: "browser"` and persists the winning browser

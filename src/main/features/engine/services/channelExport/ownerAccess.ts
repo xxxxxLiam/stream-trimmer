@@ -27,7 +27,7 @@ export function parseOwnerList(raw: string | undefined | null): string[] {
     .filter(Boolean);
 }
 
-/** Pure decision, mirroring src/lib/ownerGate.ts decideAccess. */
+/** Pure decision, mirroring src/renderer/src/shared/utils/ownerGate.ts decideAccess. */
 export function decideOwnerAccess(input: {
   list: string[];
   salt: string;

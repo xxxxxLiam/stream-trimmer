@@ -38,7 +38,7 @@ exactly two readable text tiers, `fg` and `fg-dim`; a third does not exist.
 Disabled text uses the `disabled` token, never `fg-dim` with an opacity
 modifier — that lands around 2:1.
 
-The product's logo is `src/components/shell/BrandMark.tsx`, traced from the
+The product's logo is `src/renderer/src/shared/components/BrandMark.tsx`, traced from the
 installer icon so the window and the dock show one mark. It stands alone:
 there is no wordmark beside it.
 

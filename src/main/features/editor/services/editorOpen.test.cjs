@@ -2,7 +2,7 @@
  * File: editorOpen.test.cjs
  * Path: src/main/features/editor/services/editorOpen.test.cjs
  * Description: Pins editorOpen.ts failure paths with fake fs / exec, so no Mac
- *   or editor is needed. Run: node --test electron/editorOpen.test.cjs
+ *   or editor is needed. Run: node --test src/main/features/editor/services/editorOpen.test.cjs
  */
 const test = require("node:test");
 const assert = require("node:assert/strict");

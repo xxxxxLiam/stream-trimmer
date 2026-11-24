@@ -52,7 +52,7 @@ module.exports = capture;
 // it was baked with to a sidecar next to the server bundle (electron/ownerCheck.ts
 // reads it; its keys are deliberately plain, that file ships in every build). A public build writes nothing and removes any stale one a previous
 // owner build left behind, so "no sidecar" means "no exporter". The folder name
-// is the same one src/lib/campaigns.ts uses when the exporter is built.
+// is the same one src/renderer/src/shared/utils/campaigns.ts uses when the exporter is built.
 const shapeFile = path.join(path.dirname(outFile), "build-shape.json");
 if (channelData) {
   fs.writeFileSync(

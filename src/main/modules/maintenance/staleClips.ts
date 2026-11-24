@@ -18,7 +18,7 @@ export function sweepStaleClips() {
     let removed = 0;
     for (const name of fs.readdirSync(root)) {
       if (!name.startsWith("ytclip-")) continue;
-      // Cookie copies are owned by server/cookieJar.ts, which sweeps its own.
+      // Cookie copies are owned by src/main/features/engine/services/cookieJar.ts, which sweeps its own.
       if (name.startsWith("ytclip-cookies-")) continue;
       const dir = path.join(root, name);
       try {

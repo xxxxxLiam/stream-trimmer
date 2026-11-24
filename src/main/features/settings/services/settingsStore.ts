@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
-/** "/a/b/clips" -> "/a/b/<name>". Same rule as defaultDataDir in src/lib/campaigns.ts. */
+/** "/a/b/clips" -> "/a/b/<name>". Same rule as defaultDataDir in src/renderer/src/shared/utils/campaigns.ts. */
 function siblingDataDir(clipsDir: any, name: any) {
   const trimmed = String(clipsDir).replace(/[\\/]+$/, "");
   const sep = trimmed.includes("\\") && !trimmed.includes("/") ? "\\" : "/";
@@ -32,7 +32,7 @@ function siblingDataDir(clipsDir: any, name: any) {
  *    suggested name belongs to the build shape, so it is only written when the
  *    caller supplies `dataFolderName` (a build that has the exporter). Without
  *    one, `clipper.dataDir` stays unset and the renderer derives its own
- *    suggestion from the clips folder (src/lib/campaigns.ts, gated by build).
+ *    suggestion from the clips folder (src/renderer/src/shared/utils/campaigns.ts, gated by build).
  * Idempotent: values the user already set are never overwritten.
  */
 function migrateSettings(input: any, { dataFolderName }: any = {}) {

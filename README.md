@@ -311,7 +311,7 @@ body-level signal, and must start a line, case-sensitively, with its colon —
 so "this is not a breaking change" cannot trigger a major.
 
 The logic is in `scripts/detectBump.cjs` and covered by
-`server/detectBump.test.ts`, so it can be changed without guessing.
+`scripts/detectBump.test.ts`, so it can be changed without guessing.
 
 #### Overrides
 

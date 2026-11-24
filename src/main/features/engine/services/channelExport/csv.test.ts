@@ -23,7 +23,7 @@ import {
   writeCsv,
   writeCsvFromJsonl,
 } from "./csv";
-import * as client from "../../../../../lib/channel";
+import * as client from "../../../../../renderer/src/features/channelExport/utils/channel";
 
 const READ_CHUNK = 1 << 20; // must match csv.ts
 

@@ -27,10 +27,10 @@ Tab names and the order/active tab are remembered across app restarts. Tabs reop
 
 ## Technical notes
 
-- New `src/context/WorkspaceContext.tsx` holds the tab list (`id`, `name`, `autoName`, `busy`) plus add/close/rename/select actions, persisted through the existing settings layer (`src/lib/persist.ts`, new key `clipper.workspaces`).
+- New `src/renderer/src/features/workspace/hooks/WorkspaceContext.tsx` holds the tab list (`id`, `name`, `autoName`, `busy`) plus add/close/rename/select actions, persisted through the existing settings layer (`src/renderer/src/shared/utils/persist.ts`, new key `clipper.workspaces`).
 - `App.tsx` renders one `<ClipperProvider><ChannelExportProvider>` pair per tab, all kept mounted; only the active one is visible (hidden ones get `display:none` rather than unmounting) so in-flight jobs and SSE progress streams survive tab switches.
 - The backend already keys downloads and exports by a per-request `jobId` (`/api/download?jobId=`, `/api/channel/export`), so concurrent jobs from multiple tabs need no server change.
-- Shared state stays where it is: `src/lib/downloads.ts` and the save-folder settings are module-level external stores read via `useSyncExternalStore`, so all provider instances stay in sync automatically.
+- Shared state stays where it is: `src/renderer/src/shared/utils/downloads.ts` and the save-folder settings are module-level external stores read via `useSyncExternalStore`, so all provider instances stay in sync automatically.
 - Each tab reports its busy state and derived title up to the workspace context so the tab strip can show the name and activity dot.
 - The keyboard shortcut listener in `PlayerControls.tsx` becomes active-tab-only, so hidden tabs don't react to key presses.
-- New `src/components/WorkspaceTabs.tsx` for the strip, styled with the existing panel/hairline/accent tokens.
+- New `src/renderer/src/features/workspace/components/WorkspaceTabs.tsx` for the strip, styled with the existing panel/hairline/accent tokens.

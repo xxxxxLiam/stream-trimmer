@@ -55,7 +55,7 @@ failure instead of guessing.
   `process.on("unhandledRejection")`, `app.on("render-process-gone")`,
   `app.on("child-process-gone")`, and per-window `unresponsive`; append to
   `path.join(app.getPath("userData"), "logs", "main.log")` with rotation at ~1MB.
-- `electron/youtubeSession.cjs`: guard `win.setTitle` and every post-await step with
+- `src/main/features/youtube/services/youtubeSession.ts`: guard `win.setTitle` and every post-await step with
   `win.isDestroyed()`; clear the interval in the `closed` handler before `finish(false)`;
   set `destroyed = true` so an in-flight `validate` result is discarded.
 - `electron/main.cjs` `youtube:connect` validate callback: pass `AbortSignal.timeout(20000)`

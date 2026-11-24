@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const read = (p: string) => readFileSync(join(root, p), "utf8");
-/** Every non-test main-process source file (electron/ plus src/main/). */
+/** Every non-test main-process source file (src/main/). */
 function mainSources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(join(root, dir))) {
     const rel = `${dir}/${name}`;
@@ -24,7 +24,7 @@ function mainSources(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
-const sources = [...mainSources("electron"), ...mainSources("src/main")];
+const sources = mainSources("src/main");
 const service = read("src/main/features/diagnostics/services/diagnosticsService.ts");
 const handlers = read("src/main/ipc/diagnosticsHandlers.ts");
 const fnBody = (src: string, name: string) => {

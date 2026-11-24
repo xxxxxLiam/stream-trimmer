@@ -43,7 +43,7 @@ The current probe is also fragile:
 
 ## Technical files
 - `server/index.ts`: replace multi-browser Watch Later polling with a single-browser, cancellable account-cookie probe and structured error mapping.
-- `src/hooks/useClipper.ts`: remove repeated polling; model open/check/success/failure states and remember the selected browser.
-- `src/components/FormatQualityFields.tsx`: retain the compact row while adding the browser menu and truthful actions/messages.
-- `src/lib/clip.ts` and context typings: refine probe response/status types.
+- `src/renderer/src/modules/clipper/hooks/useClipDownload.ts`: remove repeated polling; model open/check/success/failure states and remember the selected browser.
+- `src/renderer/src/modules/clipper/components/FormatQualityFields.tsx`: retain the compact row while adding the browser menu and truthful actions/messages.
+- `src/renderer/src/shared/utils/clip.ts` and context typings: refine probe response/status types.
 - Add focused test files following the existing TypeScript conventions.

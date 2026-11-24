@@ -3,7 +3,7 @@
  * Path: tailwind.config.ts
  * Description: Tailwind v3 config; scans HTML + all TS/TSX sources. Holds the
  *   design tokens from BUILD-SPEC sections 1 and 2. Gradient "premium layer"
- *   values live as CSS custom properties in src/styles.css so one accent change
+ *   values live as CSS custom properties in src/renderer/src/styles.css so one accent change
  *   carries through; the utilities here only point at them.
  */
 import type { Config } from "tailwindcss";
@@ -11,7 +11,7 @@ import type { Config } from "tailwindcss";
 const accentHsl = "hsl(var(--accent-h) var(--accent-s) var(--accent-l)";
 
 export default {
-  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  content: ["./src/renderer/index.html", "./src/renderer/src/**/*.{ts,tsx}"],
   theme: {
     // Four sizes plus numerals. There is deliberately no 11px.
     fontSize: {

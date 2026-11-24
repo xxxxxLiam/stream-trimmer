@@ -3,12 +3,12 @@
  * Path: src/main/shared/utils/redact.test.ts
  * Description: F-6 — the main-process copy of redact() scrubs the log before
  * "Copy log" puts it on the clipboard, and stays in step with the renderer's
- * redact() in src/lib/diagnostics.ts (duplicated because main cannot import TS).
+ * redact() in src/renderer/src/shared/utils/diagnostics.ts (duplicated because main cannot import TS).
  */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
-import { redact as rendererRedact } from "../../../lib/diagnostics";
+import { redact as rendererRedact } from "../../../renderer/src/shared/utils/diagnostics";
 
 const require = createRequire(import.meta.url);
 import { redact } from "./redact";

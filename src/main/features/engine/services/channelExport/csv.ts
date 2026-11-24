@@ -15,7 +15,7 @@ export const CSV_BOM = "﻿";
 const EOL = "\r\n";
 
 // Every field is quoted, so nothing in the data needs escaping beyond the
-// quote character itself. This matches rowsToCsv() in src/lib/channel.ts.
+// quote character itself. This matches rowsToCsv() in src/renderer/src/features/channelExport/utils/channel.ts.
 //
 // A spreadsheet reads a cell that starts with = + - @ (or a tab / CR / LF) as a
 // formula, and the text here is written by strangers (comments, captions). Such
@@ -44,7 +44,7 @@ export function csvHeader(columns: string[]): string {
   return CSV_BOM + columns.map(csvCell).join(",") + EOL;
 }
 
-// Column orders are duplicated from src/lib/channel.ts because the server is
+// Column orders are duplicated from src/renderer/src/features/channelExport/utils/channel.ts because the server is
 // bundled separately and cannot import from src/. channelCsv.test.ts asserts
 // the two copies stay identical.
 export const VIDEO_COLUMNS = [
@@ -99,7 +99,7 @@ export const SUMMARY_COLUMNS = [
 
 /**
  * What summary.csv records under `included`, so a partial export says which
- * parts it holds. Mirrors describeParts in src/lib/channel.ts — channelCsv
+ * parts it holds. Mirrors describeParts in src/renderer/src/features/channelExport/utils/channel.ts — channelCsv
  * drift tests keep the two in step.
  */
 export function describeParts(parts: {

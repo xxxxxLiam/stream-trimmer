@@ -186,7 +186,7 @@ test("path and rows deliveries produce the same CSV bytes", SLOW, () =>
       const viaPath = await runExport(harness, { ...opts, deliver: "path" });
       const viaRows = await runExport(harness, { ...opts, deliver: "rows" });
 
-      const { buildExportFiles } = await import("../../../../../lib/channel");
+      const { buildExportFiles } = await import("../../../../../renderer/src/features/channelExport/utils/channel");
       const built = buildExportFiles(viaRows as any);
       const onDisk = filesByName(viaPath);
 
@@ -669,7 +669,7 @@ test("path and rows deliveries agree on a partial export too", SLOW, () =>
       const viaPath = await runExport(harness, { ...opts, deliver: "path" });
       const viaRows = await runExport(harness, { ...opts, deliver: "rows" });
 
-      const { buildExportFiles } = await import("../../../../../lib/channel");
+      const { buildExportFiles } = await import("../../../../../renderer/src/features/channelExport/utils/channel");
       const built = buildExportFiles(viaRows as any);
       assert.deepEqual(
         built.map((f) => f.name).sort(),

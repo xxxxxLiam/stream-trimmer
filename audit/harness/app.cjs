@@ -15,7 +15,7 @@
  *     (server/index.ts: resolveBinDir falls back to `<cwd>/resources/bin`).
  *     Point it at a stub root to script yt-dlp's behaviour offline.
  *
- * Seeding: state lives in `<userData>/settings.json` (src/lib/persist.ts reads
+ * Seeding: state lives in `<userData>/settings.json` (src/renderer/src/shared/utils/persist.ts reads
  * it through the preload snapshot), so `seed` is written before launch and the
  * app boots already in that state.
  */
