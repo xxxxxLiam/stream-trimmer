@@ -35,7 +35,23 @@ test("window mode crops to the 1360 by 760 app frame the board draws", { skip: !
     assert.deepEqual([frame.width, frame.height], [1360, 760]);
     assert.equal(png.readUInt32BE(16), 1360);
     assert.equal(png.readUInt32BE(20), 760);
-    await assert.rejects(() => renderBoard("Main01Layout", { window: 5 }), /no window frame #5/);
+    await assert.rejects(() => renderBoard("Main01Layout", { window: 5 }), /no frame #5/);
+  } finally {
+    if (prev === undefined) delete process.env.PARITY_SNAPSHOT;
+    else process.env.PARITY_SNAPSHOT = prev;
+  }
+});
+
+test("a frame drawn partly off the board reports the visible region inside it", { skip: !have }, async () => {
+  const prev = process.env.PARITY_SNAPSHOT;
+  process.env.PARITY_SNAPSHOT = "pending";
+  try {
+    if (!fs.existsSync(`${require("./parity/boardRender.cjs").SNAPSHOT}/Main07Making.dc.html`)) return;
+    const { png, frame } = await renderBoard("Main07Making", { window: 0 });
+    // The window is drawn shifted left so only its right-hand panel shows.
+    assert.equal(frame.width, 1360);
+    assert.ok(frame.clip.x > 900 && frame.clip.width < 400, JSON.stringify(frame.clip));
+    assert.equal(png.readUInt32BE(16), frame.clip.width);
   } finally {
     if (prev === undefined) delete process.env.PARITY_SNAPSHOT;
     else process.env.PARITY_SNAPSHOT = prev;

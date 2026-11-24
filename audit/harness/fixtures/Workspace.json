@@ -1,5 +1,5 @@
 {
- "_doc": "Shared workspace fixture: an open video (stub yt-dlp, transcript from podcast214.vtt), two campaigns, a bank for the open video, three open videos. The stub answers every link with the same title and duration, so other rows read the same title; that is a stub limit, not an app bug. Use with --window and a board from the pending snapshot.",
+ "_doc": "Shared workspace fixture: an open video (stub yt-dlp, transcript from podcast214.vtt), two campaigns, a bank for the open video, three open videos. The stub answers every link with the same title and duration, so other rows read the same title; that is a stub limit, not an app bug. Use with --window and a board from the pending snapshot. tips are off; the open tab has the 1:12:04 to 1:12:46 range marked; mask paints the preview picture on both sides because it needs YouTube.",
  "seed": {
   "clipper.dataDirConfirmed": true,
   "clipper.campaigns": [
@@ -15,7 +15,22 @@
     "quality": "best",
     "clipsDir": "/tmp/Clips/Acme",
     "dataDir": "/tmp/Data/Acme",
-    "usedRanges": {},
+    "usedRanges": {
+     "podcast214": [
+      {
+       "start": 482,
+       "end": 515,
+       "clipId": "ACM-podcast214-01",
+       "at": "$NOW"
+      },
+      {
+       "start": 900,
+       "end": 940,
+       "clipId": "ACM-podcast214-02",
+       "at": "$NOW"
+      }
+     ]
+    },
     "dailyQuota": 3
    },
    {
@@ -42,7 +57,13 @@
      "id": "ws_a",
      "name": "",
      "url": "https://www.youtube.com/watch?v=podcast214",
-     "campaignId": "acme"
+     "campaignId": "acme",
+     "segments": [
+      {
+       "start": 4324,
+       "end": 4366
+      }
+     ]
     },
     {
      "id": "ws_b",
@@ -106,7 +127,8 @@
     ]
    }
   },
-  "clipper.signInSkipped": true
+  "clipper.signInSkipped": true,
+  "clipper.tips.on": false
  },
  "stub": {
   "info": {
@@ -128,6 +150,14 @@
  "steps": [
   {
    "wait": 1500
+  }
+ ],
+ "mask": [
+  {
+   "x": 330,
+   "y": 97,
+   "width": 700,
+   "height": 313
   }
  ]
 }

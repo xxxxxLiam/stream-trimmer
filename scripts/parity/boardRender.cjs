@@ -108,29 +108,37 @@ async function renderBoard(screen, opts = {}) {
     await page.goto("file://" + path.join(snapshotDir(), file));
     await page.waitForSelector("html[data-board-ready]");
     await page.evaluate(() => document.fonts && document.fonts.ready);
-    if (opts.window !== undefined) {
-      const handles = await page.evaluateHandle(() =>
+    const pick = opts.window !== undefined ? { n: opts.window, w: 900, h: 500 } : opts.el !== undefined ? { n: opts.el, w: 300, h: 400 } : null;
+    if (pick) {
+      const handles = await page.evaluateHandle(([minW, minH]) =>
         [...document.querySelectorAll("x-dc *")].filter((e) => {
           const b = e.getBoundingClientRect();
           const st = getComputedStyle(e);
-          return b.width >= 900 && b.height >= 500 && st.borderTopLeftRadius === "14px" && st.overflow === "hidden";
+          return b.width >= minW && b.height >= minH && st.borderTopLeftRadius === "14px" && (st.overflow === "hidden" || minW < 900);
         }),
+        [pick.w, pick.h],
       );
-      const els = (await handles.getProperties());
-      const el = els.get(String(opts.window))?.asElement();
-      if (!el) throw new Error(`${file} has no window frame #${opts.window}`);
-      // Page coordinates, rounded to whole pixels so the capture matches an integer-sized app window.
+      const els = await handles.getProperties();
+      const el = els.get(String(pick.n))?.asElement();
+      if (!el) throw new Error(`${file} has no frame #${pick.n} (rounded 14px, at least ${pick.w} by ${pick.h})`);
+      // Page coordinates. A board can draw a frame partly outside itself (a crop of the right panel,
+      // a window cut off at the bottom): capture only what is visible, and report where in the frame
+      // that part starts, so the app can be cropped to the same region.
       const box = await el.evaluate((n) => {
         const r = n.getBoundingClientRect();
-        return { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height };
+        return { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height, pw: document.documentElement.scrollWidth, ph: document.documentElement.scrollHeight };
       });
+      const x0 = Math.max(0, Math.round(box.x));
+      const y0 = Math.max(0, Math.round(box.y));
+      const x1 = Math.min(box.pw, Math.round(box.x + box.width));
+      const y1 = Math.min(box.ph, Math.round(box.y + box.height));
       const width = Math.round(box.width);
       const height = Math.round(box.height);
-      const png = await page.screenshot({ fullPage: true, clip: { x: Math.round(box.x), y: Math.round(box.y), width, height } });
-      // A board can be shorter than the window it draws (the frame is cut off at the board's edge).
-      // Report the window's real size, and how much of it the picture shows.
-      const shotHeight = Math.min(height, Math.max(0, Math.round(await page.evaluate(() => document.documentElement.scrollHeight)) - Math.round(box.y)));
-      return { png, frame: { width, height, shotHeight, title: frame.title } };
+      const png = await page.screenshot({ fullPage: true, clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } });
+      return {
+        png,
+        frame: { width, height, clip: { x: x0 - Math.round(box.x), y: y0 - Math.round(box.y), width: x1 - x0, height: y1 - y0 }, title: frame.title },
+      };
     }
     return { png: await page.screenshot({ clip: { x: 0, y: 0, width: frame.width, height: frame.height } }), frame };
   } finally {
