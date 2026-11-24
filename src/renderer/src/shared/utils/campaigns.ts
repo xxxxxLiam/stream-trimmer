@@ -7,7 +7,13 @@
  */
 
 /** A source-video range already used by a published clip. Seconds. */
-export type UsedRange = { start: number; end: number; clipId: string };
+export type UsedRange = {
+  start: number;
+  end: number;
+  clipId: string;
+  /** When the clip was made (ms since epoch). Older entries have none and never count as "today". */
+  at?: number;
+};
 
 export type CampaignFormat = "mp4" | "mp3";
 
@@ -29,6 +35,8 @@ export type Campaign = {
   /** Where channel-export CSVs go (research). Never the same folder as clipsDir. */
   dataDir: string;
   usedRanges: Record<string, UsedRange[]>;
+  /** Clips due per day. Unset or 0 means no quota, and the top bar shows no "today" count. */
+  dailyQuota?: number;
 };
 
 export type CampaignInput = Partial<Omit<Campaign, "id" | "usedRanges">> & {
@@ -343,15 +351,34 @@ export function addUsedRanges(
   videoId: string,
   ranges: ReadonlyArray<{ start: number; end: number }>,
   clipId: string,
+  at: number = Date.now(),
 ): Campaign {
   const existing = c.usedRanges[videoId] ?? [];
   const next = [...existing];
   for (const r of ranges) {
     if (!(r.end > r.start)) continue;
     if (next.some((u) => u.clipId === clipId && u.start === r.start && u.end === r.end)) continue;
-    next.push({ start: r.start, end: r.end, clipId });
+    next.push({ start: r.start, end: r.end, clipId, at });
   }
   return { ...c, usedRanges: { ...c.usedRanges, [videoId]: next } };
+}
+
+/** Clips this campaign made today (local day), counting a joined clip once however many ranges it has. */
+export function clipsMadeToday(c: Campaign | null | undefined, now: number = Date.now()): number {
+  if (!c) return 0;
+  const dayStart = new Date(now).setHours(0, 0, 0, 0);
+  const ids = new Set<string>();
+  for (const list of Object.values(c.usedRanges)) {
+    for (const u of list) if (u.clipId && typeof u.at === "number" && u.at >= dayStart) ids.add(u.clipId);
+  }
+  return ids.size;
+}
+
+/** The top bar's count, "2 of 3 today", or null when the campaign has no daily quota. */
+export function todayCount(c: Campaign | null | undefined, now: number = Date.now()): string | null {
+  const quota = c?.dailyQuota;
+  if (!c || !quota || quota <= 0) return null;
+  return `${clipsMadeToday(c, now)} of ${quota} today`;
 }
 
 /** Takes a clip's ranges back out, e.g. when the user deletes a cut. */
@@ -391,7 +418,14 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         const clean = list.flatMap((u) => {
           const x = u as Record<string, unknown>;
           return x && typeof x.start === "number" && typeof x.end === "number"
-            ? [{ start: x.start, end: x.end, clipId: typeof x.clipId === "string" ? x.clipId : "" }]
+            ? [
+                {
+                  start: x.start,
+                  end: x.end,
+                  clipId: typeof x.clipId === "string" ? x.clipId : "",
+                  ...(typeof x.at === "number" && Number.isFinite(x.at) ? { at: x.at } : {}),
+                },
+              ]
             : [];
         });
         if (clean.length) used[vid] = clean;
@@ -411,6 +445,7 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         clipsDir: typeof r.clipsDir === "string" ? r.clipsDir : "",
         dataDir: typeof r.dataDir === "string" ? r.dataDir : "",
         usedRanges: used,
+        ...(typeof r.dailyQuota === "number" && r.dailyQuota > 0 ? { dailyQuota: Math.floor(r.dailyQuota) } : {}),
       }),
     );
   }

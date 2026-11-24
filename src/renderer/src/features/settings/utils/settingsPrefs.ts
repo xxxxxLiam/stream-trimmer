@@ -8,13 +8,16 @@
 
 export type AppPrefs = { notifyQueueDone: boolean; autoUpdate: boolean };
 export type ExtraSeconds = 0 | 1 | 2;
-export type CampaignPrefs = { clipsPerDay: number; extraSeconds: ExtraSeconds; languages: string[] };
+export type CampaignPrefs = { extraSeconds: ExtraSeconds; languages: string[] };
+
+/** Shown for a campaign with no quota yet. Clips a day itself is `Campaign.dailyQuota`, which the top bar reads. */
+export const DEFAULT_DAILY_QUOTA = 3;
 
 export const APP_PREFS_KEY = "clipper.appPrefs";
 export const CAMPAIGN_PREFS_KEY = "clipper.campaignPrefs";
 
 export const DEFAULT_APP_PREFS: AppPrefs = { notifyQueueDone: true, autoUpdate: true };
-export const DEFAULT_CAMPAIGN_PREFS: CampaignPrefs = { clipsPerDay: 3, extraSeconds: 1, languages: ["original"] };
+export const DEFAULT_CAMPAIGN_PREFS: CampaignPrefs = { extraSeconds: 1, languages: ["original"] };
 
 export const MAX_CLIPS_PER_DAY = 99;
 export const EXTRA_SECONDS_CHOICES: readonly ExtraSeconds[] = [0, 1, 2];
@@ -41,12 +44,10 @@ export function normalizeAppPrefs(raw: unknown): AppPrefs {
 
 export function normalizeCampaignPrefs(raw: unknown): CampaignPrefs {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const perDay = typeof r.clipsPerDay === "number" && Number.isInteger(r.clipsPerDay) ? r.clipsPerDay : NaN;
   const extra = EXTRA_SECONDS_CHOICES.find((n) => n === r.extraSeconds);
   const langs = Array.isArray(r.languages) ? r.languages.filter((l): l is string => typeof l === "string" && l !== "") : [];
   const unique = [...new Set(["original", ...langs])];
   return {
-    clipsPerDay: perDay >= 1 && perDay <= MAX_CLIPS_PER_DAY ? perDay : DEFAULT_CAMPAIGN_PREFS.clipsPerDay,
     extraSeconds: extra ?? DEFAULT_CAMPAIGN_PREFS.extraSeconds,
     languages: unique,
   };
@@ -64,8 +65,8 @@ export function toggleLanguage(list: readonly string[], code: string): string[] 
 }
 
 /** "3 clips a day · 1s extra at both ends" */
-export function campaignSummary(p: CampaignPrefs): string {
-  return `${p.clipsPerDay} clip${p.clipsPerDay === 1 ? "" : "s"} a day · ${p.extraSeconds}s extra at both ends`;
+export function campaignSummary(quota: number, p: CampaignPrefs): string {
+  return `${quota} clip${quota === 1 ? "" : "s"} a day · ${p.extraSeconds}s extra at both ends`;
 }
 
 /** "Languages: Original, Spanish", or null when the campaign only wants the original. */

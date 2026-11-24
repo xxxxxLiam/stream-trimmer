@@ -198,7 +198,17 @@ function CampaignForm({
   );
 }
 
-export default function CampaignMenu({ onClose, onOpenSettings }: { onClose?: () => void; onOpenSettings?: (id: string) => void }) {
+export default function CampaignMenu({
+  onClose,
+  onOpenSettings,
+}: {
+  onClose?: () => void;
+  /**
+   * Opens the campaign form for the active campaign. The workspace screen passes it (the Start,
+   * Settings and Help build owns the form); without it the menu's own inline form is used.
+   */
+  onOpenSettings?: (campaignId: string) => void;
+}) {
   const { campaigns, activeId, setActiveId, remove } = useCampaign();
   const [mode, setMode] = useState<{ kind: "list" } | { kind: "form"; id: string | null }>({
     kind: "list",
@@ -219,8 +229,24 @@ export default function CampaignMenu({ onClose, onOpenSettings }: { onClose?: ()
     );
   }
 
+  const current = campaigns.find((c) => c.id === activeId);
   return (
     <div className="flex flex-col gap-2">
+      {current ? (
+        <button
+          type="button"
+          id="ui-campaign-settings"
+          className="btn justify-start"
+          onClick={() => {
+            if (onOpenSettings) {
+              onOpenSettings(current.id);
+              onClose?.();
+            } else setMode({ kind: "form", id: current.id });
+          }}
+        >
+          {current.name} settings
+        </button>
+      ) : null}
       {campaigns.length === 0 ? (
         <p className="m-0 text-meta text-fg-dim">
           No campaigns yet. A campaign remembers, for one client, how long clips should be, how

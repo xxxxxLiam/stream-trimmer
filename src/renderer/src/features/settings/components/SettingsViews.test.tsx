@@ -42,7 +42,10 @@ test("campaigns list: summary lines, Edit per campaign, Add campaign", () => {
 
 const campaign: SettingsCampaignProps = {
   name: "Acme",
-  prefs: { clipsPerDay: 3, extraSeconds: 1, languages: ["original", "es"] },
+  prefs: { extraSeconds: 1, languages: ["original", "es"] },
+  dubs: [{ code: "es", label: "Spanish" }, { code: "pt", label: "Portuguese" }],
+  quota: 3,
+  onQuota: noop,
   folderLabel: "Clipr/Acme",
   finalCut: null,
   onPatch: noop,
@@ -65,6 +68,10 @@ test("one campaign: quota, extra seconds, languages, folder; no id pattern, form
   assert.match(h, /aria-label="Back to Campaigns"/);
   assert.doesNotMatch(h, /Final Cut/);
   assert.doesNotMatch(h, /pattern|prefix|Quality|Format|short code/i);
+});
+
+test("Languages show only when the open video has dubs", () => {
+  assert.doesNotMatch(renderToStaticMarkup(<SettingsCampaign {...campaign} dubs={[]} />), /Languages/);
 });
 
 test("Final Cut library and event appear only when Final Cut is ticked", () => {
@@ -90,7 +97,7 @@ test("clips folder view and Back targets", () => {
 test("App mounts the drawer, the gear toggles it and the campaign menu opens it on a campaign", () => {
   const app = read("routes/App.tsx");
   assert.match(app, /<SettingsDrawer/);
-  assert.match(app, /onOpenSettings=\{\(id\) =>/);
-  assert.match(read("modules/layout/components/AppHeader.tsx"), /id="ui-settings"/);
-  assert.doesNotMatch(read("modules/layout/components/AppHeader.tsx"), /settingsBody/);
+  assert.match(app, /const openCampaignSettings = \(campaignId: string\) => \{\s*setSettingsStartAt\(campaignId\)/);
+  assert.match(app, /<CampaignMenu onOpenSettings=\{openCampaignSettings\} \/>/);
+  assert.match(app, /onToggleSettings=\{\(\) => \{\s*setSettingsStartAt\(null\)/);
 });

@@ -195,7 +195,7 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
             <label key={label} className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="text-meta text-fg-dim">{label}</span>
               <input
-                className="field font-mono"
+                className="field"
                 inputMode="numeric"
                 value={value}
                 onChange={(e) => set(e.target.value)}

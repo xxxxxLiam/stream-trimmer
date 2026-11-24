@@ -14,7 +14,8 @@ import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
-import { toggleLanguage } from "../utils/settingsPrefs";
+import { DEFAULT_DAILY_QUOTA, toggleLanguage } from "../utils/settingsPrefs";
+import type { AudioTrack } from "../../../shared/utils/clip";
 import type { EditorHandoffSettings } from "../../../shared/utils/fcpxml";
 
 export type SettingsDrawerProps = {
@@ -22,11 +23,13 @@ export type SettingsDrawerProps = {
   onClose: () => void;
   /** Campaign to land on, from "<Campaign> settings" in the campaign menu. */
   startAt: string | null;
+  /** Audio tracks of the open video; its dubs become the language chips. */
+  tracks?: AudioTrack[];
   /** The active campaign's Final Cut settings; other campaigns' are not loaded. */
   editor: { campaignId: string | null; settings: EditorHandoffSettings; onChange: (s: EditorHandoffSettings) => void };
 };
 
-export default function SettingsDrawer({ open, onClose, startAt, editor }: SettingsDrawerProps) {
+export default function SettingsDrawer({ open, onClose, startAt, tracks, editor }: SettingsDrawerProps) {
   const c = useSettingsController({ open, onClose, startAt });
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -41,6 +44,9 @@ export default function SettingsDrawer({ open, onClose, startAt, editor }: Setti
       <SettingsCampaign
         name={campaign.name}
         prefs={c.prefsFor(campaign.id)}
+        dubs={(tracks ?? []).filter((t) => t.kind !== "original").map((t) => ({ code: t.language, label: t.label }))}
+        quota={campaign.dailyQuota ?? DEFAULT_DAILY_QUOTA}
+        onQuota={(n) => c.campaigns.update(campaign.id, { dailyQuota: n })}
         folderLabel={folderChipLabel(campaign.clipsDir)}
         finalCut={
           isActive && editor.settings.afterCutting === "finalcut"
@@ -104,6 +110,7 @@ export default function SettingsDrawer({ open, onClose, startAt, editor }: Setti
         onClose={() => c.setAdding(false)}
         onCreated={(made) => {
           c.setAdding(false);
+          c.campaigns.update(made.id, { dailyQuota: DEFAULT_DAILY_QUOTA });
           c.setView({ kind: "campaign", id: made.id });
         }}
       />

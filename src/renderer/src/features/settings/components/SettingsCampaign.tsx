@@ -6,14 +6,19 @@
  *   Delete campaign. No clip id fields, no format or quality.
  */
 import { DrawerHeader, drawerBody, outlineButton } from "./DrawerParts";
-import { DUB_LANGUAGES, EXTRA_SECONDS_CHOICES, type CampaignPrefs } from "../utils/settingsPrefs";
+import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
 export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void };
 
 export type SettingsCampaignProps = {
   name: string;
   prefs: CampaignPrefs;
+  /** Clips a day (`Campaign.dailyQuota`); the top bar shows "N of M today" from it. */
+  quota: number;
+  onQuota: (n: number) => void;
   folderLabel: string;
+  /** Dub tracks of the open video. The Languages block shows only when there are some. */
+  dubs: { code: string; label: string }[];
   /** Present only while Final Cut Pro is ticked in the Clip menu for this campaign. */
   finalCut: FinalCutFields | null;
   onPatch: (p: Partial<CampaignPrefs>) => void;
@@ -37,9 +42,9 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
       <div className={drawerBody}>
       <div className="flex h-[52px] items-center gap-2 border-b border-hairline">
         <span className="flex-1 text-body">Clips a day</span>
-        <button type="button" aria-label="One fewer clip a day" disabled={prefs.clipsPerDay <= 1} onClick={() => p.onPatch({ clipsPerDay: prefs.clipsPerDay - 1 })} className={stepButton}>−</button>
-        <span aria-live="polite" className="w-6 text-center text-body [font-variant-numeric:tabular-nums]">{prefs.clipsPerDay}</span>
-        <button type="button" aria-label="One more clip a day" onClick={() => p.onPatch({ clipsPerDay: prefs.clipsPerDay + 1 })} className={stepButton}>+</button>
+        <button type="button" aria-label="One fewer clip a day" disabled={p.quota <= 1} onClick={() => p.onQuota(stepClipsPerDay(p.quota, -1))} className={stepButton}>−</button>
+        <span aria-live="polite" className="w-6 text-center text-body [font-variant-numeric:tabular-nums]">{p.quota}</span>
+        <button type="button" aria-label="One more clip a day" onClick={() => p.onQuota(stepClipsPerDay(p.quota, 1))} className={stepButton}>+</button>
       </div>
       <div className="flex flex-col gap-2 border-b border-hairline py-3">
         <span className="text-body">Extra seconds at both ends</span>
@@ -62,13 +67,14 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           })}
         </div>
       </div>
+      {p.dubs.length > 0 && (
       <div className="flex flex-col gap-2 border-b border-hairline py-3">
         <div className="flex flex-col gap-0.5">
           <span className="text-body">Languages</span>
           <span className="text-meta text-fg-dim">Shown only when the video has dubs</span>
         </div>
         <div className="flex flex-wrap gap-2">
-          {[{ code: "original", label: "Original" }, ...DUB_LANGUAGES].map((l) => {
+          {[{ code: "original", label: "Original" }, ...p.dubs].map((l) => {
             const on = prefs.languages.includes(l.code);
             return (
               <button
@@ -90,6 +96,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           })}
         </div>
       </div>
+      )}
       <div className="flex items-center gap-3 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-body">Folder</span>

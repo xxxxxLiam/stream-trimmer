@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
-import { campaignSummary, languagesLine } from "../utils/settingsPrefs";
+import { DEFAULT_DAILY_QUOTA, campaignSummary, languagesLine } from "../utils/settingsPrefs";
 import { useSettingsState } from "./useSettingsState";
 
 export type SettingsView = { kind: "top" } | { kind: "campaigns" } | { kind: "campaign"; id: string } | { kind: "folder" };
@@ -60,7 +60,7 @@ export function useSettingsController({
     () =>
       campaigns.campaigns.map((c) => {
         const p = prefs.prefsFor(c.id);
-        return { id: c.id, name: c.name, summary: campaignSummary(p), languages: languagesLine(p) };
+        return { id: c.id, name: c.name, summary: campaignSummary(c.dailyQuota ?? DEFAULT_DAILY_QUOTA, p), languages: languagesLine(p) };
       }),
     [campaigns.campaigns, prefs],
   );
