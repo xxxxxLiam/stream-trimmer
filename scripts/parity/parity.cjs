@@ -135,9 +135,19 @@ async function screenshotApp(screen, frame, fx, useWindow) {
   const fixture = loadFixture(o.fixture);
   const appPng = await screenshotApp(o.screen, frame, fixture, o.window !== undefined);
   fs.writeFileSync(path.join(outDir, "app.png"), appPng);
-  const b = PNG.sync.read(boardPng);
-  const p = PNG.sync.read(appPng);
-  if (b.width !== p.width || b.height !== p.height) throw new Error(`size mismatch: board ${b.width}x${b.height}, app ${p.width}x${p.height}`);
+  let b = PNG.sync.read(boardPng);
+  let p = PNG.sync.read(appPng);
+  if (b.width !== p.width || b.height !== p.height) {
+    if (o.el === undefined) throw new Error(`size mismatch: board ${b.width}x${b.height}, app ${p.width}x${p.height}`);
+    // A drawn piece (drawer, menu) is the height of its content on the board but fills the window in the
+    // app: compare the part both have, from the top left, and say so.
+    const w = Math.min(b.width, p.width);
+    const h = Math.min(b.height, p.height);
+    const cut = (img) => { const out = new PNG({ width: w, height: h }); PNG.bitblt(img, out, 0, 0, w, h, 0, 0); return out; };
+    console.log(`sizes differ (board ${b.width}x${b.height}, app ${p.width}x${p.height}); comparing the top ${w}x${h}`);
+    b = cut(b);
+    p = cut(p);
+  }
   // Regions neither side can honestly show (the video picture, which needs YouTube): painted the same
   // flat colour on both, so they never count as a difference. Rects are relative to the compared image.
   for (const m of fixture.mask || []) {
