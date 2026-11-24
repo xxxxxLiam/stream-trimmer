@@ -8,7 +8,7 @@ Process-first, per the Electron File Structure Guide:
 src/main/{index.ts, ipc/, features/<name>/{services,utils,...}, modules/<name>/, shared/}
 src/preload/index.ts
 src/renderer/{index.html, src/{main.tsx, routes/, features/, modules/, shared/}}
-src/common/{ipc,schemas,types,constants}
+src/common/{ipc,schemas,types,constants,utils}
 resources/ build/ e2e/ scripts/ docs/
 ```
 

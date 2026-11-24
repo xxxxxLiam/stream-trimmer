@@ -8,6 +8,18 @@ import { type FailureAttempt, type FailureDiagnostics } from "../../../shared/ut
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
 export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
 
+/** How each quality reads in the Quality select and the footer chip. */
+export const QUALITY_LABELS: Record<string, string> = {
+  best: "Best",
+  "1080": "1080p",
+  "720": "720p",
+  "480": "480p",
+  "360": "360p",
+  "320": "320 kbps",
+  "192": "192 kbps",
+  "128": "128 kbps",
+};
+
 export type Quality =
   | (typeof VIDEO_QUALITIES)[number]
   | (typeof AUDIO_QUALITIES)[number];

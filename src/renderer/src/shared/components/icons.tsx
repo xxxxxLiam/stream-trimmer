@@ -6,7 +6,7 @@
  */
 import type { ReactNode, SVGProps } from "react";
 
-function Icon({ children, ...rest }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
+export function Icon({ children, ...rest }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
   return (
     <svg
       width={16}

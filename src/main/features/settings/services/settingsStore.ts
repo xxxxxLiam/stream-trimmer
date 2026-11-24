@@ -11,15 +11,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { siblingDir as siblingDataDir } from "../../../../common/utils/siblingDir";
 
-/** "/a/b/clips" -> "/a/b/<name>". Same rule as defaultDataDir in src/renderer/src/shared/utils/campaigns.ts. */
-function siblingDataDir(clipsDir: any, name: any) {
-  const trimmed = String(clipsDir).replace(/[\\/]+$/, "");
-  const sep = trimmed.includes("\\") && !trimmed.includes("/") ? "\\" : "/";
-  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  if (cut < 0) return name;
-  return `${trimmed.slice(0, cut)}${sep}${name}`;
-}
 
 /**
  * v4 folder migration. Pure: returns a new object, never mutates its input.

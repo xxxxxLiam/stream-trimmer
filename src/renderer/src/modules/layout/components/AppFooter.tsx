@@ -9,21 +9,11 @@ import { useCallback, useRef, useState } from "react";
 import { useClipperContext } from "../../clipper/hooks/ClipperContext";
 import { useCampaign } from "../../../features/campaigns/hooks/CampaignContext";
 import FormatQualityFields from "../../clipper/components/FormatQualityFields";
+import { QUALITY_LABELS } from "../../clipper/utils/clipperTypes";
 import { IconChevronDown, IconFolder } from "../../../shared/components/icons";
 import { useDismiss } from "../../../shared/hooks/useDismiss";
 import { CHANNEL_DATA_BUILT } from "../../../shared/utils/ownerGate";
 import { useDataFolderVisible } from "../../../shared/hooks/useDataFolderVisible";
-
-const QUALITY_LABEL: Record<string, string> = {
-  best: "Best",
-  "1080": "1080p",
-  "720": "720p",
-  "480": "480p",
-  "360": "360p",
-  "320": "320 kbps",
-  "192": "192 kbps",
-  "128": "128 kbps",
-};
 
 function baseName(dir: string): string {
   return dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
@@ -47,7 +37,7 @@ function FormatChip() {
         title="Format and quality"
       >
         <span>{format.toUpperCase()}</span>
-        <span className="text-fg-dim">{QUALITY_LABEL[quality] ?? quality}</span>
+        <span className="text-fg-dim">{QUALITY_LABELS[quality] ?? quality}</span>
         <IconChevronDown className="shrink-0 text-fg-dim" />
       </button>
       {open && (

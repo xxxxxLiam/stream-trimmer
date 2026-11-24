@@ -8,6 +8,7 @@
 // A device check, not a security boundary — see src/renderer/src/shared/utils/ownerGate.ts.
 import fs from "node:fs";
 import path from "node:path";
+import { parseMachineList as parseList } from "../../../../common/utils/machineList";
 
 /**
  * Reads the build's baked owner settings from the sidecar the build script
@@ -26,14 +27,6 @@ function readBakedShape(distDir: any) {
   } catch {
     return null;
   }
-}
-
-/** "a, B ,," -> ["a","b"]. Same rule as parseMachineList in src/renderer/src/shared/utils/ownerGate.ts. */
-function parseList(raw: any) {
-  return String(raw ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
 }
 
 function createOwnerCheck({ readMachineId, hashMachineId, getBaked }: any) {

@@ -7,6 +7,7 @@
  */
 import { useState } from "react";
 import { useSegments } from "../../../shared/hooks/useSegments";
+import { Icon } from "../../../shared/components/icons";
 import {
   formatLength,
   formatTimecode,
@@ -29,37 +30,17 @@ export type SegmentListProps = {
 
 function IconGrip() {
   return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <Icon>
       <path d="M6 4.5h.01M10 4.5h.01M6 8h.01M10 8h.01M6 11.5h.01M10 11.5h.01" />
-    </svg>
+    </Icon>
   );
 }
 
 function IconClose() {
   return (
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      aria-hidden="true"
-      focusable="false"
-    >
+    <Icon>
       <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
-    </svg>
+    </Icon>
   );
 }
 

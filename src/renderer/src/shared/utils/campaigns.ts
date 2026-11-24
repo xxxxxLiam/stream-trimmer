@@ -91,6 +91,7 @@ export function normalizeBand<T extends Pick<Campaign, "targetMinSec" | "targetM
 }
 
 import { CHANNEL_DATA_BUILT } from "./ownerGate";
+import { siblingDir } from "../../../../common/utils/siblingDir";
 
 /**
  * Name of the suggested data folder. The exporter's own name only exists in a build that
@@ -100,12 +101,7 @@ export const DATA_FOLDER_NAME: string = CHANNEL_DATA_BUILT ? "channel-data" : "d
 
 /** "/a/b/clips" -> "/a/b/<data folder>". Keeps the separator style of the input. */
 export function defaultDataDir(clipsDir: string): string {
-  const trimmed = clipsDir.replace(/[\\/]+$/, "");
-  const sep = trimmed.includes("\\") && !trimmed.includes("/") ? "\\" : "/";
-  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  if (cut < 0) return DATA_FOLDER_NAME;
-  const parent = trimmed.slice(0, cut);
-  return `${parent === "" ? "" : parent}${sep}${DATA_FOLDER_NAME}`;
+  return siblingDir(clipsDir, DATA_FOLDER_NAME);
 }
 
 function normFolder(p: string): string {

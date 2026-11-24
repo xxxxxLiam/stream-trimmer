@@ -17,7 +17,6 @@ import {
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
-  type SVGProps,
 } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
@@ -30,6 +29,7 @@ import {
 } from "../utils/transcript";
 import { useTranscriptWindow } from "../hooks/useTranscriptWindow";
 
+import { Icon } from "../../../shared/components/icons";
 export type TranscriptColumnProps = {
   className?: string;
   /** Playhead seconds. Defaults to the last seek the transcript asked for. */
@@ -48,21 +48,6 @@ const HATCH: CSSProperties = {
 };
 const NO_RANGES: readonly TimeRange[] = [];
 
-const Icon = (p: SVGProps<SVGSVGElement> & { children: ReactNode }) => (
-  <svg
-    width={16}
-    height={16}
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={1.5}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    {...p}
-  />
-);
 const IconSearch = () => (
   <Icon>
     <circle cx="7" cy="7" r="4.25" />

@@ -5,18 +5,7 @@
  */
 import { useClipperContext } from "../hooks/ClipperContext";
 import { AUDIO_QUALITIES, VIDEO_QUALITIES } from "../hooks/useClipper";
-
-const QUALITY_LABELS: Record<string, string> = {
-  best: "Best",
-  "1080": "1080p",
-  "720": "720p",
-  "480": "480p",
-  "360": "360p",
-  "320": "320 kbps",
-  "192": "192 kbps",
-  "128": "128 kbps",
-};
-
+import { QUALITY_LABELS } from "../utils/clipperTypes";
 
 export default function FormatQualityFields() {
   const { info, format, setFormat, quality, setQuality } = useClipperContext();

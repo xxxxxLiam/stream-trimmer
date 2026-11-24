@@ -19,6 +19,9 @@
  * true. A non-matching install gets no prompt, no message, nothing.
  */
 import { useEffect, useState } from "react";
+import { parseMachineList } from "../../../../common/utils/machineList";
+
+export { parseMachineList };
 
 declare const __CHANNEL_DATA__: boolean | undefined;
 declare const __OWNER_MACHINES__: string | undefined;
@@ -37,12 +40,6 @@ const SALT: string =
 export const ANY_MACHINE = "*";
 
 /** Splits the comma-separated list into trimmed, lowercase, non-empty hashes. */
-export function parseMachineList(raw: string | undefined | null): string[] {
-  return String(raw ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 /** Pure decision, so it can be tested without Electron. Fails closed. */
 export function decideAccess(input: {
