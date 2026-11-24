@@ -19,6 +19,7 @@ export function useExportQueries() {
   const vid = videoId ?? "";
   const clips = useMemo(() => (campaignId && vid ? clipsFor(data, campaignId, vid) : []), [data, campaignId, vid]);
   const waiting = useMemo(() => waitingClips(clips), [clips]);
+  const made = useMemo(() => clips.filter((c) => c.status !== "banked"), [clips]);
   const nextId = useMemo(() => suggestedNextId(waiting), [waiting]);
   const planned = useMemo(() => bankedRanges(clips), [clips]);
   const gate = !active
@@ -27,5 +28,5 @@ export function useExportQueries() {
       ? "Open a video to see its moments."
       : "";
 
-  return { campaignId, vid, clips, waiting, nextId, planned, gate, campaignName: active?.name ?? "" };
+  return { campaignId, vid, clips, waiting, made, nextId, planned, gate, campaignName: active?.name ?? "" };
 }

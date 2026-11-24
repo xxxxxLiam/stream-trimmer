@@ -52,14 +52,14 @@ export default function ExportPanel() {
 
       {c.gate ? (
         <p className="px-[14px] py-6 text-center text-body text-fg-dim">{c.gate}</p>
-      ) : c.waiting.length === 0 ? (
+      ) : c.waiting.length === 0 && c.made.length === 0 ? (
         <p className="px-[14px] py-6 text-center text-body text-fg-dim">{emptyExportText(IS_MAC)}</p>
       ) : (
         <>
           <div className="flex justify-between px-3 pb-1 pt-[10px] text-meta text-fg-dim">
             Waiting in this video<span>{c.waiting.length}</span>
           </div>
-          {c.waiting.map((clip) => {
+          {[...c.waiting, ...c.made].map((clip) => {
             const name = validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip);
             return (
               <WaitingRow
@@ -68,6 +68,7 @@ export default function ExportPanel() {
                 name={name || clip.id}
                 suggested={clip.id === c.nextId}
                 selected={clip.id === c.selectedId}
+                made={clip.status !== "banked"}
                 onSelect={() => c.select(clip)}
                 onMake={() => void c.make(clip)}
                 onRemove={() => c.remove(clip)}
