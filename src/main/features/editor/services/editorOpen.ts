@@ -18,15 +18,36 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync, spawn as spawnProcess } from "node:child_process";
+import { findWindowsEditor, WINDOWS_SEARCH_PLACES, type WinDeps } from "./editorDiscoveryWin";
 
 /** The only applications this module will launch. Names never come from the UI. */
-type AppDef = { label: string; match: (name: string) => boolean; folder?: (name: string) => boolean };
+type AppDef = {
+  label: string;
+  match: (name: string) => boolean;
+  folder?: (name: string) => boolean;
+  /** Mac install folder inside /Applications that holds the .app (DaVinci Resolve). */
+  macFolder?: string;
+  /** Final Cut is Mac-only: it is hidden from the menu and never launched on Windows. */
+  macOnly?: boolean;
+  /**
+   * False when the editor can't take our project file: it is opened empty and the file is shown in
+   * Finder / File Explorer, ready to drag in. (CapCut always; Resolve until its import is verified.)
+   */
+  takesFile?: boolean;
+};
 
 const APPS: Record<string, AppDef> = {
   finalcut: {
     label: "Final Cut Pro",
     match: (name: string) => /^Final Cut Pro( Creator Studio| Trial)?\.app$/.test(name),
+    macOnly: true,
+  },
+  resolve: {
+    label: "DaVinci Resolve",
+    match: (name: string) => /^DaVinci Resolve\.app$/.test(name),
+    macFolder: "DaVinci Resolve",
+    takesFile: false,
   },
   premiere: {
     label: "Adobe Premiere Pro",
@@ -37,6 +58,7 @@ const APPS: Record<string, AppDef> = {
   capcut: {
     label: "CapCut",
     match: (name: string) => /^CapCut\.app$/.test(name),
+    takesFile: false,
   },
 };
 
@@ -57,10 +79,34 @@ function byVersionDesc(a: string, b: string): number {
   return b.localeCompare(a, undefined, { numeric: true });
 }
 
-/** Absolute path of an installed app, or null. macOS only. */
-function findApp(key: string, { platform = process.platform, fsImpl = fs, home = os.homedir() } = {}) {
+/** Reads a registry key's default value with the system `reg` tool (Windows only). */
+function readRegistryDefault(key: string): string | null {
+  try {
+    const out = execFileSync("reg", ["query", key, "/ve"], { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    const m = out.match(/REG_(?:EXPAND_)?SZ\s+(.+)/);
+    return m ? m[1].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+type FindOpts = {
+  platform?: NodeJS.Platform;
+  fsImpl?: any;
+  home?: string;
+  env?: WinDeps["env"];
+  readRegistry?: WinDeps["readRegistry"];
+};
+
+/** Absolute path of an installed editor, or null. Mac: .app bundles. Windows: the .exe. */
+function findApp(key: string, { platform = process.platform, fsImpl = fs, home = os.homedir(), env = process.env as WinDeps["env"], readRegistry = readRegistryDefault }: FindOpts = {}) {
   const app = APPS[key];
-  if (!app || platform !== "darwin") return null;
+  if (!app) return null;
+  if (platform === "win32") {
+    if (app.macOnly) return null;
+    return findWindowsEditor(key, { fsImpl, env, readRegistry });
+  }
+  if (platform !== "darwin") return null;
   for (const dir of appDirs(home)) {
     const names = readDir(dir, fsImpl).sort(byVersionDesc);
     for (const name of names) {
@@ -74,62 +120,113 @@ function findApp(key: string, { platform = process.platform, fsImpl = fs, home =
         if (inner.length) return path.join(dir, name, inner[0]);
       }
     }
+    if (app.macFolder) {
+      const inner = readDir(path.join(dir, app.macFolder), fsImpl).filter(app.match);
+      if (inner.length) return path.join(dir, app.macFolder, inner[0]);
+    }
   }
   return null;
 }
 
-function installedApps(opts?: Parameters<typeof findApp>[1]) {
-  return {
+/** Which editors are installed. Use offeredEditors for which ones this system shows at all. */
+function installedApps(opts?: FindOpts) {
+  const platform = opts?.platform ?? process.platform;
+  const apps = {
     finalcut: findApp("finalcut", opts) !== null,
     premiere: findApp("premiere", opts) !== null,
+    resolve: findApp("resolve", opts) !== null,
     capcut: findApp("capcut", opts) !== null,
   };
+  void platform;
+  return apps;
+}
+
+function offeredEditors(platform: NodeJS.Platform = process.platform): string[] {
+  return Object.keys(APPS).filter((k) => !(APPS[k].macOnly && platform !== "darwin"));
 }
 
 function isAbsolutePath(p: unknown): p is string {
   return typeof p === "string" && p.length > 0 && path.isAbsolute(p);
 }
 
+/** "Finder" or "File Explorer", for plain messages. */
+const fileManagerName = (platform: NodeJS.Platform = process.platform) => (platform === "win32" ? "File Explorer" : "Finder");
+
 /**
- * Open `file` (optional) with the named editor. `app` is a key of APPS.
- * Missing app: { ok:false, missing:"<name>", error } and the file stays put.
+ * Open the named editor, with `file` when that editor can take it. `app` is a key of APPS.
+ * - Missing app: { ok:false, missing:"<name>", error } and the file stays put.
+ * - An editor that can't take our file (takesFile:false) is opened empty, and the file is shown in
+ *   Finder / File Explorer through `showFile`, ready to drag in ({ ok:true, shown:true }).
+ * - Mac: `open -a`. Windows: the found .exe run directly with the file as its argument, never through
+ *   a shell string. Final Cut is Mac-only.
  */
 function openWithApp(
   { app, file }: { app?: unknown; file?: unknown },
-  { platform = process.platform, fsImpl = fs, home = os.homedir(), exec = execFile } = {},
-) {
+  {
+    platform = process.platform,
+    fsImpl = fs,
+    home = os.homedir(),
+    exec = execFile,
+    spawn = spawnProcess,
+    showFile,
+    env,
+    readRegistry,
+  }: FindOpts & { exec?: any; spawn?: any; showFile?: (file: string) => void } = {},
+): Promise<any> {
   const def = APPS[app as string];
   if (!def) return Promise.resolve({ ok: false, error: "That editor is not one this app can open." });
   const saved = file ? ` The file is saved at ${file}.` : "";
-  if (platform !== "darwin") {
-    return Promise.resolve({
-      ok: false,
-      error: `Opening ${def.label} from here is macOS only.${saved}`,
-    });
+  if (platform !== "darwin" && platform !== "win32") {
+    return Promise.resolve({ ok: false, error: `Opening ${def.label} from here works on a Mac or Windows only.${saved}` });
   }
-  if (file !== undefined && !isAbsolutePath(file)) {
+  if (def.macOnly && platform !== "darwin") {
+    return Promise.resolve({ ok: false, error: `${def.label} only runs on a Mac.${saved}` });
+  }
+  const isAbs = platform === "win32" ? path.win32.isAbsolute : path.isAbsolute;
+  if (file !== undefined && !(typeof file === "string" && file.length > 0 && isAbs(file))) {
     return Promise.resolve({ ok: false, error: "The file path is not an absolute path." });
   }
   if (file && !fsImpl.existsSync(file)) {
     return Promise.resolve({ ok: false, error: `The file is not there any more: ${file}` });
   }
-  const appPath = findApp(app as string, { platform, fsImpl, home });
+  const appPath = findApp(app as string, { platform, fsImpl, home, env, readRegistry });
   if (!appPath) {
+    const where = platform === "win32" ? WINDOWS_SEARCH_PLACES : "/Applications and ~/Applications";
     return Promise.resolve({
       ok: false,
       missing: def.label,
-      error: `${def.label} is not installed (looked in /Applications and ~/Applications).${saved}`,
+      error: `${def.label} is not installed (looked in ${where}).${saved}`,
     });
   }
-  const args = ["-a", appPath, ...(file ? [file] : [])];
-  return new Promise((resolve) => {
-    exec("open", args, (err, _out, stderr) => {
-      if (err) {
-        const why = String(stderr || err.message || "").trim();
-        resolve({ ok: false, error: `${def.label} would not open${why ? `: ${why}` : "."}${saved}` });
-      } else {
-        resolve({ ok: true, appPath });
+  const passFile = !!file && def.takesFile !== false;
+  const showAfter = !!file && def.takesFile === false;
+  const fail = (why: string) => ({ ok: false, error: `${def.label} would not open${why ? `: ${why}` : "."}${saved}` });
+  const done = () => {
+    if (showAfter && showFile) {
+      showFile(file as string);
+      return { ok: true, appPath, shown: true };
+    }
+    return { ok: true, appPath };
+  };
+  if (platform === "win32") {
+    return new Promise((resolve) => {
+      try {
+        const child = spawn(appPath, passFile ? [file] : [], { detached: true, stdio: "ignore", windowsHide: false });
+        child.once("error", (err: Error) => resolve(fail(String(err.message || err).trim())));
+        child.once("spawn", () => {
+          child.unref?.();
+          resolve(done());
+        });
+      } catch (err: any) {
+        resolve(fail(String(err?.message || err).trim()));
       }
+    });
+  }
+  const args = ["-a", appPath, ...(passFile ? [file] : [])];
+  return new Promise((resolve) => {
+    exec("open", args, (err: any, _out: string, stderr: string) => {
+      if (err) resolve(fail(String(stderr || err.message || "").trim()));
+      else resolve(done());
     });
   });
 }
@@ -323,6 +420,8 @@ function pathExists(target: unknown, fsImpl = fs) {
 
 export {
   APPS,
+  fileManagerName,
+  offeredEditors,
   findApp,
   installedApps,
   openWithApp,
