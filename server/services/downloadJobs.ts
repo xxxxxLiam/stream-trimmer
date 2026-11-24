@@ -19,7 +19,7 @@ export class CancelledError extends Error {
   }
 }
 
-interface ActiveJob {
+export interface ActiveJob {
   cancelled: boolean;
   /** True while the clip is being built; false once it is finished or failed. */
   building: boolean;
