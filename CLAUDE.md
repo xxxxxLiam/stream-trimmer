@@ -77,9 +77,10 @@ loop.
 
 ## Testing
 
-- Run the project's own commands: `npm test` (main, preload, scripts),
-  `npm run test:renderer` (renderer), and `npm run check` for everything
-  (typecheck of all four tsconfigs, both test suites, lint). Do not bundle
+- Run the project's own commands: `npm test` (every suite: main, preload,
+  common, scripts, renderer; the release workflow runs this too),
+  `npm run test:renderer` (renderer only), and `npm run check` for everything
+  (typecheck of all four tsconfigs, `npm test`, lint). Do not bundle
   tests with esbuild to run them — it breaks their relative `require`s and
   invents failures. Checks run locally; GitHub Actions are for releases only.
 - A test that cannot fail is not a test. When fixing a bug, revert the fix
