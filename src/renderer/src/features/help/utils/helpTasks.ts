@@ -49,10 +49,10 @@ export const ANCHORS = {
   footerClips: "ui-footer-clips",
   footerData: "ui-footer-data",
   footerFormat: "ui-footer-format",
-  /** Transcript column: its search box and its lines. */
-  transcriptColumn: "ui-col-transcript",
-  /** Centre column: the timeline, the mark bar and the segment list. */
-  centreColumn: "ui-col-centre",
+  /** The left panels (Videos, Transcript, Markers). */
+  transcriptColumn: "ui-panels-left",
+  /** The centre panels: Preview over Timeline. */
+  centreColumn: "ui-panels-centre",
   markIn: "ui-mark-in",
   markOut: "ui-mark-out",
   addSegment: "ui-add-segment",

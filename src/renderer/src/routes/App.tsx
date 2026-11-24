@@ -19,7 +19,6 @@ import {
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
-import WorkspaceTabs from "../features/workspace/components/WorkspaceTabs";
 import ChannelExportPanel from "../features/channelExport/components/ChannelExportPanel";
 import { CHANNEL_DATA_BUILT, useOwnerAccess } from "../shared/utils/ownerGate";
 import EditorHandoff, { runAfterCutting } from "../features/handoff/components/EditorHandoff";
@@ -33,7 +32,6 @@ import { getDownloads } from "../shared/utils/downloads";
 import { addSessionClip, sessionClipsFor, type SessionClipsByCampaign } from "../shared/utils/handoff";
 import { readSetting, writeSetting } from "../shared/utils/persist";
 import type { BankedClip } from "../shared/utils/bank";
-import PreviewPanel from "../features/player/components/PreviewPanel";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
 import YouTubeConnectModal from "../features/youtubeConnection/components/YouTubeConnectModal";
@@ -46,19 +44,15 @@ import {
 // Shell
 import AppHeader from "../modules/layout/components/AppHeader";
 import AppFooter from "../modules/layout/components/AppFooter";
-import ThreeColumnLayout from "../modules/layout/components/ThreeColumnLayout";
-import DownloadBar from "../features/downloads/components/DownloadBar";
+import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
+import PanelsMenu from "../modules/layout/components/PanelsMenu";
+import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
 import { buildCopyBlocksInput } from "../features/handoff/utils/copyBlocksInput";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
-import TranscriptColumn from "../features/transcript/components/TranscriptColumn"; // B3, left column
-import Timeline from "../features/player/components/Timeline"; // B2, centre under video
-import MarkBar from "../features/clips/components/MarkBar"; // B2, centre under Timeline
-import ClipsColumn from "../features/clips/components/ClipsColumn"; // B2/B4, right column
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
 import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
 import CampaignStart from "../features/campaigns/components/CampaignStart";
-import { tabDomId, tabPanelDomId } from "../features/workspace/components/WorkspaceTabs";
 import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
 
 const EDITOR_KEY = "clipper.editorHandoff";
@@ -394,6 +388,21 @@ function Layout({ active }: { active: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
+  const panelHost: PanelHost = {
+    playhead,
+    cutSegments: (segs) => void cutClip(segs),
+    cutBanked,
+    editorHandoff: {
+      settings: editorSettings,
+      onChange: setEditorSettings,
+      campaignId: campaign?.id ?? null,
+      campaignName: campaign?.name,
+      sourceTitle: info?.title,
+      clipsDir: folders.clipsDir || saveDir || undefined,
+      clips: sessionClips,
+    },
+  };
+
   return (
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
@@ -410,32 +419,15 @@ function Layout({ active }: { active: boolean }) {
           onToggleSettings={() => setSettingsOpen((v) => !v)}
           onCloseSettings={closeSettings}
           campaignMenu={<CampaignMenu />}
+          panelsMenu={<PanelsMenu triggerClassName="icon-btn" />}
         />
         {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
-          <ThreeColumnLayout
-            transcript={<TranscriptColumn playhead={playhead} />}
-            centre={
-              <>
-                <PreviewPanel />
-                <Timeline />
-                <MarkBar onCut={(segs) => void cutClip(segs)} />
-                <DownloadBar />
-                <div className="px-2 pb-2">
-                  <EditorHandoff
-                    settings={editorSettings}
-                    onChange={setEditorSettings}
-                    campaignId={campaign?.id ?? null}
-                    campaignName={campaign?.name}
-                    sourceTitle={info?.title}
-                    clipsDir={folders.clipsDir || saveDir || undefined}
-                    clips={sessionClips}
-                  />
-                </div>
-              </>
-            }
-            clips={<ClipsColumn onCutBanked={cutBanked} />}
-            drawer={<HelpDrawer open={helpOpen} onClose={closeHelp} />}
-          />
+          <PanelHostProvider value={panelHost}>
+            <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
+              <PanelWorkspace />
+              <HelpDrawer open={helpOpen} onClose={closeHelp} />
+            </div>
+          </PanelHostProvider>
         ) : (
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2">
@@ -476,19 +468,12 @@ function Shell() {
 
   return (
     <div className="surface-ground flex h-screen w-full flex-col overflow-hidden">
-      {/* Workspace tabs (multiple videos). Kept from v3; the header below is per tab. */}
-      <div className="flex items-center border-b border-hairline px-3 py-1">
-        <WorkspaceTabs />
-      </div>
       <div className="relative min-h-0 flex-1">
         {tabs.map((tab) => {
           const active = tab.id === activeId;
           return (
             <div
               key={tab.id}
-              role="tabpanel"
-              id={tabPanelDomId(tab.id)}
-              aria-labelledby={tabDomId(tab.id)}
               className="absolute inset-0"
               style={{ display: active ? undefined : "none" }}
             >

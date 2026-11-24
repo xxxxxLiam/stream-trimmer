@@ -38,6 +38,8 @@ export type AppHeaderProps = {
   campaignMenu?: ReactNode;
   /** Body of the settings popover. */
   settingsBody?: ReactNode;
+  /** The Panels menu button, placed before Help. */
+  panelsMenu?: ReactNode;
 };
 
 function SourceChip() {
@@ -192,6 +194,8 @@ export default function AppHeader(p: AppHeaderProps) {
           )}
         </div>
       )}
+
+      {p.panelsMenu}
 
       {/* HELP: always the last item, top right, on every screen. */}
       <HelpButton open={p.helpOpen} onToggle={p.onToggleHelp} />
