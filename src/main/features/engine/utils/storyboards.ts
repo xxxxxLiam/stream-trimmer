@@ -8,17 +8,8 @@
  *   follow yt-dlp's extractor (_extract_storyboard); not verified against real YouTube.
  */
 
-export interface StoryboardLevel {
-  id: string;
-  /** Size of one frame in pixels. */
-  width: number;
-  height: number;
-  columns: number;
-  rows: number;
-  /** Frames per second of video, so 1 / fps seconds between frames. */
-  fps: number;
-  sheets: { url: string; duration: number }[];
-}
+import type { StoryboardLevel } from "../../../../common/types/storyboard";
+export type { StoryboardLevel };
 
 interface InfoFormat {
   format_id?: string;

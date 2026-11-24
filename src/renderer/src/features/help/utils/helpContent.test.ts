@@ -32,7 +32,7 @@ const appears = (label: string, files: string[]) => {
 
 /** Labels from controls another thread is still building. Remove each as it lands; the test then
  *  insists it is gone from this list, so the check never goes quiet. */
-const NOT_BUILT_YET = new Set(["+ section", "Clip joined"]);
+const NOT_BUILT_YET = new Set(["Clip joined"]);
 
 test("every control label an answer names is a label the app shows", () => {
   const files = sources(ROOT);

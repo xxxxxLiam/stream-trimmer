@@ -55,6 +55,8 @@ import { nameForLanguage, planLanguages } from "../shared/utils/audioLanguages";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
+import { getClipDestination } from "../features/player/hooks/useClipDestination";
+import { openInFor, toAfterCutting } from "../features/player/utils/clipDestination";
 import { buildCopyBlocksInput } from "../features/handoff/utils/copyBlocksInput";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
@@ -64,6 +66,12 @@ import CampaignStart from "../features/campaigns/components/CampaignStart";
 import SettingsDrawer from "../features/settings/components/SettingsDrawer";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
+
+/** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
+function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
+  const d = getClipDestination();
+  return { ...settings, afterCutting: toAfterCutting(d), openIn: openInFor(d) };
+}
 
 const EDITOR_KEY = "clipper.editorHandoff";
 
@@ -375,7 +383,7 @@ function Layout({ active }: { active: boolean }) {
     async (segments: Segment[]) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
-      const startSettings = editorRef.current;
+      const startSettings = withDestination(editorRef.current);
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
       const clipId = campaign ? nextClipId(videoId, taken) : null;
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
@@ -402,7 +410,7 @@ function Layout({ active }: { active: boolean }) {
   const cutBanked = useCallback(
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
-      const startSettings = editorRef.current;
+      const startSettings = withDestination(editorRef.current);
       const baseId = projectName?.trim() || clip.id;
       let madeAny = false;
       for (const plan of languagePlansRef.current) {
@@ -469,6 +477,12 @@ function Layout({ active }: { active: boolean }) {
       clipsDir: folders.clipsDir || saveDir || undefined,
       clips: sessionClips,
     },
+    // Not wired yet: the videos list (Left panels) provides the next video, and the campaign form
+    // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".
+    day: { campaignName: campaign?.name ?? null, next: null, made: 0, quota: null },
+    onNextVideo: () => {},
+    onOpenBank: () => {},
+    onOpenVideo: () => {},
   };
 
   // Overlays that are not panels. They stay one key (and one Panels menu row) away.

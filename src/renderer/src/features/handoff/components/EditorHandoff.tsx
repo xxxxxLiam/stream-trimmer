@@ -45,7 +45,7 @@ export interface EditorBridge {
   installed: () => Promise<{ ok: boolean; apps?: { finalcut: boolean; premiere: boolean; capcut: boolean } }>;
   probe: (file: string) => Promise<({ ok: true } & RawProbe) | { ok: false; error: string }>;
   writeFcpxml: (p: { dirPath: string; filename: string; contents: string }) => Promise<Result>;
-  openWith: (p: { app: "finalcut" | "capcut"; file?: string }) => Promise<Result>;
+  openWith: (p: { app: "finalcut" | "premiere" | "resolve" | "capcut"; file?: string }) => Promise<Result & { shown?: boolean }>;
   /**
    * Whether a directory exists at this absolute path (needs `editor:pathExists`
    * in electron/editorOpen.ts). Absent bridge method: a library cannot be
@@ -310,6 +310,12 @@ async function runAfterCuttingInner(
       sourceTitle: ctx.sourceTitle,
     });
     outcome = await exportNamed(api, { ...ctx, clips: batch }, eventName, settings.afterCutting, settings);
+  }
+  if (api && settings.openIn && justSaved) {
+    // The editor chosen in the Clip menu opens with the saved clip; where it can't take it, the
+    // file is shown in the folder instead.
+    const r = await api.openWith({ app: settings.openIn, file: justSaved.path });
+    outcome = { ok: r.ok, message: r.ok ? (r.shown ? "Opened the editor and showed the clip." : "Opened the editor.") : r.error ?? "The editor would not open." };
   }
   if (api && settings.capcutDropDir && ctx.clips.length > 0) {
     const r = await api.copyFiles({ dirPath: settings.capcutDropDir, files: ctx.clips.map((c) => c.path) });
