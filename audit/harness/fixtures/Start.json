@@ -1,6 +1,6 @@
 {
   "_doc": "Parity fixture for the Start board. seed = settings.json written before launch; steps run after the window loads (click, fill, press, waitFor, wait, eval); waitFor = selector that means ready.",
-  "seed": { "clipper.dataDirConfirmed": true },
+  "seed": { "clipper.dataDirConfirmed": true, "clipper.signInSkipped": true },
   "waitFor": "#root *",
   "steps": []
 }

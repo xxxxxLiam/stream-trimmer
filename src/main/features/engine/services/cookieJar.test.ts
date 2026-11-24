@@ -212,6 +212,6 @@ test("HttpOnly-prefixed cookies count as a sign-in, in the jar check and in the 
   ].join("\n");
   assert.equal(jarHasSignIn(httpOnlyOnly), true);
   assert.equal(jarHasSignIn(SIGNED_OUT), false);
-  const { validateCookieText } = require("../../youtube/services/cookieFile.ts");
-  assert.equal(validateCookieText(httpOnlyOnly).ok, true);
+  const { checkCookiesFile } = require("../../youtube/services/cookieFile.ts");
+  assert.equal(checkCookiesFile(httpOnlyOnly).ok, true);
 });

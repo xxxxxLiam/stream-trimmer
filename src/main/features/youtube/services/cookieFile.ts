@@ -1,72 +1,76 @@
 /**
  * File: cookieFile.ts
  * Path: src/main/features/youtube/services/cookieFile.ts
- * Description: Validation for an imported Netscape cookies.txt. Pure (no
- * electron import) so it can be tested.
+ * Description: The check on a dropped or chosen cookies.txt. Pure (no electron import) so it can
+ * be tested. Returns one of four approved reasons, each with its one-sentence fix, for the Help page.
  */
 
 // The Netscape parsing itself lives in cookieState.ts, which also reads the
 // sign-in's expiry out of a file. Both must agree on what counts as a
 // sign-in, so there is exactly one copy of the rules.
+import type { CookieCheck } from "../../../../common/types/signIn";
 import {
   AUTH_COOKIES,
   isRelevantDomain,
   parseCookieRows,
 } from "./cookieState";
 
+const isYouTube = (domain: unknown) => /(^|\.)youtube\.com$/i.test(String(domain || ""));
+
 /**
  * Checks a Netscape cookies.txt the user exported from their own browser.
  *
- * This is the route that works when nothing else does: on Windows a running
- * Chrome holds an exclusive lock on its cookie database, and since Chrome 127
- * App-Bound Encryption means even a readable copy cannot be decrypted by
- * another process. Exporting from inside the browser sidesteps both, because
- * the browser does its own decryption.
+ * The reasons are checked in this order, and the first that applies wins:
+ *   not-a-cookies-file  empty, JSON, or no tab-separated cookie rows at all
+ *   wrong-site          made on google.com (or elsewhere): no youtube.com cookies
+ *   signed-out          youtube.com cookies, but none carries a sign-in
+ *   session-ended       a sign-in is there but every sign-in cookie is past its date
  *
- * Expiry is deliberately NOT checked here: this gate decides whether a file
- * is worth adopting at all, and refusing an import outright over a date is a
- * worse outcome than adopting it and reporting it as expired afterwards —
- * readCookieFileState in cookieState.ts is what answers that question.
- *
- * Returns { ok, reason } — never throws.
+ * A file whose sign-in cookies have no date (session cookies) is accepted.
+ * Never throws.
  */
-function validateCookieText(text: unknown) {
+export function checkCookiesFile(text: unknown, now = Date.now()): CookieCheck {
   const raw = String(text || "");
-  if (!raw.trim()) {
-    return { ok: false, reason: "That file is empty." };
-  }
-
-  const rows = parseCookieRows(raw);
+  const rows = /^\s*[[{]/.test(raw) ? [] : parseCookieRows(raw);
 
   if (rows.length === 0) {
     return {
       ok: false,
-      reason:
-        "That doesn't look like a cookies.txt file. It should be the Netscape format, with tab-separated columns.",
+      reason: "not-a-cookies-file",
+      message: "That is not a cookies file.",
+      fix: "Export it again as cookies.txt, in the Netscape format.",
     };
   }
 
   const relevant = rows.filter((row) => isRelevantDomain(row.domain));
-  if (relevant.length === 0) {
+  if (!rows.some((row) => isYouTube(row.domain))) {
     return {
       ok: false,
-      reason:
-        "No YouTube or Google cookies in that file. Export it while signed in to YouTube.",
+      reason: "wrong-site",
+      message: "That file was made on google.com, not youtube.com.",
+      fix: "Open youtube.com, then export the cookies from that tab.",
     };
   }
 
-  const signedIn = relevant.some(
-    (row) => AUTH_COOKIES.includes(row.name) && row.value && row.value.length > 0,
-  );
-  if (!signedIn) {
+  const auth = relevant.filter((row) => AUTH_COOKIES.includes(row.name) && row.value);
+  if (auth.length === 0) {
     return {
       ok: false,
-      reason:
-        "That file has YouTube cookies but no sign-in. Sign in to YouTube in your browser, then export again.",
+      reason: "signed-out",
+      message: "You were signed out when that file was made.",
+      fix: "Sign in to YouTube, then export it again.",
+    };
+  }
+
+  const live = auth.some((row) => row.expiry === null || row.expiry * 1000 > now);
+  if (!live) {
+    return {
+      ok: false,
+      reason: "session-ended",
+      message: "YouTube ended that session, so the file is too old.",
+      fix: "Sign in to YouTube again, then export a fresh file.",
     };
   }
 
   return { ok: true, count: relevant.length };
 }
-
-export { AUTH_COOKIES, validateCookieText };

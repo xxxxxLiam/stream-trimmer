@@ -61,6 +61,8 @@ import CampaignMenu from "../features/campaigns/components/CampaignMenu";
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
 import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
 import CampaignStart from "../features/campaigns/components/CampaignStart";
+import SettingsDrawer from "../features/settings/components/SettingsDrawer";
+import ColdStartScreen from "../features/start/components/ColdStartScreen";
 import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
@@ -232,6 +234,8 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
+  const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
   // nobody is nagged: someone who just wants to paste a link and cut once never set a
   // campaign up, and that is a legitimate way to use the app.
@@ -284,7 +288,10 @@ function Layout({ active }: { active: boolean }) {
   const closeHelp = useCallback(() => setHelpOpen(false), []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeCopy = useCallback(() => setCopyOpen(false), []);
-  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    setSettingsStartAt(null);
+  }, []);
 
   // Switching campaign re-points the saving folder, format and quality at once. The clips
   // folder lives on the campaign; the clipper still saves to its own saveDir, so mirror it.
@@ -436,6 +443,15 @@ function Layout({ active }: { active: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
+  const settingsDrawer = (
+    <SettingsDrawer
+      open={settingsOpen}
+      onClose={closeSettings}
+      startAt={settingsStartAt}
+      tracks={info?.audioTracks}
+      editor={{ campaignId: campaign?.id ?? null, settings: editorSettings, onChange: setEditorSettings }}
+    />
+  );
   const panelHost: PanelHost = {
     playhead,
     cutSegments: (segs) => void cutClip(segs),
@@ -480,17 +496,33 @@ function Layout({ active }: { active: boolean }) {
     },
     { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
   );
-  const openCampaignSettings: ((campaignId: string) => void) | undefined = undefined;
+  const openCampaignSettings = (campaignId: string) => {
+    setSettingsStartAt(campaignId);
+    setHelpOpen(false);
+    setSettingsOpen(true);
+  };
 
   return (
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
+        {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
+        {!info && !(CHANNEL_DATA_BUILT && screen === "channel") ? (
+          <ColdStartScreen />
+        ) : (
+        <>
         <TopBar
           helpOpen={helpOpen}
-          onToggleHelp={() => setHelpOpen((v) => !v)}
+          onToggleHelp={() => {
+            setSettingsOpen(false);
+            setHelpOpen((v) => !v);
+          }}
           settingsOpen={settingsOpen}
-          onToggleSettings={() => setSettingsOpen((v) => !v)}
+          onToggleSettings={() => {
+            setSettingsStartAt(null);
+            setHelpOpen(false);
+            setSettingsOpen((v) => !v);
+          }}
           campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
           panelsMenuExtras={overlayItems}
         />
@@ -499,6 +531,7 @@ function Layout({ active }: { active: boolean }) {
             <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
               <PanelWorkspace />
               <HelpDrawer open={helpOpen} onClose={closeHelp} />
+              {settingsDrawer}
             </div>
           </PanelHostProvider>
         ) : (
@@ -524,9 +557,11 @@ function Layout({ active }: { active: boolean }) {
           // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
           onSignIn={() => setHelpOpen(true)}
         />
+        </>
+        )}
       </main>
       <CampaignStart
-        open={active && !campaign && !campaignPromptDismissed}
+        open={active && !!info && !campaign && !campaignPromptDismissed}
         onClose={() => setCampaignPromptDismissed(true)}
         onChosen={() => setCampaignPromptDismissed(true)}
       />

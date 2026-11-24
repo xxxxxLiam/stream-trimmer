@@ -13,6 +13,7 @@
  *   corruptSource  write a truncated, unplayable file for source.* outputs
  *   failProbe      exit 1 with stderr on the metadata probe
  *   stderr         text for failProbe
+ *   failDownload   stderr text: every download run exits 1 with it (a tool-out-of-date error, a private video)
  *   partialBytes   leave `<output>.part` of this many bytes and fail with a
  *                  dropped-connection error (what a broken download leaves)
  *   partialOnFull  with partialBytes: only the whole-file (source.*) download drops
@@ -82,6 +83,10 @@ async function main() {
     fs.appendFileSync(process.env.FAKE_JOB_LOG + ".pids", process.pid + "\n");
   } catch {}
   if (cfg.delayMs) await sleep(cfg.delayMs);
+  if (cfg.failDownload) {
+    process.stderr.write(String(cfg.failDownload) + "\n");
+    process.exit(1);
+  }
   if (has("--download-sections") && cfg.failSections) {
     process.stderr.write("ERROR: unable to download: HTTP Error 403: Forbidden\n");
     process.exit(1);

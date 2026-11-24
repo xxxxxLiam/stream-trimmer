@@ -27,6 +27,30 @@ export interface ActiveJob {
 }
 
 const activeJobs = new Map<string, Set<ActiveJob>>();
+const busyListeners = new Set<() => void>();
+
+/** How many clips are being made right now. */
+export function activeJobCount(): number {
+  let n = 0;
+  for (const set of activeJobs.values()) for (const job of set) if (job.building) n += 1;
+  return n;
+}
+
+/** Calls `cb` whenever a clip starts or stops being made. Returns the way to stop listening. */
+export function onActiveJobsChange(cb: () => void): () => void {
+  busyListeners.add(cb);
+  return () => busyListeners.delete(cb);
+}
+
+function notifyBusy() {
+  for (const cb of busyListeners) {
+    try {
+      cb();
+    } catch {
+      /* a listener must never break a download */
+    }
+  }
+}
 
 export function registerJob(id: string): ActiveJob {
   const job: ActiveJob = { cancelled: false, building: true, children: new Set() };
@@ -36,15 +60,18 @@ export function registerJob(id: string): ActiveJob {
     activeJobs.set(id, set);
   }
   set.add(job);
+  notifyBusy();
   return job;
 }
 
 export function unregisterJob(id: string, job: ActiveJob) {
   job.building = false;
   const set = activeJobs.get(id);
-  if (!set) return;
-  set.delete(job);
-  if (set.size === 0) activeJobs.delete(id);
+  if (set) {
+    set.delete(job);
+    if (set.size === 0) activeJobs.delete(id);
+  }
+  notifyBusy();
 }
 
 /** Kills a child and, where it leads its own process group, everything under it. */

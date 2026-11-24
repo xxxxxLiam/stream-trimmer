@@ -16,6 +16,8 @@ export interface Bitrates {
 
 import type { StoryboardLevel } from "../../../../common/types/storyboard";
 
+export type AudioTrack = { language: string; label: string; kind: "original" | "auto-dubbed" | "creator-dub" };
+
 export interface VideoInfo {
   id: string;
   title: string;
@@ -25,7 +27,7 @@ export interface VideoInfo {
   /** Audio tracks the video has (language and original / dub tag). Present when the engine read them. */
   /** Storyboard sprite sheets for the timeline filmstrip. Empty or absent: a plain Source lane. */
   storyboards?: StoryboardLevel[];
-  audioTracks?: { language: string; label: string; kind: "original" | "auto-dubbed" | "creator-dub" }[];
+  audioTracks?: AudioTrack[];
 }
 
 export interface TranscriptWord {

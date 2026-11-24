@@ -6,6 +6,8 @@
 import { type Response } from "express";
 
 // Progress channel — Server-Sent Events keyed by jobId.
+import type { ClipRowState } from "../../../../common/types/clipRowState";
+
 interface ProgressEvent {
   phase: "downloading" | "processing" | "done" | "error";
   percent: number;
@@ -14,6 +16,8 @@ interface ProgressEvent {
   stage?: string;
   segment?: number;
   segments?: number;
+  /** What the clip's Export row says when it failed (or is being retried). */
+  row?: ClipRowState;
 }
 
 interface JobChannel {

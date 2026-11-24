@@ -91,11 +91,26 @@ try {
     // Secondary route: opens YouTube in the user's own browser, so yt-dlp can
     // be pointed at that browser's cookie store instead of an imported file.
     openYouTubeSignIn: () => ipcRenderer.invoke(IPC.shellOpenYouTubeSignIn),
+    openSymbols: () => ipcRenderer.invoke(IPC.symbolsOpen),
     getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
     getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 
+    getSignInSignal: () => ipcRenderer.invoke(IPC.signInStatus),
+    reportBrowserSignIn: (usable: boolean) => ipcRenderer.invoke(IPC.signInReportBrowser, usable),
+    onSignInSignal: (cb: (payload: unknown) => void) => {
+      const listener = (_e: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on(IPC.signInSignal, listener);
+      return () => ipcRenderer.removeListener(IPC.signInSignal, listener);
+    },
+
     checkForUpdates: () => ipcRenderer.invoke(IPC.updaterCheck),
-    quitAndInstall: () => ipcRenderer.invoke(IPC.updaterQuitAndInstall),
+    restartToUpdate: () => ipcRenderer.invoke(IPC.updaterRestartToUpdate),
+    getUpdateReady: () => ipcRenderer.invoke(IPC.updaterReadyNow),
+    onUpdateReady: (cb: (payload: unknown) => void) => {
+      const listener = (_e: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on(IPC.updaterReady, listener);
+      return () => ipcRenderer.removeListener(IPC.updaterReady, listener);
+    },
     onUpdateStatus: (cb: (payload: unknown) => void) => {
       const listener = (_e: unknown, payload: unknown) => cb(payload);
       ipcRenderer.on(IPC.updaterStatus, listener);

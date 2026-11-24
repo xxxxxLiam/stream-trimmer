@@ -7,6 +7,7 @@
 import path from "node:path";
 import electron from "electron";
 import { isDev } from "../../shared/utils/env";
+import { rememberUiPort } from "./symbolsWindow";
 
 const { BrowserWindow, shell } = electron;
 
@@ -47,6 +48,7 @@ export function closeSplash() {
 }
 
 export async function createWindow(port: number) {
+  rememberUiPort(port);
   mainWindow = new BrowserWindow({
     // The window may not be smaller than the clipping loop needs. At the old
     // 900x600 floor the mark bar and the Cut button could never be on screen
