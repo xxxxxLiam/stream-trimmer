@@ -6,12 +6,12 @@
  *   group with a Join tag; clipped flags fold into "Clipped · N". Trim next flag (N) at the bottom.
  */
 import { IconChevronDown } from "../../../shared/components/PanelIcons";
-import { formatTimestamp } from "../../../shared/utils/clip";
+import { formatClock } from "../../../shared/utils/clock";
 import { useMarkersController } from "../hooks/useMarkersController";
 import type { FlagRow } from "../utils/markers";
 
 function Row({ row, onOpen, grouped }: { row: FlagRow; onOpen: () => void; grouped?: boolean }) {
-  const time = formatTimestamp(row.at);
+  const time = formatClock(row.at);
   return (
     <button
       type="button"
