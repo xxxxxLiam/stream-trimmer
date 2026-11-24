@@ -2,134 +2,35 @@
  * File: useClipper.ts
  * Path: src/hooks/useClipper.ts
  * Description: Central clipper state — URL, info, range, format/quality, transcript, download.
+ * Composes the hooks in ./clipper; the shared values (url, info, range text,
+ * format, quality, error) live here and are handed to them.
  */
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
-import {
-  MAX_CLIP_SECONDS,
-  formatTimestamp,
-  parseTimestamp,
-  extractVideoId,
-  normalizeYouTubeUrl,
-  parseJson,
-  estimateBytes,
-  apiUrl,
-  buildClipFilename,
-  commentsToCsv,
-  sanitizeFilename,
-  type ClipFormat,
-  type TranscriptLine,
-  type TranscriptResponse,
-  type VideoInfo,
-  type CommentsResponse,
-} from "../lib/clip";
-import { readSetting, writeSetting } from "../lib/persist";
-import type { FailureAttempt, FailureDiagnostics } from "../lib/diagnostics";
-import {
-  cookiePayload,
-  isSignedOut,
-  markDisconnected,
-  signedOutQuality,
-  useYouTubeConnection,
-} from "../lib/youtubeConnection";
+import { useMemo, useState } from "react";
+import { extractVideoId, estimateBytes, type ClipFormat, type VideoInfo } from "../lib/clip";
+import { useYouTubeConnection } from "../lib/youtubeConnection";
+import { useClipDownload } from "./clipper/useClipDownload";
+import { useClipRange } from "./clipper/useClipRange";
+import { useComments } from "./clipper/useComments";
+import { useQualityRules } from "./clipper/useQualityRules";
+import { useSaveLocations } from "./clipper/useSaveLocations";
+import { useSavedFiles } from "./clipper/useSavedFiles";
+import { useTranscript } from "./clipper/useTranscript";
+import { useVideoInfo } from "./clipper/useVideoInfo";
 
-import {
-  addDownload,
-  clearDownloads as clearDownloadHistory,
-  displayDirName,
-  getDownloads,
-  readSaveDirNames,
-  removeDownload as removeDownloadEntry,
-  subscribeDownloads,
-  writeSaveDirNames,
-  type DownloadEntry,
-} from "../lib/downloads";
-
-export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
-export const AUDIO_QUALITIES = ["320", "192", "128"] as const;
-
-export type Quality =
-  | (typeof VIDEO_QUALITIES)[number]
-  | (typeof AUDIO_QUALITIES)[number];
-
-/** A failed download, kept with what Copy diagnostics needs. Matched to the error text by `message`. */
-export interface DownloadFailureInfo {
-  message: string;
-  code?: string;
-  diagnostics?: FailureDiagnostics;
-  attempt: FailureAttempt;
-}
-
-/** Carries the engine's failure fields from the response to the catch block. */
-class DownloadFailureError extends Error {
-  code?: string;
-  diagnostics?: FailureDiagnostics;
-  constructor(message: string, code?: string, diagnostics?: FailureDiagnostics) {
-    super(message);
-    this.code = code;
-    this.diagnostics = diagnostics;
-  }
-}
-
-/**
- * The engine answers a download that was cancelled (POST /api/download/cancel) with
- * `499 {"error":"Cancelled","code":"cancelled","cancelled":true}`. That is the user's own Cancel
- * arriving back, not a failure: no error banner, no diagnostics prompt.
- */
-export function isCancelledResponse(
-  status: number,
-  body: { code?: string; cancelled?: boolean } | null | undefined,
-): boolean {
-  return status === 499 || body?.code === "cancelled" || body?.cancelled === true;
-}
-
-/** Thrown from the response handler for a cancelled download, and treated like an abort. */
-export class DownloadCancelledError extends Error {
-  constructor() {
-    super("Cancelled");
-  }
-}
-
-/** True for an aborted fetch or a cancelled-by-engine answer: both are the user stopping the cut. */
-export function isQuietCancel(e: unknown): boolean {
-  return (
-    e instanceof DownloadCancelledError ||
-    (typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError")
-  );
-}
-
-/**
- * Why a link cannot be cut, or null when it names one video. The engine will happily
- * answer /api/info for a channel or playlist URL, so without this check such a link loaded
- * as a source and "Cut" then silently did nothing (B-5).
- */
-export function videoUrlProblem(url: string): string | null {
-  if (!url.trim()) return null;
-  if (extractVideoId(url.trim())) return null;
-  return "That link is not a single video (a channel, playlist or other page). Paste a link to one video.";
-}
-
-/**
- * Tell the engine to stop the job's child processes. Aborting the fetch only hangs up the
- * request; the engine keeps cutting unless it is told (B-6). Best effort: an engine without
- * the route, or one that is already gone, must not break Cancel.
- */
-export async function requestEngineCancel(
-  jobId: string,
-  post: (path: string, body: unknown) => Promise<unknown>,
-): Promise<void> {
-  try {
-    await post("/api/download/cancel", { jobId });
-  } catch {
-    /* the abort alone still frees the renderer */
-  }
-}
+export {
+  AUDIO_QUALITIES,
+  VIDEO_QUALITIES,
+  type DownloadFailureInfo,
+  type DownloadOptions,
+  type Quality,
+} from "./clipper/clipperTypes";
+export {
+  DownloadCancelledError,
+  isCancelledResponse,
+  isQuietCancel,
+  requestEngineCancel,
+  videoUrlProblem,
+} from "./clipper/downloadErrors";
 
 export function useClipper() {
   const [url, setUrl] = useState("");
@@ -141,735 +42,41 @@ export function useClipper() {
   // Sign-in lives in an app-wide store shared by every workspace tab; the
   // connection UI is a modal in the shell, not part of this form.
   const connection = useYouTubeConnection();
-
-  const [loadingInfo, setLoadingInfo] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadPhase, setDownloadPhase] = useState<
-    "idle" | "downloading" | "processing" | "done" | "error"
-  >("idle");
-  // Set when the engine reports it is continuing a previously interrupted
-  // download, so the status bar can say so instead of looking like a restart.
-  const [downloadNote, setDownloadNote] = useState("");
-  const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
-  // Confirmation notice for a completed save (clip or comments CSV).
-  const [savedNotice, setSavedNotice] = useState<{
-    kind: "clip" | "comments";
-    path: string;
-    label: string;
-    /** Informational line, e.g. the resolution actually delivered. */
-    detail?: string;
-  } | null>(null);
-  const dismissSavedNotice = useCallback(() => setSavedNotice(null), []);
-  const downloadAbortRef = useRef<AbortController | null>(null);
-  const downloadJobRef = useRef<string | null>(null);
   const [error, setError] = useState("");
-  const [failure, setFailure] = useState<DownloadFailureInfo | null>(null);
-
-  const [showTranscript, setShowTranscript] = useState(false);
-  // Seek requests are a counter-stamped channel so repeated seeks to the same
-  // timestamp still reach the player.
-  const [seekRequest, setSeekRequest] = useState<{
-    time: number;
-    nonce: number;
-  } | null>(null);
-  const requestSeek = useCallback((time: number) => {
-    setSeekRequest((prev) => ({ time, nonce: (prev?.nonce ?? 0) + 1 }));
-  }, []);
-  const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
-  const [loadingTranscript, setLoadingTranscript] = useState(false);
-  const [transcriptQuery, setTranscriptQuery] = useState("");
-
-  // Comment export state.
-  const [exportingComments, setExportingComments] = useState(false);
-  const [commentsNote, setCommentsNote] = useState<string>("");
 
   const isElectron =
     typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
-  // Saved locations: a small user-managed list with one active destination.
-  // Persisted via the settings store so they survive app restarts.
-  const [saveDirs, setSaveDirsState] = useState<string[]>(() =>
-    readSetting<string[]>("clipper.saveDirs", []),
-  );
-  const [saveDir, setSaveDirState] = useState<string | null>(() => {
-    const active = readSetting<string | null>("clipper.saveDir", null);
-    if (active) return active;
-    const list = readSetting<string[]>("clipper.saveDirs", []);
-    return list[0] ?? null;
-  });
-  const setSaveDir = useCallback((dir: string | null) => {
-    setSaveDirState(dir);
-    writeSetting("clipper.saveDir", dir);
-    if (!dir) return;
-    setSaveDirsState((prev) => {
-      if (prev.includes(dir)) return prev;
-      const next = [...prev, dir];
-      writeSetting("clipper.saveDirs", next);
-      return next;
-    });
-  }, []);
-  const removeSaveDir = useCallback(
-    (dir: string) => {
-      setSaveDirsState((prev) => {
-        const next = prev.filter((d) => d !== dir);
-        writeSetting("clipper.saveDirs", next);
-        setSaveDirState((current) => {
-          if (current !== dir) return current;
-          const fallback = next[0] ?? null;
-          writeSetting("clipper.saveDir", fallback);
-          return fallback;
-        });
-        return next;
-      });
-    },
-    [],
-  );
-  const pickSaveDir = useCallback(async () => {
-    if (!window.electronAPI) return;
-    const chosen = await window.electronAPI.pickDirectory();
-    if (chosen) setSaveDir(chosen);
-  }, [setSaveDir]);
 
-  // Optional nicknames for saved locations (path -> label).
-  const [saveDirNames, setSaveDirNames] = useState<Record<string, string>>(() =>
-    readSaveDirNames(),
-  );
-  const renameSaveDir = useCallback((dir: string, name: string) => {
-    setSaveDirNames((prev) => {
-      const next = { ...prev };
-      if (name.trim()) next[dir] = name.trim();
-      else delete next[dir];
-      writeSaveDirNames(next);
-      return next;
-    });
-  }, []);
-  const labelForDir = useCallback(
-    (dir: string | null) => (dir ? displayDirName(dir, saveDirNames) : ""),
-    [saveDirNames],
-  );
-
-  // --- Download history ---------------------------------------------------
-  const downloads = useSyncExternalStore(subscribeDownloads, getDownloads);
-  const revealDownload = useCallback(
-    (entry: DownloadEntry) => {
-      if (isElectron && window.electronAPI?.showInFolder && entry.path) {
-        void window.electronAPI.showInFolder(entry.path);
-      }
-    },
-    [isElectron],
-  );
-  const removeDownload = useCallback(
-    (id: string) => removeDownloadEntry(id),
-    [],
-  );
-  const clearDownloads = useCallback(() => clearDownloadHistory(), []);
-
-
-  // --- YouTube sign-in ----------------------------------------------------
-  // Connection state and actions live in the shared store (src/lib/
-  // youtubeConnection.ts) so every workspace tab sees one connection.
-
-
-  const revealLastSaved = useCallback(() => {
-    if (isElectron && window.electronAPI?.showInFolder && lastSavedPath) {
-      void window.electronAPI.showInFolder(lastSavedPath);
-    }
-  }, [isElectron, lastSavedPath]);
-
-  const revealSaved = useCallback(() => {
-    if (isElectron && window.electronAPI?.showInFolder && savedNotice?.path) {
-      void window.electronAPI.showInFolder(savedNotice.path);
-    }
-    setSavedNotice(null);
-  }, [isElectron, savedNotice]);
-
-  const exportComments = useCallback(async () => {
-    if (!info) {
-      setError("Load a video first");
-      return;
-    }
-    setError("");
-    setCommentsNote("");
-    setExportingComments(true);
-    try {
-      const res = await fetch(apiUrl("/api/comments"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Metadata, captions and comments need the session as much as the
-        // download does — without it YouTube answers "Sign in to confirm
-        // you're not a bot" and the app looks signed out when it isn't.
-        body: JSON.stringify({
-          url: normalizeYouTubeUrl(url),
-          ...cookiePayload(),
-        }),
-      });
-      const data = await parseJson<CommentsResponse & { error?: string }>(res);
-      if (!res.ok) throw new Error(data.error || "Failed to fetch comments");
-      if (data.commentsDisabled) {
-        setCommentsNote("Comments are disabled for this video");
-        return;
-      }
-      if (!data.comments || data.comments.length === 0) {
-        setCommentsNote("No comments found for this video");
-        return;
-      }
-      const csv = commentsToCsv(data.comments);
-      const filename = `${sanitizeFilename(info.title)}-comments.csv`;
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      if (isElectron && window.electronAPI && saveDir) {
-        const arr = await blob.arrayBuffer();
-        const result = await window.electronAPI.saveFile({
-          dirPath: saveDir,
-          filename,
-          data: arr,
-        });
-        if (!result.ok) throw new Error(result.error);
-        setLastSavedPath(result.path ?? null);
-        setSavedNotice({
-          kind: "comments",
-          path: result.path ?? "",
-          label: filename,
-        });
-        addDownload({
-          kind: "comments",
-          label: filename,
-          path: result.path ?? "",
-          dir: saveDir,
-        });
-      } else {
-        const objectUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = objectUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        // Revoking on this tick cancels the download the click just started:
-        // the browser has not read the blob yet, and the request fails with
-        // a bare ERR_FAILED. Hold the URL until the transfer can have run.
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-        setSavedNotice({ kind: "comments", path: "", label: filename });
-        addDownload({
-          kind: "comments",
-          label: filename,
-          path: "",
-          dir: null,
-        });
-      }
-      setCommentsNote(
-        `Exported ${data.comments.length} comments (dislikes unavailable from YouTube)`,
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to export comments");
-    } finally {
-      setExportingComments(false);
-    }
-  }, [info, url, isElectron, saveDir]);
+  const saveLocations = useSaveLocations();
+  const { saveDir } = saveLocations;
+  const savedFiles = useSavedFiles(isElectron);
+  const { setLastSavedPath, setSavedNotice } = savedFiles;
 
   const videoId = useMemo(() => extractVideoId(url), [url]);
-  const duration = info?.duration ?? 0;
-
-  const start = useMemo(() => {
-    const parsed = parseTimestamp(startText);
-    return parsed == null ? 0 : parsed;
-  }, [startText]);
-
-  const end = useMemo(() => {
-    const parsed = parseTimestamp(endText);
-    return parsed == null ? duration : parsed;
-  }, [endText, duration]);
-
-  const startInvalid =
-    startText.trim() !== "" && parseTimestamp(startText) == null;
-  const endInvalid = endText.trim() !== "" && parseTimestamp(endText) == null;
-
-  const validationError = useMemo(() => {
-    if (!url || !info) return "";
-    if (startInvalid || endInvalid) return "Timestamp must look like HH:MM:SS";
-    if (start >= end) return "Start must be before end";
-    if (end > info.duration) return "End exceeds video duration";
-    if (end - start > MAX_CLIP_SECONDS)
-      return "Clip length capped at 10 minutes";
-    return "";
-  }, [url, info, start, end, startInvalid, endInvalid]);
-
-  useEffect(() => {
-    setError(validationError || "");
-  }, [validationError]);
-
-  // AF2-2: signed out, the engine only serves 360p, so hold the quality there (and give the
-  // user's choice back when they sign in) instead of failing the first Cut at the default Best.
-  const heldQuality = useRef<string | null>(null);
-  const signedOut = isSignedOut(connection);
-  useEffect(() => {
-    const next = signedOutQuality({ signedOut, format, quality, held: heldQuality.current });
-    heldQuality.current = next.held;
-    if (next.quality !== quality) setQuality(next.quality);
-  }, [signedOut, format, quality]);
-
-  // Keep quality valid when switching format (resolutions vs bitrates).
-  useEffect(() => {
-    const allowed: readonly string[] =
-      format === "mp3" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
-    if (!allowed.includes(quality)) setQuality(allowed[0]);
-  }, [format, quality]);
-
-  // Reset transcript whenever the video changes.
-  useEffect(() => {
-    setTranscript(null);
-    setShowTranscript(false);
-    setTranscriptQuery("");
-  }, [videoId]);
-
-  const pasteInto = useCallback(async (setter: (v: string) => void) => {
-    try {
-      const text = await navigator.clipboard.readText();
-      setter(text.trim());
-    } catch {
-      setError(
-        "Couldn't read clipboard. Paste manually or allow clipboard access.",
-      );
-    }
-  }, []);
-
-  const setStartFromSeconds = useCallback(
-    (value: number) => setStartText(formatTimestamp(Math.min(value, end - 1))),
-    [end],
-  );
-  const setEndFromSeconds = useCallback(
-    (value: number) => setEndText(formatTimestamp(Math.max(value, start + 1))),
-    [start],
-  );
-
-  const loadInfo = useCallback(async () => {
-    if (!url) return;
-    const problem = videoUrlProblem(url);
-    if (problem) {
-      // Not a video: do not present it as a loaded source.
-      setInfo(null);
-      setError(problem);
-      return;
-    }
-    setError("");
-    setLoadingInfo(true);
-    try {
-      const res = await fetch(apiUrl("/api/info"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Metadata, captions and comments need the session as much as the
-        // download does — without it YouTube answers "Sign in to confirm
-        // you're not a bot" and the app looks signed out when it isn't.
-        body: JSON.stringify({
-          url: normalizeYouTubeUrl(url),
-          ...cookiePayload(),
-        }),
-      });
-      const data = await parseJson<VideoInfo & { error?: string }>(res);
-      if (!res.ok) throw new Error(data.error || "Failed to load video info");
-      setInfo(data);
-      setStartText("");
-      setEndText(formatTimestamp(Math.min(data.duration, MAX_CLIP_SECONDS)));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load video info");
-      setInfo(null);
-    } finally {
-      setLoadingInfo(false);
-    }
-  }, [url]);
-
-  // Auto-search: load video info as soon as the URL resolves to a new video
-  // id. Debounced so typing doesn't spam the backend; re-entering the same
-  // link is a no-op. Partial / invalid text is ignored silently.
-  const loadInfoRef = useRef(loadInfo);
-  loadInfoRef.current = loadInfo;
-  const lastLoadedIdRef = useRef<string | null>(null);
-  const autoLoadNowRef = useRef(false);
-
-  useEffect(() => {
-    if (!videoId) return;
-    if (lastLoadedIdRef.current === videoId) return;
-    const immediate = autoLoadNowRef.current;
-    autoLoadNowRef.current = false;
-    const run = () => {
-      lastLoadedIdRef.current = videoId;
-      void loadInfoRef.current();
-    };
-    if (immediate) {
-      run();
-      return;
-    }
-    const t = window.setTimeout(run, 450);
-    return () => window.clearTimeout(t);
-  }, [videoId]);
-
-  /** Called by the URL bar on paste to skip the debounce. */
-  const flushAutoLoad = useCallback(() => {
-    autoLoadNowRef.current = true;
-  }, []);
-
-  /** Manual search (button / Enter) — always reloads the current URL. */
-  const searchNow = useCallback(() => {
-    lastLoadedIdRef.current = videoId;
-    void loadInfoRef.current();
-  }, [videoId]);
-
-
-
-  const loadTranscript = useCallback(async () => {
-    if (!url) return;
-    setLoadingTranscript(true);
-    try {
-      const res = await fetch(apiUrl("/api/transcript"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Metadata, captions and comments need the session as much as the
-        // download does — without it YouTube answers "Sign in to confirm
-        // you're not a bot" and the app looks signed out when it isn't.
-        body: JSON.stringify({
-          url: normalizeYouTubeUrl(url),
-          ...cookiePayload(),
-        }),
-      });
-      const data = await parseJson<TranscriptResponse>(res);
-      setTranscript(data.available ? data.lines : []);
-    } catch {
-      setTranscript([]);
-    } finally {
-      setLoadingTranscript(false);
-    }
-  }, [url]);
-
-  const toggleTranscript = useCallback(() => {
-    setShowTranscript((prev) => {
-      const next = !prev;
-      if (next && transcript === null) void loadTranscript();
-      return next;
-    });
-  }, [transcript, loadTranscript]);
-
-  /** Fetch the transcript once, on demand (used by the Transcript tab). */
-  const ensureTranscript = useCallback(() => {
-    if (transcript === null && !loadingTranscript) void loadTranscript();
-  }, [transcript, loadingTranscript, loadTranscript]);
-
-  const rangeTranscript = useMemo(() => {
-    if (!transcript) return [];
-    return transcript.filter((l) => l.end > start && l.start < end);
-  }, [transcript, start, end]);
-
-  const filteredTranscript = useMemo(() => {
-    const q = transcriptQuery.trim().toLowerCase();
-    if (!q) return rangeTranscript;
-    return rangeTranscript.filter((l) => l.text.toLowerCase().includes(q));
-  }, [rangeTranscript, transcriptQuery]);
-
-  // Full transcript view (search narrows; range only highlights).
-  const displayTranscript = useMemo(() => {
-    if (!transcript) return [];
-    const q = transcriptQuery.trim().toLowerCase();
-    if (!q) return transcript;
-    return transcript.filter((l) => l.text.toLowerCase().includes(q));
-  }, [transcript, transcriptQuery]);
-
-  const rangeTranscriptText = useMemo(
-    () => rangeTranscript.map((l) => l.text).join(" "),
-    [rangeTranscript],
-  );
-
-  const copyTranscript = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(rangeTranscriptText);
-    } catch {
-      setError("Couldn't copy. Select the text and copy manually.");
-    }
-  }, [rangeTranscriptText]);
-
-  // Click a transcript line → set its start as clip start, or its end as clip end.
-  // Choice: end button uses line.end so "set as end" includes the whole spoken line.
-  const setStartFromLine = useCallback(
-    (line: TranscriptLine) => setStartText(formatTimestamp(line.start)),
-    [],
-  );
-  const setEndFromLine = useCallback(
-    (line: TranscriptLine) => setEndText(formatTimestamp(line.end)),
-    [],
-  );
-
-  // Live size estimate (bytes) for the selected range/format/quality.
-  const estimatedBytes = useMemo(() => {
-    if (!info?.bitrates) return 0;
-    const table = format === "mp3" ? info.bitrates.mp3 : info.bitrates.mp4;
-    const kbps = table?.[quality] ?? 0;
-    return estimateBytes(kbps, Math.max(0, end - start));
-  }, [info, format, quality, start, end]);
-
-  const cancelDownload = useCallback(() => {
-    const jobId = downloadJobRef.current;
-    downloadAbortRef.current?.abort();
-    downloadAbortRef.current = null;
-    downloadJobRef.current = null;
-    if (jobId) {
-      // The engine ends the job's yt-dlp/ffmpeg children on this call. (Server side is G-10.)
-      void requestEngineCancel(jobId, (path, body) =>
-        fetch(apiUrl(path), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }),
-      );
-    }
-  }, []);
-
-  /**
-   * Cuts the clip. With no argument it cuts the in/out range as before. `opts.segments`
-   * cuts a list of ranges joined, in order, into one file (the server concatenates).
-   * `opts.clipId` names the file after the campaign's clip id. Resolves true when the
-   * clip was saved, so the caller can record the used ranges.
-   */
-  const download = useCallback(async (opts?: DownloadOptions): Promise<boolean> => {
-    if (!info) {
-      setError("Load a video first");
-      return false;
-    }
-    const sourceProblem = videoUrlProblem(url);
-    if (sourceProblem) {
-      setError(sourceProblem);
-      return false;
-    }
-    const multi = opts?.segments && opts.segments.length > 0 ? opts.segments : null;
-    // The in/out fields only matter when no segment list is given.
-    if (!multi && validationError) {
-      setError(validationError);
-      return false;
-    }
-    const segs = multi ?? [{ start, end }];
-    const cutStart = segs[0].start;
-    const cutEnd = segs[segs.length - 1].end;
-    let saved = false;
-    setError("");
-    setDownloading(true);
-    setDownloadProgress(0);
-    setDownloadPhase("downloading");
-    setDownloadNote("");
-    setSavedNotice(null);
-    setFailure(null);
-    const controller = new AbortController();
-    downloadAbortRef.current = controller;
-    // When the desktop app has somewhere to put the clip, the engine hands
-    // back its location and the main process moves the file. Only then does
-    // the media avoid the UI entirely; every other case still streams.
-    const deliverPath = Boolean(
-      isElectron && window.electronAPI?.saveClip && saveDir,
-    );
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    downloadJobRef.current = jobId;
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource(
-        apiUrl(`/api/download/progress?jobId=${encodeURIComponent(jobId)}`),
-      );
-      es.onmessage = (ev) => {
-        try {
-          const data = JSON.parse(ev.data) as {
-            phase: "downloading" | "processing" | "done" | "error";
-            percent: number;
-            message?: string;
-          };
-          setDownloadPhase(data.phase);
-          if (data.phase === "downloading" && data.message)
-            setDownloadNote(data.message);
-          if (typeof data.percent === "number") {
-            setDownloadProgress((prev) =>
-              data.phase === "downloading"
-                ? Math.max(prev, data.percent)
-                : data.percent,
-            );
-          }
-        } catch {
-          /* ignore */
-        }
-      };
-    } catch {
-      /* EventSource unavailable — proceed without progress */
-    }
-    try {
-      const res = await fetch(
-        apiUrl(`/api/download?jobId=${encodeURIComponent(jobId)}`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            url: normalizeYouTubeUrl(url),
-            ...(segs.length > 1 ? { segments: segs } : { start: cutStart, end: cutEnd }),
-            format,
-            quality,
-            deliver: deliverPath ? "path" : "stream",
-            ...cookiePayload(),
-          }),
-        },
-      );
-      if (!res.ok) {
-        type FailureBody = {
-          error?: string;
-          code?: string;
-          diagnostics?: FailureDiagnostics;
-          cancelled?: boolean;
-        };
-        const data = await parseJson<FailureBody>(res).catch(
-          () => ({}) as FailureBody,
-        );
-        if (isCancelledResponse(res.status, data)) throw new DownloadCancelledError();
-        if (data.code === "YOUTUBE_AUTH_REQUIRED") {
-          markDisconnected(data.error);
-        }
-        throw new DownloadFailureError(
-          data.error || "Download failed",
-          data.code,
-          data.diagnostics,
-        );
-      }
-      // For `deliver: "path"` the body is a few bytes of JSON naming the
-      // finished file, not the clip itself.
-      const handoff = deliverPath
-        ? await parseJson<{ path: string; size: number }>(res)
-        : null;
-      const blob = deliverPath ? null : await res.blob();
-      const ext = format === "mp3" ? "mp3" : "mp4";
-      const filename = opts?.clipId
-        ? `${sanitizeFilename(opts.clipId)}.${ext}`
-        : buildClipFilename(info.title, cutStart, cutEnd, ext);
-      // What the server actually produced — YouTube may only serve renditions
-      // below the requested height, in which case the clip is still valid.
-      const deliveredHeight = Number(res.headers.get("X-Delivered-Height"));
-      const deliveredKbps = Number(res.headers.get("X-Delivered-Audio-Kbps"));
-      const availableHeights = (res.headers.get("X-Available-Heights") || "")
-        .split(",")
-        .map((h) => Number(h))
-        .filter((h) => h > 0);
-      const authMode = res.headers.get("X-Auth-Mode") || "";
-      const requestedHeight = Number(quality);
-      let detail: string | undefined;
-      if (format === "mp3") {
-        detail = deliveredKbps ? `Downloaded at ${deliveredKbps} kbps.` : undefined;
-      } else if (deliveredHeight) {
-        if (requestedHeight && deliveredHeight < requestedHeight) {
-          const offered = availableHeights.length
-            ? ` YouTube offered ${availableHeights
-                .slice(0, 6)
-                .map((h) => `${h}p`)
-                .join(", ")}.`
-            : "";
-          const signedOut =
-            authMode === "none"
-              ? " This download ran without a YouTube sign-in."
-              : "";
-          detail = `Downloaded at ${deliveredHeight}p instead of ${requestedHeight}p.${offered}${signedOut}`;
-        } else {
-          detail = `Downloaded at ${deliveredHeight}p.`;
-        }
-      }
-
-      if (isElectron && window.electronAPI && saveDir) {
-        const result = handoff
-          ? await window.electronAPI.saveClip!({
-              tempPath: handoff.path,
-              dirPath: saveDir,
-              filename,
-            })
-          : await window.electronAPI.saveFile({
-              dirPath: saveDir,
-              filename,
-              data: await blob!.arrayBuffer(),
-            });
-        if (!result.ok) throw new Error(result.error);
-        setLastSavedPath(result.path ?? null);
-        setSavedNotice({
-          kind: "clip",
-          path: result.path ?? "",
-          label: filename,
-          detail,
-        });
-        addDownload({
-          kind: "clip",
-          label: filename,
-          path: result.path ?? "",
-          dir: saveDir,
-          detail:
-            detail ??
-            `${segs.map((r) => `${formatTimestamp(r.start)} – ${formatTimestamp(r.end)}`).join("; ")} · ${format.toUpperCase()}`,
-        });
-      } else {
-        setLastSavedPath(null);
-        const objectUrl = URL.createObjectURL(blob!);
-        const a = document.createElement("a");
-        a.href = objectUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        // Revoking on this tick cancels the download the click just started:
-        // the browser has not read the blob yet, and the request fails with
-        // a bare ERR_FAILED. Hold the URL until the transfer can have run.
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-        setSavedNotice({ kind: "clip", path: "", label: filename, detail });
-        addDownload({
-          kind: "clip",
-          label: filename,
-          path: "",
-          dir: null,
-          detail,
-        });
-      }
-      setDownloadProgress(100);
-      setDownloadPhase("done");
-      saved = true;
-    } catch (e) {
-      if (isQuietCancel(e)) {
-        setDownloadPhase("idle");
-      } else {
-        const raw = e instanceof Error ? e.message : "Download failed";
-        const engineFailure = e instanceof DownloadFailureError ? e : null;
-        // A bare "Failed to fetch" is what fetch() rejects with for any
-        // transport-level failure. Left as-is it sends people hunting for a
-        // YouTube or sign-in problem, when the clip itself built fine and
-        // only the local transfer broke.
-        const transportFailure =
-          /failed to fetch|networkerror|load failed|network request failed/i.test(
-            raw,
-          );
-        const message = transportFailure
-          ? "The clip was built, but the transfer from the local engine broke before it finished. This is not a YouTube or sign-in problem. Copy the diagnostics for the reason."
-          : raw;
-        setError(message);
-        setFailure({
-          message,
-          code: engineFailure?.code,
-          diagnostics: engineFailure?.diagnostics,
-          attempt: {
-            operation: "download clip",
-            videoId: extractVideoId(url),
-            segments: segs,
-            format,
-            quality,
-          },
-        });
-        setDownloadPhase("error");
-      }
-    } finally {
-      es?.close();
-      downloadAbortRef.current = null;
-      if (downloadJobRef.current === jobId) downloadJobRef.current = null;
-      setDownloading(false);
-      window.setTimeout(() => {
-        setDownloadPhase("idle");
-        setDownloadProgress(0);
-      }, 1200);
-    }
-    return saved;
-  }, [
+  const range = useClipRange({ url, info, startText, endText, setStartText, setEndText, setError });
+  const { duration, start, end, validationError } = range;
+  useQualityRules({ connection, format, quality, setQuality });
+  const transcript = useTranscript({
+    url,
+    videoId,
+    start,
+    end,
+    setError,
+    setStartText,
+    setEndText,
+  });
+  const videoInfo = useVideoInfo({ url, videoId, setInfo, setStartText, setEndText, setError });
+  const comments = useComments({
     info,
-    validationError,
+    url,
+    isElectron,
+    saveDir,
+    setError,
+    setLastSavedPath,
+    setSavedNotice,
+  });
+  const clipDownload = useClipDownload({
+    info,
     url,
     start,
     end,
@@ -878,8 +85,19 @@ export function useClipper() {
     isElectron,
     saveDir,
     connection,
+    validationError,
+    setError,
+    setLastSavedPath,
+    setSavedNotice,
+  });
 
-  ]);
+  // Live size estimate (bytes) for the selected range/format/quality.
+  const estimatedBytes = useMemo(() => {
+    if (!info?.bitrates) return 0;
+    const table = format === "mp3" ? info.bitrates.mp3 : info.bitrates.mp4;
+    const kbps = table?.[quality] ?? 0;
+    return estimateBytes(kbps, Math.max(0, end - start));
+  }, [info, format, quality, start, end]);
 
   return {
     url,
@@ -895,70 +113,65 @@ export function useClipper() {
     setQuality,
     connection,
 
-    loadingInfo,
-    downloading,
-    downloadProgress,
-    downloadPhase,
-    downloadNote,
+    loadingInfo: videoInfo.loadingInfo,
+    downloading: clipDownload.downloading,
+    downloadProgress: clipDownload.downloadProgress,
+    downloadPhase: clipDownload.downloadPhase,
+    downloadNote: clipDownload.downloadNote,
     error,
-    failure,
+    failure: clipDownload.failure,
     videoId,
     duration,
     start,
     end,
     validationError,
-    loadInfo,
-    searchNow,
-    flushAutoLoad,
-    download,
-    pasteInto,
-    setStartFromSeconds,
-    setEndFromSeconds,
-    showTranscript,
-    toggleTranscript,
-    ensureTranscript,
-    loadingTranscript,
-    transcript,
-    rangeTranscript,
-    filteredTranscript,
-    displayTranscript,
-    transcriptQuery,
-    setTranscriptQuery,
-    setStartFromLine,
-    setEndFromLine,
-    seekRequest,
-    requestSeek,
-    rangeTranscriptText,
-    copyTranscript,
+    loadInfo: videoInfo.loadInfo,
+    searchNow: videoInfo.searchNow,
+    flushAutoLoad: videoInfo.flushAutoLoad,
+    download: clipDownload.download,
+    pasteInto: range.pasteInto,
+    setStartFromSeconds: range.setStartFromSeconds,
+    setEndFromSeconds: range.setEndFromSeconds,
+    showTranscript: transcript.showTranscript,
+    toggleTranscript: transcript.toggleTranscript,
+    ensureTranscript: transcript.ensureTranscript,
+    loadingTranscript: transcript.loadingTranscript,
+    transcript: transcript.transcript,
+    rangeTranscript: transcript.rangeTranscript,
+    filteredTranscript: transcript.filteredTranscript,
+    displayTranscript: transcript.displayTranscript,
+    transcriptQuery: transcript.transcriptQuery,
+    setTranscriptQuery: transcript.setTranscriptQuery,
+    setStartFromLine: transcript.setStartFromLine,
+    setEndFromLine: transcript.setEndFromLine,
+    seekRequest: transcript.seekRequest,
+    requestSeek: transcript.requestSeek,
+    rangeTranscriptText: transcript.rangeTranscriptText,
+    copyTranscript: transcript.copyTranscript,
     estimatedBytes,
     isElectron,
     saveDir,
-    saveDirs,
-    setSaveDir,
-    removeSaveDir,
-    pickSaveDir,
-    saveDirNames,
-    renameSaveDir,
-    labelForDir,
-    downloads,
-    revealDownload,
-    removeDownload,
-    clearDownloads,
-    lastSavedPath,
-    revealLastSaved,
-    savedNotice,
-    dismissSavedNotice,
-    revealSaved,
-    cancelDownload,
-    exportComments,
-    exportingComments,
-    commentsNote,
+    saveDirs: saveLocations.saveDirs,
+    setSaveDir: saveLocations.setSaveDir,
+    removeSaveDir: saveLocations.removeSaveDir,
+    pickSaveDir: saveLocations.pickSaveDir,
+    saveDirNames: saveLocations.saveDirNames,
+    renameSaveDir: saveLocations.renameSaveDir,
+    labelForDir: saveLocations.labelForDir,
+    downloads: savedFiles.downloads,
+    revealDownload: savedFiles.revealDownload,
+    removeDownload: savedFiles.removeDownload,
+    clearDownloads: savedFiles.clearDownloads,
+    lastSavedPath: savedFiles.lastSavedPath,
+    revealLastSaved: savedFiles.revealLastSaved,
+    savedNotice: savedFiles.savedNotice,
+    dismissSavedNotice: savedFiles.dismissSavedNotice,
+    revealSaved: savedFiles.revealSaved,
+    cancelDownload: clipDownload.cancelDownload,
+    exportComments: comments.exportComments,
+    exportingComments: comments.exportingComments,
+    commentsNote: comments.commentsNote,
   };
 }
-
-export type DownloadOptions = {
-  segments?: Array<{ start: number; end: number }>;
-  clipId?: string;
-};
 
 export type ClipperState = ReturnType<typeof useClipper>;

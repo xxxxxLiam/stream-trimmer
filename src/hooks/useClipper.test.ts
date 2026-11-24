@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import {
   DownloadCancelledError,
   isCancelledResponse,
@@ -50,8 +50,18 @@ test("B-6: an engine that refuses or is gone does not break Cancel", async () =>
 });
 
 
+/** The clipper hook's source: the composing file plus the hooks it was split into. */
+function clipperSource(): string {
+  const dir = new URL("./clipper/", import.meta.url);
+  const parts = readdirSync(dir)
+    .filter((f) => f.endsWith(".ts"))
+    .sort()
+    .map((f) => readFileSync(new URL(f, dir), "utf8"));
+  return [readFileSync(new URL("./useClipper.ts", import.meta.url), "utf8"), ...parts].join("\n");
+}
+
 test("B-5/B-6 wiring: cancelDownload calls the engine, loadInfo and download refuse non-video links", () => {
-  const src = readFileSync(new URL("./useClipper.ts", import.meta.url), "utf8");
+  const src = clipperSource();
   const cancel = src.slice(src.indexOf("const cancelDownload"), src.indexOf("const cancelDownload") + 600);
   assert.match(cancel, /requestEngineCancel\(/);
   const load = src.slice(src.indexOf("const loadInfo"), src.indexOf("const loadInfo") + 400);
@@ -74,7 +84,7 @@ test("item 12: a 499 cancelled answer is quiet, an ordinary failure is not", () 
 });
 
 test("item 12: the download handler routes a cancelled answer to the quiet path, before it can raise an error", () => {
-  const src = readFileSync(new URL("./useClipper.ts", import.meta.url), "utf8");
+  const src = clipperSource();
   const check = src.indexOf("if (isCancelledResponse(res.status, data)) throw new DownloadCancelledError();");
   const raise = src.indexOf("throw new DownloadFailureError(", check);
   assert.ok(check > 0 && check < raise, "cancel check must precede the failure throw");
