@@ -34,7 +34,7 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
   const today = todayCount(active);
 
   return (
-    <header className="relative flex h-[52px] shrink-0 items-center gap-3 border-b border-hairline pl-4 pr-3">
+    <header className="relative flex h-[53px] shrink-0 items-center gap-3 border-b border-hairline pl-4 pr-3">
       {active ? <CampaignChip menu={campaignMenu} /> : null}
       {today ? (
         <span id="ui-today-count" className="text-meta text-fg-dim">
