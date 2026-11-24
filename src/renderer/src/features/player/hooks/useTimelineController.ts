@@ -5,6 +5,7 @@
  *   shared tools (pointer, scissors, flag, hand, zoom), the zoom window or the fold, and the lanes'
  *   data into one view model with its pointer handlers.
  */
+import { useSuggestedName } from "./useSuggestedName";
 import { useEffect, useMemo, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
@@ -48,6 +49,12 @@ export function useTimelineController() {
     [store.segments, range?.start, range?.end],
   );
   const joined = sections.length >= 2;
+  const existingNames = useMemo(
+    () => [...(videoId && active ? (active.usedRanges[videoId] ?? []) : []), ...store.banked].map((r) => (r as { label?: string }).label ?? "").filter(Boolean),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [videoId, active, store.banked],
+  );
+  const suggestedName = useSuggestedName(videoId, clipper.info?.title ?? "", lines, sections, existingNames);
   const total = sectionsLength(sections);
 
   const win = windowFor(duration, tools.zoom, s.focus ?? playhead);
@@ -167,6 +174,7 @@ export function useTimelineController() {
     playhead,
     range,
     sections,
+    suggestedName,
     joined,
     total,
     segments: store.segments,
