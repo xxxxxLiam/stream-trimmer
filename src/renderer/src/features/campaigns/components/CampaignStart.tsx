@@ -52,7 +52,7 @@ export default function CampaignStart({
               type="button"
               role="option"
               aria-selected={c.id === activeId}
-              className={`btn w-full min-w-0 justify-start text-left ${c.id === activeId ? "border-accent" : ""}`}
+              className={`btn w-full min-w-0 justify-start text-left ${c.id === activeId ? "border-ice" : ""}`}
               onClick={() => {
                 setActiveId(c.id);
                 onChosen?.(c.id);
@@ -60,7 +60,7 @@ export default function CampaignStart({
               }}
             >
               <span className="min-w-0 flex-1 truncate">{c.name}</span>
-              <span className="shrink-0 font-mono text-meta text-fg-dim">
+              <span className="shrink-0 text-meta text-fg-dim">
                 {formatLength(c.targetMinSec)} to {formatLength(c.targetMaxSec)}
               </span>
             </button>

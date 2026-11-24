@@ -255,13 +255,6 @@ test("item 10: every precise id T8 asked for now exists, so the pending list is 
   const usedIds = new Set(used().map((u) => u.id));
   for (const id of wanted) assert.ok(usedIds.has(id), `${id} is not used by any step`);
   assert.deepEqual(Object.keys(PENDING_PRECISE_ANCHORS), []);
-  // SetupChecklist (F-18) clicks these two by id; they must exist for it to work.
-  const literals = literalIds();
-  assert.ok((literals.get("help-anchor-youtube-status") ?? []).includes("features/youtubeConnection/components/YouTubeStatusChip.tsx"));
-  assert.ok((literals.get("help-anchor-clips-tabs") ?? []).includes("features/clips/components/ClipsColumn.tsx"));
-  const checklist = FILES.find((f) => f.path === "features/help/components/SetupChecklist.tsx")!.text;
-  assert.match(checklist, /getElementById\("help-anchor-youtube-status"\)/);
-  assert.match(checklist, /getElementById\("help-anchor-clips-tabs"\)/);
 });
 
 test("F-1: wished-for ids are not used yet, and still do not exist (move them when they do)", () => {

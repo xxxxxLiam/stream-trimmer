@@ -12,6 +12,7 @@ import { registerDownloadRoutes } from "./downloadRoutes";
 import { registerCommentsRoutes } from "./commentsRoutes";
 import { registerProgressRoutes } from "./progressRoutes";
 import { registerChannelRegistration } from "./channelRegistration";
+import { registerToolRoutes } from "./toolRoutes";
 import { registerCacheRoutes } from "./cacheRoutes";
 import { registerFallbackRoutes } from "./fallbackRoutes";
 
@@ -23,5 +24,6 @@ export function registerRoutes(app: Express): void {
   registerProgressRoutes(app);
   registerChannelRegistration(app);
   registerCacheRoutes(app);
+  registerToolRoutes(app);
   registerFallbackRoutes(app);
 }

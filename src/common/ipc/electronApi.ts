@@ -59,6 +59,11 @@ export interface ElectronAPI {
   showInFolder: (
     targetPath: string,
   ) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Undo of a just-made clip: moves its file to the Trash / Recycle Bin. Refuses anything outside
+   * the user's clip folders; a file that's already gone is ok.
+   */
+  undoClip?: (targetPath: string) => Promise<{ ok: boolean; error?: string }>;
   fileExists?: (targetPath: string) => Promise<boolean>;
   startDrag?: (targetPath: string) => void;
   /** Reads the stored cookies.txt and reports whether a session is on disk. */
