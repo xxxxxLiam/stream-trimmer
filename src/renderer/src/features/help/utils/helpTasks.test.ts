@@ -152,7 +152,7 @@ function literalIds(): Map<string, string[]> {
  * `templated` is for ids built from a list (`clips-tab-${t.id}`).
  */
 const WHERE: Record<string, { file: string; state: string; opener?: string; templated?: RegExp }> = {
-  "ui-source-chip": { file: "features/transcript/panels.tsx", state: "workspace screen" },
+  "ui-source-chip": { file: "features/workspace/components/VideosPanel.tsx", state: "workspace screen" },
   "ui-campaign-chip": { file: "features/campaigns/components/CampaignChip.tsx", state: "always" },
   "ui-panels-menu": { file: "modules/layout/components/PanelsMenu.tsx", state: "always" },
   "ui-footer-clips": { file: "modules/layout/components/BottomBar.tsx", state: "always" },

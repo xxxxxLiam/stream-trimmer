@@ -427,6 +427,7 @@ function Layout({ active }: { active: boolean }) {
     playhead,
     cutSegments: (segs) => void cutClip(segs),
     cutBanked,
+    openSymbols: () => setSymbolsOpen(true),
     editorHandoff: {
       settings: editorSettings,
       onChange: setEditorSettings,

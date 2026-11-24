@@ -25,6 +25,7 @@ import {
   useSegmentsState,
   type SegmentStore,
 } from "../../../shared/hooks/useSegmentsState";
+import { setDone, nextOpenId } from "../utils/videoList";
 import { activeAfterClose, indexForDigit, moveItem, stepIndex } from "../../../shared/utils/tabOps";
 
 const STORE_KEY = "clipper.workspaces";
@@ -41,6 +42,8 @@ export type WorkspaceTab = {
   segments?: Segment[];
   /** The campaign this tab is cutting for. Each tab keeps its own. */
   campaignId?: string;
+  /** Folded into "Done" in the Videos list. Nothing is deleted. */
+  done?: boolean;
 };
 
 /** How many closed tabs Ctrl+Shift+T can bring back. */
@@ -52,6 +55,7 @@ export function cleanTab(t: WorkspaceTab): WorkspaceTab {
   const out: WorkspaceTab = { id: t.id, name: typeof t.name === "string" ? t.name : "" };
   if (typeof t.url === "string" && t.url) out.url = t.url;
   if (typeof t.campaignId === "string" && t.campaignId) out.campaignId = t.campaignId;
+  if (t.done === true) out.done = true;
   if (Array.isArray(t.segments)) {
     const segs = t.segments.filter(
       (s) => s && Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start,
@@ -101,6 +105,7 @@ export function applyTabWork(
       url,
       segments: work.segments as Segment[],
       campaignId: t.campaignId,
+      done: t.done,
     });
   });
   return changed ? next : tabs;
@@ -127,7 +132,10 @@ export type WorkspaceState = {
   meta: Record<string, TabMeta>;
   labelFor: (id: string) => string;
   selectTab: (id: string) => void;
-  addTab: () => void;
+  /** Open a new video; with a link it loads that video. */
+  addTab: (url?: string) => void;
+  /** Fold a video into Done, or bring it back. Marking the open one moves to the next open video. */
+  setTabDone: (id: string, done: boolean) => void;
   /** Close a tab. False when the user backed out of the confirmation and nothing closed. */
   closeTab: (id: string) => boolean;
   /** Put tab `id` at `toIndex` (drag, or the keyboard move). */
@@ -173,10 +181,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const selectTab = useCallback((id: string) => setActiveId(id), []);
 
-  const addTab = useCallback(() => {
+  const addTab = useCallback((url?: string) => {
     const id = newId();
-    setTabs((prev) => [...prev, { id, name: "" }]);
+    const link = typeof url === "string" ? url.trim() : "";
+    setTabs((prev) => [...prev, link ? { id, name: "", url: link } : { id, name: "" }]);
     setActiveId(id);
+  }, []);
+
+  const setTabDone = useCallback((id: string, done: boolean) => {
+    const current = tabsRef.current;
+    setTabs(setDone(current, id, done));
+    if (done && activeRef.current === id) {
+      const next = nextOpenId(current, id);
+      if (next) setActiveId(next);
+    }
   }, []);
 
   const closeTab = useCallback(
@@ -339,6 +357,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       labelFor,
       selectTab,
       addTab,
+      setTabDone,
       closeTab,
       moveTab,
       renameTab,
@@ -355,6 +374,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       labelFor,
       selectTab,
       addTab,
+      setTabDone,
       closeTab,
       moveTab,
       renameTab,

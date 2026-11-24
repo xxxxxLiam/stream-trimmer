@@ -55,3 +55,11 @@ test("B-8: a closed tab goes back where it was, with its work, and only once", (
   assert.deepEqual(back[1].segments, [{ start: 1, end: 2 }]);
   assert.equal(reinsertTab(back, closed), back);
 });
+
+test("a video folded into Done stays Done across a relaunch", () => {
+  const parsed = parsePersisted(
+    JSON.parse(JSON.stringify({ tabs: [{ id: "a", name: "", done: true }, { id: "b", name: "" }], activeId: "b" })),
+  );
+  assert.equal(parsed?.tabs[0].done, true);
+  assert.equal(parsed?.tabs[1].done, undefined);
+});
