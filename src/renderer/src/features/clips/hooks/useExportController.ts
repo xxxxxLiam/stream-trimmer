@@ -6,6 +6,7 @@
  *   and the waiting rows.
  */
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
+import { isRetryingNote } from "../utils/clipFailure";
 import { useExportEffects, useRetryKey } from "./useExportEffects";
 import { useExportMutations } from "./useExportMutations";
 import { useExportQueries } from "./useExportQueries";
@@ -17,7 +18,7 @@ export function useExportController() {
   useExportEffects(queries, state);
   const actions = useExportMutations(queries, state);
   useRetryKey(Boolean(state.failed) && !state.importing, actions.retry);
-  const { downloading, downloadProgress, downloadPhase, downloads, failure } = useClipperContext();
+  const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
   const finishedEntry = state.finished ? downloads.find((d) => d.id === state.finished?.entryId) : undefined;
 
@@ -28,7 +29,9 @@ export function useExportController() {
     notice: state.notice,
     importing: state.importing,
     setImporting: state.setImporting,
-    making: downloading ? { name: state.makingName, percent: downloadProgress, phase: downloadPhase } : null,
+    making: downloading
+      ? { name: state.makingName, percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote) }
+      : null,
     finished: state.finished && !downloading ? { name: state.finished.name, secondsLeft: state.secondsLeft } : null,
     finishedEntry,
     failed: state.failed && !downloading ? state.failed : null,

@@ -3,6 +3,7 @@
  * Path: src/renderer/src/modules/clipper/utils/downloadErrors.ts
  * Description: Download failure and cancel types and the pure checks the clipper hooks share.
  */
+import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { extractVideoId } from "../../../shared/utils/clip";
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 
@@ -10,10 +11,13 @@ import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 export class DownloadFailureError extends Error {
   code?: string;
   diagnostics?: FailureDiagnostics;
-  constructor(message: string, code?: string, diagnostics?: FailureDiagnostics) {
+  /** What the clip's Export row says, decided in main (see common/types/clipRowState.ts). */
+  row?: ClipRowState;
+  constructor(message: string, code?: string, diagnostics?: FailureDiagnostics, row?: ClipRowState) {
     super(message);
     this.code = code;
     this.diagnostics = diagnostics;
+    this.row = row;
   }
 }
 

@@ -13,7 +13,7 @@ export type FinishedClip = { entryId: string; name: string; endsAt: number };
 
 /** What was being made, kept so a failure can name it and Retry can make it again. */
 export type ClipAttempt = { name: string; segments: Segment[]; bankId?: string };
-export type FailedClip = ClipAttempt & { kind: ClipFailureKind; attempts: number; message: string; code?: string };
+export type FailedClip = ClipAttempt & { kind: ClipFailureKind; attempts: number; message: string; code?: string; reason?: string };
 
 export function useExportState() {
   const [selectedId, setSelectedId] = useState<string | null>(null);

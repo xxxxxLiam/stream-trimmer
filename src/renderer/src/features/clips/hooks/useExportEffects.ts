@@ -10,7 +10,7 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { clipTitle, getDownloads } from "../../../shared/utils/downloads";
 import { UNDO_SECONDS } from "../utils/exportRows";
-import { classifyClipFailure, isRetryKey } from "../utils/clipFailure";
+import { classifyClipFailure, isRetryKey, rowFailure } from "../utils/clipFailure";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
@@ -57,10 +57,12 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         const a = s.attempt.current ?? { name: "New clip", segments: seg.segments.map((x) => ({ start: x.start, end: x.end })) };
         const key = JSON.stringify(a.segments);
         s.failCount.current = { key, count: s.failCount.current.key === key ? s.failCount.current.count + 1 : 1 };
+        const fromRow = failure?.row ? rowFailure(failure.row) : null;
         s.setFailed({
           ...a,
-          kind: classifyClipFailure(failure?.code),
-          attempts: s.failCount.current.count,
+          kind: fromRow?.kind ?? classifyClipFailure(failure?.code),
+          attempts: fromRow?.attempts ?? s.failCount.current.count,
+          reason: fromRow?.reason,
           message: error,
           code: failure?.code,
         });

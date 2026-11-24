@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyClipFailure, failureActions, failureCopy, isRetryKey } from "./clipFailure";
+import { classifyClipFailure, isRetryingNote, rowFailure, failureActions, failureCopy, isRetryKey } from "./clipFailure";
 
 test("codes map to the three failure rows", () => {
   assert.equal(classifyClipFailure("disk_full"), "disk");
@@ -37,4 +37,23 @@ test("R retries; Cmd R and typing do not", () => {
   assert.equal(isRetryKey({ ...base, ctrlKey: true }), false);
   assert.equal(isRetryKey({ ...base, target: { tagName: "INPUT" } }), false);
   assert.equal(isRetryKey({ ...base, key: "b" }), false);
+});
+
+test("the engine's row state decides the kind and whether the retry was spent", () => {
+  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: false }), { kind: "stopped", attempts: 1 });
+  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: true }), { kind: "stopped", attempts: 1 });
+  assert.deepEqual(rowFailure({ state: "failed-final", reason: "x" }), { kind: "stopped", attempts: 2 });
+  assert.deepEqual(rowFailure({ state: "no-space", reason: "x" }), { kind: "disk", attempts: 1 });
+  assert.deepEqual(rowFailure({ state: "cannot-download", kind: "private", reason: "x" }), { kind: "private", attempts: 1 });
+  assert.deepEqual(rowFailure({ state: "cannot-download", kind: "other", reason: "Members only." }), {
+    kind: "private",
+    attempts: 1,
+    reason: "Members only.",
+  });
+  assert.equal(failureCopy("private", 1, "Members only.").reason, "Members only.");
+});
+
+test("the retry sentence is recognised while the engine retries", () => {
+  assert.equal(isRetryingNote("Clipr is updating its download tools and will try once more."), true);
+  assert.equal(isRetryingNote("Downloading"), false);
 });

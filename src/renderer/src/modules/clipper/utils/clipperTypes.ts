@@ -3,6 +3,7 @@
  * Path: src/renderer/src/modules/clipper/utils/clipperTypes.ts
  * Description: Quality lists and the shapes the clipper hooks and their consumers share.
  */
+import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { type FailureAttempt, type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 
 export const VIDEO_QUALITIES = ["best", "1080", "720", "480", "360"] as const;
@@ -30,6 +31,8 @@ export interface DownloadFailureInfo {
   code?: string;
   diagnostics?: FailureDiagnostics;
   attempt: FailureAttempt;
+  /** The engine's own words for the clip's Export row, when it sent them. */
+  row?: ClipRowState;
 }
 
 export type DownloadOptions = {

@@ -25,7 +25,7 @@ export type FailedRowProps = {
 };
 
 export default function FailedRow({ failed, failure, onAction }: FailedRowProps) {
-  const copy = failureCopy(failed.kind, failed.attempts);
+  const copy = failureCopy(failed.kind, failed.attempts, failed.reason);
   return (
     <div className="mx-[10px] mb-[6px] mt-[10px] rounded-control border border-error bg-raised px-[10px] py-[9px]" role="group" aria-label={`${failed.name} failed`}>
       <div className="text-body font-medium">{failed.name}</div>
