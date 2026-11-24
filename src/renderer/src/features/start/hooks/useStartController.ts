@@ -5,7 +5,7 @@
  *   button, or the copied-link offer), opens the video through the clipper context, and opens the
  *   save folder from the folder chip.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { pasteKeyLabel, shortLink, youtubeLinkFromText, type ToolsStatus } from "../utils/startUtils";
@@ -20,14 +20,26 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
   const tools = useToolsStatusQueries(toolsOverride);
   const dir = folders.clipsDir || saveDir || "";
 
+  // A link given while the tools are being checked waits in the box and opens when they are ready.
+  const [held, setHeld] = useState("");
+  const ready = tools.status === "ready";
+
   // A pasted link opens at once (no debounce); typed text keeps the debounce.
   const openLink = useCallback(
     (text: string) => {
+      if (!ready) return setHeld(text.trim());
       if (youtubeLinkFromText(text)) flushAutoLoad();
       setUrl(text.trim());
     },
-    [flushAutoLoad, setUrl],
+    [ready, flushAutoLoad, setUrl],
   );
+  useEffect(() => {
+    if (ready && held) {
+      setHeld("");
+      if (youtubeLinkFromText(held)) flushAutoLoad();
+      setUrl(held);
+    }
+  }, [ready, held, flushAutoLoad, setUrl]);
 
   const { copied } = useStartEffects({ active: !url });
 
@@ -45,10 +57,10 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
   const platform = typeof navigator === "undefined" ? "" : navigator.platform;
   return {
     pasteKey: pasteKeyLabel(platform),
-    value: url,
+    value: held || url,
     onChange: (v) => (youtubeLinkFromText(v) ? openLink(v) : setUrl(v)),
     onPasteButton,
-    offer: copied && !url ? { text: copied, short: shortLink(copied) } : null,
+    offer: copied && !url && !held ? { text: copied, short: shortLink(copied) } : null,
     onUseOffer: () => copied && openLink(copied),
     toolsStatus: tools.status,
     onRetryTools: tools.retry,
