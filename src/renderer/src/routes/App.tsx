@@ -38,13 +38,13 @@ import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
   restoreConnection,
-  signInNotice,
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import type { MenuItem } from "../modules/layout/components/PopoverMenu";
+import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
 import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
@@ -220,7 +220,7 @@ function Layout({ active }: { active: boolean }) {
     pickDataDir,
   } = useCampaign();
   const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
-  const signIn = signInNotice(useYouTubeConnection());
+  const lowQuality = useSignInSignalEffects();
   const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
@@ -544,8 +544,8 @@ function Layout({ active }: { active: boolean }) {
           onSelectLanguages={setAudioSel}
           folder={folders.clipsDir || saveDir || ""}
           onPickFolder={isElectron ? pickClipsDir : undefined}
-          at360={signIn.at360}
-          showSignInPill={signIn.pill}
+          at360={lowQuality}
+          showSignInPill={lowQuality}
           // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
           onSignIn={() => {
             setHelpStartAt("signin");

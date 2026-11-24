@@ -17,15 +17,17 @@ const REPO = path.resolve(__dirname, "..", "..");
 
 function args() {
   const a = process.argv.slice(2);
-  const out = { screen: null, fixture: null, threshold: 0.1, boardOnly: false };
+  const out = { screen: null, fixture: null, threshold: 0.1, boardOnly: false, window: undefined };
   for (let i = 0; i < a.length; i++) {
     if (a[i] === "--fixture") out.fixture = a[++i];
     else if (a[i] === "--threshold") out.threshold = Number(a[++i]);
     else if (a[i] === "--board-only") out.boardOnly = true;
+    else if (a[i] === "--window") out.window = /^\d+$/.test(a[i + 1] || "") ? Number(a[++i]) : 0;
+    else if (a[i] === "--snapshot") process.env.PARITY_SNAPSHOT = a[++i];
     else if (!out.screen) out.screen = a[i];
   }
   if (!out.screen) {
-    console.error("usage: npm run parity -- <Screen> [--fixture name] [--threshold 0.1] [--board-only]");
+    console.error("usage: npm run parity -- <Screen> [--window [n]] [--snapshot pending|snapshot|<dir>] [--fixture name] [--threshold 0.1] [--board-only]");
     process.exit(2);
   }
   out.fixture = out.fixture || out.screen;
@@ -50,25 +52,62 @@ async function runSteps(win, steps) {
   }
 }
 
+/** fx.stub = stub.json for the fake yt-dlp (info, vttFile, ...). Returns the cwd for launchApp. */
+function makeStubRoot(fx) {
+  const os = require("node:os");
+  const { execFileSync } = require("node:child_process");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "parity-stub-"));
+  execFileSync("node", [path.join(REPO, "audit", "harness", "make-stub-root.cjs"), root]);
+  fs.writeFileSync(path.join(root, "stub.json"), JSON.stringify(fx.stub));
+  fs.copyFileSync(path.join(REPO, "audit", "fixtures", "fixture.mp4"), path.join(root, "fixture.mp4"));
+  if (fx.stub.vttFile) {
+    fs.copyFileSync(path.join(REPO, "audit", "harness", "fixtures", fx.stub.vttFile), path.join(root, fx.stub.vttFile));
+  }
+  return root;
+}
+
 async function screenshotApp(screen, frame, fx) {
   const { launchApp } = require("../../audit/harness/app.cjs");
-  const a = await launchApp({ label: `parity-${screen}`, seed: fx.seed });
+  // The packaged-shape app looks for binaries in <electron>/dist/resources/bin, not under cwd, so a
+  // stub root is linked there for the run and removed after. One stubbed parity run at a time.
+  let link = null;
+  let stubRoot;
+  if (fx.stub) {
+    stubRoot = makeStubRoot(fx);
+    link = path.join(REPO, "node_modules", "electron", "dist", "resources", "bin");
+    fs.rmSync(link, { recursive: true, force: true });
+    fs.symlinkSync(path.join(stubRoot, "resources", "bin"), link);
+  }
+  const a = await launchApp({ label: `parity-${screen}`, seed: fx.seed, cwd: stubRoot });
   try {
-    await a.win.setViewportSize({ width: frame.width, height: frame.height });
+    // Size the real window's content area (setViewportSize alone does not move the Electron window).
+    await a.app.evaluate(({ BrowserWindow }, [w, h]) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.webContents.getURL().includes("127.0.0.1") && !win.webContents.getURL().includes("localhost")) continue;
+        win.setMinimumSize(1, 1);
+        win.setContentSize(w, h);
+      }
+    }, [frame.width, frame.height]);
+    await a.win.waitForTimeout(300);
+    const inner = await a.win.evaluate(() => [innerWidth, innerHeight]);
+    if (inner[0] !== frame.width || inner[1] !== frame.height) {
+      console.warn(`window content is ${inner.join("x")}, wanted ${frame.width}x${frame.height}`);
+    }
     await a.win.waitForSelector(fx.waitFor || "#root *");
     await runSteps(a.win, fx.steps);
     await a.win.waitForTimeout(400);
     return await a.win.screenshot({ clip: { x: 0, y: 0, width: frame.width, height: frame.height } });
   } finally {
     await a.close();
+    if (link) fs.rmSync(link, { recursive: true, force: true });
   }
 }
 
 (async () => {
   const o = args();
-  const outDir = path.join(REPO, "audit", "out", "parity", o.screen);
+  const outDir = path.join(REPO, "audit", "out", "parity", o.screen + (o.window !== undefined ? `-window${o.window}` : ""));
   fs.mkdirSync(outDir, { recursive: true });
-  const { png: boardPng, frame } = await renderBoard(o.screen);
+  const { png: boardPng, frame } = await renderBoard(o.screen, { window: o.window });
   fs.writeFileSync(path.join(outDir, "board.png"), boardPng);
   console.log(`board: ${frame.title} (${frame.width}x${frame.height})`);
   if (o.boardOnly) return;
@@ -77,7 +116,7 @@ async function screenshotApp(screen, frame, fx) {
   fs.writeFileSync(path.join(outDir, "app.png"), appPng);
   const b = PNG.sync.read(boardPng);
   const p = PNG.sync.read(appPng);
-  if (b.width !== p.width || b.height !== p.height) throw new Error("size mismatch between board and app");
+  if (b.width !== p.width || b.height !== p.height) throw new Error(`size mismatch: board ${b.width}x${b.height}, app ${p.width}x${p.height}`);
   const diff = new PNG({ width: b.width, height: b.height });
   const bad = pixelmatch(b.data, p.data, diff.data, b.width, b.height, { threshold: o.threshold, includeAA: false });
   fs.writeFileSync(path.join(outDir, "diff.png"), PNG.sync.write(diff));

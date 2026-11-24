@@ -21,7 +21,8 @@
  *     "stderr":    "",         // text to emit on failure
  *     "delayMs":   0,          // stall, for slow-network and cancel tests
  *     "progress":  [0, 25, 100],
- *     "writeMedia": true       // copy the fixture clip to the output path
+ *     "writeMedia": true,      // copy the fixture clip to the output path
+ *     "vtt": "WEBVTT...",      // text served as the transcript (or "vttFile": name beside stub.json)
  *   }
  */
 const fs = require("node:fs");
@@ -38,8 +39,13 @@ fs.mkdirSync(bin, { recursive: true });
 
 // Real ffmpeg/deno: the cut and concat must be genuine for the audit to mean
 // anything. Only the network-facing tool is replaced.
+const { execSync } = require("node:child_process");
+const onPath = (n) => { try { return execSync(`command -v ${n}`, { encoding: "utf8" }).trim(); } catch { return ""; } };
 for (const name of ["ffmpeg", "deno"]) {
-  const real = path.join(REPO, "resources", "bin", name);
+  // The repo's bundled binary when there is one, then $STUB_BIN_DIR/<name>, then whatever is on PATH.
+  const bundled = path.join(REPO, "resources", "bin", name);
+  const extra = process.env.STUB_BIN_DIR ? path.join(process.env.STUB_BIN_DIR, name) : "";
+  const real = fs.existsSync(bundled) ? bundled : extra && fs.existsSync(extra) ? extra : onPath(name) || bundled;
   const link = path.join(bin, name);
   if (fs.existsSync(real) && !fs.existsSync(link)) fs.symlinkSync(real, link);
 }
@@ -95,6 +101,14 @@ async function main() {
       subtitles: {}, automatic_captions: {}, comments: [],
     }, cfg.info);
     process.stdout.write(JSON.stringify(info) + "\\n");
+    return;
+  }
+
+  // Transcript: --skip-download with subtitles asks for <output>.en.vtt. cfg.vtt is the file's text.
+  if (has("--skip-download") && (has("--write-subs") || has("--write-auto-subs"))) {
+    const out = valOf("-o") || valOf("--output");
+    const vtt = cfg.vttFile ? fs.readFileSync(path.join(__dirname, "..", "..", cfg.vttFile), "utf8") : cfg.vtt;
+    if (out && vtt) fs.writeFileSync(out + ".en.vtt", vtt);
     return;
   }
 
