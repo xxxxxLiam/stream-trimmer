@@ -34,7 +34,7 @@ Promise.all([
   }),
   esbuild.build({
     ...common,
-    entryPoints: [path.join(root, "electron", "preload.ts")],
+    entryPoints: [path.join(root, "src", "preload", "index.ts")],
     outfile: path.join(outRoot, "preload", "index.cjs"),
   }),
 ])

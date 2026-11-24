@@ -1,4 +1,4 @@
-// electron/preload.ts — reads the loopback API base URL from the additional
+// src/preload/index.ts — reads the loopback API base URL from the additional
 // argument passed by main.ts and exposes it as window.__API_BASE__ before
 // any renderer code runs.
 import electron from "electron";
