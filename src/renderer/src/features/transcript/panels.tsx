@@ -8,9 +8,19 @@
 import PanelPlaceholder from "../../modules/layout/components/PanelPlaceholder";
 import { registerPanel } from "../../modules/layout/utils/panelRegistry";
 import { usePanelHost } from "../../modules/layout/hooks/PanelHostContext";
+import UrlBar from "../../modules/clipper/components/UrlBar";
 import TranscriptColumn from "./components/TranscriptColumn";
 
-registerPanel({ id: "videos", title: "Videos", group: "left", component: () => <PanelPlaceholder title="Videos" /> });
+// Until the Videos list is built, the panel carries the link box so a video can still be opened.
+function VideosPanel() {
+  return (
+    <div id="ui-source-chip" className="flex min-h-0 flex-1 flex-col gap-3 p-2">
+      <UrlBar />
+      <PanelPlaceholder title="Videos" />
+    </div>
+  );
+}
+registerPanel({ id: "videos", title: "Videos", group: "left", component: VideosPanel });
 
 function TranscriptPanel() {
   const { playhead } = usePanelHost();

@@ -17,10 +17,14 @@ export type MenuItem =
       /** A tick shows when set (true or false keeps the room so labels line up). */
       checked?: boolean;
       disabled?: boolean;
+      /** Keep the menu open after picking, for a list of ticks. */
+      keepOpen?: boolean;
       onSelect: () => void;
     };
 
 export type PopoverMenuProps = {
+  /** DOM id of the trigger button (help tour anchors). */
+  id?: string;
   /** Accessible name of the trigger button. */
   label: string;
   /** What the trigger shows (an icon). */
@@ -35,9 +39,12 @@ export type PopoverMenuProps = {
   heading?: string;
   /** Marks the trigger as pressed while the menu is open (top bar active state). */
   pressedWhenOpen?: boolean;
+  /** Show the label beside the icon while the menu is open (the top bar's "on" look). */
+  labelWhenOpen?: boolean;
 };
 
 export default function PopoverMenu({
+  id,
   label,
   children,
   items,
@@ -46,6 +53,7 @@ export default function PopoverMenu({
   triggerClassName = "icon-btn",
   heading,
   pressedWhenOpen = true,
+  labelWhenOpen = false,
 }: PopoverMenuProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -79,6 +87,7 @@ export default function PopoverMenu({
     <div ref={root} className="relative flex">
       <button
         ref={trigger}
+        id={id}
         type="button"
         className={triggerClassName}
         aria-label={label}
@@ -96,6 +105,7 @@ export default function PopoverMenu({
         }}
       >
         {children}
+        {open && labelWhenOpen ? <span className="icon-label ml-2 text-body">{label}</span> : null}
       </button>
       {open ? (
         <div
@@ -103,7 +113,7 @@ export default function PopoverMenu({
           role="menu"
           aria-label={label}
           onKeyDown={onMenuKey}
-          className={`surface-raised absolute z-40 min-w-[200px] border border-hairline-strong py-1 ${
+          className={`surface-raised absolute z-40 min-w-[200px] border border-hairlineStrong py-1 ${
             side === "below" ? "top-full mt-1" : "bottom-full mb-1"
           } ${align === "end" ? "right-0" : "left-0"}`}
         >
@@ -121,6 +131,7 @@ export default function PopoverMenu({
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-body text-fg hover:bg-hover disabled:text-disabled"
                 onClick={() => {
                   item.onSelect();
+                  if (item.keepOpen) return;
                   close();
                   trigger.current?.focus();
                 }}

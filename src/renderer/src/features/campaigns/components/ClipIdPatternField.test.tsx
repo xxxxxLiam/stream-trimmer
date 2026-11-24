@@ -41,6 +41,7 @@ test("the form and the wizard use this control instead of a free-text pattern bo
 test("the Data folder field is only offered when the exporter is built in", () => {
   const menu = readFileSync(new URL("./CampaignMenu.tsx", import.meta.url), "utf8");
   assert.match(menu, /dataVisible \? \(\[\["dataDir"/);
-  const footer = readFileSync(new URL("../../../modules/layout/components/AppFooter.tsx", import.meta.url), "utf8");
-  assert.match(footer, /\{showData && \(/);
+  // The bottom bar no longer has a Data folder button; it lives only in the campaign form.
+  const bar = readFileSync(new URL("../../../modules/layout/components/BottomBar.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(bar, /Data folder/);
 });

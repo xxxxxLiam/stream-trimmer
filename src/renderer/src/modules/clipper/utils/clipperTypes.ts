@@ -35,4 +35,6 @@ export interface DownloadFailureInfo {
 export type DownloadOptions = {
   segments?: Array<{ start: number; end: number }>;
   clipId?: string;
+  /** Audio language to cut ("es"). Omitted means the original track. One clip per language. */
+  audioLanguage?: string;
 };

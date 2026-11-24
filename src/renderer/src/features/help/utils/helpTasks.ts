@@ -44,11 +44,10 @@ export const MAX_DO_LENGTH = 90;
 export const ANCHORS = {
   sourceChip: "ui-source-chip",
   campaignChip: "ui-campaign-chip",
-  copyBlocks: "ui-copy-blocks",
-  symbols: "ui-symbols",
+  copyBlocks: "ui-panels-menu",
+  symbols: "ui-panels-menu",
   footerClips: "ui-footer-clips",
-  footerData: "ui-footer-data",
-  footerFormat: "ui-footer-format",
+  footerData: "ui-campaign-settings",
   /** The left panels (Videos, Transcript, Markers). */
   transcriptColumn: "ui-panels-left",
   /** The centre panels: Preview over Timeline. */
@@ -152,7 +151,7 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Switch campaign",
     aliases: ["change campaign", "new campaign", "other campaign", "project", "client", "account"],
     steps: [
-      { do: "Open the campaign chip in the header.", why: "Lists every campaign you have made.", anchorId: A.campaignChip },
+      { do: "Open the campaign chip in the top bar.", why: "Lists every campaign you have made.", anchorId: A.campaignChip },
       { do: "Pick a campaign from the list.", why: "Re-points length band, format and both folders.", anchorId: A.campaignList },
     ],
   },
@@ -161,7 +160,7 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Change where clips save",
     aliases: ["save folder", "output folder", "download folder", "directory", "destination", "clips location"],
     steps: [
-      { do: "Click the Clips folder chip in the footer.", why: "Opens the folder picker for this campaign.", anchorId: A.footerClips },
+      { do: "Click the folder button in the bottom bar.", why: "Opens the folder picker for this campaign.", anchorId: A.footerClips },
       { do: "Choose a folder.", why: "New clips land here. Data exports stay separate.", anchorId: A.footerClips },
     ],
   },
@@ -170,8 +169,9 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Change where exported data saves",
     aliases: ["data folder", "csv location", "research folder", "export location", "csv folder"],
     steps: [
-      { do: "Click the Data folder chip in the footer.", why: "Opens the folder picker for exported data.", anchorId: A.footerData },
-      { do: "Choose a folder.", why: "Keeps large CSVs apart from your clips.", anchorId: A.footerData },
+      { do: "Open the campaign chip in the top bar.", why: "Its menu has the campaign's settings.", anchorId: A.campaignChip },
+      { do: "Choose the campaign's settings row.", why: "The Data folder is set there.", anchorId: A.footerData },
+      { do: "Choose the Data folder.", why: "Keeps large CSVs apart from your clips.", anchorId: A.footerData },
     ],
   },
   {
@@ -179,7 +179,7 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Copy a transcript for a chat",
     aliases: ["paste transcript", "handoff", "send transcript", "copy captions", "copy text", "timecodes"],
     steps: [
-      { do: "Open Copy blocks (Cmd Shift C).", why: "One button per block of text.", anchorId: A.copyBlocks },
+      { do: "Open the Panels menu, then Copy blocks (Cmd Shift C).", why: "One button per block of text.", anchorId: A.copyBlocks },
       { do: "Press the transcript block you need.", why: "Copies it with source video timecodes.", anchorId: A.copyTranscript },
     ],
   },
@@ -188,7 +188,7 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Copy the script lines",
     aliases: ["verbatim", "speaker lines", "script", "quote lines", "copy segments"],
     steps: [
-      { do: "Add your segments, then open Copy blocks.", why: "Script lines follow your segment order.", anchorId: A.copyBlocks },
+      { do: "Add your segments, then open Copy blocks from the Panels menu.", why: "Script lines follow your segment order.", anchorId: A.copyBlocks },
       { do: "Press Script lines, verbatim.", why: "Copies speaker, timecode and text per line.", anchorId: A.copyScript },
     ],
   },
@@ -197,7 +197,7 @@ export const HELP_TASKS: HelpTask[] = [
     title: "Insert a symbol or honorific",
     aliases: ["arabic", "bismillah", "salawat", "sallallahu", "phrase", "glyph", "special character", "paste symbol"],
     steps: [
-      { do: "Open Symbols (Cmd ;).", why: "A click-to-copy palette that stays on top.", anchorId: A.symbols },
+      { do: "Open the Panels menu, then Symbols (Cmd ;).", why: "A click-to-copy palette that stays on top.", anchorId: A.symbols },
       { do: "Search, then click the entry you want.", why: "It copies at once; paste where you need it.", anchorId: A.symbolList },
     ],
   },
@@ -230,7 +230,7 @@ export const CHANNEL_HELP_TASKS: HelpTask[] = [
     title: "Export a channel's data",
     aliases: ["channel export", "csv", "scrape", "comments", "video list", "research data"],
     steps: [
-      { do: "Open Channel data in the header.", why: "The exporter is its own screen.", anchorId: "ui-channel-link" },
+      { do: "Open the Panels menu, then Channel data.", why: "The exporter is its own screen.", anchorId: "ui-panels-menu" },
       { do: "Paste the channel link and press Start.", why: "Streams rows to your data folder as it goes.", anchorId: "ui-channel-start" },
     ],
   },
@@ -240,7 +240,8 @@ export const CHANNEL_HELP_TASKS: HelpTask[] = [
     aliases: ["cancel", "abort", "halt", "interrupt", "stop export", "partial"],
     steps: [
       { do: "Press Stop while the export runs.", why: "Ends the run without losing rows so far.", anchorId: "ui-channel-stop" },
-      { do: "Check your data folder for the file.", why: "Everything fetched before Stop is saved.", anchorId: "ui-footer-data" },
+      { do: "Open the campaign chip in the top bar.", why: "Its menu has the campaign's settings.", anchorId: A.campaignChip },
+      { do: "Check your data folder for the file.", why: "Everything fetched before Stop is saved.", anchorId: "ui-campaign-settings" },
     ],
   },
 ];
