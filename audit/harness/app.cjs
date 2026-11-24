@@ -12,7 +12,7 @@
  *   - The app picks its own free HTTP port (src/main/modules/engineHost/engineHost.ts: pickFreePort),
  *     so nothing needs coordinating ports.
  *   - `cwd` decides where the server finds yt-dlp/ffmpeg
- *     (server/index.ts: resolveBinDir falls back to `<cwd>/resources/bin`).
+ *     (src/main/features/engine/services/binaries.ts: resolveBinDir falls back to `<cwd>/resources/bin`).
  *     Point it at a stub root to script yt-dlp's behaviour offline.
  *
  * Seeding: state lives in `<userData>/settings.json` (src/renderer/src/shared/utils/persist.ts reads

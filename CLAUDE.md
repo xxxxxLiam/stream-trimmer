@@ -1,5 +1,30 @@
 # Working rules for this repository
 
+## File structure
+
+Process-first, per the Electron File Structure Guide:
+
+```
+src/main/{index.ts, ipc/, features/<name>/{services,utils,...}, modules/<name>/, shared/}
+src/preload/index.ts
+src/renderer/{index.html, src/{main.tsx, routes/, features/, modules/, shared/}}
+src/common/{ipc,schemas,types,constants}
+resources/ build/ e2e/ scripts/ docs/
+```
+
+- Placement by consumer: one feature uses it → that feature's folder; two or
+  more features in one process → that process's `shared/`; two or more
+  processes → `src/common`.
+- **Import boundary:** main, preload and renderer never import each other.
+  Only `src/common` crosses. Enforced by the split tsconfigs
+  (`tsconfig.node/preload/web.json`) and ESLint `no-restricted-imports`
+  (`npm run lint`). Test files are exempt.
+- **IPC handlers** in `src/main/ipc/` do input validation and one call into
+  `features/<name>/services/*` — no business logic.
+- **Exception:** `src/preload/index.ts` is a one-file folder (process root);
+  no other folder may hold a single file.
+- The engine (`src/main/features/engine`) runs in the main process.
+
 ## Design
 
 **No visible scrollbars.** Anywhere in the UI, in designs and in the shipped
@@ -52,10 +77,11 @@ loop.
 
 ## Testing
 
-- Run the project's own command: `npm test` (`tsx --test server/*.test.ts`).
-  For the renderer suites too: `node_modules/.bin/tsx --test $(git ls-files
-  '*.test.ts' '*.test.tsx')`. Do not bundle tests with esbuild to run them —
-  it breaks their relative `require`s and invents failures.
+- Run the project's own commands: `npm test` (main, preload, scripts),
+  `npm run test:renderer` (renderer), and `npm run check` for everything
+  (typecheck of all four tsconfigs, both test suites, lint). Do not bundle
+  tests with esbuild to run them — it breaks their relative `require`s and
+  invents failures. Checks run locally; GitHub Actions are for releases only.
 - A test that cannot fail is not a test. When fixing a bug, revert the fix
   and watch the new test fail before restoring it.
 - `audit/harness/` drives the real packaged-shape app under xvfb with an
