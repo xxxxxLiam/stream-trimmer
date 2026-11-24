@@ -3,12 +3,12 @@
  * Path: src/renderer/src/features/settings/components/SettingsFolder.tsx
  * Description: Clips folder view (Settings.dc.html view 4): the folder and a Change button.
  */
-import { DrawerHeader, drawerBody, outlineButton } from "./DrawerParts";
+import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 
 export default function SettingsFolder(p: { label: string; problem: string; onChange: () => void; onBack: () => void; onClose: () => void }) {
   return (
     <>
-      <DrawerHeader title="Clips folder" back="Settings" onBack={p.onBack} onClose={p.onClose} />
+      <DrawerHeader closeName="Settings" title="Clips folder" back="Settings" onBack={p.onBack} onClose={p.onClose} />
       <div className={drawerBody}>
       <div className="flex items-center gap-3 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

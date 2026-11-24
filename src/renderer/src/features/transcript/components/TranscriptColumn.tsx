@@ -21,6 +21,7 @@ import {
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { formatTimestamp, parseTimestamp } from "../../../shared/utils/clip";
+import { formatClock } from "../../../shared/utils/clock";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import {
   WINDOW_SIZE,
@@ -402,7 +403,7 @@ export default function TranscriptColumn({
                       }
                     >
                       <span className="flex-none text-meta tabular-nums text-fg-dim">
-                        {formatTimestamp(line.start)}
+                        {formatClock(line.start)}
                       </span>
                       <span className={"min-w-0 flex-1 " + (isUsed ? "text-fg-dim" : "")}>
                         {matchLines.has(i) ? highlight(line.text, w.query) : line.text}

@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { pasteKeyLabel, shortLink, youtubeLinkFromText } from "./startUtils";
+import { pasteKeyLabel, shortLink, toolsStatusFrom, youtubeLinkFromText } from "./startUtils";
 
 test("paste key is Command V on a Mac and Ctrl V elsewhere", () => {
   assert.equal(pasteKeyLabel("MacIntel"), "⌘V");
@@ -25,4 +25,12 @@ test("only a lone YouTube video link counts as a link", () => {
 test("link and folder read short on the chips", () => {
   assert.equal(shortLink("https://www.youtube.com/watch?v=abc"), "youtube.com/watch?v=abc");
   assert.match(shortLink("https://www.youtube.com/watch?v=" + "x".repeat(60)), /…$/);
+});
+
+test("the engine's tool report becomes the cold start state", () => {
+  assert.equal(toolsStatusFrom({ overall: "checking", tools: {} }), "checking");
+  assert.equal(toolsStatusFrom({ overall: "broken" }), "broken");
+  assert.equal(toolsStatusFrom({ overall: "ready" }), "ready");
+  assert.equal(toolsStatusFrom(null), "ready");
+  assert.equal(toolsStatusFrom({ overall: 3 }), "ready");
 });
