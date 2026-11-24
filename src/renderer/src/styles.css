@@ -246,6 +246,11 @@
   .icon-btn:disabled {
     color: var(--c-disabled);
   }
+  /* A top bar button that is on shows its label next to the icon, so it grows past the square. */
+  .icon-btn:has(> .icon-label) {
+    width: auto;
+    padding-inline: 12px;
+  }
   .icon-btn[aria-pressed="true"],
   .icon-btn[aria-expanded="true"] {
     border-color: var(--accent);

@@ -8,6 +8,8 @@ import test from "node:test";
 import {
   addUsedRanges,
   clipNumber,
+  clipsMadeToday,
+  todayCount,
   countUsedRanges,
   createCampaign,
   DATA_FOLDER_NAME,
@@ -142,10 +144,10 @@ test("custom patterns work", () => {
 
 test("addUsedRanges appends, skips empties and exact duplicates; query by video", () => {
   let c = make();
-  c = addUsedRanges(c, "v", [{ start: 10, end: 20 }, { start: 5, end: 5 }], "DS-v-01");
-  c = addUsedRanges(c, "v", [{ start: 10, end: 20 }], "DS-v-01");
-  c = addUsedRanges(c, "w", [{ start: 1, end: 2 }], "DS-w-01");
-  assert.deepEqual(usedRangesFor(c, "v"), [{ start: 10, end: 20, clipId: "DS-v-01" }]);
+  c = addUsedRanges(c, "v", [{ start: 10, end: 20 }, { start: 5, end: 5 }], "DS-v-01", 111);
+  c = addUsedRanges(c, "v", [{ start: 10, end: 20 }], "DS-v-01", 222);
+  c = addUsedRanges(c, "w", [{ start: 1, end: 2 }], "DS-w-01", 333);
+  assert.deepEqual(usedRangesFor(c, "v"), [{ start: 10, end: 20, clipId: "DS-v-01", at: 111 }]);
   assert.deepEqual(usedRangesFor(c, "none"), []);
   assert.deepEqual(usedRangesFor(null, "v"), []);
   assert.equal(countUsedRanges(c), 2);
@@ -258,4 +260,28 @@ test("a hidden Data folder is moved aside instead of clashing; a visible one is 
   assert.equal(reconcileDataDir("/a/clips", "/a/clips/", false), "/a/data");
   assert.equal(reconcileDataDir("/a/clips", "/a/clips", true), "/a/clips");
   assert.equal(reconcileDataDir("/a/clips", "/b/data", false), "/b/data");
+});
+
+test("today count: a joined clip counts once, yesterday and unstamped clips do not, no quota shows nothing", () => {
+  const noon = new Date(2026, 10, 24, 12, 0, 0).getTime();
+  const yesterday = noon - 24 * 3600 * 1000;
+  let c = createCampaign([], { name: "Acme" }).campaign;
+  c = addUsedRanges(c, "vid", [{ start: 10, end: 20 }, { start: 40, end: 50 }], "AC-1", noon - 1000);
+  c = addUsedRanges(c, "vid", [{ start: 60, end: 70 }], "AC-2", noon);
+  c = addUsedRanges(c, "vid", [{ start: 80, end: 90 }], "AC-0", yesterday);
+  c.usedRanges["other"] = [{ start: 1, end: 2, clipId: "AC-OLD" }];
+  assert.equal(clipsMadeToday(c, noon), 2);
+  assert.equal(todayCount(c, noon), null, "no quota set, no count");
+  assert.equal(todayCount({ ...c, dailyQuota: 3 }, noon), "2 of 3 today");
+  assert.equal(todayCount(null, noon), null);
+});
+
+test("daily quota and the time a clip was made survive a reload", () => {
+  const noon = new Date(2026, 10, 24, 12, 0, 0).getTime();
+  let c = createCampaign([], { name: "Acme" }).campaign;
+  c = { ...addUsedRanges(c, "vid", [{ start: 1, end: 2 }], "AC-1", noon), dailyQuota: 4 };
+  const back = normalizeCampaigns(JSON.parse(JSON.stringify([c])))[0];
+  assert.equal(back.dailyQuota, 4);
+  assert.equal(back.usedRanges.vid[0].at, noon);
+  assert.equal(normalizeCampaigns([{ ...c, dailyQuota: -2 }])[0].dailyQuota, undefined);
 });
