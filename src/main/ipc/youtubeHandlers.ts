@@ -4,6 +4,7 @@
  * Description: The imported YouTube session: probe it, import a cookies.txt (from
  *   a picked file or dropped text), disconnect it, and the fallback sign-in page.
  */
+import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import * as logger from "../modules/logger/logger";
 import { getMainWindow } from "../modules/windows/windows";
@@ -18,11 +19,11 @@ import {
 const { dialog, ipcMain, shell } = electron;
 
 export function registerYoutubeHandlers() {
-  ipcMain.handle("youtube:probe", () => probeSession());
+  ipcMain.handle(IPC.youtubeProbe, () => probeSession());
 
   // Import a cookies.txt the user exported from their own browser. On Windows
   // this is the only route that reliably works — see cookieFile.ts.
-  ipcMain.handle("youtube:importCookies", async () => {
+  ipcMain.handle(IPC.youtubeImportCookies, async () => {
     try {
       const res = await dialog.showOpenDialog(getMainWindow(), {
         title: "Choose the cookies.txt you exported",
@@ -42,14 +43,14 @@ export function registerYoutubeHandlers() {
     }
   });
 
-  ipcMain.handle("youtube:importCookiesText", async (_e: unknown, text: unknown) => {
+  ipcMain.handle(IPC.youtubeImportCookiesText, async (_e: unknown, text: unknown) => {
     if (typeof text !== "string" || text.length > 5_000_000) {
       return { ok: false, error: "That does not look like a cookies.txt file." };
     }
     return importCookiesFromText(text);
   });
 
-  ipcMain.handle("youtube:disconnect", () => disconnect());
+  ipcMain.handle(IPC.youtubeDisconnect, () => disconnect());
 
-  ipcMain.handle("shell:openYouTubeSignIn", () => openSignInPage(shell));
+  ipcMain.handle(IPC.shellOpenYouTubeSignIn, () => openSignInPage(shell));
 }

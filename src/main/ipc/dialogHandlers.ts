@@ -3,6 +3,7 @@
  * Path: src/main/ipc/dialogHandlers.ts
  * Description: The two native folder pickers.
  */
+import { IPC } from "../../common/ipc/channels";
 import path from "node:path";
 import electron from "electron";
 import { getMainWindow } from "../modules/windows/windows";
@@ -11,7 +12,7 @@ import { rememberPickedDir } from "../features/files/services/saveRoots";
 const { app, dialog, ipcMain } = electron;
 
 export function registerDialogHandlers() {
-  ipcMain.handle("dialog:pickDirectory", async () => {
+  ipcMain.handle(IPC.dialogPickDirectory, async () => {
     const res = await dialog.showOpenDialog(getMainWindow(), {
       title: "Choose a folder",
       properties: ["openDirectory", "createDirectory"],
@@ -21,7 +22,7 @@ export function registerDialogHandlers() {
     return res.filePaths[0];
   });
 
-  ipcMain.handle("dialog:pickFcpLibrary", async () => {
+  ipcMain.handle(IPC.dialogPickFcpLibrary, async () => {
     const mainWindow = getMainWindow();
     const res = await dialog.showOpenDialog(mainWindow, {
       title: "Choose your Final Cut Pro library",

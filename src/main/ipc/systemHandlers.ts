@@ -4,6 +4,7 @@
  * Description: Facts about this computer: default browser, the order to try
  *   browsers in, and the folders to use on a fresh install.
  */
+import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import {
   browserOrder,
@@ -14,7 +15,7 @@ import {
 const { app, ipcMain } = electron;
 
 export function registerSystemHandlers() {
-  ipcMain.handle("system:defaultBrowser", () => defaultBrowser(app));
-  ipcMain.handle("system:defaultFolders", () => defaultFolders(app));
-  ipcMain.handle("system:browserOrder", (_e: unknown, saved: unknown) => browserOrder(app, saved));
+  ipcMain.handle(IPC.systemDefaultBrowser, () => defaultBrowser(app));
+  ipcMain.handle(IPC.systemDefaultFolders, () => defaultFolders(app));
+  ipcMain.handle(IPC.systemBrowserOrder, (_e: unknown, saved: unknown) => browserOrder(app, saved));
 }

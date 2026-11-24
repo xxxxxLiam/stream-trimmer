@@ -1,6 +1,7 @@
 // src/preload/index.ts — reads the loopback API base URL from the additional
 // argument passed by main.ts and exposes it as window.__API_BASE__ before
 // any renderer code runs.
+import { IPC } from "../common/ipc/channels";
 import electron from "electron";
 const { contextBridge, ipcRenderer } = electron;
 
@@ -32,72 +33,72 @@ try {
     isElectron: true,
     settingsSnapshot: (() => {
       try {
-        return ipcRenderer.sendSync("settings:all") || {};
+        return ipcRenderer.sendSync(IPC.settingsAll) || {};
       } catch {
         return {};
       }
     })(),
-    setSetting: (key: unknown, value: unknown) => ipcRenderer.invoke("settings:set", key, value),
-    pickDirectory: () => ipcRenderer.invoke("dialog:pickDirectory"), pickFcpLibrary: () => ipcRenderer.invoke("dialog:pickFcpLibrary"),
+    setSetting: (key: unknown, value: unknown) => ipcRenderer.invoke(IPC.settingsSet, key, value),
+    pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.
-    getDefaultFolders: () => ipcRenderer.invoke("system:defaultFolders"),
-    saveFile: (payload: unknown) => ipcRenderer.invoke("file:save", payload),
+    getDefaultFolders: () => ipcRenderer.invoke(IPC.systemDefaultFolders),
+    saveFile: (payload: unknown) => ipcRenderer.invoke(IPC.fileSave, payload),
     // Moves a finished clip out of the engine's temp dir. Only the path
     // crosses the bridge — never the media itself.
-    saveClip: (payload: unknown) => ipcRenderer.invoke("clip:save", payload),
-    saveFiles: (payload: unknown) => ipcRenderer.invoke("file:saveFiles", payload),
+    saveClip: (payload: unknown) => ipcRenderer.invoke(IPC.clipSave, payload),
+    saveFiles: (payload: unknown) => ipcRenderer.invoke(IPC.fileSaveFiles, payload),
     // Moves the channel exporter's CSVs out of the engine's temp dir. Like
     // saveClip, only paths cross the bridge — never the file contents.
-    saveExport: (payload: unknown) => ipcRenderer.invoke("export:save", payload),
+    saveExport: (payload: unknown) => ipcRenderer.invoke(IPC.exportSave, payload),
     showInFolder: (targetPath: unknown) =>
-      ipcRenderer.invoke("file:showInFolder", targetPath),
-    fileExists: (targetPath: unknown) => ipcRenderer.invoke("file:exists", targetPath),
+      ipcRenderer.invoke(IPC.fileShowInFolder, targetPath),
+    fileExists: (targetPath: unknown) => ipcRenderer.invoke(IPC.fileExists, targetPath),
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.
     startDrag: (targetPath: unknown) => {
       if (Date.now() - lastTrustedDragStart > DRAG_GESTURE_MS) return;
-      ipcRenderer.send("file:startDrag", targetPath);
+      ipcRenderer.send(IPC.fileStartDrag, targetPath);
     },
     // The YouTube session, which is one imported cookies.txt. Cookie values
     // never cross this bridge — the main process writes the file and only
     // yt-dlp reads it, so the renderer sees booleans and a count.
-    probeYouTube: () => ipcRenderer.invoke("youtube:probe"),
-    disconnectYouTube: () => ipcRenderer.invoke("youtube:disconnect"),
-    importYouTubeCookies: () => ipcRenderer.invoke("youtube:importCookies"),
+    probeYouTube: () => ipcRenderer.invoke(IPC.youtubeProbe),
+    disconnectYouTube: () => ipcRenderer.invoke(IPC.youtubeDisconnect),
+    importYouTubeCookies: () => ipcRenderer.invoke(IPC.youtubeImportCookies),
     // A cookies.txt dropped on the window: the renderer reads the text and
     // main validates and commits it.
     importYouTubeCookiesText: (text: unknown) =>
-      ipcRenderer.invoke("youtube:importCookiesText", text),
+      ipcRenderer.invoke(IPC.youtubeImportCookiesText, text),
     // Owner gate. Main hashes the local machine id with the supplied salt and
     // answers with a boolean only; the raw id never crosses the bridge.
-    isOwnerMachine: (list: unknown, salt: unknown) => ipcRenderer.invoke("owner:check", list, salt),
+    isOwnerMachine: (list: unknown, salt: unknown) => ipcRenderer.invoke(IPC.ownerCheck, list, salt),
     // Editor handoff (electron/editorOpen.ts). Paths and small payloads only.
     editor: {
-      installed: () => ipcRenderer.invoke("editor:installed"),
-      probe: (file: unknown) => ipcRenderer.invoke("editor:probe", file),
-      writeFcpxml: (payload: unknown) => ipcRenderer.invoke("editor:writeFcpxml", payload),
-      openWith: (payload: unknown) => ipcRenderer.invoke("editor:openWith", payload),
-      reveal: (target: unknown) => ipcRenderer.invoke("editor:reveal", target),
-      copyFiles: (payload: unknown) => ipcRenderer.invoke("editor:copyFiles", payload),
-      pathExists: (target: unknown) => ipcRenderer.invoke("editor:pathExists", target),
+      installed: () => ipcRenderer.invoke(IPC.editorInstalled),
+      probe: (file: unknown) => ipcRenderer.invoke(IPC.editorProbe, file),
+      writeFcpxml: (payload: unknown) => ipcRenderer.invoke(IPC.editorWriteFcpxml, payload),
+      openWith: (payload: unknown) => ipcRenderer.invoke(IPC.editorOpenWith, payload),
+      reveal: (target: unknown) => ipcRenderer.invoke(IPC.editorReveal, target),
+      copyFiles: (payload: unknown) => ipcRenderer.invoke(IPC.editorCopyFiles, payload),
+      pathExists: (target: unknown) => ipcRenderer.invoke(IPC.editorPathExists, target),
     },
     // Diagnostics: reads the app's own local log so a crash can be reported.
-    readDiagnostics: () => ipcRenderer.invoke("diagnostics:read"),
-    revealDiagnostics: () => ipcRenderer.invoke("diagnostics:reveal"),
-    copyDiagnostics: () => ipcRenderer.invoke("diagnostics:copy"),
+    readDiagnostics: () => ipcRenderer.invoke(IPC.diagnosticsRead),
+    revealDiagnostics: () => ipcRenderer.invoke(IPC.diagnosticsReveal),
+    copyDiagnostics: () => ipcRenderer.invoke(IPC.diagnosticsCopy),
     // Secondary route: opens YouTube in the user's own browser, so yt-dlp can
     // be pointed at that browser's cookie store instead of an imported file.
-    openYouTubeSignIn: () => ipcRenderer.invoke("shell:openYouTubeSignIn"),
-    getDefaultBrowser: () => ipcRenderer.invoke("system:defaultBrowser"),
-    getBrowserOrder: (saved: unknown) => ipcRenderer.invoke("system:browserOrder", saved),
+    openYouTubeSignIn: () => ipcRenderer.invoke(IPC.shellOpenYouTubeSignIn),
+    getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
+    getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 
-    checkForUpdates: () => ipcRenderer.invoke("updater:check"),
-    quitAndInstall: () => ipcRenderer.invoke("updater:quitAndInstall"),
+    checkForUpdates: () => ipcRenderer.invoke(IPC.updaterCheck),
+    quitAndInstall: () => ipcRenderer.invoke(IPC.updaterQuitAndInstall),
     onUpdateStatus: (cb: (payload: unknown) => void) => {
       const listener = (_e: unknown, payload: unknown) => cb(payload);
-      ipcRenderer.on("updater:status", listener);
-      return () => ipcRenderer.removeListener("updater:status", listener);
+      ipcRenderer.on(IPC.updaterStatus, listener);
+      return () => ipcRenderer.removeListener(IPC.updaterStatus, listener);
     },
   });
 } catch {
