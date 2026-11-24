@@ -8,16 +8,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
-import { useVideoFlags } from "./useVideoFlags";
+import { useFlagsState } from "../../../shared/hooks/useFlagsState";
 import { formatTimestamp, parseTimestamp } from "../../../shared/utils/clip";
 import { groupFlags, nextOpenFlag, trimWindow, type FlagRow } from "../utils/markers";
 import { markerMemory } from "../utils/markerMemory";
 
 export function useMarkersController() {
-  const { flags } = useVideoFlags();
   const clipper = useClipperContext();
   const { playhead, cutSegments } = usePanelHost();
   const { videoId, transcript, duration, startText, endText, downloading, error } = clipper;
+  const { flags } = useFlagsState(videoId);
   useSyncExternalStore(markerMemory.subscribe, markerMemory.get, markerMemory.get);
   const mem = markerMemory.for(videoId);
 

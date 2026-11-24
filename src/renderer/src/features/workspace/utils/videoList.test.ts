@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { matchesVideoQuery, nextOpenId, setDone, splitVideos, waitingIn, looksLikeLink } from "./videoList";
+import { matchesVideoQuery, nextOpenId, nextWaitingId, setDone, splitVideos, waitingIn, looksLikeLink } from "./videoList";
 import type { WorkspaceTab } from "../hooks/WorkspaceContext";
 import type { BankData } from "../../../shared/utils/bank";
 
@@ -51,4 +51,12 @@ test("looksLikeLink tells a pasted link from search words", () => {
   assert.equal(looksLikeLink("https://www.youtube.com/watch?v=abc"), true);
   assert.equal(looksLikeLink("youtu.be/abc"), true);
   assert.equal(looksLikeLink("founder story"), false);
+});
+
+test("nextWaitingId skips Done videos and ones with nothing waiting, and wraps", () => {
+  const tabs = [tab("a"), tab("b", { done: true }), tab("c"), tab("d")];
+  const waiting = (t: WorkspaceTab) => (t.id === "a" || t.id === "b" ? 2 : t.id === "d" ? 1 : 0);
+  assert.equal(nextWaitingId(tabs, "a", waiting), "d");
+  assert.equal(nextWaitingId(tabs, "d", waiting), "a");
+  assert.equal(nextWaitingId(tabs, "a", () => 0), null);
 });

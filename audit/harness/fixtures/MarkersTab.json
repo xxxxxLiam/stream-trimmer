@@ -1,5 +1,5 @@
 {
- "_doc": "Workspace fixture with the Markers tab selected in the left group.",
+ "_doc": "Workspace fixture with the Markers tab selected: two open flags, two with a range, two clipped (as on board 03.2.8).",
  "seed": {
   "clipper.dataDirConfirmed": true,
   "clipper.campaigns": [
@@ -106,7 +106,35 @@
     ]
    }
   },
-  "clipper.signInSkipped": true
+  "clipper.signInSkipped": true,
+  "clipper.flags": {
+   "podcast214": [
+    3000,
+    3300,
+    4462,
+    4865,
+    5500,
+    5582
+   ]
+  },
+  "clipper.markerMemory": {
+   "podcast214": {
+    "ranges": {
+     "5500000": {
+      "start": 5485,
+      "end": 5515
+     },
+     "5582000": {
+      "start": 5567,
+      "end": 5597
+     }
+    },
+    "clipped": [
+     3000,
+     3300
+    ]
+   }
+  }
  },
  "stub": {
   "info": {
