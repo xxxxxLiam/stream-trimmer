@@ -10,6 +10,7 @@ import electron from "electron";
 import {
   copyFiles,
   installedApps,
+  offeredEditors,
   openWithApp,
   pathExists,
   probeMedia,
@@ -27,10 +28,10 @@ export function registerEditorHandlers() {
       return { ok: false, error: err && err.message ? err.message : String(err) };
     }
   };
-  ipcMain.handle(IPC.editorInstalled, guard(async () => ({ ok: true, apps: installedApps() })));
+  ipcMain.handle(IPC.editorInstalled, guard(async () => ({ ok: true, apps: installedApps(), offered: offeredEditors() })));
   ipcMain.handle(IPC.editorProbe, guard((file: unknown) => probeMedia(file)));
   ipcMain.handle(IPC.editorWriteFcpxml, guard((payload: unknown) => writeFcpxml(payload || {})));
-  ipcMain.handle(IPC.editorOpenWith, guard((payload: unknown) => openWithApp(payload || {})));
+  ipcMain.handle(IPC.editorOpenWith, guard((payload: unknown) => openWithApp(payload || {}, { showFile: (f: string) => shell.showItemInFolder(f) })));
   ipcMain.handle(IPC.editorReveal, guard((target: unknown) => reveal(target, { shell })));
   ipcMain.handle(IPC.editorCopyFiles, guard((payload: unknown) => copyFiles(payload || {})));
   ipcMain.handle(IPC.editorPathExists, guard((target: unknown) => pathExists(target)));

@@ -72,8 +72,10 @@ test("open failing surfaces the reason; non-macOS says macOS only", async () => 
   assert.equal(bad.ok, false);
   assert.match(bad.error, /CapCut would not open: LSOpenURLsWithRole/);
   const win = await ed.openWithApp({ app: "finalcut", file: "/c/a.fcpxml" }, { platform: "win32" });
-  assert.match(win.error, /macOS only/);
+  assert.match(win.error, /only runs on a Mac/);
   assert.match(win.error, /saved at/);
+  const linux = await ed.openWithApp({ app: "capcut" }, { platform: "linux" });
+  assert.match(linux.error, /Mac or Windows only/);
 });
 
 test("only known editors can be launched; the file must exist", async () => {
@@ -124,4 +126,23 @@ test("reveal: missing path is named; folder opens; file is shown", async () => {
   assert.deepEqual(calls, [["open", dir], ["show", file]]);
   const gone = await ed.reveal(path.join(dir, "gone"), { shell });
   assert.match(gone.error, /Nothing is at .*gone/);
+});
+
+test("Mac: Resolve is found inside its folder, and CapCut/Resolve open empty with the file shown", async () => {
+  const fsImpl = fakeFs(
+    { "/Applications": ["DaVinci Resolve", "CapCut.app"], "/Applications/DaVinci Resolve": ["DaVinci Resolve.app", "Uninstall.app"] },
+    ["/c/a.mp4"],
+  );
+  assert.equal(ed.findApp("resolve", { ...mac, fsImpl }), "/Applications/DaVinci Resolve/DaVinci Resolve.app");
+  for (const [app, bundle] of [["capcut", "/Applications/CapCut.app"], ["resolve", "/Applications/DaVinci Resolve/DaVinci Resolve.app"]]) {
+    let call;
+    const shown = [];
+    const r = await ed.openWithApp({ app, file: "/c/a.mp4" }, {
+      ...mac, fsImpl, exec: (cmd, args, cb) => { call = [cmd, args]; cb(null, "", ""); }, showFile: (f) => shown.push(f),
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.shown, true);
+    assert.deepEqual(call, ["open", ["-a", bundle]]);
+    assert.deepEqual(shown, ["/c/a.mp4"]);
+  }
 });

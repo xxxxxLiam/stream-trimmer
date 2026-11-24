@@ -97,7 +97,9 @@ export interface ElectronAPI {
   editor?: {
     installed: () => Promise<{
       ok: boolean;
-      apps?: { finalcut: boolean; premiere: boolean; capcut: boolean };
+      apps?: { finalcut: boolean; premiere: boolean; resolve: boolean; capcut: boolean };
+      /** Editors this system offers at all; Final Cut is not listed on Windows. */
+      offered?: string[];
       error?: string;
     }>;
     probe: (file: string) => Promise<{ ok: boolean; error?: string; [k: string]: unknown }>;
@@ -107,9 +109,9 @@ export interface ElectronAPI {
       contents: string;
     }) => Promise<{ ok: boolean; path?: string; error?: string }>;
     openWith: (payload: {
-      app: "finalcut" | "premiere" | "capcut";
+      app: "finalcut" | "premiere" | "resolve" | "capcut";
       file?: string;
-    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; error?: string }>;
+    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; shown?: boolean; error?: string }>;
     reveal: (target: string) => Promise<{ ok: boolean; error?: string }>;
     copyFiles: (payload: {
       dirPath: string;
