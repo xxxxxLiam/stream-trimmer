@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { toolCheckDue } from "./toolChecks";
+import { toolCheckDue } from "./toolCheckSchedule";
 
 const NOW = 1_800_000_000_000;
 test("never checked, or a day ago: due", () => {

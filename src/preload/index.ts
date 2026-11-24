@@ -90,6 +90,7 @@ try {
     // Secondary route: opens YouTube in the user's own browser, so yt-dlp can
     // be pointed at that browser's cookie store instead of an imported file.
     openYouTubeSignIn: () => ipcRenderer.invoke(IPC.shellOpenYouTubeSignIn),
+    openSymbols: () => ipcRenderer.invoke(IPC.symbolsOpen),
     getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
     getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 

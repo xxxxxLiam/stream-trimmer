@@ -145,6 +145,8 @@ export interface ElectronAPI {
   onSignInSignal: (cb: (signal: SignInSignal) => void) => () => void;
   /** The silent browser sweep's result: true when one browser's YouTube sign-in was usable. */
   reportBrowserSignIn: (usable: boolean) => Promise<{ ok: boolean }>;
+  /** Opens the small always-on-top Symbols and phrases window (one instance). Esc closes it. */
+  openSymbols: () => Promise<{ ok: boolean }>;
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string;

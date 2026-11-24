@@ -5,17 +5,10 @@
  */
 import { getSettings } from "../../features/settings/services/settingsService";
 import { updateTools } from "../../features/engine/services/toolUpdater";
+import { TOOLS_CHECKED_SETTING, toolCheckDue } from "./toolCheckSchedule";
 import * as logger from "../logger/logger";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const DELAY_MS = 60_000;
-export const TOOLS_CHECKED_SETTING = "clipper.toolsCheckedAt";
-
-/** True when a day or more has passed since the last check (or there never was one). */
-export function toolCheckDue(lastCheckedAt: unknown, now: number): boolean {
-  if (typeof lastCheckedAt !== "number" || !Number.isFinite(lastCheckedAt)) return true;
-  return now - lastCheckedAt >= DAY_MS || lastCheckedAt > now;
-}
 
 let timer: NodeJS.Timeout | null = null;
 
