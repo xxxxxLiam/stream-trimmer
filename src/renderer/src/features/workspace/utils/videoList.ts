@@ -47,3 +47,17 @@ export function matchesVideoQuery(title: string, campaign: string, query: string
 export function looksLikeLink(text: string): boolean {
   return /^(https?:\/\/|www\.|youtu\.be\/|youtube\.com\/)/i.test(text.trim());
 }
+
+/** The next open video (after `activeId`, wrapping) that has moments waiting, or null. */
+export function nextWaitingId(
+  tabs: readonly WorkspaceTab[],
+  activeId: string,
+  waiting: (t: WorkspaceTab) => number,
+): string | null {
+  const at = tabs.findIndex((t) => t.id === activeId);
+  for (let k = 1; k < tabs.length; k++) {
+    const t = tabs[(at + k) % tabs.length];
+    if (!t.done && t.id !== activeId && waiting(t) > 0) return t.id;
+  }
+  return null;
+}
