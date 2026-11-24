@@ -57,16 +57,18 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid, cutBanked, recordUse, s],
   );
 
-  const undo = useCallback(() => {
+  const undo = useCallback(async () => {
     const entry = getDownloads().find((d) => d.id === s.finished?.entryId);
     s.setFinished(null);
     if (!entry) return;
-    undoClip({
+    const res = await undoClip({
       entry,
+      trashFile: window.electronAPI?.undoClip,
       forgetUse,
       backToWaiting: (c, v, id) => bankStore.setStatus(c, v, id, "banked"),
       removeDownload,
     });
+    if (!res.ok) s.setNotice(res.error ?? "The clip could not be undone.");
   }, [s, forgetUse, removeDownload]);
 
   const retry = useCallback(() => {

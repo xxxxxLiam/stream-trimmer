@@ -42,8 +42,11 @@ import {
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
-import AppHeader from "../modules/layout/components/AppHeader";
-import AppFooter from "../modules/layout/components/AppFooter";
+import TopBar from "../modules/layout/components/TopBar";
+import BottomBar from "../modules/layout/components/BottomBar";
+import type { MenuItem } from "../modules/layout/components/PopoverMenu";
+import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
+import { nameForLanguage, planLanguages } from "../shared/utils/audioLanguages";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
@@ -246,6 +249,11 @@ function Layout({ active }: { active: boolean }) {
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
 
   const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
+  // Which audio languages the next Clip makes, remembered per campaign. No dubs: one plain clip.
+  const [audioSel, setAudioSel] = useAudioLanguageState(campaign?.id ?? null);
+  const languagePlans = useMemo(() => planLanguages(info?.audioTracks, audioSel), [info?.audioTracks, audioSel]);
+  const languagePlansRef = useRef(languagePlans);
+  languagePlansRef.current = languagePlans;
   // Clips cut this session, kept per campaign: the panel's Export / Send all / Copy file path read
   // only the ACTIVE campaign's list, so another client's clips are never offered, or sent.
   const [sessionByCampaign, setSessionByCampaign] = useState<SessionClipsByCampaign<SessionClip>>({});
@@ -348,15 +356,23 @@ function Layout({ active }: { active: boolean }) {
       const startSettings = editorRef.current;
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
       const clipId = campaign ? nextClipId(videoId, taken) : null;
-      const ok = await download({ segments, clipId: clipId ?? undefined });
-      if (!ok) return;
-      if (cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
-      afterSaved(clipId ?? `clip-${Date.now()}`, undefined, segments, startSettings);
+      // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
+      let madeAny = false;
+      for (const plan of languagePlansRef.current) {
+        const base = clipId ?? (plan.suffix ? info?.title || "clip" : undefined);
+        const name = base ? nameForLanguage(base, plan) : undefined;
+        const ok = await download({ segments, clipId: name, audioLanguage: plan.language });
+        if (!ok) break;
+        if (!madeAny && cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
+        madeAny = true;
+        afterSaved(name ?? `clip-${Date.now()}`, undefined, segments, startSettings);
+      }
+      if (!madeAny) return;
       clearSegments();
       setStartText("");
       setEndText("");
     },
-    [videoId, campaign, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
+    [videoId, campaign, info?.title, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
   );
 
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
@@ -365,9 +381,15 @@ function Layout({ active }: { active: boolean }) {
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
       const startSettings = editorRef.current;
-      const ok = await download({ segments: clip.segments, clipId: projectName?.trim() || clip.id });
-      if (ok) afterSaved(clip.id, clip.label, clip.segments, startSettings, projectName);
-      return ok;
+      const baseId = projectName?.trim() || clip.id;
+      let madeAny = false;
+      for (const plan of languagePlansRef.current) {
+        const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
+        if (!ok) break;
+        madeAny = true;
+        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName);
+      }
+      return madeAny;
     },
     [download, afterSaved],
   );
@@ -416,23 +438,29 @@ function Layout({ active }: { active: boolean }) {
     },
   };
 
+  // Overlays that are not panels. They stay one key (and one Panels menu row) away.
+  const overlayItems: MenuItem[] = [
+    { key: "copy", label: "Copy blocks", onSelect: () => setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; }) },
+    { key: "symbols", label: "Symbols", onSelect: () => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; }) },
+    ...(CHANNEL_DATA_BUILT && channelAvailable
+      ? [{ key: "channel", label: screen === "channel" ? "Back to workspace" : "Channel data", onSelect: () => setScreen(screen === "channel" ? "workspace" : "channel") } as MenuItem]
+      : []),
+  ];
+  // The campaign menu's "<Campaign> settings" row calls this. The Start, Settings and Help build
+  // swaps in its campaign form here; until then the menu falls back to its own inline form.
+  const openCampaignSettings: ((campaignId: string) => void) | undefined = undefined;
+
   return (
     <>
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
-        <AppHeader
-          {...(CHANNEL_DATA_BUILT ? { screen, onScreen: setScreen, channelAvailable } : null)}
-          copyOpen={copyOpen}
-          onToggleCopy={() => setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; })}
-          symbolsOpen={symbolsOpen}
-          onToggleSymbols={() => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; })}
+        <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => setHelpOpen((v) => !v)}
           settingsOpen={settingsOpen}
           onToggleSettings={() => setSettingsOpen((v) => !v)}
-          onCloseSettings={closeSettings}
-          campaignMenu={<CampaignMenu />}
-          panelsMenu={<PanelsMenu triggerClassName="icon-btn" />}
+          campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
+          panelsMenuExtras={overlayItems}
         />
         {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
           <PanelHostProvider value={panelHost}>
@@ -452,9 +480,13 @@ function Layout({ active }: { active: boolean }) {
             <HelpDrawer open={helpOpen} onClose={closeHelp} />
           </div>
         )}
-        <AppFooter
-          onPickClipsDir={isElectron ? pickClipsDir : undefined}
-          onPickDataDir={isElectron ? pickDataDir : undefined}
+        <BottomBar
+          clipCount={languagePlans.length}
+          tracks={info?.audioTracks}
+          selectedLanguages={audioSel}
+          onSelectLanguages={setAudioSel}
+          folder={folders.clipsDir || saveDir || ""}
+          onPickFolder={isElectron ? pickClipsDir : undefined}
         />
       </main>
       <CampaignStart
