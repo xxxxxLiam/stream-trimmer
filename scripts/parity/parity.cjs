@@ -96,7 +96,7 @@ async function screenshotApp(screen, frame, fx) {
     await a.win.waitForSelector(fx.waitFor || "#root *");
     await runSteps(a.win, fx.steps);
     await a.win.waitForTimeout(400);
-    return await a.win.screenshot({ clip: { x: 0, y: 0, width: frame.width, height: frame.height } });
+    return await a.win.screenshot({ clip: { x: 0, y: 0, width: frame.width, height: frame.shotHeight || frame.height } });
   } finally {
     await a.close();
     if (link) fs.rmSync(link, { recursive: true, force: true });

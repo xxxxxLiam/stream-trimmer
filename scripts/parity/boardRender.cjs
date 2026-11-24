@@ -127,7 +127,10 @@ async function renderBoard(screen, opts = {}) {
       const width = Math.round(box.width);
       const height = Math.round(box.height);
       const png = await page.screenshot({ fullPage: true, clip: { x: Math.round(box.x), y: Math.round(box.y), width, height } });
-      return { png, frame: { width, height, title: frame.title } };
+      // A board can be shorter than the window it draws (the frame is cut off at the board's edge).
+      // Report the window's real size, and how much of it the picture shows.
+      const shotHeight = Math.min(height, Math.max(0, Math.round(await page.evaluate(() => document.documentElement.scrollHeight)) - Math.round(box.y)));
+      return { png, frame: { width, height, shotHeight, title: frame.title } };
     }
     return { png: await page.screenshot({ clip: { x: 0, y: 0, width: frame.width, height: frame.height } }), frame };
   } finally {
