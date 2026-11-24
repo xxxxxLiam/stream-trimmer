@@ -303,3 +303,25 @@ test("E-4: the owner's own machine is let through", SLOW, async (t) => {
     },
   );
 });
+
+test("a cancelled export resumes without re-scraping the videos it already collected", SLOW, () =>
+  withHarness(CHANNEL, async (harness) => {
+    const jobId = `iso_${crypto.randomUUID()}`;
+    const running = post(harness, `/api/channel/export?jobId=${jobId}`, REQUEST);
+    const dir = await midRun(harness);
+    const cancelled = await post(harness, "/api/channel/export/cancel", { jobId });
+    assert.equal(cancelled.status, 200);
+    await running;
+
+    const saved = fs
+      .readFileSync(path.join(dir, "statuses.jsonl"), "utf8")
+      .split("\n")
+      .filter((l) => l.trim()).length;
+    assert.ok(saved > 0 && saved < 6, `the first run should stop part-way, saved ${saved}`);
+
+    harness.resetCalls();
+    const resumed = await startExport(harness);
+    assert.equal(resumed.status, 200, JSON.stringify(resumed.body));
+    assert.equal(harness.calls().comments, 6 - saved, "only the videos not yet collected are scraped");
+    assert.equal(scanCsvFile(csvOf(resumed.body, "comments.csv")).rows, 6 * 3, "and every row is still there");
+  }));
