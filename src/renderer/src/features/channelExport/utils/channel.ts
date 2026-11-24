@@ -5,6 +5,9 @@
  */
 import { sanitizeFilename } from "../../../shared/utils/clip";
 import type { AuthSource } from "../../../shared/utils/clip";
+import { COMMENT_COLUMNS, CSV_BOM, CSV_EOL, STATUS_COLUMNS, SUMMARY_COLUMNS, TRANSCRIPT_COLUMNS, VIDEO_COLUMNS, csvCell } from "../../../../../common/schemas/channelCsv";
+
+export { COMMENT_COLUMNS, STATUS_COLUMNS, SUMMARY_COLUMNS, TRANSCRIPT_COLUMNS, VIDEO_COLUMNS };
 
 export type ChannelContentType = "shorts" | "longform" | "all";
 
@@ -200,82 +203,17 @@ export function isPathDelivery(
 }
 
 // RFC 4180-ish CSV with a UTF-8 BOM so Excel handles emoji and non-Latin text.
+// The cell rule and column orders are the engine's own (src/common/schemas/channelCsv.ts).
 export function rowsToCsv(columns: string[], rows: CsvRow[]): string {
-  // Same rule as csvCell() in src/main/features/engine/services/channelExport/csv.ts, byte for byte: a text cell that a
-  // spreadsheet would read as a formula (leading = + - @ tab CR LF) gets a
-  // leading single quote; real numbers and plain decimal strings are left alone.
-  const FORMULA_START = /^[=+\-@\t\r\n]/;
-  const PLAIN_NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
-  const escape = (v: unknown): string => {
-    const s = v == null ? "" : String(v);
-    const safe =
-      typeof v !== "number" && FORMULA_START.test(s) && !PLAIN_NUMBER.test(s)
-        ? `'${s}`
-        : s;
-    return `"${safe.replace(/"/g, '""')}"`;
-  };
-  const lines = [columns.map(escape).join(",")];
-  for (const row of rows) {
-    lines.push(columns.map((c) => escape(row[c])).join(","));
-  }
-  return "\uFEFF" + lines.join("\r\n") + "\r\n";
+  const lines = [columns.map(csvCell).join(",")];
+  for (const row of rows) lines.push(columns.map((c) => csvCell(row[c])).join(","));
+  return CSV_BOM + lines.join(CSV_EOL) + CSV_EOL;
 }
-
-export const VIDEO_COLUMNS = [
-  "video_id",
-  "url",
-  "title",
-  "description",
-  "upload_date",
-  "duration_seconds",
-  "is_short",
-  "view_count",
-  "like_count",
-  "comment_count",
-  "channel",
-  "thumbnail",
-  "tags",
-  "tag_count",
-  "hashtags",
-  "hashtags_in_title",
-];
-
-
-export const COMMENT_COLUMNS = [
-  "video_id",
-  "comment_id",
-  "parent_id",
-  "is_reply",
-  "author",
-  "author_channel_id",
-  "text",
-  "like_count",
-  "is_pinned",
-  "is_uploader",
-  "published_time",
-  "timestamp",
-];
-
-export const TRANSCRIPT_COLUMNS = ["video_id", "start", "end", "text"];
-
-export const STATUS_COLUMNS = ["video_id", "title", "status"];
 
 export interface ExportFile {
   name: string;
   contents: string;
 }
-
-export const SUMMARY_COLUMNS = [
-  "channel",
-  "channel_url",
-  "subscriber_count",
-  "exported_at",
-  "filter",
-  "requested",
-  "exported",
-  "cancelled",
-  "included",
-];
 
 export function buildExportFiles(data: ChannelExportRows): ExportFile[] {
   // Only the parts that were asked for. The server does the same for path
