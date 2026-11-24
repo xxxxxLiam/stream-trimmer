@@ -19,6 +19,16 @@ export interface DownloadEntry {
   dir: string | null;
   detail?: string;
   savedAt: number;
+  /** Set after a clip is made, for the History row: campaign, length, and where it came from. */
+  campaign?: string;
+  campaignId?: string;
+  /** The id the clip was made under (bank id or campaign clip id); Undo gives its ranges back. */
+  clipId?: string;
+  segments?: { start: number; end: number }[];
+  seconds?: number;
+  videoId?: string;
+  videoTitle?: string;
+  startSec?: number;
 }
 
 type Listener = () => void;
@@ -50,6 +60,20 @@ export function addDownload(
   };
   entries = [next, ...entries].slice(0, MAX_ENTRIES);
   emit();
+}
+
+/** Adds what only the screen knows (campaign, length, source) to an entry just saved. */
+export function annotateDownload(
+  id: string,
+  extra: Pick<DownloadEntry, "campaign" | "campaignId" | "clipId" | "segments" | "seconds" | "videoId" | "videoTitle" | "startSec">,
+): void {
+  entries = entries.map((e) => (e.id === id ? { ...e, ...extra } : e));
+  emit();
+}
+
+/** The clip's name without its file extension ("Honest Version.mp4" is "Honest Version"). */
+export function clipTitle(label: string): string {
+  return label.replace(/\.[A-Za-z0-9]{2,4}$/, "");
 }
 
 export function removeDownload(id: string): void {
