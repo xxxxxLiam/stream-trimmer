@@ -27,7 +27,7 @@ function Row({
     <div
       className={
         "group relative mx-[10px] my-[3px] flex items-center gap-[10px] rounded-control border bg-raised p-2 " +
-        (row.isOpen ? "border-ice shadow-row" : "border-transparent hover:bg-hover")
+        (row.isOpen ? "border-ice shadow-row" : "border-transparent")
       }
     >
       <button
