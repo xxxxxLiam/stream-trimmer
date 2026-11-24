@@ -25,3 +25,19 @@ test("renders a board at its canvas.json frame with every binding expanded", { s
 test("rejects a board that is not in canvas.json", { skip: !have }, async () => {
   await assert.rejects(() => renderBoard("NoSuchBoard"), /not in canvas.json/);
 });
+
+test("window mode crops to the 1360 by 760 app frame the board draws", { skip: !have }, async () => {
+  const prev = process.env.PARITY_SNAPSHOT;
+  process.env.PARITY_SNAPSHOT = "pending";
+  try {
+    if (!fs.existsSync(`${require("./parity/boardRender.cjs").SNAPSHOT}/Main01Layout.dc.html`)) return;
+    const { png, frame } = await renderBoard("Main01Layout", { window: 0 });
+    assert.deepEqual([frame.width, frame.height], [1360, 760]);
+    assert.equal(png.readUInt32BE(16), 1360);
+    assert.equal(png.readUInt32BE(20), 760);
+    await assert.rejects(() => renderBoard("Main01Layout", { window: 5 }), /no window frame #5/);
+  } finally {
+    if (prev === undefined) delete process.env.PARITY_SNAPSHOT;
+    else process.env.PARITY_SNAPSHOT = prev;
+  }
+});

@@ -11,8 +11,13 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { chromium } = require("playwright");
 
-const SNAPSHOT = process.env.PARITY_SNAPSHOT
-  || "/mnt/project-files/design/canvas-snapshot-2026-11-24/project";
+const SNAPSHOTS = {
+  snapshot: "/mnt/project-files/design/canvas-snapshot-2026-11-24/project",
+  // One board per workspace state (03.2.x), published after the snapshot.
+  pending: "/mnt/project-files/design/canvas-pending/project",
+};
+/** Read at call time so the CLI flag can set it after load. */
+const snapshotDir = () => SNAPSHOTS[process.env.PARITY_SNAPSHOT] || process.env.PARITY_SNAPSHOT || SNAPSHOTS.snapshot;
 
 /** Runs in the page. Replaces the missing support.js. */
 const SHIM = `
@@ -78,13 +83,18 @@ const SHIM = `
 
 /** Frame size of a board, from canvas.json. */
 function boardFrame(file) {
-  const meta = JSON.parse(fs.readFileSync(path.join(SNAPSHOT, "canvas.json"), "utf8"));
+  const meta = JSON.parse(fs.readFileSync(path.join(snapshotDir(), "canvas.json"), "utf8"));
   const b = meta.boards[file];
   if (!b) throw new Error(`${file} is not in canvas.json`);
   return { width: b.w, height: b.h, title: b.title };
 }
 
-/** Screenshot a board at its frame size. Returns a PNG buffer. */
+/**
+ * Screenshot a board at its frame size, or (opts.window = n) just the n-th app-window drawing on
+ * it: the 14px-radius, overflow-hidden frame at least 900 by 500, in document order. Boards draw
+ * the window inside a heading and a margin, so this is the part the real app can be compared to.
+ * Returns { png, frame } with frame = the size that was captured.
+ */
 async function renderBoard(screen, opts = {}) {
   const file = screen.endsWith(".dc.html") ? screen : `${screen}.dc.html`;
   const frame = boardFrame(file);
@@ -95,13 +105,34 @@ async function renderBoard(screen, opts = {}) {
       deviceScaleFactor: 1,
     });
     await page.route("**/support.js", (r) => r.fulfill({ contentType: "text/javascript", body: SHIM }));
-    await page.goto("file://" + path.join(SNAPSHOT, file));
+    await page.goto("file://" + path.join(snapshotDir(), file));
     await page.waitForSelector("html[data-board-ready]");
     await page.evaluate(() => document.fonts && document.fonts.ready);
+    if (opts.window !== undefined) {
+      const handles = await page.evaluateHandle(() =>
+        [...document.querySelectorAll("x-dc *")].filter((e) => {
+          const b = e.getBoundingClientRect();
+          const st = getComputedStyle(e);
+          return b.width >= 900 && b.height >= 500 && st.borderTopLeftRadius === "14px" && st.overflow === "hidden";
+        }),
+      );
+      const els = (await handles.getProperties());
+      const el = els.get(String(opts.window))?.asElement();
+      if (!el) throw new Error(`${file} has no window frame #${opts.window}`);
+      // Page coordinates, rounded to whole pixels so the capture matches an integer-sized app window.
+      const box = await el.evaluate((n) => {
+        const r = n.getBoundingClientRect();
+        return { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height };
+      });
+      const width = Math.round(box.width);
+      const height = Math.round(box.height);
+      const png = await page.screenshot({ fullPage: true, clip: { x: Math.round(box.x), y: Math.round(box.y), width, height } });
+      return { png, frame: { width, height, title: frame.title } };
+    }
     return { png: await page.screenshot({ clip: { x: 0, y: 0, width: frame.width, height: frame.height } }), frame };
   } finally {
     await browser.close();
   }
 }
 
-module.exports = { renderBoard, boardFrame, SNAPSHOT };
+module.exports = { renderBoard, boardFrame, get SNAPSHOT() { return snapshotDir(); } };
