@@ -65,7 +65,9 @@ test("the player fills the column, and the controls under it stay reachable", ()
   assert.doesNotMatch(rule![1], /100vh/, "no viewport-height cap: that is what letterboxed it");
 
   const slots = readFileSync(new URL("../../player/panels.tsx", import.meta.url), "utf8");
-  for (const slot of ["Preview", "Timeline"]) {
+  // The Preview no longer scrolls: its video well takes the height the panel gives it and the
+  // transport sits under it inside the panel, so only the Timeline slot has to scroll itself.
+  for (const slot of ["Timeline"]) {
     assert.match(
       slots,
       new RegExp(`tabIndex=\\{0\\} aria-label="${slot}" className="[^"]*overflow-y-auto`),

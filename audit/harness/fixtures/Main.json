@@ -1,0 +1,6 @@
+{
+  "_doc": "Parity fixture for the Workspace board (03.2.1). Boots with the data folder confirmed and no video: the board's picture is a placeholder, and YouTube is unreachable from cloud sessions, so the video well cannot match.",
+  "seed": { "clipper.dataDirConfirmed": true },
+  "waitFor": "#root *",
+  "steps": []
+}
