@@ -35,6 +35,7 @@
   --ice-tint-50: rgb(var(--ice-rgb) / 0.5);
   --ice-tint-60: rgb(var(--ice-rgb) / 0.6);
   --ice-tint-80: rgb(var(--ice-rgb) / 0.8);
+  --frost-tint-08: rgb(var(--frost-rgb) / 0.08);
   --frost-tint-35: rgb(var(--frost-rgb) / 0.35);
   --frost-tint-45: rgb(var(--frost-rgb) / 0.45);
   --frost-tint-60: rgb(var(--frost-rgb) / 0.6);

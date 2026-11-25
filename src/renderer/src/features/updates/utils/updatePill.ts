@@ -1,7 +1,7 @@
 /**
  * File: updatePill.ts
  * Path: src/renderer/src/features/updates/utils/updatePill.ts
- * Description: What the top bar's update pill says for the main process's UpdateReady. "Restart to
+ * Description: What the top bar's update pill says for the main process's UpdateReady. "Restart app to
  *   update" (mode restart), or on the unsigned Mac build "Get version <x>" that opens the installer
  *   download (mode download). Whether a clip is being made is the main process's call: a restart it
  *   during a clip answers { ok: true, waiting: true } and Clipr restarts by itself when the clips finish.
@@ -15,7 +15,7 @@ export type UpdatePill =
 export function updatePillFor(ready: UpdateReady | null): UpdatePill | null {
   if (!ready) return null;
   if (ready.mode === "download") return { kind: "download", label: `Get version ${ready.version}`, url: ready.url };
-  return { kind: "restart", label: "Restart to update" };
+  return { kind: "restart", label: "Restart app to update" };
 }
 
 /** The sentence under a refused restart, or null when it worked. */
@@ -25,7 +25,12 @@ export function restartRefusal(result: RestartToUpdateResult): string | null {
   return "The update could not restart the app. It will install when you quit.";
 }
 
-/** The quiet pill while the new version downloads (no click: nothing to do yet). */
+/** The pill while a restart waits for the clip being made (Press to cancel). */
+export function waitingLabel(clipName: string | null | undefined): string {
+  return `Restarts after ${clipName?.trim() || "the clip"}`;
+}
+
+/** The pill while the new version downloads (no click: nothing to do yet). */
 export function downloadingLabel(percent: number): string {
   if (!Number.isFinite(percent) || percent < 0) return "Downloading update";
   return `Downloading update ${Math.max(0, Math.min(100, Math.round(percent)))}%`;

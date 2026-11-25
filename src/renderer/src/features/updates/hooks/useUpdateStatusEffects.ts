@@ -8,15 +8,19 @@ import { useEffect, useState } from "react";
 import type { UpdateReady } from "../../../../../common/types/updates";
 
 /** The ready update, and while one is still coming down, how far along it is (whole percent), else null. */
-export function useUpdateStatusEffects(): { ready: UpdateReady | null; downloading: number | null } {
+export function useUpdateStatusEffects(): { ready: UpdateReady | null; downloading: number | null; waiting: boolean } {
   const [ready, setReady] = useState<UpdateReady | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
+  // A restart that is waiting for the clip being made (the pill then reads "Restarts after <clip>").
+  const [waiting, setWaiting] = useState(false);
   useEffect(() => {
     const api = typeof window !== "undefined" ? window.electronAPI : undefined;
     if (!api?.onUpdateReady) return;
     let live = true;
     void api.getUpdateReady?.().then((r) => live && r && setReady(r));
     const off = api.onUpdateReady(setReady);
+    void api.getRestartWaiting?.().then((w) => live && setWaiting(!!w));
+    const offWaiting = api.onRestartWaiting?.(setWaiting);
     // F-16: the download's progress arrives on its own channel; without this nothing shows while it runs.
     const offStatus = api.onUpdateStatus?.((s) => {
       // F3-4: only a downloading status moves it, and only to a real number; "checking" mid-download keeps the
@@ -28,7 +32,8 @@ export function useUpdateStatusEffects(): { ready: UpdateReady | null; downloadi
       live = false;
       off();
       offStatus?.();
+      offWaiting?.();
     };
   }, []);
-  return { ready, downloading };
+  return { ready, downloading, waiting };
 }
