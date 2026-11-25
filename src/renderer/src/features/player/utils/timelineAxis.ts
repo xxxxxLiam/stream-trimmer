@@ -40,7 +40,7 @@ export function windowFor(duration: number, zoom: number, focus: number): Win {
 export function fitWindow(range: Range | null, duration: number): Win {
   if (!range || !(range.end > range.start)) return { start: 0, end: Math.max(0, duration) };
   const len = range.end - range.start;
-  const pad = Math.max(len * 0.5, (MIN_WINDOW_SECONDS - len) / 2, 5);
+  const pad = Math.max(len / 3, (MIN_WINDOW_SECONDS - len) / 2, 5);
   const start = Math.max(0, range.start - pad);
   const end = Math.min(duration || range.end + pad, range.end + pad);
   return { start, end };

@@ -1,0 +1,7 @@
+{
+ "_doc": "PreviewEnd cropped to the preview panel, for Main05EndOfVideo --el 2.",
+ "extends": "PreviewEnd",
+ "region": {
+  "selector": "[data-panel='preview']"
+ }
+}
