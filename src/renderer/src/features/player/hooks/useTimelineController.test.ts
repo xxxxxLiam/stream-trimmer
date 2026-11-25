@@ -234,9 +234,16 @@ test("the selection outline sits exactly on the picture strip's top and bottom l
 
 test("pointer tool: pressing a selected range's body on the Source lane moves it (length kept); a grabbed edge resizes; no move means a click seek", () => {
   assert.match(down, /target\.closest\('\[data-lane="source"\]'\)/);
-  assert.match(down, /kind: "move", grab: t - range\.start, len: range\.end - range\.start/);
+  assert.match(down, /kind: "move", grab: t - hit\.r\.start, len: hit\.r\.end - hit\.r\.start/);
+  assert.match(down, /pickSection\(/);
   assert.match(src, /const r = movedRange\(d\.len, d\.grab, t, duration\);\s*clipper\.setRangeFromSeconds\(r\.start, r\.end\)/);
-  assert.match(src, /if \(!d\.moved\) clipper\.requestSeek\(Math\.round\(d\.pressedAt\)\)/);
+  assert.match(src, /if \(!d\.moved\) \{[\s\S]*?clipper\.requestSeek\(Math\.round\(d\.pressedAt\)\)/);
+});
+
+test("a locked section is movable too: it is promoted to the selected range, the old one locks, Esc puts all back", () => {
+  assert.match(down, /if \(range\) store\.add\(range, /);
+  assert.match(down, /store\.remove\(hit\.id\)/);
+  assert.match(src, /store\.load\(before\.segments\)/);
 });
 
 test("a moved range touching another section reads as one and joins only on release; Esc and edge scroll cover the move", () => {

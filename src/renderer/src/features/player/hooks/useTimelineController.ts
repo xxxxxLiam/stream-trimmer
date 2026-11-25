@@ -18,7 +18,7 @@ import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
 import { clampX, edgeScroll, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
-import { TOUCH_PX, movedRange, touching } from "../utils/sectionMove";
+import { TOUCH_PX, movedRange, pickSection, touching } from "../utils/sectionMove";
 import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, END_PAD_PX, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
@@ -184,6 +184,7 @@ export function useTimelineController() {
     if (tools.tool === "range") {
       // Select range: press and drag sets a range; a grabbed edge of the picked range resizes it.
       marksBeforeDrag.current = { start: clipper.startText, end: clipper.endText };
+      promoted.current = false;
       if (range) {
         const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
         if (edge) {
@@ -199,16 +200,27 @@ export function useTimelineController() {
     }
     // On the Source lane the pointer also works the selected range: a grabbed edge resizes it, its body moves it
     // (length kept). A press on the body that never moves is just a click, which goes to that spot.
-    if (range && target.closest('[data-lane="source"]')) {
-      const a = toX(axis, range.start);
-      const b = toX(axis, range.end);
-      const edge = grabbedEdge(x, a, b);
-      if (edge || (x >= a && x <= b)) {
-        marksBeforeDrag.current = { start: clipper.startText, end: clipper.endText };
+    if (target.closest('[data-lane="source"]')) {
+      const hit = pickSection(
+        x,
+        [...(range ? [{ id: "range" as const, r: range }] : []), ...store.segments.map((r, i) => ({ id: i, r }))],
+        (tt) => toX(axis, tt),
+        grabbedEdge,
+      );
+      if (hit) {
+        marksBeforeDrag.current = { start: clipper.startText, end: clipper.endText, segments: store.segments.map((x0) => ({ ...x0 })) };
+        promoted.current = hit.id !== "range";
+        // A locked section is taken up as the selected range (the one that was selected locks in its place), so
+        // every section moves, resizes and merges the same way. Esc, or a press that never moves, puts all back.
+        if (hit.id !== "range") {
+          if (range) store.add(range, { duration: duration || undefined });
+          store.remove(hit.id);
+          clipper.setRangeFromSeconds(hit.r.start, hit.r.end);
+        }
         frozen.current = shown;
         s.setDragOrigin(e.clientX);
-        if (edge) return s.setDrag({ kind: "edge", edge, fixed: edge === "start" ? range.end : range.start });
-        return s.setDrag({ kind: "move", grab: t - range.start, len: range.end - range.start, pressedAt: t, moved: false });
+        if (hit.edge) return s.setDrag({ kind: "edge", edge: hit.edge, fixed: hit.edge === "start" ? hit.r.end : hit.r.start });
+        return s.setDrag({ kind: "move", grab: t - hit.r.start, len: hit.r.end - hit.r.start, pressedAt: t, moved: false });
       }
     }
     // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
@@ -217,7 +229,9 @@ export function useTimelineController() {
   };
 
   // B3-2: Esc during a Select range drag puts the marks back as they were and ends the drag.
-  const marksBeforeDrag = useRef<{ start: string; end: string } | null>(null);
+  const marksBeforeDrag = useRef<{ start: string; end: string; segments?: { start: number; end: number }[] } | null>(null);
+  /** A locked section was taken up as the selected range by the press now being dragged. */
+  const promoted = useRef(false);
   const dragKind = s.drag?.kind;
   useEffect(() => {
     if (dragKind !== "range" && dragKind !== "edge" && dragKind !== "move") return;
@@ -227,6 +241,7 @@ export function useTimelineController() {
       if (before) {
         clipper.setStartText(before.start);
         clipper.setEndText(before.end);
+        if (before.segments) store.load(before.segments);
       }
       frozen.current = null;
       s.setDrag(null);
@@ -329,7 +344,15 @@ export function useTimelineController() {
     s.setDrag(null);
     if (d?.kind === "move") {
       frozen.current = null;
-      if (!d.moved) clipper.requestSeek(Math.round(d.pressedAt));
+      if (!d.moved) {
+        const before = marksBeforeDrag.current;
+        if (promoted.current && before) {
+          clipper.setStartText(before.start);
+          clipper.setEndText(before.end);
+          if (before.segments) store.load(before.segments);
+        }
+        clipper.requestSeek(Math.round(d.pressedAt));
+      }
       else if (mergeHint) {
         // Let go while touching: the sections become one range (the touched ones fold into it).
         [...mergeHint.indices].sort((a, b) => b - a).forEach((i) => store.remove(i));

@@ -30,3 +30,21 @@ test("touching: a range that bridges two sections joins all three", () => {
   const sections = [{ start: 100, end: 130 }, { start: 140, end: 170 }];
   assert.deepEqual(touching({ start: 128, end: 142 }, sections, 0), { union: { start: 100, end: 170 }, indices: [0, 1] });
 });
+
+import { pickSection } from "./sectionMove";
+
+test("pickSection: the selected range wins, then locked sections; edges before bodies; none outside", () => {
+  const xOf = (t: number) => t; // 1 px per second
+  const edgeOf = (x: number, a: number, b: number) => (Math.abs(x - a) <= 4 ? ("start" as const) : Math.abs(x - b) <= 4 ? ("end" as const) : null);
+  const cands = [
+    { id: "range" as const, r: { start: 100, end: 140 } },
+    { id: 0, r: { start: 300, end: 360 } },
+    { id: 1, r: { start: 500, end: 520 } },
+  ];
+  assert.deepEqual(pickSection(120, cands, xOf, edgeOf), { id: "range", r: cands[0].r, edge: null });
+  assert.deepEqual(pickSection(330, cands, xOf, edgeOf), { id: 0, r: cands[1].r, edge: null });
+  assert.deepEqual(pickSection(303, cands, xOf, edgeOf), { id: 0, r: cands[1].r, edge: "start" });
+  assert.deepEqual(pickSection(521, cands, xOf, edgeOf), { id: 1, r: cands[2].r, edge: "end" });
+  assert.equal(pickSection(200, cands, xOf, edgeOf), null);
+  assert.equal(pickSection(5, [], xOf, edgeOf), null);
+});

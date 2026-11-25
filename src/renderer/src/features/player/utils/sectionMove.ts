@@ -36,3 +36,24 @@ export function touching(range: Range, sections: readonly Range[], tol: number):
   });
   return indices.length ? { union: { start, end }, indices } : null;
 }
+
+export type Candidate = { id: "range" | number; r: Range };
+
+/**
+ * Which section a press at lane position `x` is on: the selected range first, then the locked sections in
+ * order. A press near an edge grabs that edge; inside the body it grabs the body. Null when it is on none.
+ */
+export function pickSection(
+  x: number,
+  candidates: readonly Candidate[],
+  xOf: (t: number) => number,
+  edgeOf: (x: number, a: number, b: number) => "start" | "end" | null,
+): { id: "range" | number; r: Range; edge: "start" | "end" | null } | null {
+  for (const c of candidates) {
+    const a = xOf(c.r.start);
+    const b = xOf(c.r.end);
+    const edge = edgeOf(x, a, b);
+    if (edge || (x >= a && x <= b)) return { id: c.id, r: c.r, edge };
+  }
+  return null;
+}
