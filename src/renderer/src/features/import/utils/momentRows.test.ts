@@ -35,9 +35,12 @@ test("end before start is flagged with Swap times; a cut-off link with Skip", ()
   assert.deepEqual(rows[1].problem, { reason: "link cut off", fix: "skip" });
 });
 
-test("a moment past the end of the open video is flagged", () => {
-  const rows = parseMoments([header, `${A}\t2:20:00\t2:21:00\tToo Late\t\t\t\t`].join("\n"), ctx);
-  assert.equal(rows[0].problem?.reason, "past the end of the video");
+test("a moment that starts past the end of the open video is flagged; one that only ends past it stops at the end", () => {
+  const rows = parseMoments([header, `${A}\t2:20:00\t2:21:00\tToo Late\t\t\t\t`, `${A}\t2:14:00\t2:20:00\tRan Over\t\t\t\t`].join("\n"), ctx);
+  assert.equal(rows[0].problem?.reason, "This part isn’t in the video");
+  assert.equal(rows[1].problem, undefined);
+  assert.equal(rows[1].end, 8073);
+  assert.equal(rows[1].ranPastEnd, 8073);
 });
 
 test("rows with no header still read in the Copy format order", () => {

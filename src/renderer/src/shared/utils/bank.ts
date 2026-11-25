@@ -24,6 +24,8 @@ export type BankedClip = {
   /** Rating from the import, 0 to 10. */
   rating?: number;
   note?: string;
+  /** An imported or typed out point was past the video's end and was moved to it: the end, in seconds. Goes when the clip is opened. */
+  ranPastEnd?: number;
 };
 
 /** campaignId -> videoId -> clips, in import order. */
@@ -70,6 +72,7 @@ export function normalizeBank(raw: unknown): BankData {
         if (typeof r.tier === "string" && r.tier) clip.tier = r.tier;
         if (typeof r.rating === "number" && Number.isFinite(r.rating)) clip.rating = r.rating;
         if (typeof r.note === "string" && r.note) clip.note = r.note;
+        if (typeof r.ranPastEnd === "number" && Number.isFinite(r.ranPastEnd) && r.ranPastEnd > 0) clip.ranPastEnd = r.ranPastEnd;
         if (!clips.some((x) => x.id === r.id)) clips.push(clip);
       }
       if (clips.length) (out[campaignId] ??= {})[videoId] = clips;
@@ -153,6 +156,7 @@ export function importClips(
       if (p.tier) clip.tier = p.tier;
       if (p.note) clip.note = p.note;
       if (typeof p.rating === "number") clip.rating = p.rating;
+      if (typeof p.ranPastEnd === "number") clip.ranPastEnd = p.ranPastEnd;
       return clip;
     };
     if (idx >= 0) {
@@ -204,6 +208,17 @@ export function setNote(data: BankData, campaignId: string, videoId: string, cli
       return note.trim() ? { ...rest, note: note.trim() } : rest;
     }),
   );
+}
+
+/** The "ran past the end" line has done its job once the clip is opened or changed. */
+export function clearRanPastEnd(data: BankData, campaignId: string, videoId: string, clipId: string): BankData {
+  const list = clipsFor(data, campaignId, videoId);
+  if (!list.some((c) => c.id === clipId && c.ranPastEnd !== undefined)) return data;
+  return withClips(data, campaignId, videoId, list.map((c) => {
+    if (c.id !== clipId) return c;
+    const { ranPastEnd: _gone, ...rest } = c;
+    return rest;
+  }));
 }
 
 export type CutResult = { data: BankData; clip: BankedClip; ranges: Segment[] };
@@ -324,6 +339,7 @@ export type BankStore = {
   setStatus: (campaignId: string, videoId: string, clipId: string, status: BankStatus) => void;
   remove: (campaignId: string, videoId: string, clipId: string) => void;
   setNote: (campaignId: string, videoId: string, clipId: string, note: string) => void;
+  clearRanPastEnd: (campaignId: string, videoId: string, clipId: string) => void;
   /** Forget everything banked under a campaign (it was removed). */
   removeCampaign: (campaignId: string) => void;
 };
@@ -358,6 +374,7 @@ export function createBankStore(io: BankIO): BankStore {
     setStatus: (c, v, id, s) => commit(setStatus(data, c, v, id, s)),
     remove: (c, v, id) => commit(removeClip(data, c, v, id)),
     setNote: (c, v, id, n) => commit(setNote(data, c, v, id, n)),
+    clearRanPastEnd: (c, v, id) => commit(clearRanPastEnd(data, c, v, id)),
     removeCampaign: (c) => commit(removeCampaignBank(data, c)),
   };
 }
