@@ -16,6 +16,7 @@ import { labelWidth, packRows, placeLabels } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
+import { MAX_CLIP_SECONDS, overCapMessage } from "../../../shared/utils/clip";
 import { useClipController } from "../hooks/useClipController";
 import { IconClose } from "../../../shared/components/PanelIcons";
 import ClipNameField from "./ClipNameField";
@@ -24,6 +25,7 @@ import LaneLabel from "./LaneLabel";
 /** A bar never draws narrower than its padding and border (8 + 8 + 2), so rows are packed on this. */
 const MIN_BAR = 18;
 const ROW_H = 14;
+const OVER_LINE_H = 16;
 const BAR =
   "absolute top-[5px] h-[24px] overflow-hidden text-ellipsis whitespace-nowrap px-[8px] text-meta leading-[22px]";
 
@@ -145,7 +147,9 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     );
   };
   const laneRows = Math.max(1, ...slots.map((s) => s.rows));
-  const laneHeight = laneRows > 1 ? 10 + laneRows * ROW_H : 34;
+  // An unsaved range over the 10-minute cap says so under its bar, live as it is dragged, without a hover.
+  const overCap = unsaved && c.totalSeconds > MAX_CLIP_SECONDS ? overCapMessage(c.totalSeconds) : "";
+  const laneHeight = (laneRows > 1 ? 10 + laneRows * ROW_H : 34) + (overCap ? OVER_LINE_H : 0);
   const placeOf = (key: string) => {
     const i = named.findIndex((n) => n.key === key);
     return i < 0 ? { inside: true, outsideWidth: 0 } : places[i];
@@ -230,6 +234,8 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 style={styleOf("built", sections[0].start, sections[0].end)}
                 length={c.lengthText}
                 blocked={clipNow.reason}
+                over={overCap}
+                lineTop={5 + laneRows * (laneRows > 1 ? ROW_H : 24) + 2}
                 onCreate={clipNow.clip}
                 onRemove={c.clearRange}
               />
@@ -297,21 +303,37 @@ export function UnsavedRange({
   style,
   length,
   blocked,
+  over = "",
+  lineTop = 31,
   onCreate,
   onRemove,
 }: {
   style: CSSProperties;
   length: string;
   blocked: string | null;
+  /** The over-the-cap sentence, shown under the bar; empty when the range fits. */
+  over?: string;
+  lineTop?: number;
   onCreate: () => void;
   onRemove: () => void;
 }) {
   const width = Number(style.width ?? 0);
   const narrow = width < 150;
   return (
+    <>
+    {over ? (
+      <span
+        role="alert"
+        data-unsaved-over
+        className="pointer-events-none absolute whitespace-nowrap text-meta leading-[14px] text-error"
+        style={{ left: Math.max(0, Number(style.left ?? 0)), top: lineTop }}
+      >
+        {over}
+      </span>
+    ) : null}
     <span
       data-unsaved-range
-      className="absolute rounded-chip border border-dashed border-ice bg-ice-tint-12"
+      className={`absolute rounded-chip border border-dashed bg-ice-tint-12 ${over ? "border-error" : "border-ice"}`}
       style={{ ...style, overflow: "visible" }}
     >
       <button
@@ -334,5 +356,6 @@ export function UnsavedRange({
         <IconClose />
       </button>
     </span>
+    </>
   );
 }

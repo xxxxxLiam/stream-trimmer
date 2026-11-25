@@ -57,3 +57,13 @@ test("seeking backwards is guarded too, not just forwards", () => {
   assert.equal(acceptPolledTime(90, pendingAt(10), NOW + 200), false);
   assert.equal(acceptPolledTime(10.2, pendingAt(10), NOW + 200), true);
 });
+
+import { readFileSync as readSrc } from "node:fs";
+
+test("the embed keeps YouTube's normal controls: nothing turns them off, so they fade while playing", () => {
+  const src = readSrc(new URL("./useYouTubePlayerController.ts", import.meta.url), "utf8");
+  const vars = src.slice(src.indexOf("playerVars: {"), src.indexOf("events: {"));
+  assert.doesNotMatch(vars, /controls:\s*0/);
+  assert.doesNotMatch(vars, /disablekb/);
+  assert.match(vars, /modestbranding: 1/);
+});

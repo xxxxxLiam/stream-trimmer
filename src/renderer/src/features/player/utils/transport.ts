@@ -60,6 +60,36 @@ export function loopSeek(sections: readonly Range[], t: number): number | null {
   return null;
 }
 
+/** How early (seconds) before a section's end the jump to the next one is made, since the playhead is read every 200 ms. */
+export const SECTION_LEAD = 0.25;
+
+/**
+ * A joined clip (two or more sections with gaps) plays only its sections: while playing, reaching a section's
+ * end jumps over the gap to the next section's start; after the last one it wraps to the first when looping
+ * and otherwise stops there. Before the first section or inside a gap it jumps forward to the next start.
+ * Null when playback is fine where it is. One section, or none, is left alone (the loop handles it).
+ */
+export function joinedStep(
+  sections: readonly Range[],
+  t: number,
+  loop: boolean,
+): { kind: "seek"; to: number } | { kind: "stop"; at: number } | null {
+  if (sections.length < 2) return null;
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i];
+    if (t < s.start) return { kind: "seek", to: s.start };
+    if (t < s.end - SECTION_LEAD) return null;
+    if (t < s.end) {
+      const next = sections[i + 1];
+      if (next) return { kind: "seek", to: next.start };
+      return loop ? { kind: "seek", to: sections[0].start } : { kind: "stop", at: s.end };
+    }
+    // At or past this section's end: the next one decides (or, after the last, loop or stop).
+    if (i === sections.length - 1) return loop ? { kind: "seek", to: sections[0].start } : { kind: "stop", at: s.end };
+  }
+  return null;
+}
+
 export type TransportButton = "play" | "back" | "forward" | "loop" | "speed" | "volume" | "fullscreen";
 
 export function hoverLabel(button: TransportButton, mac: boolean): string {
@@ -129,10 +159,15 @@ export function clipToVideo(sections: readonly Range[], at: number): number {
   return last ? last.end : 0;
 }
 
-const PRESSABLE_TAGS = ["BUTTON", "A", "SUMMARY", "INPUT", "TEXTAREA", "SELECT"];
-const PRESSABLE_ROLES = ["button", "switch", "link", "checkbox", "radio", "tab", "menuitem", "menuitemradio", "menuitemcheckbox", "option", "slider"];
+/** Where Space means something else: typing in a field, flipping a switch or box, choosing in a menu or list. */
+const PRESSABLE_TAGS = ["INPUT", "TEXTAREA", "SELECT", "SUMMARY"];
+const PRESSABLE_ROLES = ["textbox", "searchbox", "combobox", "listbox", "switch", "checkbox", "radio", "menuitem", "menuitemradio", "menuitemcheckbox", "option"];
 
-/** Space presses a focused button, switch, link, menu item or field; only elsewhere is it play and pause. */
+/**
+ * Space is play and pause from anywhere (Liam, 25 Nov): on a panel row, a tool, a tab, a plain button or the
+ * timeline too. Only where Space means something else does it keep that: a text field, a switch, box or radio,
+ * and a menu or list choice.
+ */
 export function spacePresses(el: { tagName?: string; isContentEditable?: boolean; getAttribute?: (n: string) => string | null } | null): boolean {
   if (!el) return false;
   if (el.isContentEditable) return true;
