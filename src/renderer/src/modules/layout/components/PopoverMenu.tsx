@@ -48,6 +48,8 @@ export type PopoverMenuProps = {
   pressedWhenOpen?: boolean;
   /** Show the label beside the icon while the menu is open (the top bar's "on" look). */
   labelWhenOpen?: boolean;
+  /** The small-menu look (4px padding, 8px corners, 5px item corners) used by Export's + menu. */
+  tight?: boolean;
 };
 
 export default function PopoverMenu({
@@ -62,6 +64,7 @@ export default function PopoverMenu({
   menuWidth,
   boxes = false,
   pressedWhenOpen = true,
+  tight = false,
   labelWhenOpen = false,
 }: PopoverMenuProps) {
   const [open, setOpen] = useState(false);
@@ -124,7 +127,7 @@ export default function PopoverMenu({
           aria-label={label}
           onKeyDown={onMenuKey}
           style={menuWidth ? { width: menuWidth } : undefined}
-          className={`absolute z-40 rounded-panel border border-hairlineStrong bg-raised p-[6px] ${menuWidth ? "" : "min-w-[200px]"} ${
+          className={`absolute z-40 border border-hairlineStrong bg-raised ${tight ? "rounded-control p-[4px]" : "rounded-panel p-[6px]"} ${menuWidth ? "" : "min-w-[200px]"} ${
             side === "below" ? "top-full mt-[2px]" : "bottom-full mb-[2px]"
           } ${align === "end" ? "right-0" : align === "center" ? "left-1/2 -translate-x-1/2" : "left-0"}`}
         >
@@ -147,7 +150,7 @@ export default function PopoverMenu({
                 role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
                 aria-checked={item.checked}
                 disabled={item.disabled}
-                className={`flex h-[44px] w-full items-center gap-[10px] rounded-control pr-[10px] text-left text-body text-fg hover:bg-hover disabled:text-disabled ${
+                className={`flex h-[44px] w-full items-center gap-[10px] ${tight ? "rounded-chip" : "rounded-control"} pr-[10px] text-left text-body text-fg hover:bg-hover disabled:text-disabled ${
                   item.checked === undefined && hasTicks ? "pl-[36px]" : "pl-[10px]"
                 }`}
                 onClick={() => {

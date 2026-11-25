@@ -5,6 +5,7 @@
  */
 import { createElement } from "react";
 import PanelTabStrip, { panelBodyDomId, tabDomId } from "./PanelTabStrip";
+import { usePanelHostOptional } from "../hooks/PanelHostContext";
 import { usePanelLayoutState } from "../hooks/usePanelLayoutState";
 import type { PanelGroupId } from "../utils/panelRegistry";
 import { closedPanels } from "../utils/panelLayout";
@@ -19,6 +20,20 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   const other = group === "left" ? "right" : "left";
   const tabs = state.tabs.flatMap((id) => getPanel(id) ?? []);
   const activeDef = state.active ? getPanel(state.active) : undefined;
+  const host = usePanelHostOptional();
+  // Board 04.2: with Export in front, + adds to Export. The panel menu (···) still opens and closes panels.
+  const mac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+  const addMenu =
+    activeDef?.id === "export" && host
+      ? {
+          label: "Add to Export",
+          width: 212,
+          items: [
+            { key: "import", label: "Import moments", detail: mac ? "⌘V" : "Ctrl V", onSelect: () => host.openImport() },
+            { key: "moment", label: "Add a moment", onSelect: () => host.addMoment() },
+          ] as MenuItem[],
+        }
+      : undefined;
   const menuItems: MenuItem[] = [
     ...(activeDef && activeDef.closable !== false
       ? [{ key: "close", label: `Close ${activeDef.title}`, onSelect: () => close(activeDef.id) } as MenuItem]
@@ -40,6 +55,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   return (
     <section aria-label={NAMES[group]} className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <PanelTabStrip
+        addMenu={addMenu}
         label={NAMES[group]}
         tabs={tabs}
         active={state.active}

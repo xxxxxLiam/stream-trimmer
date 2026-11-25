@@ -483,6 +483,10 @@ function Layout({ active }: { active: boolean }) {
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
+    addMoment: () => {
+      if (!campaign?.id || !videoId || tabSegments.length === 0) return;
+      bankStore.importClips(campaign.id, videoId, [{ line: 1, id: null, label: "", segments: tabSegments.map((x) => ({ start: x.start, end: x.end })) }]);
+    },
     openChannel: (url) => {
       if (url) channel.setChannelUrl(url);
       setChannelOpen(true);
