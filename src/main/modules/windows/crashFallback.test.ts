@@ -79,5 +79,6 @@ test("E2-2: the window wiring answers the fallback's links only from the fallbac
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("./windows.ts", import.meta.url), "utf8");
   assert.match(src, /isFallbackUrl\(mainWindow\.webContents\.getURL\(\)\)/);
-  assert.match(src, /what === "fallback"/);
+  assert.match(src, /pageAfterDeath\(recovery,/);
+  assert.match(src, /fallback\.reset\(\);\s*return crashFallbackUrl\(\)/);
 });
