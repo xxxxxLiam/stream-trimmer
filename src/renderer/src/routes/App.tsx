@@ -19,6 +19,7 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
+import { clearInFlightCut, saveInFlightCut, takeInterruptedCut } from "../shared/utils/inFlightCut";
 import { consumeCrashFlag } from "../shared/utils/crashNoteStore";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
@@ -413,6 +414,9 @@ function Layout({ active }: { active: boolean }) {
       const moment = cutCampaignId ? matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments) : undefined;
       const groupId = moment?.id ?? name;
       setMakingClipId(moment?.id ?? null);
+      // Saved while it runs, so a quit or crash mid-cut does not lose the range the marks no longer hold (a waiting
+      // moment is already in the bank).
+      if (cutCampaignId && !moment) saveInFlightCut({ campaignId: cutCampaignId, videoId, name, segments });
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
       let madeAny = false;
       try {
@@ -428,6 +432,7 @@ function Layout({ active }: { active: boolean }) {
           afterSaved(fileName, undefined, segments, startSettings, undefined, groupId);
         }
       } finally {
+        clearInFlightCut();
         setMakingName(null);
         setMakingClipId(null);
       }
@@ -437,6 +442,11 @@ function Layout({ active }: { active: boolean }) {
   // Clips are made one after another. Pressing Clip hands the marked sections over and clears them at
   // once, so the next clip can be marked while this one is making (a failed clip has its own Retry).
   const cutQueue = useRef(createSerialQueue());
+  // A cut that was cut off by a quit or a crash: its range comes back as a waiting moment, name kept.
+  useEffect(() => {
+    const cut = takeInterruptedCut();
+    if (cut) bankStore.importClips(cut.campaignId, cut.videoId, [{ line: 1, id: null, label: cut.name, segments: cut.segments }]);
+  }, []);
   const cutMarked = (segs: Segment[]) => {
     void cutQueue.current.enqueue(() => cutClip(segs));
     clearSegments();

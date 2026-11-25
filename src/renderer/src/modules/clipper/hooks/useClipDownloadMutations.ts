@@ -106,14 +106,25 @@ export function useClipDownloadMutations({
     setDownloadNote("");
     setSavedNotice(null);
     setFailure(null);
+    // Stop works from this moment, including while the clip waits for the launch sign-in check (up to 20 s).
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
     // A clip made in the first seconds waits for the launch sign-in check, then asks for the quality its result allows.
-    await whenSignInSettled();
+    await Promise.race([
+      whenSignInSettled(),
+      new Promise<void>((resolve) => controller.signal.addEventListener("abort", () => resolve(), { once: true })),
+    ]);
+    if (controller.signal.aborted) {
+      // Stopped before anything started: nothing was asked of the engine, and the clip goes back to Waiting.
+      setDownloading(false);
+      setDownloadPhase("idle");
+      setDownloadProgress(0);
+      return false;
+    }
     // Whatever the check could not decide in time counts as signed out: 360p and the sign-in pill, never a 1080p
     // request that goes out with no session and is refused.
     const hadSession = connectionNow().connected;
     const quality = requestedQuality({ signedOut: !hadSession, format, quality: qualityArg });
-    const controller = new AbortController();
-    downloadAbortRef.current = controller;
     // When the desktop app has somewhere to put the clip, the engine hands
     // back its location and the main process moves the file. Only then does
     // the media avoid the UI entirely; every other case still streams.
