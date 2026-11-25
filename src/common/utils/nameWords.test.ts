@@ -3,6 +3,7 @@
  * Description: One rule names a clip from a title in both processes (C2-7): the engine's fallback in the
  *   lane and the renderer's saved name are the same words.
  */
+/* eslint-disable no-restricted-imports -- this test deliberately compares the two processes' copies of the rule */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { suggestClipName } from "../../main/features/engine/services/clipNames/clipNames";
