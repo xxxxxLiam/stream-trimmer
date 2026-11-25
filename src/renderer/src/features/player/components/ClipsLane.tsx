@@ -83,22 +83,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     sections.length === 1 &&
     b.start === sections[0].start &&
     b.end === sections[0].end;
-  const named = [
-    ...c.used.map((u) => ({
-      key: `used-${u.start}-${u.end}`,
-      start: u.start,
-      end: u.end,
-      label: u.label ?? u.clipId ?? timeName(u.start),
-    })),
-    ...c.waiting
-      .filter((b) => !isBuilt(b))
-      .map((b) => ({
-        key: `wait-${b.start}-${b.end}`,
-        start: b.start,
-        end: b.end,
-        label: b.label ?? timeName(b.start),
-      })),
-  ].filter((n) => shown(n.start, n.end));
+  const named: { key: string; start: number; end: number; label: string }[] = [];
   // The clip being built gets the same free-space naming (an 18 px bar on a long video would show "P").
   if (sections.length === 1 && shown(sections[0].start, sections[0].end)) {
     named.push({ key: "built", start: sections[0].start, end: sections[0].end, label: building(sections[0].start) });
@@ -130,11 +115,16 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     if (!stacked(key)) return null;
     const { row, from, to } = slotOf(key);
     const w = labelWidth(label);
-    const right = Math.max(0, c.width - to - 4);
-    const onRight = right >= Math.min(w, 48) || from < w;
+    // Room is the gap to the next bar on either side (any row), so a name never runs over another clip's bar or name.
+    const nextLeft = Math.min(c.width, ...bars.filter((b) => b.left >= to - 1 && b.left > from).map((b) => b.left));
+    const prevRight = Math.max(0, ...bars.filter((b) => b.left + b.width <= from + 1 && b.left < from).map((b) => b.left + b.width));
+    const right = Math.max(0, nextLeft - to - 8);
+    const left = Math.max(0, from - prevRight - 8);
+    const onRight = right >= Math.min(w, 48) || (from < w && left < Math.min(w, 48));
+    if (onRight ? right < 24 : left < 24) return null;
     const style = onRight
       ? { left: to + 4, width: Math.min(w, right), top: 5 + row * ROW_H }
-      : { left: Math.max(0, from - 4 - w), width: w, top: 5 + row * ROW_H, textAlign: "right" as const };
+      : { left: from - 4 - Math.min(w, left), width: Math.min(w, left), top: 5 + row * ROW_H, textAlign: "right" as const };
     return (
       <span
         key={`${key}-stack-label`}
@@ -175,60 +165,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
       <div className="relative h-full flex-1 overflow-x-clip overflow-y-visible">
         {c.opening ? null : (
           <>
-            {c.used.map((u, i) =>
-              shown(u.start, u.end) ? (
-                <span key={`used-${i}-${u.start}`}>
-                  <button
-                    type="button"
-                    title={u.label ?? u.clipId ?? timeName(u.start)}
-                    onClick={() => playFrom(u.start)}
-                    className={`${BAR} rounded-chip border border-frost text-center font-medium text-fg`}
-                    style={styleOf(`used-${u.start}-${u.end}`, u.start, u.end)}
-                  >
-                    {placeOf(`used-${u.start}-${u.end}`).inside && !stacked(`used-${u.start}-${u.end}`)
-                      ? (u.label ?? u.clipId ?? timeName(u.start))
-                      : ""}
-                  </button>
-                  {stackedLabel(`used-${u.start}-${u.end}`, u.label ?? u.clipId ?? timeName(u.start))}
-                  {outside(
-                    `used-${u.start}-${u.end}`,
-                    u.start,
-                    u.end,
-                    u.label ?? u.clipId ?? timeName(u.start),
-                  )}
-                </span>
-              ) : null,
-            )}
-            {c.waiting.map((b, i) =>
-              shown(b.start, b.end) && !isBuilt(b) ? (
-                <span key={`wait-${i}-${b.start}`}>
-                  <button
-                    type="button"
-                    title={b.label ?? timeName(b.start)}
-                    onClick={() => playFrom(b.start)}
-                    className={`${BAR} rounded-chip border text-center ${
-                      c.range &&
-                      b.start === c.range.start &&
-                      b.end === c.range.end
-                        ? "border-frost text-fg"
-                        : "border-hairlineStrong text-fg-dim"
-                    }`}
-                    style={styleOf(`wait-${b.start}-${b.end}`, b.start, b.end)}
-                  >
-                    {placeOf(`wait-${b.start}-${b.end}`).inside && !stacked(`wait-${b.start}-${b.end}`)
-                      ? (b.label ?? timeName(b.start))
-                      : ""}
-                  </button>
-                  {stackedLabel(`wait-${b.start}-${b.end}`, b.label ?? timeName(b.start))}
-                  {outside(
-                    `wait-${b.start}-${b.end}`,
-                    b.start,
-                    b.end,
-                    b.label ?? timeName(b.start),
-                  )}
-                </span>
-              ) : null,
-            )}
+            {/* Only the active clip is drawn here: the bank's moments live in Export, not on the lane. */}
             {unsaved ? (
               <UnsavedRange
                 style={styleOf("built", sections[0].start, sections[0].end)}
