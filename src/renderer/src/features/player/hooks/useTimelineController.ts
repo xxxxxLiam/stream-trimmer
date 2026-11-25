@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
-import { getZoom, useToolState } from "../../../modules/layout/hooks/useToolState";
+import { ZOOM_MIN, getZoom, useToolState } from "../../../modules/layout/hooks/useToolState";
 import { useAudioLanguageState } from "../../../modules/layout/hooks/useAudioLanguageState";
 import { audioLanesOf } from "../../../shared/utils/audioLanguages";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
@@ -18,7 +18,7 @@ import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
 import { clampX, edgeScroll, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
-import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
+import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, END_PAD_PX, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
@@ -69,7 +69,9 @@ export function useTimelineController() {
   const suggestedName = useSuggestedName(videoId, clipper.info?.title ?? "", lines, sections, existingNames);
   const total = sectionsLength(sections);
 
-  const win = windowFor(duration, tools.zoom, s.focus ?? playhead);
+  // The room kept after the video's end (at Fit, and at the far right when zoomed in), as a share of the lane.
+  const padFrac = s.width > 0 ? END_PAD_PX / s.width : 0;
+  const win = windowFor(duration, tools.zoom, s.focus ?? playhead, padFrac);
   const liveFold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
   const live = { axis: (liveFold ? liveFold.axis : linearAxis(win, s.width)) as Axis, fold: liveFold?.fold ?? ([] as Fold[]), folded: !!liveFold };
   // The axis the pointer went down on stays for the whole drag: the drag itself creates a range, which
@@ -80,7 +82,7 @@ export function useTimelineController() {
   const axis = shown.axis;
   const folded = shown.folded;
   const view = tools.zoom > 0 && !folded ? win : null;
-  const ticks = axisTicks(axis);
+  const ticks = axisTicks(axis, 110, { start: 0, end: duration });
 
   const used: readonly NamedRange[] = videoId && active ? (active.usedRanges[videoId] ?? []) : [];
   const waiting = store.banked;
@@ -92,6 +94,7 @@ export function useTimelineController() {
     duration,
     playhead,
     zoom: tools.zoom,
+    padFrac,
     fitRequests: tools.fitRequests,
     focus: s.focus,
     setFocus: s.setFocus,
@@ -109,7 +112,9 @@ export function useTimelineController() {
   // The handlers sit on the whole timeline area (so a tool works in any part of it, including the
   // space under the tracks); the lanes start after the label column, so x is measured from the right.
   const laneLeft = (e: PointerEvent<HTMLElement>) => e.currentTarget.getBoundingClientRect().right - s.width;
-  const timeAt = (e: PointerEvent<HTMLElement>): number | null => toT(axis, e.clientX - laneLeft(e));
+  // Never past the video: the padding after its end, and the view out past Fit, are not footage.
+  const inVideo = (t: number | null) => (t === null ? null : Math.min(Math.max(0, t), duration));
+  const timeAt = (e: PointerEvent<HTMLElement>): number | null => inVideo(toT(axis, e.clientX - laneLeft(e)));
   const snap = (t: number, edge: "start" | "end") => Math.round(snapToWord(lines, t, edge));
 
   const setRange = (a: number, b: number) => {
@@ -133,8 +138,8 @@ export function useTimelineController() {
 
   /** Zoom to `zoom` keeping time `t`, at lane position `x`, under the same spot (a pinch or click zooms into the point). */
   const zoomAt = (x: number, t: number, zoom: number) => {
-    const next = Math.min(100, Math.max(0, zoom));
-    if (!folded && s.width > 0) s.setFocus(focusForAnchor(duration, next, t, x / s.width));
+    const next = Math.min(100, Math.max(ZOOM_MIN, zoom));
+    if (!folded && s.width > 0) s.setFocus(focusForAnchor(duration, next, t, x / s.width, padFrac));
     else s.setFocus(t);
     tools.setZoom(next);
   };
@@ -260,7 +265,7 @@ export function useTimelineController() {
 
   /** Move the scrub / range / edge drag to where the pointer is (kept on the lane: past the end is the end). */
   const dragTo = (d: NonNullable<typeof s.drag>, clientX: number, left: number) => {
-    const t = toT(axis, clampX(clientX - left, s.width));
+    const t = inVideo(toT(axis, clampX(clientX - left, s.width)));
     if (t === null) return;
     if (d.kind === "edge") {
       setRange(d.fixed, t);
@@ -275,13 +280,13 @@ export function useTimelineController() {
   const scrollRef = useRef<() => void>(() => {});
   scrollRef.current = () => {
     const d = s.drag;
-    if (!d || d.kind === "pan" || !(duration > 0) || tools.zoom === 0) return;
+    if (!d || d.kind === "pan" || !(duration > 0) || tools.zoom <= 0) return;
     const v = edgeScroll(pointer.current.clientX - pointer.current.left, s.width);
     if (!v) return;
     const per = (win.end - win.start) / Math.max(1, s.width);
     const next = Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + v * per * EDGE_SCROLL_PX));
     if (frozen.current && frozen.current.folded) return;
-    if (frozen.current) frozen.current = { axis: linearAxis(windowFor(duration, tools.zoom, next), s.width) as Axis, fold: [], folded: false };
+    if (frozen.current) frozen.current = { axis: linearAxis(windowFor(duration, tools.zoom, next, padFrac), s.width) as Axis, fold: [], folded: false };
     s.setFocus(next);
     if (d.kind === "scrub") {
       const at = toT(axis, clampX(pointer.current.clientX - pointer.current.left, s.width));
@@ -312,7 +317,7 @@ export function useTimelineController() {
       s.setFocus(Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + act.pixels * per)));
     } else {
       const x = e.clientX - left;
-      const at = toT(axis, x);
+      const at = inVideo(toT(axis, x));
       if (at !== null) zoomAt(x, at, getZoom() + act.amount);
       else tools.zoomBy(act.amount);
     }

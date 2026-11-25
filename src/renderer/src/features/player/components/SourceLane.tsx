@@ -17,12 +17,12 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
   // Unused footage is dimmed: everything not under a picked range or a made clip.
   const dim: { start: number; end: number }[] = [];
   if (covered.length > 0 && c.duration > 0) {
-    let at = c.axis.pieces[0]?.t0 ?? 0;
+    let at = Math.max(0, c.axis.pieces[0]?.t0 ?? 0);
     for (const r of covered) {
       if (r.start > at) dim.push({ start: at, end: r.start });
       at = Math.max(at, r.end);
     }
-    const end = c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? c.duration;
+    const end = Math.min(c.duration, c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? c.duration);
     if (at < end) dim.push({ start: at, end });
   }
   return (
@@ -35,7 +35,7 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
         {c.opening ? null : (
           <>
             {/* The picture strip shows the moment the video opens, ready to scrub; no range is needed first. */}
-            <Filmstrip axis={c.axis} levels={c.storyboards} height={height - 12} />
+            <Filmstrip axis={c.axis} levels={c.storyboards} height={height - 12} duration={c.duration} />
             {dim.map((d) => {
               const x = toX(c.axis, d.start);
               return (

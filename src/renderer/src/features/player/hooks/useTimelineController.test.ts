@@ -76,19 +76,19 @@ test("a short timeline scrolls its tracks vertically under a ruler that stays pu
 });
 
 test("Fit's re-centre runs after the zoom-reset effect, so Fit (zoom to 0 and a new centre in one commit) is not cleared", () => {
-  const clear = effects.indexOf("if (a.zoom === 0) a.setFocus(null)");
+  const clear = effects.indexOf("if (a.zoom <= 0) a.setFocus(null)");
   const fit = effects.indexOf("fitWindow(a.range, a.duration)");
   assert.ok(clear > 0 && fit > 0 && clear < fit);
 });
 
 test("V18-T-1: a zoom with no centre takes the one it shows, and a scrub never moves the axis", () => {
   assert.match(effects, /a\.zoom > 0 && a\.focus === null\) a\.setFocus\(a\.win\.start/);
-  assert.match(effects, /a\.zoom === 0 \|\| a\.scrubbing\) return/);
+  assert.match(effects, /a\.zoom <= 0 \|\| a\.scrubbing\) return/);
   assert.match(src, /scrubbing: s\.drag\?\.kind === "scrub"/);
 });
 
 test("V18-T-2: wheel and pinch zoom, and the zoom tool, anchor on the pointer", () => {
-  assert.match(src, /focusForAnchor\(duration, next, t, x \/ s\.width\)/);
+  assert.match(src, /focusForAnchor\(duration, next, t, x \/ s\.width, padFrac\)/);
   assert.match(src, /zoomAt\(x, at, getZoom\(\) \+ act\.amount\)/);
   assert.match(src, /tools\.tool === "zoom"\) return zoomAt\(/);
   assert.doesNotMatch(src, /s\.setFocus\(at\);\s*tools\.zoomBy/, "centring on the pointer time drifted away from it");
@@ -205,6 +205,18 @@ test("dragging the playhead, a new range or an edge to either end of a zoomed ti
   assert.match(src, /edgeScroll\(pointer\.current\.clientX - pointer\.current\.left, s\.width\)/);
   assert.match(src, /window\.setInterval\(\(\) => scrollRef\.current\(\), 40\)/);
   assert.match(src, /const scrolling = dragKind === "scrub" \|\| dragKind === "range" \|\| dragKind === "edge"/);
-  assert.match(src, /tools\.zoom === 0\) return/); // nothing to scroll at Fit
+  assert.match(src, /tools\.zoom <= 0\) return/); // nothing to scroll at Fit
   assert.match(src, /s\.setFocus\(next\)/);
+});
+
+const filmstrip = readFileSync(new URL("../components/Filmstrip.tsx", import.meta.url), "utf8");
+
+test("Fit and the far right keep end room; the view can go out; pointer times stay inside the video", () => {
+  assert.match(src, /const padFrac = s\.width > 0 \? END_PAD_PX \/ s\.width : 0/);
+  assert.match(src, /windowFor\(duration, tools\.zoom, s\.focus \?\? playhead, padFrac\)/);
+  assert.match(src, /const inVideo = \(t: number \| null\)/);
+  assert.match(src, /axisTicks\(axis, 110, \{ start: 0, end: duration \}\)/);
+  assert.match(effects, /zoomForSpan\(a\.duration, w\.end - w\.start, a\.padFrac\)/);
+  assert.match(filmstrip, /Math\.min\(p\.t1, duration \?\? p\.t1\)/);
+  assert.match(sourceLane, /duration=\{c\.duration\}/);
 });

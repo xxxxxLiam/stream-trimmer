@@ -5,7 +5,8 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { grabbedEdge, pickHintLead, scissorsClick, zoomStep } from "./laneTools";
+import { grabbedEdge, pickHintLead, scissorsClick, zoomStep, zoomThumbPercent } from "./laneTools";
+import { ZOOM_MIN } from "../../../modules/layout/hooks/useToolState";
 
 test("scissors: the first click is a start, the second ends the range", () => {
   assert.deepEqual(scissorsClick(null, 100), { kind: "start", at: 100 });
@@ -110,10 +111,14 @@ test("V18-T-11: the zoom tool's cursor zooms out while Alt is held", () => {
   assert.equal(cursorFor("hand", true), "cursor-grab", "Alt changes only the zoom tool");
 });
 
-test("V18-T-8: a slider position maps to a zoom and stays inside 0 to 100", () => {
-  assert.equal(zoomFromX(150, 100, 100), 50);
-  assert.equal(zoomFromX(50, 100, 100), 0);
+test("V18-T-8: a slider position maps to a zoom and stays inside the slider's range (zoomed out to 100)", () => {
+  assert.equal(zoomFromX(100, 100, 100), ZOOM_MIN);
+  assert.equal(zoomFromX(50, 100, 100), ZOOM_MIN);
   assert.equal(zoomFromX(500, 100, 100), 100);
+  assert.equal(zoomFromX(200, 100, 100), 100);
+  assert.equal(zoomFromX(150, 100, 100), (ZOOM_MIN + 100) / 2);
+  assert.equal(zoomThumbPercent(0), (-ZOOM_MIN / (100 - ZOOM_MIN)) * 100, "Fit sits a fifth of the way along");
+  assert.equal(zoomThumbPercent(zoomFromX(130, 100, 100)), 30);
   assert.equal(zoomFromX(150, 100, 0), 0);
 });
 

@@ -4,6 +4,7 @@
  * Description: The pure decisions behind the timeline tools: the scissors' two clicks (a start, then
  *   an end; they only mark, never seek), grabbing a range's edge, and zooming in or out.
  */
+import { ZOOM_MIN } from "../../../modules/layout/hooks/useToolState";
 import { DEFAULT_SIZES } from "../../../modules/layout/utils/panelLayout";
 export const EDGE_GRAB_PX = 8;
 
@@ -71,9 +72,11 @@ export const clampX = (x: number, width: number) => Math.min(Math.max(0, x), Mat
 export const cursorFor = (tool: keyof typeof TOOL_CURSORS, alt: boolean) =>
   tool === "zoom" && alt ? "cursor-zoom-out" : TOOL_CURSORS[tool];
 
-/** The zoom (0 to 100) for a press or drag at `clientX` on a slider whose track starts at `left`. */
+/** The zoom (ZOOM_MIN to 100) for a press or drag at `clientX` on a slider whose track starts at `left`. */
 export const zoomFromX = (clientX: number, left: number, width: number) =>
-  width > 0 ? Math.min(100, Math.max(0, ((clientX - left) / width) * 100)) : 0;
+  width > 0 ? ZOOM_MIN + Math.min(1, Math.max(0, (clientX - left) / width)) * (100 - ZOOM_MIN) : 0;
+/** Where the thumb sits (0 to 100 %) for a zoom. */
+export const zoomThumbPercent = (zoom: number) => ((Math.min(100, Math.max(ZOOM_MIN, zoom)) - ZOOM_MIN) / (100 - ZOOM_MIN)) * 100;
 
 /** The mouse cursor for each tool, over the whole timeline: an arrow, crosshair (scissors), resize bar (range), cell, hand and magnifier. */
 export const TOOL_CURSORS = {
