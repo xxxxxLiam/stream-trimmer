@@ -21,6 +21,13 @@
  */
 export const DEGRADED_HEIGHT_RATIO = 0.5;
 
+/**
+ * What "best" means for a clip: the tallest picture up to 1080p. A 4K source is not worth the download
+ * time or the disk for a clip that is posted at 1080p, so the ladder stops here (a request that names a
+ * height still gets that height).
+ */
+export const BEST_HEIGHT_CAP = 1080;
+
 /** The tallest usable height out of what the probe reported, or 0. */
 export function bestAvailableHeight(available: readonly number[]): number {
   let best = 0;

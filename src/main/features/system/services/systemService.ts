@@ -33,14 +33,16 @@ export function defaultBrowser(app: unknown) {
  */
 export async function defaultFolders(app: Electron.App) {
   try {
-    const base = path.join(app.getPath("videos"), "Clipr");
-    const clipsDir = path.join(base, "Clips");
-    const dataDir = path.join(base, "Data");
+    // Downloads/Clipr: where a downloader's files are expected. Only used when nothing is set, so a
+    // folder an earlier version made under Videos (or one the person chose) is left where it is.
+    const downloads = app.getPath("downloads");
+    const clipsDir = path.join(downloads, "Clipr");
+    const dataDir = path.join(downloads, "Clipr data");
     await fsp.mkdir(clipsDir, { recursive: true });
     await fsp.mkdir(dataDir, { recursive: true });
     return { clipsDir, dataDir };
   } catch {
-    // A read-only or missing Videos folder is not worth failing a launch over;
+    // A read-only or missing Downloads folder is not worth failing a launch over;
     // the app simply carries on with nothing set, exactly as it does today.
     return null;
   }
