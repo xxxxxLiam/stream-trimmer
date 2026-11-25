@@ -36,11 +36,17 @@ export type Campaign = {
   dailyQuota: number;
   /** Id of this campaign's Final Cut look in the saved looks (fcpLooks.ts); none when unset. */
   fcpLookId?: string;
+  /** The campaign's clip length rule in seconds, either end optional. Unset (the default) means no rule; it never blocks Clip. */
+  lengthMinSec?: number;
+  lengthMaxSec?: number;
 };
 
 export type CampaignInput = Partial<Omit<Campaign, "id" | "usedRanges">> & {
   name: string;
 };
+
+/** A stored length rule end: whole seconds from 1 to 24 hours. */
+const isRuleSec = (v: unknown): v is number => typeof v === "number" && v >= 1 && v <= 86400;
 
 /** Clips a day a campaign starts with, and what an older campaign with none gets. */
 export const DEFAULT_DAILY_QUOTA = 3;
@@ -488,6 +494,8 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         usedRanges: used,
         dailyQuota: typeof r.dailyQuota === "number" && r.dailyQuota >= 1 ? Math.min(99, Math.floor(r.dailyQuota)) : DEFAULT_DAILY_QUOTA,
         ...(typeof r.fcpLookId === "string" && r.fcpLookId ? { fcpLookId: r.fcpLookId } : {}),
+        ...(isRuleSec(r.lengthMinSec) ? { lengthMinSec: Math.floor(r.lengthMinSec) } : {}),
+        ...(isRuleSec(r.lengthMaxSec) ? { lengthMaxSec: Math.floor(r.lengthMaxSec) } : {}),
       }),
     );
   }

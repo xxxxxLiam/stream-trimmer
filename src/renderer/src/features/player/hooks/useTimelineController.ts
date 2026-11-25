@@ -259,6 +259,8 @@ export function useTimelineController() {
     inText: range ? clockTime(range.start) : startPicked ? clockTime(clipper.start) : dash,
     outText: range ? clockTime(range.end) : dash,
     lengthText: total > 0 ? lengthLabel(total) : dash,
+    /** The whole joined clip in seconds, for the campaign's length rule. */
+    totalSeconds: total,
     onLanePointerDown,
     onLanePointerMove,
     onLanePointerUp,

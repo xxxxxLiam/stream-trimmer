@@ -6,6 +6,8 @@
  *   Delete campaign. No clip id fields, no format or quality.
  */
 import { useState } from "react";
+import { formatClock } from "../../../shared/utils/clock";
+import { parseTimestamp } from "../../../shared/utils/clip";
 import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
@@ -16,6 +18,9 @@ export type SettingsCampaignProps = {
   quota: number;
   onQuota: (n: number) => void;
   folderLabel: string;
+  /** The optional clip length rule in seconds (either end may be unset), and writing it. Never blocks Clip. */
+  lengthRule: { min?: number; max?: number };
+  onLengthRule: (patch: { lengthMinSec?: number; lengthMaxSec?: number }) => void;
   /** Dub tracks of the open video. The Languages block shows only when there are some. */
   dubs: { code: string; label: string }[];
   /** The button for the editor ticked in the Clip menu; null for Save to folder and CapCut, which have nothing to set. */
@@ -42,6 +47,33 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [nameProblem, setNameProblem] = useState("");
   const [folderProblem, setFolderProblem] = useState("");
+  const [lengthDraft, setLengthDraft] = useState<{ min?: string; max?: string }>({});
+  const [lengthProblem, setLengthProblem] = useState("");
+  const commitLength = (end: "min" | "max") => {
+    const text = lengthDraft[end];
+    if (text === undefined) return;
+    const next = text.trim() === "" ? undefined : parseTimestamp(text);
+    const other = end === "min" ? p.lengthRule.max : p.lengthRule.min;
+    const bad = next === null || (next !== undefined && next < 1) ? "Use minutes and seconds, like 0:30."
+      : next !== undefined && other !== undefined && (end === "min" ? next > other : next < other) ? "The first time must not be longer than the second." : "";
+    setLengthProblem(bad);
+    setLengthDraft((d) => ({ ...d, [end]: undefined }));
+    if (!bad) p.onLengthRule(end === "min" ? { lengthMinSec: next ?? undefined } : { lengthMaxSec: next ?? undefined });
+  };
+  const lengthField = (end: "min" | "max", label: string) => (
+    <input
+      type="text"
+      inputMode="numeric"
+      aria-label={label}
+      aria-invalid={lengthProblem ? true : undefined}
+      placeholder={end === "min" ? "0:30" : "1:00"}
+      value={lengthDraft[end] ?? (p.lengthRule[end] ? formatClock(p.lengthRule[end] ?? 0) : "")}
+      onChange={(e) => { setLengthDraft((d) => ({ ...d, [end]: e.target.value })); setLengthProblem(""); }}
+      onBlur={() => commitLength(end)}
+      onKeyDown={(e) => { if (e.key === "Enter") commitLength(end); }}
+      className={`${fieldInput} w-[72px] text-center [font-variant-numeric:tabular-nums] ${lengthProblem ? "border-error" : ""}`}
+    />
+  );
   const commitName = () => {
     if (draft === null) return;
     if (draft.trim() === p.name) {
@@ -102,6 +134,15 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
             );
           })}
         </div>
+      </div>
+      <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
+        <div role="group" aria-label="Clip length" className="flex items-center gap-[8px]">
+          <span className="flex-1 text-body leading-[normal]">Clip length</span>
+          {lengthField("min", "Shortest clip length")}
+          <span className="text-body text-fg-dim">to</span>
+          {lengthField("max", "Longest clip length")}
+        </div>
+        {lengthProblem ? <span role="alert" className="text-meta text-error">{lengthProblem}</span> : <span className="text-meta text-fg-dim">Leave empty if {p.name} has no length rule.</span>}
       </div>
       {p.dubs.length > 0 && (
       <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
