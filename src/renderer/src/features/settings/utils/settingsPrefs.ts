@@ -90,3 +90,12 @@ export function saveCampaignPrefs(
   write(CAMPAIGN_PREFS_KEY, { ...all, [id]: { ...normalizeCampaignPrefs(all[id]), ...patch } });
   if (typeof window !== "undefined") window.dispatchEvent(new Event(PREFS_CHANGED_EVENT));
 }
+
+/** A deleted campaign's prefs go with it. */
+export function dropCampaignPrefs(id: string, read: (key: string) => Record<string, unknown>, write: (key: string, value: unknown) => void): void {
+  const all = { ...read(CAMPAIGN_PREFS_KEY) };
+  if (!(id in all)) return;
+  delete all[id];
+  write(CAMPAIGN_PREFS_KEY, all);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PREFS_CHANGED_EVENT));
+}

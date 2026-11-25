@@ -45,3 +45,6 @@ export function plainOpenError(raw: string | null | undefined): string {
   const raw_ = /exitCode|exit code|ERROR:|yt-dlp|ffmpeg|Command failed|\n\s+at |\bat .+\(.+:\d+|[A-Za-z]:\\|\/(usr|home|Users|var|tmp)\//i;
   return raw_.test(t) ? OPEN_FAILED : t;
 }
+
+/** What the box says when pasted or submitted text is not a link to one video. */
+export const NOT_A_VIDEO = "That is not a link to one video. Paste a YouTube video link.";
