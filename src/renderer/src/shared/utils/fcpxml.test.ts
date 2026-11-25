@@ -20,6 +20,7 @@ import {
   DEFAULT_PROJECT_PATTERN,
   buildFcpxml,
   buildSessionFcpxml,
+  importLayout,
   libraryLocation,
   libraryPath,
   normalizeTimeline,
@@ -829,4 +830,47 @@ test("an unknown stored layout falls back to the Export layout", () => {
   assert.equal(normalizeEditorSettings({ layout: "weird" }).layout, "export");
   assert.equal(normalizeEditorSettings({ layout: "day" }).layout, "day");
   assert.equal(normalizeEditorSettings({}).layout, "export");
+});
+
+test("D-1: the event is the campaign's Event, or the campaign name while that is blank", () => {
+  assert.equal(importLayout({ mediaEvent: "Acme exports" }, { campaignName: "Acme" }).eventName, "Acme exports");
+  assert.equal(importLayout({ mediaEvent: "  " }, { campaignName: "Acme" }).eventName, "Acme");
+  assert.equal(importLayout({}, { campaignName: "Acme", sourceTitle: "Talk" }).eventName, "Acme", "never the video's title");
+  assert.equal(importLayout({ mediaEvent: "" }, {}).eventName, "Clips");
+});
+
+test("D-1: each source video is a keyword collection in the event, and its clips carry that keyword", () => {
+  const xml = buildFcpxml({
+    eventName: "Acme",
+    clips: [
+      clip({ id: "A-01", keyword: importLayout({}, { sourceTitle: "Podcast #214, the long talk" }).keyword }),
+      clip({ id: "A-02", path: "/x/a2.mp4", keyword: importLayout({}, { sourceTitle: "Podcast #214, the long talk" }).keyword }),
+      clip({ id: "B-01", path: "/x/b1.mp4", keyword: "Founder story" }),
+    ],
+  });
+  assert.equal((xml.match(/<event /g) ?? []).length, 1);
+  const collections = [...xml.matchAll(/<keyword-collection name="([^"]*)"\/>/g)].map((m) => m[1]);
+  assert.deepEqual(collections, ["Podcast #214 the long talk", "Founder story"], "one per video, commas dropped");
+  const keywords = [...xml.matchAll(/<keyword [^>]*value="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(keywords, ["Raw", "Podcast #214 the long talk", "Raw", "Podcast #214 the long talk", "Raw", "Founder story"]);
+  assert.equal(importLayout({}, { sourceTitle: "a, b\nc" }).keyword, "a b c");
+  // A clip with no known source video keeps just Raw, and no empty collection appears.
+  const bare = buildFcpxml({ eventName: "Acme", clips: [clip()] });
+  assert.doesNotMatch(bare, /keyword-collection/);
+});
+
+test("D-1: a document with keyword collections still validates against the FCPXML 1.10 DTD", { skip: !hasXmllint }, () => {
+  const xml = buildFcpxml({
+    eventName: "Acme",
+    clips: [clip({ keyword: "Podcast" }), clip({ id: "B-01", path: "/x/b.mp4", keyword: "Founder" })],
+    project: PROJECT,
+  });
+  assert.equal(validate(xml), "");
+});
+
+test("D-5: a one-clip document is named for the clip, so sends never overwrite each other", async () => {
+  const probe = async () => ({ kind: "ffprobe" as const, json: { streams: [{ codec_type: "video", width: 1080, height: 1920, avg_frame_rate: "30/1" }], format: { duration: "5" } } });
+  const one = await buildSessionFcpxml([{ id: "A-01", path: "/c/a.mp4", segments: [{ start: 0, end: 5 }] }], "Acme", probe);
+  assert.equal(one.filename, "Acme A-01.fcpxml");
+  assert.equal(fcpxmlFilename("Acme"), "Acme.fcpxml");
 });

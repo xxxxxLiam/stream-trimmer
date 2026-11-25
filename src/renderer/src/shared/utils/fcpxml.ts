@@ -194,6 +194,22 @@ export function resolveEventName(opts: {
   return name || "Clips";
 }
 
+/**
+ * How a send is laid out in Final Cut, in ONE place: today every clip of a campaign goes into one
+ * event (the Event typed in the campaign's settings, else the campaign name) and each source video
+ * is a keyword collection inside it (its title, without the commas that split a keyword list). A
+ * layout setting switches this function; the sending code only calls it.
+ */
+export function importLayout(
+  settings: { mediaEvent?: string },
+  ctx: { campaignName?: string; sourceTitle?: string },
+): { eventName: string; keyword: string } {
+  return {
+    eventName: resolveEventName({ from: "campaign", campaignName: (settings.mediaEvent ?? "").trim() || ctx.campaignName }),
+    keyword: (ctx.sourceTitle ?? "").replace(/[,\u0000-\u001F]/g, " ").replace(/\s+/g, " ").trim(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Rational time
 // ---------------------------------------------------------------------------
@@ -536,6 +552,8 @@ export interface FcpClip {
   sourceTitle?: string;
   /** When the clip was cut (ms since 1970): the day it belongs to in the per-day layout. */
   cutAt?: number;
+  /** Keyword and keyword collection this clip gets in the event (see `importLayout`); blank for none. */
+  keyword?: string;
   /** From ffprobe on this exact file. */
   media: MediaInfo;
 }
@@ -723,10 +741,12 @@ function legacyEvents(
   mediaItems: string[],
   projectItems: string[],
   hasProject: boolean,
+  collections: string[] = [],
 ): string[] {
   const merged = hasProject && projectEvent.trim() === mediaEvent.trim();
   const events: string[] = [
     `    <event name="${attrText(mediaEvent)}">`,
+    ...collections,
     ...mediaItems,
     ...(merged ? projectItems : []),
     `    </event>`,
@@ -873,6 +893,8 @@ export function buildFcpxml(input: FcpxmlInput): string {
         <keyword start="0s" duration="${duration}" value="Raw"/>` +
         (folders && videoOf.has(index)
           ? `\n        <keyword start="0s" duration="${duration}" value="${attrText(keywordText(videoOf.get(index) as string))}"/>`
+          : !layout && clip.keyword?.trim()
+            ? `\n        <keyword start="0s" duration="${duration}" value="${attrText(clip.keyword ?? "")}"/>`
           : "") +
         `
       </asset-clip>`,
@@ -909,6 +931,9 @@ export function buildFcpxml(input: FcpxmlInput): string {
     }
   });
 
+  const collections = [...new Set(input.clips.map((c) => (c.keyword ?? "").trim()).filter(Boolean))].map(
+    (k) => `      <keyword-collection name="${attrText(k)}"/>`,
+  );
   const events: string[] = layout
     ? laidOutEvents({
         layout,
@@ -919,7 +944,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
         projectItems,
         projectNames,
       })
-    : legacyEvents(input.eventName, input.project?.eventName ?? "", mediaItems, projectItems, !!input.project);
+    : legacyEvents(input.eventName, input.project?.eventName ?? "", mediaItems, projectItems, !!input.project, collections);
 
   const location = libraryLocation(input.library ?? "");
   // Apple's import shape: import-options first (the DTD requires it before
@@ -951,8 +976,8 @@ export function buildFcpxml(input: FcpxmlInput): string {
 }
 
 /** A filename for the document: event name made safe, with the extension. */
-export function fcpxmlFilename(eventName: string): string {
-  const safe = noEmDash(eventName)
+export function fcpxmlFilename(eventName: string, clipId?: string): string {
+  const safe = noEmDash(clipId ? `${eventName} ${clipId}` : eventName)
     .replace(/[\\/:*?"<>|\u0000-\u001F]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -978,6 +1003,8 @@ export interface SessionClip {
   sourceTitle?: string;
   /** When the clip was cut, ms since 1970 (its day in the per-day layout). */
   cutAt?: number;
+  /** Keyword and keyword collection this clip gets in the event (see `importLayout`). */
+  keyword?: string;
 }
 
 export interface SessionResult {
@@ -1047,7 +1074,8 @@ export async function buildSessionFcpxml(
   }
   return {
     xml: buildFcpxml({ eventName, clips: ready, library: options.library, project: options.project, layout: options.layout }),
-    filename: fcpxmlFilename(options.layout ? eventName.trim() || DEFAULT_EXPORT_EVENT : eventName),
+    // One clip per document is named for the clip, so a later send never overwrites an earlier file.
+    filename: fcpxmlFilename(options.layout ? eventName.trim() || DEFAULT_EXPORT_EVENT : eventName, ready.length === 1 ? ready[0].id : undefined),
     included: ready.length,
     projectNames: options.project ? resolveProjectNames(ready, options.project) : [],
     skipped,

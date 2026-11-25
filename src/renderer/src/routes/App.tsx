@@ -60,7 +60,7 @@ import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
 import { getClipDestination } from "../features/player/hooks/useClipDestination";
-import { openInFor, toAfterCutting } from "../features/player/utils/clipDestination";
+import { settingsWithDestination } from "../features/player/utils/clipDestination";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
@@ -72,8 +72,7 @@ import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
 function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
-  const d = getClipDestination();
-  return { ...settings, afterCutting: toAfterCutting(d), openIn: openInFor(d) };
+  return settingsWithDestination(settings, getClipDestination());
 }
 
 const EDITOR_KEY = "clipper.editorHandoff";
