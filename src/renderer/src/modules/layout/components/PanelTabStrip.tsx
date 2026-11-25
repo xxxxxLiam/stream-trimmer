@@ -119,7 +119,7 @@ export default function PanelTabStrip({
                 tabIndex={selected ? 0 : -1}
                 onClick={() => onActivate(t.id)}
                 onKeyDown={(e) => onKeyDown(e, t.id, t.closable !== false)}
-                className={`inline-flex h-full shrink-0 items-center whitespace-nowrap text-body ${
+                className={`inline-flex h-full shrink-0 items-center whitespace-nowrap text-body leading-[normal] ${
                   selected ? "text-fg shadow-[inset_0_-2px_0_var(--ice)]" : "text-fg-dim hover:text-fg"
                 }`}
               >
