@@ -430,7 +430,8 @@ function Layout({ active }: { active: boolean }) {
         const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
         if (!ok) break;
         madeAny = true;
-        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName, clip.id);
+        // The Final Cut clip carries the clip's name, the file's, not the bank id.
+        afterSaved(nameForLanguage(baseId, plan), undefined, clip.segments, startSettings, projectName, clip.id);
       }
       return madeAny;
     },
@@ -504,6 +505,7 @@ function Layout({ active }: { active: boolean }) {
       sourceTitle: info?.title,
       clipsDir: folders.clipsDir || saveDir || undefined,
       clips: sessionClips,
+      settingsFor: editorSettingsFor,
     },
     // Not wired yet: the videos list (Left panels) provides the next video, and the campaign form
     // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".

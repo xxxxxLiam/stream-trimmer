@@ -358,6 +358,8 @@ export type EditorHandoffProps = {
   clipsDir?: string;
   /** Every finished clip from this session for THIS campaign, in the order they were cut. */
   clips: SessionClip[];
+  /** Any campaign's settings, for a clip of another campaign sent from History. */
+  settingsFor?: (campaignId: string) => EditorHandoffSettings;
 };
 
 const OPTIONS: { value: AfterCutting; label: string }[] = [

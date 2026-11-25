@@ -24,3 +24,8 @@ test("C-5: a clip's language copies share its id in History", () => {
   assert.match(app, /clipId: groupId \?\? clipId/);
   assert.match(app, /afterSaved\(fileName, undefined, segments, startSettings, undefined, name\)/);
 });
+
+test("D2-7: Make this clip names the Final Cut clip after the file, not \"B01 - name\", so two videos' B01 moments never share a document", () => {
+  assert.match(app, /afterSaved\(nameForLanguage\(baseId, plan\), undefined, clip\.segments, startSettings, projectName, clip\.id\)/);
+  assert.doesNotMatch(app, /afterSaved\(nameForLanguage\(clip\.id, plan\), clip\.label/);
+});

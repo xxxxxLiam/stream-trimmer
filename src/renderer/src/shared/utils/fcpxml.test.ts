@@ -185,8 +185,9 @@ test("ffmpeg -i fallback refuses a rate it cannot know exactly", () => {
 
 // ---- names and notes -------------------------------------------------------
 
-test("clip name is the id plus its label; no em dash", () => {
-  assert.equal(clipName({ id: "T1-A01", label: "the hook" }), "T1-A01 - the hook");
+test("clip name is the clip's own name (its label without the extension), else its id; never id plus label", () => {
+  assert.equal(clipName({ id: "T1-A01", label: "the hook" }), "the hook");
+  assert.equal(clipName({ id: "T1-A01", label: "the hook.mp4" }), "the hook");
   assert.equal(clipName({ id: "T1-A01" }), "T1-A01");
   assert.equal(clipName({ id: "T1-A01", label: "  " }), "T1-A01");
 });
@@ -228,10 +229,10 @@ test("single segment: version, format, rational durations, note", () => {
   assert.match(xml, /<fcpxml version="1\.10">/);
   assert.match(xml, /<format id="r1" frameDuration="1001\/30000s" width="1920" height="1080" colorSpace="1-1-1 \(Rec\. 709\)"\/>/);
   // 10.01s at 30000/1001 is 300 frames.
-  assert.match(xml, /<asset id="a1" name="M-abc-01 - the hook" start="0s" duration="300300\/30000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48k">/);
+  assert.match(xml, /<asset id="a1" name="the hook" start="0s" duration="300300\/30000s" hasVideo="1" format="r1" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48k">/);
   assert.match(xml, /<media-rep kind="original-media" src="file:\/\/\/Users\/me\/Clips\/M-abc-01\.mp4"\/>/);
   assert.match(xml, /<event name="Shorts">/);
-  assert.match(xml, /<asset-clip ref="a1" name="M-abc-01 - the hook" start="0s" duration="300300\/30000s" format="r1" tcFormat="NDF">/);
+  assert.match(xml, /<asset-clip ref="a1" name="the hook" start="0s" duration="300300\/30000s" format="r1" tcFormat="NDF">/);
   assert.match(xml, /<note>Source: https:\/\/www\.youtube\.com\/watch\?v=abc\nSource timecodes: 00:01:12 to 00:01:30<\/note>/);
   assert.ok(!xml.includes("\u2014"));
   assert.ok(!/duration="[\d.]+s"/.test(xml.replace(/\d+\/\d+s/g, "")), "no decimal-second durations");
@@ -299,7 +300,7 @@ test("awkward names produce well-formed XML that parses back to the originals", 
   });
   assert.ok(!xml.includes("Bob's & Co"), "raw ampersand must not appear");
   assert.match(xml, /<event name="Q&amp;A &quot;live&quot; &lt;1&gt;">/);
-  assert.match(xml, /M-a-02 - \u0628\u0633\u0645/);
+  assert.match(xml, /\u0628\u0633\u0645/);
   assert.match(xml, /src="file:\/\/\/Users\/me\/My%20Clips\/Bob%27s%20%26%20Co%20%22q%22\.mp4"/);
   if (hasXmllint) {
     assert.equal(validate(xml), "");
@@ -307,7 +308,7 @@ test("awkward names produce well-formed XML that parses back to the originals", 
     const py = "import sys,json,xml.etree.ElementTree as E;r=E.fromstring(sys.stdin.buffer.read());print(json.dumps([next(r.iter('event')).get('name')]+[a.get('name') for a in r.iter('asset-clip')]+[m.get('src') for m in r.iter('media-rep')],ensure_ascii=False))";
     const out = JSON.parse(execFileSync("python3", ["-I", "-c", py], { input: xml, encoding: "utf8" }));
     assert.equal(out[0], `Q&A "live" <1>`);
-    assert.equal(out[1], `M-a-01 - Bob's "big" idea & more <b>`);
+    assert.equal(out[1], `Bob's "big" idea & more <b>`);
     assert.equal(out[2], clipName(AWKWARD[1]));
     assert.equal(decodeURIComponent(out[4]), "file:///Users/me/\u0645\u0631\u062D\u0628\u0627/\u65E5\u672C\u8A9E.mp4");
   }
@@ -753,9 +754,11 @@ test("layout A: one Export event, a folder per video holding its raw clips, proj
   assert.equal(rest.length, 0, "one event for everything");
   assert.equal(event.event, "Export", "blank campaign Event falls back to Export");
   assert.deepEqual(event.collections, ["Podcast #214 the long talk", "Morning routine"], "a comma in a title becomes a space: commas split keywords");
-  assert.deepEqual(event.keywords["ACM-talk-01 - Honest"], ["Raw", "Podcast #214 the long talk"]);
-  assert.deepEqual(Object.keys(event.smart), ["Podcast #214, the long talk projects", "Morning routine projects"]);
-  assert.deepEqual(event.smart["Podcast #214, the long talk projects"], ["ACM-talk-01 Honest", "ACM-talk-02 Second"]);
+  assert.deepEqual(event.keywords["Honest"], ["Podcast #214 the long talk"]);
+  // The smart collection is named like the keyword collection and matches by the video's name (one spelling),
+  // so every project from that video lands in it, now and on later imports.
+  assert.deepEqual(Object.keys(event.smart), ["Podcast #214 the long talk", "Morning routine"]);
+  assert.deepEqual(event.smart["Podcast #214 the long talk"], ["Podcast #214 the long talk"]);
   assert.equal(event.items.filter((i) => i.startsWith("project:")).length, 3);
 });
 
@@ -767,7 +770,7 @@ test("layout B: one event per video, no folders", () => {
   const events = shape(layoutXml("video"));
   assert.deepEqual(events.map((e) => e.event), ["Podcast #214, the long talk", "Morning routine"]);
   assert.deepEqual(events[0].collections, []);
-  assert.deepEqual(events[0].items, ["asset-clip:ACM-talk-01 - Honest", "project:ACM-talk-01 Honest", "asset-clip:ACM-talk-02 - Second", "project:ACM-talk-02 Second"]);
+  assert.deepEqual(events[0].items, ["asset-clip:Honest", "project:ACM-talk-01 Honest", "asset-clip:Second", "project:ACM-talk-02 Second"]);
 });
 
 test("layout C: one event per day with a folder per video inside", () => {
@@ -785,14 +788,14 @@ test("layout D: everything in the campaign's event, no folders", () => {
   assert.deepEqual(event.collections, []);
   assert.deepEqual(event.smart, {});
   assert.equal(event.items.length, 6);
-  assert.equal(shape(layoutXml("flat"))[0].event, "Clips");
+  assert.equal(shape(layoutXml("flat"))[0].event, "Export", "a blank Event falls back to Export, as the plan and the preview say");
 });
 
 test("a clip never lands under another video's folder or event (D-5 / D-1)", () => {
   const [a] = shape(layoutXml("export"));
-  const morning = a.keywords["ACM-morning-01 - Coffee"];
+  const morning = a.keywords["Coffee"];
   assert.ok(morning.includes("Morning routine") && !morning.includes("Podcast #214 the long talk"));
-  assert.deepEqual(shape(layoutXml("video")).find((e) => e.event === "Morning routine")?.items.filter((i) => i.startsWith("asset-clip")), ["asset-clip:ACM-morning-01 - Coffee"]);
+  assert.deepEqual(shape(layoutXml("video")).find((e) => e.event === "Morning routine")?.items.filter((i) => i.startsWith("asset-clip")), ["asset-clip:Coffee"]);
 });
 
 test("without projects the folders still hold the raw clips and no smart collection is written", () => {
@@ -852,7 +855,7 @@ test("D-1: each source video is a keyword collection in the event, and its clips
   const collections = [...xml.matchAll(/<keyword-collection name="([^"]*)"\/>/g)].map((m) => m[1]);
   assert.deepEqual(collections, ["Podcast #214 the long talk", "Founder story"], "one per video, commas dropped");
   const keywords = [...xml.matchAll(/<keyword [^>]*value="([^"]*)"/g)].map((m) => m[1]);
-  assert.deepEqual(keywords, ["Raw", "Podcast #214 the long talk", "Raw", "Podcast #214 the long talk", "Raw", "Founder story"]);
+  assert.deepEqual(keywords, ["Podcast #214 the long talk", "Podcast #214 the long talk", "Founder story"]);
   assert.equal(importLayout({}, { sourceTitle: "a, b\nc" }).keyword, "a b c");
   // A clip with no known source video keeps just Raw, and no empty collection appears.
   const bare = buildFcpxml({ eventName: "Acme", clips: [clip()] });
@@ -873,4 +876,26 @@ test("D-5: a one-clip document is named for the clip, so sends never overwrite e
   const one = await buildSessionFcpxml([{ id: "A-01", path: "/c/a.mp4", segments: [{ start: 0, end: 5 }] }], "Acme", probe);
   assert.equal(one.filename, "Acme A-01.fcpxml");
   assert.equal(fcpxmlFilename("Acme"), "Acme.fcpxml");
+});
+
+test("D2-6: no raw clip carries a \"Raw\" keyword, which Final Cut would turn into a Raw folder even in no-folders layouts", () => {
+  for (const layout of ["export", "video", "day", "flat"] as const) {
+    assert.ok(!layoutXml(layout).includes('value="Raw"'), layout);
+  }
+});
+
+test("D2-1: layouts A and C name the smart collection like the keyword collection and find projects by the video's name", () => {
+  for (const layout of ["export", "day"] as const) {
+    const xml = layoutXml(layout);
+    assert.match(xml, /<smart-collection name="Podcast #214 the long talk" match="any">\s*<match-text rule="includes" scope="notes" value="Podcast #214 the long talk"\/>/);
+    assert.ok(!xml.includes(" projects\""), "no second spelling or \"projects\" folder");
+    // Every project of that video carries the name the collection looks for.
+    assert.equal((xml.match(/<note>Podcast #214 the long talk<\/note>/g) ?? []).length >= 2, true);
+    assert.equal(dtdOk(xml), "");
+  }
+});
+
+test("D2-2: a blank Event on the flat layout writes Export, not Clips", () => {
+  assert.match(layoutXml("flat"), /<event name="Export">/);
+  assert.ok(!layoutXml("flat").includes('<event name="Clips">'));
 });
