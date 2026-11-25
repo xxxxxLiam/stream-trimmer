@@ -50,7 +50,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
           {createElement(activeDef.component)}
         </div>
       ) : (
-        <p className="m-0 p-4 text-body text-fg-dim">No panels open. Use + to add one.</p>
+        <p className="m-0 p-[16px] text-body text-fg-dim">No panels open. Use + to add one.</p>
       )}
     </section>
   );

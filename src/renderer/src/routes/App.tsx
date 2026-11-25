@@ -43,7 +43,6 @@ import {
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
-import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
@@ -52,6 +51,7 @@ import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingE
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
 import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
 import { nameForLanguage, planLanguages } from "../shared/utils/audioLanguages";
+import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
@@ -518,8 +518,8 @@ function Layout({ active }: { active: boolean }) {
             setHelpOpen(false);
             setSettingsOpen((v) => !v);
           }}
-          campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
           panelsMenuExtras={overlayItems}
+          campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
         />
         <PanelHostProvider value={panelHost}>
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">

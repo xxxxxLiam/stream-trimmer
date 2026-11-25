@@ -77,7 +77,7 @@ export default function PanelResizeHandle({
       aria-valuemax={max}
       tabIndex={0}
       title="Drag, or use the arrow keys, to resize. Double-click or press Enter to reset."
-      className={`panel-handle shrink-0 ${horizontalBar ? "panel-handle-h h-2 cursor-row-resize" : "panel-handle-v w-2 cursor-col-resize"}`}
+      className={`panel-handle shrink-0 ${horizontalBar ? "panel-handle-h h-[8px] cursor-row-resize" : "panel-handle-v w-[8px] cursor-col-resize"}`}
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

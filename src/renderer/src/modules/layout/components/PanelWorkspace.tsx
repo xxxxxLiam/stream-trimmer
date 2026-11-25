@@ -46,8 +46,8 @@ export default function PanelWorkspace() {
   const upper = centrePanels.filter((d) => d.id !== FIXED_CENTRE_PANEL);
 
   return (
-    <div ref={host} id="ui-panels-centre" className="flex min-h-0 min-w-0 flex-1 flex-col px-2 pt-2">
-      <div className="flex min-h-0 min-w-0 flex-1">
+    <div ref={host} id="ui-panels-centre" className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 px-[8px] pt-[8px]">
         {left.tabs.length ? (
           <>
             <div id="ui-panels-left" className="flex min-h-0 shrink-0" style={{ width: layout.sizes.left } as CSSProperties}>
