@@ -7,6 +7,7 @@
  */
 import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
+import { readFcpLookFile } from "../features/editor/services/fcpLookFile";
 import {
   copyFiles,
   installedApps,
@@ -34,5 +35,7 @@ export function registerEditorHandlers() {
   ipcMain.handle(IPC.editorOpenWith, guard((payload: unknown) => openWithApp(payload || {}, { showFile: (f: string) => shell.showItemInFolder(f) })));
   ipcMain.handle(IPC.editorReveal, guard((target: unknown) => reveal(target, { shell })));
   ipcMain.handle(IPC.editorCopyFiles, guard((payload: unknown) => copyFiles(payload || {})));
+  // A dropped file or bundle: the renderer sends its path, main reads and checks it.
+  ipcMain.handle(IPC.fcpLookRead, (_e: unknown, picked: unknown) => readFcpLookFile(picked));
   ipcMain.handle(IPC.editorPathExists, guard((target: unknown) => pathExists(target)));
 }

@@ -20,7 +20,7 @@ export function readSetting<T = string>(key: string, fallback: T): T {
     const value = cache[key];
     return value === undefined || value === null ? fallback : (value as T);
   }
-  if (typeof window === "undefined") return fallback;
+  if (typeof window === "undefined" || !window.localStorage) return fallback;
   const raw = window.localStorage.getItem(key);
   if (raw === null) return fallback;
   try {

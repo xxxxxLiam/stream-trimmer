@@ -1,11 +1,12 @@
 /**
- * File: look.test.ts
+ * File: fcpLookRichText.test.ts
+ * Path: src/common/utils/fcpLookRichText.test.ts
  * Description: The Final Cut look reads the same from a plain XML export and
  *   from the rich-text copy TextEdit saves by default.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseLook, plainTextOf } from "./look";
+import { parseLook, plainTextOf } from "./fcpLook";
 
 const xml = [
   '<?xml version="1.0" encoding="UTF-8"?>',

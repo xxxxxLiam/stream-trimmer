@@ -37,6 +37,8 @@ export type Campaign = {
   usedRanges: Record<string, UsedRange[]>;
   /** Clips due per day. Unset or 0 means no quota, and the top bar shows no "today" count. */
   dailyQuota?: number;
+  /** Id of this campaign's Final Cut look in the saved looks (fcpLooks.ts); none when unset. */
+  fcpLookId?: string;
 };
 
 export type CampaignInput = Partial<Omit<Campaign, "id" | "usedRanges">> & {
@@ -169,6 +171,8 @@ export function createCampaign(
     clipsDir,
     dataDir: input.dataDir ?? (clipsDir ? defaultDataDir(clipsDir) : ""),
     usedRanges: {},
+    // A new campaign starts with the last look used, so a second client is one pick, not a second upload.
+    ...((input.fcpLookId ?? lastLookIdUsed(list)) ? { fcpLookId: input.fcpLookId ?? lastLookIdUsed(list) } : {}),
   });
   return { campaigns: [...list, campaign], campaign };
 }
@@ -446,8 +450,15 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         dataDir: typeof r.dataDir === "string" ? r.dataDir : "",
         usedRanges: used,
         ...(typeof r.dailyQuota === "number" && r.dailyQuota > 0 ? { dailyQuota: Math.floor(r.dailyQuota) } : {}),
+        ...(typeof r.fcpLookId === "string" && r.fcpLookId ? { fcpLookId: r.fcpLookId } : {}),
       }),
     );
   }
   return out;
+}
+
+/** The look the newest campaign that has one is using (for "a new campaign starts with the last look used"). */
+export function lastLookIdUsed(list: readonly Campaign[]): string | undefined {
+  for (let i = list.length - 1; i >= 0; i--) if (list[i].fcpLookId) return list[i].fcpLookId;
+  return undefined;
 }

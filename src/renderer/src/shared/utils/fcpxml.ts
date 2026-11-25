@@ -16,7 +16,7 @@
  *   output. No em dash is emitted (user style rule).
  */
 
-import type { Look } from "../../features/handoff/utils/look";
+import type { Look } from "../../../../common/utils/fcpLook";
 
 /**
  * The FCPXML version this generator writes. When a project carries the user's
