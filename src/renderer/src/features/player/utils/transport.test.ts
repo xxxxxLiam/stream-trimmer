@@ -142,7 +142,15 @@ test("a joined clip plays only its sections: gaps are jumped, the last section l
   // Three sections in order.
   const three = [...two, { start: 900, end: 910 }];
   assert.deepEqual(joinedStep(three, 419.9, false), { kind: "seek", to: 900 });
-  // One section or none: not its job.
-  assert.equal(joinedStep([{ start: 1, end: 9 }], 50, true), null);
+  // No section: not its job. (One section is covered by the single-range test below.)
   assert.equal(joinedStep([], 5, false), null);
+});
+
+test("one picked range plays alone: play starts at its start, runs to its end, then stops (or loops); no range plays the whole video", () => {
+  const one = [{ start: 100, end: 130 }];
+  assert.deepEqual(joinedStep(one, 10, false), { kind: "seek", to: 100 }, "before the range: jump to its start");
+  assert.equal(joinedStep(one, 110, false), null, "inside it: play on");
+  assert.deepEqual(joinedStep(one, 131, false), { kind: "stop", at: 130 }, "past its end: stop at the end");
+  assert.deepEqual(joinedStep(one, 131, true), { kind: "seek", to: 100 }, "looping: back to the start");
+  assert.equal(joinedStep([], 50, false), null);
 });
