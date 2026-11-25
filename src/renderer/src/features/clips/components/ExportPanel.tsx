@@ -50,12 +50,12 @@ export default function ExportPanel() {
       )}
 
       {c.gate ? (
-        <p className="px-[14px] py-6 text-center text-body text-fg-dim">{c.gate}</p>
+        <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">{c.gate}</p>
       ) : c.waiting.length === 0 && c.made.length === 0 ? (
-        <p className="px-[14px] py-6 text-center text-body text-fg-dim">{emptyExportText(IS_MAC)}</p>
+        <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">{emptyExportText(IS_MAC)}</p>
       ) : (
         <>
-          <div className="flex justify-between px-3 pb-1 pt-[10px] text-meta text-fg-dim">
+          <div className="flex justify-between px-[12px] pb-[4px] pt-[10px] text-meta leading-[normal] text-fg-dim">
             Waiting in this video<span>{c.waiting.length}</span>
           </div>
           {[...c.waiting, ...c.made].map((clip) => {
@@ -78,13 +78,13 @@ export default function ExportPanel() {
       )}
 
       {c.notice && (
-        <p role="alert" className="mx-[10px] my-2 rounded-control border border-error px-3 py-2 text-meta text-error">
+        <p role="alert" className="mx-[10px] my-[8px] rounded-control border border-error px-[12px] py-[8px] text-meta text-error">
           {c.notice}
         </p>
       )}
 
       {!c.gate && (
-        <button type="button" onClick={() => host.openImport()} className="mx-[6px] mt-1 h-target rounded-control text-left text-meta text-fg-dim hover:text-fg px-2">
+        <button type="button" onClick={() => host.openImport()} className="mx-[6px] mt-[4px] h-[44px] rounded-control px-[8px] text-left text-meta text-fg-dim hover:text-fg">
           Import moments
         </button>
       )}

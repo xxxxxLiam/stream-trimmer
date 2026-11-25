@@ -37,14 +37,14 @@ export function failureCopy(
   reasonOverride?: string,
 ): { reason: string; detail: string } {
   if (kind === "disk") {
-    return { reason: "There isn't enough space to save it.", detail: "It waits here until it has somewhere to go." };
+    return { reason: "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
   }
   if (kind === "private") {
-    return { reason: reasonOverride ?? "This video is private, so it can't be downloaded.", detail: "Your range is kept." };
+    return { reason: reasonOverride ?? "This video is private, so it can’t be downloaded.", detail: "Your range is kept." };
   }
   return {
     reason: "YouTube stopped the download.",
-    detail: attempts < 2 ? RETRY_SENTENCE : "Your range is kept.",
+    detail: attempts < 2 ? RETRY_SENTENCE : "",
   };
 }
 

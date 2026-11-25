@@ -21,6 +21,9 @@
  *     "stderr":    "",         // text to emit on failure
  *     "delayMs":   0,          // stall, for slow-network and cancel tests
  *     "progress":  [0, 25, 100],
+ *     "failDownload": false, // only the download step fails (probes still work)
+ *     "holdMs": 0,           // stall after the last progress line
+ *     "progressDelayMs": 30, // pause between progress lines
  *     "writeMedia": true,      // copy the fixture clip to the output path
  *     "vtt": "WEBVTT...",      // text served as the transcript (or "vttFile": name beside stub.json)
  *   }
@@ -57,6 +60,9 @@ const DEFAULTS = {
   delayMs: 0,
   progress: [0, 50, 100],
   writeMedia: true,
+  failDownload: false,
+  holdMs: 0,
+  progressDelayMs: 30,
 };
 const stubJson = path.join(root, "stub.json");
 if (!fs.existsSync(stubJson)) {
@@ -113,10 +119,14 @@ async function main() {
   }
 
   // Download: emit progress lines, then place the fixture at the output path.
+  // failDownload: only the download fails (probes still work); holdMs: stall after the last progress
+  // line, so a screenshot can catch the clip part-way; progressDelayMs: pause between progress lines.
+  if (cfg.failDownload) return fail();
   for (const p of cfg.progress || []) {
     process.stdout.write("[download]  " + p + ".0% of 10.00MiB at 1.00MiB/s ETA 00:01\\n");
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, cfg.progressDelayMs || 30));
   }
+  if (cfg.holdMs) await new Promise((r) => setTimeout(r, cfg.holdMs));
   if (cfg.writeMedia) {
     const out = valOf("-o") || valOf("--output");
     const fixture = path.join(__dirname, "..", "..", "fixture.mp4");

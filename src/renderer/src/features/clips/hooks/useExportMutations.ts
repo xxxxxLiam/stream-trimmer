@@ -42,6 +42,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
       const name = validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip);
       s.setMakingName(name || clip.id);
       s.setFailed(null);
+      s.setMakingId(clip.id);
       s.attempt.current = { name: name || clip.id, segments: clip.segments, bankId: clip.id };
       s.setNotice("");
       s.setFinished(null);

@@ -22,8 +22,19 @@ export function useExportController() {
 
   const finishedEntry = state.finished ? downloads.find((d) => d.id === state.finished?.entryId) : undefined;
 
+  // A moment that is being made, failed, or just finished has its own row on top; it leaves the list
+  // below until that row goes (as on the Making, Failed and Undo boards).
+  const onTop = new Set<string>();
+  if (downloading && state.makingId) onTop.add(state.makingId);
+  if (state.failed?.bankId && !downloading) onTop.add(state.failed.bankId);
+  if (state.finished && !downloading && finishedEntry?.clipId) onTop.add(finishedEntry.clipId);
+  const waiting = queries.waiting.filter((c) => !onTop.has(c.id));
+  const made = queries.made.filter((c) => !onTop.has(c.id));
+
   return {
     ...queries,
+    waiting,
+    made,
     ...actions,
     selectedId: state.selectedId,
     notice: state.notice,

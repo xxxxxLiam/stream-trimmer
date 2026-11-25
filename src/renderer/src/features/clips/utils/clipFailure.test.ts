@@ -12,15 +12,15 @@ test("codes map to the three failure rows", () => {
 
 test("each row says the approved words", () => {
   assert.deepEqual(failureCopy("disk", 1), {
-    reason: "There isn't enough space to save it.",
+    reason: "There isn’t enough space to save it.",
     detail: "It waits here until it has somewhere to go.",
   });
   assert.deepEqual(failureCopy("private", 1), {
-    reason: "This video is private, so it can't be downloaded.",
+    reason: "This video is private, so it can’t be downloaded.",
     detail: "Your range is kept.",
   });
   assert.equal(failureCopy("stopped", 1).detail, "Clipr is updating its download tools and will try once more.");
-  assert.equal(failureCopy("stopped", 2).detail, "Your range is kept.");
+  assert.equal(failureCopy("stopped", 2).detail, "", "after the retry also failed the row says only the reason");
 });
 
 test("Copy details joins Retry only after the retry also failed", () => {

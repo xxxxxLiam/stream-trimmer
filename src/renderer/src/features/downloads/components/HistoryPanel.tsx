@@ -20,15 +20,15 @@ export default function HistoryPanel() {
       <PillSearch placeholder="Search clips, campaigns, videos" pills={h.pills} onPillsChange={h.setPills} count={h.count} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {h.total === 0 ? (
-          <p className="px-[14px] py-6 text-center text-body text-fg-dim">
+          <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">
             No clips yet. Every clip you export lands here, newest first.
           </p>
         ) : h.groups.length === 0 ? (
-          <p className="px-[14px] py-6 text-center text-body text-fg-dim">No clips match those filters.</p>
+          <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">No clips match those filters.</p>
         ) : (
           h.groups.map((g) => (
             <section key={g.key} aria-label={g.label}>
-              <div className="flex justify-between px-3 pb-1 pt-2 text-meta text-fg-dim">
+              <div className="flex justify-between px-[12px] pb-[4px] pt-[8px] text-meta leading-[normal] text-fg-dim">
                 {g.label}
                 <span>{g.entries.length}</span>
               </div>
@@ -36,12 +36,12 @@ export default function HistoryPanel() {
                 <div
                   key={e.id}
                   id={g === h.groups[0] && e === g.entries[0] ? "ui-saved-clip" : undefined}
-                  className={`mx-[6px] my-[3px] flex items-center gap-[6px] rounded-control bg-raised py-[6px] pl-2 pr-[6px] ${h.missing[e.id] ? "opacity-60" : ""}`}
+                  className={`mx-[6px] my-[3px] flex items-center gap-[6px] rounded-control bg-raised py-[6px] pl-[8px] pr-[6px] ${h.missing[e.id] ? "opacity-60" : ""}`}
                 >
                   <span className="h-[26px] w-[40px] flex-none rounded-chip bg-hover" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-body font-medium">{clipTitle(e.label)}</div>
-                    <div className="mt-[2px] truncate text-meta text-fg-dim">
+                    <div className="mt-[2px] truncate text-meta leading-[normal] text-fg-dim">
                       {h.missing[e.id] ? "File missing. It was moved or deleted." : rowMeta(e)}
                     </div>
                   </div>
@@ -62,13 +62,13 @@ export default function HistoryPanel() {
           ))
         )}
         {h.cache.bytes > 0 && (
-          <div className="mx-[6px] my-2 flex items-center gap-2 px-2 text-meta text-fg-dim">
+          <div className="mx-[6px] my-[8px] flex items-center gap-[8px] px-[8px] text-meta leading-[normal] text-fg-dim">
             <span className="min-w-0">{cacheNote(h.cache.bytes)}</span>
             <button
               type="button"
               disabled={h.cache.clearing}
               onClick={() => void h.cache.clear()}
-              className="h-target shrink-0 rounded-control px-2 text-fg hover:bg-hover disabled:text-disabled"
+              className="h-[44px] shrink-0 rounded-control px-[8px] text-fg hover:bg-hover disabled:text-disabled"
             >
               {h.cache.clearing ? "Clearing…" : "Clear unfinished"}
             </button>
