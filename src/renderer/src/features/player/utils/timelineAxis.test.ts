@@ -109,3 +109,8 @@ test("a ruler label that would run past the right edge is left out", () => {
   assert.ok(ticks.some((t) => t.label === "1:13:00"));
   assert.ok(!ticks.some((t) => t.label === "1:13:10"), "1:13:10 sits on the edge");
 });
+
+test("a tick that sits within half a second of the window start is kept", () => {
+  const ticks = rulerTicks({ start: 4310.2, end: 4390 }, 1262);
+  assert.equal(ticks[0]?.label, "1:11:50");
+});

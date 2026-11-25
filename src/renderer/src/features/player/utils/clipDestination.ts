@@ -33,8 +33,8 @@ export function toAfterCutting(d: ClipDestination): AfterCutting {
   return d === "finalcut" ? "finalcut" : "nothing";
 }
 
-export function clipReason(s: { hasRange: boolean; segments: number; busy: boolean; rangeSeconds?: number }): string | null {
-  if (s.busy) return "A clip is being made. Clip is ready when it's done.";
+/** Why Clip cannot run, or null. A clip being made is not a reason: the next one joins the line. */
+export function clipReason(s: { hasRange: boolean; segments: number; rangeSeconds?: number }): string | null {
   if (s.hasRange && s.rangeSeconds !== undefined && overCapMessage(s.rangeSeconds)) return overCapMessage(s.rangeSeconds);
   if (!s.hasRange && s.segments === 0) return "Set an end first: click the timeline or press O";
   return null;

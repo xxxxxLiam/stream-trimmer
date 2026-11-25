@@ -62,7 +62,7 @@ export function rulerTicks(win: Win, widthPx: number, minGapPx = 110): { t: numb
   const out: { t: number; label: string }[] = [];
   // A label that would run past the right edge is left out (the board draws none at the very edge).
   const room = (LABEL_PX / widthPx) * span;
-  for (let t = Math.ceil(win.start / step) * step; t <= win.end - room; t += step) out.push({ t, label: clockTime(t) });
+  for (let t = Math.ceil((win.start - 0.5) / step) * step; t <= win.end - room; t += step) out.push({ t, label: clockTime(t) });
   return out;
 }
 
@@ -142,7 +142,7 @@ export function foldedAxis(
 /** The zoom (0 to 100) that shows `span` seconds of a `duration` video. Inverse of windowFor. */
 export function zoomForSpan(duration: number, span: number): number {
   if (!(duration > 0) || !(span > 0) || span >= duration) return 0;
-  return Math.min(100, Math.max(0, Math.round((1 - (span / duration) ** (1 / 3)) * 1000) / 10));
+  return Math.min(100, Math.max(0, Math.round((1 - (span / duration) ** (1 / 3)) * 10000) / 100));
 }
 
 /** Ruler ticks for every shown stretch of an axis, as pixels. The fold has none (it is labelled). */
