@@ -22,8 +22,8 @@ test("other invalid ranges are still no range", () => {
 
 test("Clip says the real reason for an over-cap range", () => {
   assert.equal(
-    clipReason({ hasRange: true, segments: 0, busy: false, rangeSeconds: 1000 }),
+    clipReason({ hasRange: true, segments: 0, rangeSeconds: 1000 }),
     "Clips can be up to 10 minutes. This one is 16:40.",
   );
-  assert.equal(clipReason({ hasRange: true, segments: 0, busy: false, rangeSeconds: 42 }), null);
+  assert.equal(clipReason({ hasRange: true, segments: 0, rangeSeconds: 42 }), null);
 });

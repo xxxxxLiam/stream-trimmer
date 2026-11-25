@@ -40,10 +40,11 @@ test("Final Cut sends a project; the other editors open with the saved clip; fol
 
 test("Clip says why it can't run", () => {
   const reason = "Set an end first: click the timeline or press O";
-  assert.equal(clipReason({ hasRange: false, segments: 0, busy: false }), reason);
-  assert.equal(clipReason({ hasRange: true, segments: 0, busy: false }), null);
-  assert.equal(clipReason({ hasRange: false, segments: 2, busy: false }), null);
-  assert.equal(clipReason({ hasRange: true, segments: 0, busy: true }), "A clip is being made. Clip is ready when it's done.");
+  assert.equal(clipReason({ hasRange: false, segments: 0 }), reason);
+  assert.equal(clipReason({ hasRange: true, segments: 0 }), null);
+  assert.equal(clipReason({ hasRange: false, segments: 2 }), null);
+  // A clip being made is not a reason: Clip stays live and the next clip joins the line.
+  assert.equal(clipReason({ hasRange: true, segments: 0 }), null);
 });
 
 test("the choice is sticky and shared by every Clip button", async () => {
