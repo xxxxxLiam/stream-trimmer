@@ -83,6 +83,17 @@
    "acme": {
     "podcast214": [
      {
+      "id": "b0",
+      "label": "Cold Open",
+      "segments": [
+       {
+        "start": 130,
+        "end": 175
+       }
+      ],
+      "status": "banked"
+     },
+     {
       "id": "b1",
       "label": "Honest Version",
       "segments": [
@@ -154,7 +165,7 @@
    "wait": 1500
   },
   {
-   "eval": "(()=>{const rows=[...document.querySelectorAll(\"div.group\")];const r=rows.find(x=>x.textContent.includes(\"Honest Version\"));r.querySelector('button[aria-label=\"Make this clip\"]').click()})()"
+   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-label=\"Make this clip\"]')];b[0].click()})()"
   },
   {
    "waitFor": "[role=group][aria-label]"
