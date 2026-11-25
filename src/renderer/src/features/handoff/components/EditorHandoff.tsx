@@ -327,7 +327,20 @@ async function runAfterCuttingInner(
     const { eventName } = importLayout(settings, ctx);
     outcome = await exportNamed(api, ctx, eventName, settings.afterCutting, settings);
   }
-  if (api && settings.openIn && justSaved) {
+  if (api && settings.openIn === "resolve" && justSaved && ctx.clipsDir) {
+    // Resolve imports the same FCPXML Final Cut reads (File > Import > Timeline), one timeline per clip with its
+    // languages inside. It can't be launched with a file, so the app opens and the file is shown in the folder.
+    const { eventName } = importLayout(settings, ctx);
+    const sent = await exportNamed(api, ctx, eventName, undefined, { ...settings, layout: undefined });
+    if (!sent.ok || !sent.path) outcome = sent;
+    else {
+      const r = await api.openWith({ app: "resolve", file: sent.path });
+      const file = sent.path.split(/[\\/]/).pop() ?? "the file";
+      outcome = r.ok
+        ? { ok: true, message: `Saved ${file}. In Resolve: File > Import > Timeline, then choose it.`, path: sent.path, skipped: sent.skipped }
+        : { ok: false, message: r.error ?? "DaVinci Resolve would not open.", path: sent.path, skipped: sent.skipped };
+    }
+  } else if (api && settings.openIn && justSaved) {
     // The editor chosen in the Clip menu opens with the saved clip; where it can't take it, the
     // file is shown in the folder instead.
     const r = await api.openWith({ app: settings.openIn, file: justSaved.path });
@@ -867,7 +880,7 @@ export default function EditorHandoff({
               </label>
             </Section>
           </div>
-          <p className="t-meta m-0">Premiere Pro cannot open this file without a third-party converter.</p>
+          <p className="t-meta m-0">Premiere Pro cannot open this file without a third-party converter. DaVinci Resolve reads it: choose File &gt; Import &gt; Timeline.</p>
         </div>
       )}
     </section>

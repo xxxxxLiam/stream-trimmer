@@ -20,37 +20,40 @@
  * userinfo, brackets, `%`-escapes, non-ASCII and IP-literal tricks in one rule).
  * What is left is then read by BOTH parsers and must give the same host.
  */
-export function isYouTubeUrl(value: string): boolean {
-  if (typeof value !== "string" || value.length > 4096) return false;
+export function strictHttpUrl(value: string): { url: URL; host: string } | null {
+  if (typeof value !== "string" || value.length > 4096) return null;
   // Control characters, DEL, whitespace, backslash, anything non-ASCII-printable.
-  if (/[^\x21-\x7e]/.test(value) || value.includes("\\")) return false;
+  if (/[^\x21-\x7e]/.test(value) || value.includes("\\")) return null;
   // Percent-encoded control characters (%00-%1f, %7f) and an encoded backslash.
-  if (/%(?:[01][0-9a-f]|7f|5c)/i.test(value)) return false;
+  if (/%(?:[01][0-9a-f]|7f|5c)/i.test(value)) return null;
   // The scheme must be followed by exactly `//`, as RFC 3986 requires.
   const m = /^(https?):\/\/([^/?#]*)/i.exec(value);
-  if (!m) return false;
+  if (!m) return null;
   const authority = m[2];
   // Plain `host` or `host:port`: no `@` (userinfo), `[` (IP literal), `%`, ...
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.?(?::\d{1,5})?$/.test(authority)) {
-    return false;
+    return null;
   }
   const rawHost = authority.replace(/:\d+$/, "").toLowerCase().replace(/\.$/, "");
   let u: URL;
   try {
     u = new URL(value);
   } catch {
-    return false;
+    return null;
   }
-  if (u.protocol !== "https:" && u.protocol !== "http:") return false;
-  if (u.username || u.password) return false;
+  if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+  if (u.username || u.password) return null;
   const host = u.hostname.toLowerCase().replace(/\.$/, "");
   // Both readings of the host must be the same string, and that string YouTube.
-  if (host !== rawHost) return false;
-  return (
-    host === "youtube.com" ||
-    host.endsWith(".youtube.com") ||
-    host === "youtu.be"
-  );
+  if (host !== rawHost) return null;
+  return { url: u, host };
+}
+
+export function isYouTubeUrl(value: string): boolean {
+  const parsed = strictHttpUrl(value);
+  if (!parsed) return false;
+  const { host } = parsed;
+  return host === "youtube.com" || host.endsWith(".youtube.com") || host === "youtu.be";
 }
 
 // Real ids are 11 characters; only the shape is checked, since what matters is that it names one video.

@@ -47,7 +47,7 @@ export function useCommentsMutations({
         // you're not a bot" and the app looks signed out when it isn't.
         body: JSON.stringify({
           url: normalizeYouTubeUrl(url),
-          ...cookiePayload(),
+          ...cookiePayload(url),
         }),
       });
       const data = await parseJson<CommentsResponse & { error?: string }>(res);

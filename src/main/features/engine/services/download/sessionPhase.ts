@@ -14,6 +14,7 @@ import { DownloadCtx } from "./jobContext";
 export async function verifySession(ctx: DownloadCtx): Promise<boolean> {
   const { res, format, quality, cookieOptions, cookieMode, job, trackChild, diag, sendCancelled } = ctx;
   const requiresVerifiedSession =
+    ctx.isYouTube &&
     format === "mp4" && (quality === "best" || Number(quality) > 360);
   if (requiresVerifiedSession) {
     if (cookieMode === "none") {

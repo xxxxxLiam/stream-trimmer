@@ -5,6 +5,7 @@
  * user exported from their own browser and imported here; letting yt-dlp read
  * a browser's own cookie store is kept as a secondary route.
  */
+import { streamVideoId } from "./videoSource";
 import { useSyncExternalStore } from "react";
 import {
   COOKIE_BROWSERS,
@@ -239,7 +240,9 @@ export function isConnected(): boolean {
   return state.connected;
 }
 
-export function cookiePayload(): CookiePayload {
+/** The YouTube sign-in goes with YouTube requests only: a Twitch or Kick link never carries it. */
+export function cookiePayload(forUrl?: string): CookiePayload {
+  if (forUrl && streamVideoId(forUrl)) return {};
   return state.connected ? { cookiesFromBrowser: state.source } : {};
 }
 

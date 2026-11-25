@@ -4,6 +4,7 @@
  * Description: What the Export panel does: pick a waiting moment (load it on the timeline), make
  *   it, undo the clip just made, remove a moment.
  */
+import { sourceLinkFor } from "../../../shared/utils/videoSource";
 import { useCallback, useRef } from "react";
 import { clearAfterCuttingOutcome } from "../../handoff/components/EditorHandoff";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
@@ -148,7 +149,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   const signIn = useCallback(() => openSignIn(), [openSignIn]);
 
   const showInBrowser = useCallback(() => {
-    if (vid) window.open(`https://www.youtube.com/watch?v=${vid}`, "_blank", "noopener");
+    if (vid) window.open(sourceLinkFor(vid), "_blank", "noopener");
   }, [vid]);
 
   /** A moment already waiting stays waiting; a marked part that was never banked joins the bank. */

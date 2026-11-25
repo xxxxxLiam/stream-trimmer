@@ -5,6 +5,7 @@
  *   waiting count, the pill search, opening a pasted link, folding a video into Done with its
  *   8 s Undo line.
  */
+import { sourceLinkFor } from "../../../shared/utils/videoSource";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { bankStore } from "../../../shared/utils/bank";
 import { extractVideoId } from "../../../shared/utils/clip";
@@ -90,7 +91,7 @@ export function useVideosController() {
   );
 
   const openOnYouTube = useCallback((row: VideoRow) => {
-    if (row.videoId) window.open(`https://www.youtube.com/watch?v=${row.videoId}`, "_blank", "noopener");
+    if (row.videoId) window.open(sourceLinkFor(row.videoId), "_blank", "noopener");
   }, []);
 
   const undoneDone = useCallback((row: VideoRow) => ws.setTabDone(row.id, false), [ws]);
