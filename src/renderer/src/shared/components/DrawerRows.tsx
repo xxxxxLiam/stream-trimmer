@@ -6,19 +6,15 @@
  *   button. Logic-free.
  */
 import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight, X } from "react-bootstrap-icons";
 import { DrawerHeader as SharedHeader } from "./Drawer";
 
-const Chevron = ({ dir }: { dir: "left" | "right" }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d={dir === "right" ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
-  </svg>
-);
+const Chevron = ({ dir }: { dir: "left" | "right" }) => {
+  const Svg = dir === "right" ? ChevronRight : ChevronLeft;
+  return <Svg width={16} height={16} aria-hidden="true" focusable="false" />;
+};
 
-const CloseIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-    <path d="M6 6l12 12M18 6L6 18" />
-  </svg>
-);
+const CloseIcon = () => <X width={16} height={16} aria-hidden="true" focusable="false" />;
 
 /** The shared drawer header with its icons. `closeName` is what every view's close button announces. */
 export function DrawerHeader({ title, back, onBack, onClose, closeName }: { title: string; back?: string; onBack?: () => void; onClose: () => void; closeName: string }) {

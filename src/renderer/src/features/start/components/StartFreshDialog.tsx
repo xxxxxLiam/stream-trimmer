@@ -7,6 +7,7 @@
  *   question is answered once. Logic-free: the hook owns the answer.
  */
 import { useRef } from "react";
+import { Check2, Shield as ShieldIcon } from "react-bootstrap-icons";
 import { useModalFocus } from "../../../shared/hooks/useModalFocus";
 import BrandMark from "../../../shared/components/BrandMark";
 import Button from "../../../shared/components/Button";
@@ -19,39 +20,8 @@ export type StartFreshDialogProps = {
   onKeep: () => void;
 };
 
-const Tick = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    className="mt-[2px] shrink-0 text-fg-dim"
-  >
-    <path d="M3 8.5l3.2 3L13 4.5" />
-  </svg>
-);
-const Shield = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    className="mt-[2px] shrink-0 text-fg-dim"
-  >
-    <path d="M8 2l5 2v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4z" />
-  </svg>
-);
+const Tick = () => <Check2 width={16} height={16} aria-hidden="true" focusable="false" className="mt-[2px] shrink-0 text-fg-dim" />;
+const Shield = () => <ShieldIcon width={16} height={16} aria-hidden="true" focusable="false" className="mt-[2px] shrink-0 text-fg-dim" />;
 
 export default function StartFreshDialog({
   busy,

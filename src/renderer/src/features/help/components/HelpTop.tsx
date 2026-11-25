@@ -9,6 +9,7 @@ import { useRef, type KeyboardEvent } from "react";
 import { DrawerHeader, ChevronRow, SectionLabel, drawerBody } from "../../../shared/components/DrawerRows";
 import type { HelpResults } from "../utils/helpSearch";
 import { HELP_MORE, type HelpMoreId } from "../utils/helpContent";
+import { ChevronRight, Search } from "react-bootstrap-icons";
 
 export type HelpTopProps = {
   query: string;
@@ -53,10 +54,7 @@ export default function HelpTop(p: HelpTopProps) {
       <DrawerHeader title="Help" closeName="Help" onClose={p.onClose} />
       <div ref={listRef} onKeyDown={onKeyDown} className={drawerBody}>
         <div className="relative mb-[8px] mt-[4px]">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="absolute left-[14px] top-[14px] text-fg-dim">
-            <circle cx="11" cy="11" r="6" />
-            <path d="M16 16l4 4" />
-          </svg>
+          <Search width={16} height={16} className="absolute left-[14px] top-[14px] text-fg-dim" aria-hidden="true" focusable="false" />
           <label htmlFor="help-q" className="sr-only">Search Help</label>
           <input
             id="help-q"
@@ -89,9 +87,7 @@ export default function HelpTop(p: HelpTopProps) {
             className="-mx-[8px] flex h-target items-center gap-[8px] rounded-control bg-transparent px-[8px] text-left text-body leading-[normal] text-fg hover:bg-hover"
           >
             <span className="flex-1">{a.question}</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-fg-dim">
-              <path d="M9 6l6 6-6 6" />
-            </svg>
+            <ChevronRight width={16} height={16} className="text-fg-dim" aria-hidden="true" focusable="false" />
           </button>
         ))}
         {p.results.more.length > 0 && <SectionLabel>More</SectionLabel>}

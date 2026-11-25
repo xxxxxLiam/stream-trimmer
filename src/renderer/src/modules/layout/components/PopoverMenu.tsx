@@ -5,6 +5,7 @@
  *   Panels menu. Keyboard: Enter or arrow opens, arrows move, Enter picks, Esc closes.
  */
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Check2 } from "react-bootstrap-icons";
 import { useDismissEffects } from "../../../shared/hooks/useDismissEffects";
 
 export type MenuItem =
@@ -171,17 +172,13 @@ export default function PopoverMenu({
                       }`}
                     >
                       {item.checked ? (
-                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="var(--c-bg)" strokeWidth="2">
-                          <path d="M2 6.5l2.5 2.5L10 3.5" />
-                        </svg>
+                        <Check2 width={11} height={11} className="text-bg" aria-hidden="true" focusable="false" />
                       ) : null}
                     </span>
                   ) : (
                   <span className="flex w-[16px] shrink-0 justify-center">
                     {item.checked ? (
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--ice)" strokeWidth="1.8" aria-hidden="true">
-                        <path d="M2 6.5l2.5 2.5L10 3.5" />
-                      </svg>
+                      <Check2 width={12} height={12} className="text-ice" aria-hidden="true" focusable="false" />
                     ) : null}
                   </span>
                   )
