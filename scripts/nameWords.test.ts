@@ -5,9 +5,9 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { suggestClipName } from "../../main/features/engine/services/clipNames/clipNames";
-import { suggestProjectName } from "../../renderer/src/features/clips/utils/projectName";
-import { twoWordName } from "./nameWords";
+import { suggestClipName } from "../src/main/features/engine/services/clipNames/clipNames";
+import { suggestProjectName } from "../src/renderer/src/features/clips/utils/projectName";
+import { twoWordName } from "../src/common/utils/nameWords";
 
 const TITLES = ["Podcast #214, the long talk", "How I Made $10k in 30 days", "THE GREATEST SPEECH EVER GIVEN", "日本語 の タイトル", "214"];
 
