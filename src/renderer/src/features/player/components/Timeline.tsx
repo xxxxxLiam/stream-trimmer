@@ -1,13 +1,14 @@
 /**
  * File: Timeline.tsx
  * Path: src/renderer/src/features/player/components/Timeline.tsx
- * Description: The timeline panel: tools row, ruler and the three lanes (Transcript, Source, Clips),
+ * Description: The timeline panel: tools row, ruler and the lanes (Transcript, Source, one Audio lane per ticked language, Clips),
  *   full width under the preview. The tools and zoom come from the bottom bar's shared state.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTimelineView } from "../hooks/TimelineControllerContext";
 import { TOOL_CURSORS, sourceLaneHeight } from "../utils/laneTools";
 import { useTranscriptLane } from "../hooks/useTranscriptLane";
+import AudioLanes from "./AudioLanes";
 import ClipsLane from "./ClipsLane";
 import SourceLane from "./SourceLane";
 import TimelineTools from "./TimelineTools";
@@ -74,6 +75,7 @@ export default function Timeline() {
         >
           {transcriptLane ? <TranscriptLane c={c} /> : null}
           <SourceLane c={c} height={sourceLaneHeight(height)} />
+          <AudioLanes c={c} />
           <ClipsLane c={c} />
         </div>
       </div>

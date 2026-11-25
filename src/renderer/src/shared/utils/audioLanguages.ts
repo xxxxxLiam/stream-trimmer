@@ -91,3 +91,15 @@ export function shortenPath(path: string, max = 28): string {
   if (clean.length <= max) return clean;
   return `…${clean.slice(clean.length - (max - 1))}`;
 }
+
+/** One timeline lane per ticked language: "Original", "Spanish dub". A video with no dubs has none. */
+export function audioLanesOf(
+  tracks: readonly AudioTrackInfo[] | undefined,
+  selected: readonly string[] | undefined,
+): { language: string; name: string }[] {
+  if (!hasDubTracks(tracks)) return [];
+  return ticked(tracks, selected).map((t) => ({
+    language: t.language,
+    name: t.kind === "original" ? "Original" : `${t.label} dub`,
+  }));
+}
