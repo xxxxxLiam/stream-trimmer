@@ -67,7 +67,9 @@ export default function SettingsEditor(p: SettingsEditorProps) {
           </div>
         ) : (
           <p className="m-[0px] py-[12px] text-body text-fg-dim">
-            Nothing to set for {p.label} yet. Clip saves the clip and opens it in {p.label}.
+            {p.label === "DaVinci Resolve"
+              ? "Nothing to set for DaVinci Resolve. Clip saves the clip and a timeline file, opens Resolve and shows the file. In Resolve, choose File > Import > Timeline."
+              : `Nothing to set for ${p.label} yet. Clip saves the clip and opens it in ${p.label}.`}
           </p>
         )}
         {p.onSkip ? (

@@ -117,7 +117,8 @@ test("the editor page: Final Cut holds Library, Event, Layout and Your look unde
   assert.match(h, /value="Acme\.fcpbundle"/);
   assert.match(h, /aria-label="Choose the Final Cut library for Acme"/);
   const other = renderToStaticMarkup(<SettingsEditor campaignName="Acme" label="DaVinci Resolve" finalCut={null} onBack={noop} onClose={noop} />);
-  assert.match(other, /Nothing to set for DaVinci Resolve yet/);
+  assert.match(other, /Nothing to set for DaVinci Resolve\. Clip saves the clip and a timeline file/);
+  assert.match(renderToStaticMarkup(<SettingsEditor campaignName="Acme" label="Premiere Pro" finalCut={null} onBack={noop} onClose={noop} />), /Nothing to set for Premiere Pro yet/);
   assert.doesNotMatch(other, /fcp-lib/);
 });
 
