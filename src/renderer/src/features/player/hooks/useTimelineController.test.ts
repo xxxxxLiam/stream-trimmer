@@ -80,3 +80,16 @@ test("Fit's re-centre runs after the zoom-reset effect, so Fit (zoom to 0 and a 
   const fit = effects.indexOf("fitWindow(a.range, a.duration)");
   assert.ok(clear > 0 && fit > 0 && clear < fit);
 });
+
+test("V18-T-1: a zoom with no centre takes the one it shows, and a scrub never moves the axis", () => {
+  assert.match(effects, /a\.zoom > 0 && a\.focus === null\) a\.setFocus\(a\.win\.start/);
+  assert.match(effects, /a\.zoom === 0 \|\| a\.scrubbing\) return/);
+  assert.match(src, /scrubbing: s\.drag\?\.kind === "scrub"/);
+});
+
+test("V18-T-2: wheel and pinch zoom, and the zoom tool, anchor on the pointer", () => {
+  assert.match(src, /focusForAnchor\(duration, next, t, x \/ s\.width\)/);
+  assert.match(src, /zoomAt\(x, at, getZoom\(\) \+ act\.amount\)/);
+  assert.match(src, /tools\.tool === "zoom"\) return zoomAt\(/);
+  assert.doesNotMatch(src, /s\.setFocus\(at\);\s*tools\.zoomBy/, "centring on the pointer time drifted away from it");
+});

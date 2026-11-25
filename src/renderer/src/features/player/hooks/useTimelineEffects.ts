@@ -32,6 +32,8 @@ type Args = {
   tool: TimelineTool;
   setScissorsStart: (t: number | null) => void;
   view: Win | null;
+  /** A scrub is in progress: the window holds still under the pointer. */
+  scrubbing: boolean;
 };
 
 export function useTimelineEffects(a: Args) {
@@ -99,10 +101,18 @@ export function useTimelineEffects(a: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.duration, a.framed?.start, a.framed?.end]);
 
+  // Zoomed in with no centre of its own (the zoom came from the slider, the + and - buttons or a key), the
+  // view keeps the centre it has now. Without one it re-centred on the playhead on every move, so a scrub
+  // chased its own tail and every click slid the ruler.
+  useEffect(() => {
+    if (a.zoom > 0 && a.focus === null) a.setFocus(a.win.start + (a.win.end - a.win.start) / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.zoom, a.focus]);
+
   // Zoomed in, the window follows the playhead once it runs off the edge. Only when the playhead
   // moves: zooming or panning to look somewhere else must not snap the view back to it.
   useEffect(() => {
-    if (a.zoom === 0) return;
+    if (a.zoom === 0 || a.scrubbing) return; // a scrub never moves the axis under the pointer
     if (a.playhead < a.win.start || a.playhead > a.win.end) a.setFocus(a.playhead);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.playhead]);

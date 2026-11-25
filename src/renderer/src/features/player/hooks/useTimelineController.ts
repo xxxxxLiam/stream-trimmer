@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
-import { useToolState } from "../../../modules/layout/hooks/useToolState";
+import { getZoom, useToolState } from "../../../modules/layout/hooks/useToolState";
 import { useAudioLanguageState } from "../../../modules/layout/hooks/useAudioLanguageState";
 import { audioLanesOf } from "../../../shared/utils/audioLanguages";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
@@ -18,7 +18,7 @@ import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
 import { clampX, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
-import { axisDuringDrag, axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
+import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
@@ -97,6 +97,7 @@ export function useTimelineController() {
     tool: tools.tool,
     setScissorsStart: s.setScissorsStart,
     view,
+    scrubbing: s.drag?.kind === "scrub",
   });
 
   // The handlers sit on the whole timeline area (so a tool works in any part of it, including the
@@ -114,6 +115,14 @@ export function useTimelineController() {
     clipper.setEndFromSeconds(snap(hi, "end"));
   };
 
+  /** Zoom to `zoom` keeping time `t`, at lane position `x`, under the same spot (a pinch or click zooms into the point). */
+  const zoomAt = (x: number, t: number, zoom: number) => {
+    const next = Math.min(100, Math.max(0, zoom));
+    if (!folded && s.width > 0) s.setFocus(focusForAnchor(duration, next, t, x / s.width));
+    else s.setFocus(t);
+    tools.setZoom(next);
+  };
+
   /** Pointer down on the Source lane. What it does depends on the tool. */
   const onLanePointerDown = (e: PointerEvent<HTMLElement>) => {
     // Buttons and fields inside the area (a clip label, the fold, the name box) keep their own clicks.
@@ -124,10 +133,7 @@ export function useTimelineController() {
     if (t === null || !(duration > 0)) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     if (tools.tool === "flag") return flagsApi.addFlag(t);
-    if (tools.tool === "zoom") {
-      s.setFocus(t);
-      return tools.zoomBy(zoomStep(e.altKey));
-    }
+    if (tools.tool === "zoom") return zoomAt(x, t, getZoom() + zoomStep(e.altKey));
     if (tools.tool === "hand") return s.setDrag({ kind: "pan", startX: e.clientX, startFocus: s.focus ?? playhead });
     if (tools.tool === "clip") {
       // Scissors only mark: a first click is the start, the second is the end. They never seek.
@@ -208,9 +214,10 @@ export function useTimelineController() {
       const per = (win.end - win.start) / Math.max(1, s.width);
       s.setFocus(Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + act.pixels * per)));
     } else {
-      const at = toT(axis, e.clientX - left);
-      if (at !== null) s.setFocus(at);
-      tools.zoomBy(act.amount);
+      const x = e.clientX - left;
+      const at = toT(axis, x);
+      if (at !== null) zoomAt(x, at, getZoom() + act.amount);
+      else tools.zoomBy(act.amount);
     }
     return true;
   };
