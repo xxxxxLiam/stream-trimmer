@@ -86,3 +86,24 @@ test("an effect used by a filter inside an audio channel source is carried", () 
   assert.equal(look.effects.length, 1);
   assert.match(look.clip, /ref="fx1"/);
 });
+
+test("the look's own frame size and rate are read from its sequence format", () => {
+  assert.deepEqual(parseLook(sampleExport()).format, { width: 1920, height: 1080, fps: "29.97" });
+});
+
+test("rates are plain text: whole, NTSC and odd ones", async () => {
+  const { fpsText } = await import("./fcpLook");
+  assert.equal(fpsText("1/25s"), "25");
+  assert.equal(fpsText("1/30s"), "30");
+  assert.equal(fpsText("1001/24000s"), "23.976");
+  assert.equal(fpsText("1001/60000s"), "59.94");
+  assert.equal(fpsText("1/48s"), "48");
+  assert.equal(fpsText("0/30s"), null);
+  assert.equal(fpsText(undefined), null);
+});
+
+test("an export that names no usable format has a look without one", () => {
+  const noFormat = sampleExport().replace(/<format [^>]*\/>/, "");
+  assert.equal(parseLook(noFormat).format, undefined);
+  assert.ok(parseLook(noFormat).found.length > 0, "the look itself still reads");
+});

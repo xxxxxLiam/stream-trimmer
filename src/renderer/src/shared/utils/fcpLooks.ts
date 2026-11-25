@@ -28,6 +28,14 @@ export const KEY_LAST_LOOK = "clipper.fcpLastLookId";
 /** What the old single pasted look is called once it is in the list. */
 export const MIGRATED_NAME = "My look";
 
+/** The look's own frame size and rate, when stored and sane; anything else is left out. */
+function readFormat(v: unknown): SavedLook["look"]["format"] {
+  const f = v as Record<string, unknown> | null | undefined;
+  return f && typeof f.width === "number" && f.width > 0 && typeof f.height === "number" && f.height > 0 && typeof f.fps === "string" && f.fps !== ""
+    ? { width: f.width, height: f.height, fps: f.fps }
+    : undefined;
+}
+
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
 
 /** Defensive read of the stored list; a malformed entry is dropped rather than half used. */
@@ -43,7 +51,7 @@ export function normalizeSavedLooks(raw: unknown): SavedLook[] {
     out.push({
       id: r.id,
       name: r.name,
-      look: { version: l.version, clip: l.clip, effects: l.effects, found: l.found },
+      look: { version: l.version, clip: l.clip, effects: l.effects, found: l.found, ...(readFormat(l.format) ? { format: readFormat(l.format) } : {}) },
       addedAt: typeof r.addedAt === "number" && Number.isFinite(r.addedAt) ? r.addedAt : 0,
     });
   }

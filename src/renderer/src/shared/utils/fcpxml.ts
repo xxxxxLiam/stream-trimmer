@@ -64,11 +64,12 @@ export const FRAME_RATE_CHOICES: readonly string[] = [
   "60",
 ];
 
+/** Vertical at the video's own frame rate: a 25 fps clip gets a 25 fps project, not a converted 30. */
 export const DEFAULT_TIMELINE: TimelineFormat = {
   kind: "vertical",
   width: VERTICAL_SIZE.width,
   height: VERTICAL_SIZE.height,
-  fps: "30",
+  fps: "source",
 };
 
 export const DEFAULT_PROJECT_PATTERN = "{clipId} {label}";
@@ -149,7 +150,7 @@ export function normalizeTimeline(raw: unknown): TimelineFormat {
     r.kind === "source" || r.kind === "custom" || r.kind === "vertical" || r.kind === "look" ? r.kind : "vertical";
   const fpsText = typeof r.fps === "string" ? r.fps.trim() : typeof r.fps === "number" ? String(r.fps) : "";
   let fps = DEFAULT_TIMELINE.fps;
-  if (fpsText === "source" && kind === "source") fps = "source";
+  if (fpsText === "source") fps = "source";
   else if (fpsText !== "source" && parseRational(fpsText)) fps = fpsText;
   return {
     kind,
@@ -638,13 +639,21 @@ export function resolveProjectNames(
   });
 }
 
-/** The frame size and rate a clip's timeline uses; never inherits unless asked to. */
+/**
+ * The frame size and rate a clip's timeline uses. A rate of "source" (the default) follows the video, for
+ * every kind. Kind "look" uses the look's own size and rate when the look has them, else it is vertical.
+ */
 export function resolveTimeline(
   fmt: TimelineFormat,
   media: MediaInfo,
+  look?: Look["format"],
 ): { width: number; height: number; fps: Rational } {
   const rate = fmt.fps === "source" ? null : parseRational(fmt.fps);
   const fps = rate ? snapFrameRate(rate) : media.fps;
+  if (fmt.kind === "look" && look) {
+    const lookRate = parseRational(look.fps);
+    return { width: look.width, height: look.height, fps: lookRate ? snapFrameRate(lookRate) : fps };
+  }
   if (fmt.kind === "source") return { width: media.width, height: media.height, fps };
   if (fmt.kind === "custom") return { width: fmt.width, height: fmt.height, fps };
   return { ...VERTICAL_SIZE, fps };
@@ -901,7 +910,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
     );
 
     if (input.project) {
-      const tl = resolveTimeline(input.project.timeline, m);
+      const tl = resolveTimeline(input.project.timeline, m, input.project.look?.format);
       const tlFormat = formatFor(tl.width, tl.height, tl.fps);
       // Whole timeline frames, rounded down, so the clip never overruns its media.
       const assetSec = (frames * m.fps.den) / m.fps.num;
