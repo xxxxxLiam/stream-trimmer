@@ -314,9 +314,6 @@
    "wait": 300
   },
   {
-   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-expanded]')].find(x=>/Done/.test(x.textContent)); if(b&&b.getAttribute('aria-expanded')==='false') b.click();})()"
-  },
-  {
    "hover": "#ui-panels-left >> text=Founder story, part 2"
   },
   {

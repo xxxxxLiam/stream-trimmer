@@ -8,13 +8,23 @@ import { extractVideoId } from "../../../shared/utils/clip";
 import type { WorkspaceTab } from "../hooks/WorkspaceContext";
 import { clipsFor, type BankData } from "../../../shared/utils/bank";
 
-/** Mark one video Done, or bring it back. Other videos are untouched. */
+/**
+ * Mark one video Done, or bring it back. Other videos are untouched. A video just moved to Done goes to
+ * the top of the Done group (the fold shows the latest first, as on board 03.2.6).
+ */
 export function setDone(tabs: WorkspaceTab[], id: string, done: boolean): WorkspaceTab[] {
-  return tabs.map((t) => {
+  const next = tabs.map((t) => {
     if (t.id !== id) return t;
     const { done: _drop, ...rest } = t;
     return done ? { ...rest, done: true } : rest;
   });
+  if (!done) return next;
+  const moved = next.find((t) => t.id === id);
+  const others = next.filter((t) => t.id !== id);
+  if (!moved) return next;
+  const firstDone = others.findIndex((t) => t.done);
+  if (firstDone < 0) return next;
+  return [...others.slice(0, firstDone), moved, ...others.slice(firstDone)];
 }
 
 export function splitVideos(tabs: readonly WorkspaceTab[]): { open: WorkspaceTab[]; done: WorkspaceTab[] } {
@@ -32,9 +42,15 @@ export function nextOpenId(tabs: readonly WorkspaceTab[], id: string): string | 
 }
 
 /** Moments still waiting (banked) for one campaign's video. */
-export function waitingIn(data: BankData, campaignId: string | undefined, videoId: string | null): number {
+export function waitingIn(
+  data: BankData,
+  campaignId: string | undefined,
+  videoId: string | null,
+  /** The moment being made right now: it is not waiting any more. */
+  makingId: string | null = null,
+): number {
   if (!campaignId || !videoId) return 0;
-  return clipsFor(data, campaignId, videoId).filter((c) => c.status === "banked").length;
+  return clipsFor(data, campaignId, videoId).filter((c) => c.status === "banked" && c.id !== makingId).length;
 }
 
 /** Every word typed must appear in the title or the campaign name. */

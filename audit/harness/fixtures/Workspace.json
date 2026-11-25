@@ -293,9 +293,6 @@
    "wait": 1500
   },
   {
-   "click": "button[aria-expanded]:has-text('Done')"
-  },
-  {
    "wait": 300
   }
  ],

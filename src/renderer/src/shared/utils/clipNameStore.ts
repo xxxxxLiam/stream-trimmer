@@ -31,3 +31,9 @@ const making = createValue(null);
 export const setMakingName = making.set;
 export const getMakingName = making.get;
 export const useMakingName = () => useSyncExternalStore(making.subscribe, making.get, making.get);
+
+/** The bank id of the moment being made right now, so lists elsewhere do not count it as waiting. */
+const makingClip = createValue(null);
+
+export const setMakingClipId = makingClip.set;
+export const useMakingClipId = () => useSyncExternalStore(makingClip.subscribe, makingClip.get, makingClip.get);

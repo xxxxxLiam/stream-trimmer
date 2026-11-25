@@ -90,9 +90,6 @@
    "wait": 200
   },
   {
-   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-expanded]')].find(x=>/Done/.test(x.textContent)); if(b&&b.getAttribute('aria-expanded')==='false') b.click();})()"
-  },
-  {
    "hover": "span:text-is('clip length')"
   },
   {

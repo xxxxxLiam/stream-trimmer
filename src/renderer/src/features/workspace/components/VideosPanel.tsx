@@ -6,7 +6,7 @@
  *   video. Done videos fold away with an 8 s Undo line. Logic lives in useVideosController.
  */
 import type { KeyboardEvent } from "react";
-import { IconChevronDown, IconClose, IconSearch } from "../../../shared/components/PanelIcons";
+import { IconClose, IconSearch } from "../../../shared/components/PanelIcons";
 import { useVideosController, type VideoRow } from "../hooks/useVideosController";
 
 function subline(r: VideoRow): string {
@@ -167,12 +167,17 @@ export default function VideosPanel() {
             className={`mx-[10px] mb-[3px] ${v.undo ? "mt-[6px]" : "mt-[9px]"} flex h-[32px] w-[calc(100%-20px)] items-center justify-between px-[4px] text-meta leading-[normal] text-fg-dim hover:text-fg`}
           >
             Done · {doneCount}
-            <span className={"inline-flex " + (v.doneOpen ? "rotate-180" : "")}>
-              <IconChevronDown />
+            <span className={"inline-flex " + (v.doneOpen ? "rotate-90" : "")}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                <path d="M3.5 2l3 3-3 3" />
+              </svg>
             </span>
           </button>
         )}
-        {v.doneOpen && v.rows.done.map((r) => <Row key={r.id} row={r} onOpen={() => v.select(r.id)} />)}
+        {/* Closed, the fold still shows its first video (boards 03.2.1 and 03.2.6); open shows them all. */}
+        {(v.doneOpen ? v.rows.done : v.rows.done.slice(0, 1)).map((r) => (
+          <Row key={r.id} row={r} onOpen={() => v.select(r.id)} />
+        ))}
       </div>
     </div>
   );

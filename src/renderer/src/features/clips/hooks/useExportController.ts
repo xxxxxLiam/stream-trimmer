@@ -5,7 +5,8 @@
  *   mutations into what the screen shows: the Making row, the finished row with its Undo ring,
  *   and the waiting rows.
  */
-import { useMakingName } from "../../../shared/utils/clipNameStore";
+import { useEffect } from "react";
+import { setMakingClipId, useMakingName } from "../../../shared/utils/clipNameStore";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { isRetryingNote } from "../utils/clipFailure";
 import { useExportEffects, useRetryKey } from "./useExportEffects";
@@ -32,6 +33,11 @@ export function useExportController() {
   if (downloading && state.makingId) onTop.add(state.makingId);
   if (state.failed?.bankId && !downloading) onTop.add(state.failed.bankId);
   if (state.finished && !downloading && finishedEntry?.clipId) onTop.add(finishedEntry.clipId);
+  const makingNow = downloading && state.makingId ? state.makingId : null;
+  useEffect(() => {
+    setMakingClipId(makingNow);
+    return () => setMakingClipId(null);
+  }, [makingNow]);
   const waiting = queries.waiting.filter((c) => !onTop.has(c.id));
   const made = queries.made.filter((c) => !onTop.has(c.id));
 
