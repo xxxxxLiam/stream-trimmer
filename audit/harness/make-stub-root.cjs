@@ -17,6 +17,7 @@
  *
  *   {
  *     "info":      { "title": "...", "duration": 3600, "id": "abc" },
+ *     "infos":     { "<video id>": { "title": "..." } }   (per-video answers; others get "info")
  *     "exitCode":  0,          // non-zero to make yt-dlp fail
  *     "stderr":    "",         // text to emit on failure
  *     "delayMs":   0,          // stall, for slow-network and cancel tests
@@ -97,15 +98,20 @@ async function main() {
 
   // Metadata probe: -J / --dump-json / --dump-single-json
   if (has("-J") || has("--dump-json") || has("--dump-single-json")) {
+    // cfg.infos: { "<video id>": { title, duration, ... } } answers a link to that video with its own
+    // metadata; any other link gets cfg.info.
+    const asked = (argv.join(" ").match(/v=([\\w-]+)/) || [])[1];
+    const own = (cfg.infos && asked && cfg.infos[asked]) || null;
+    const base = own ? Object.assign({}, cfg.info, { id: asked }, own) : cfg.info;
     const info = Object.assign({
-      _type: "video", webpage_url: "https://www.youtube.com/watch?v=" + cfg.info.id,
+      _type: "video", webpage_url: "https://www.youtube.com/watch?v=" + base.id,
       formats: [
         { format_id: "18",  ext: "mp4", height: 360,  vcodec: "avc1", acodec: "mp4a" },
         { format_id: "137", ext: "mp4", height: 1080, vcodec: "avc1", acodec: "none" },
         { format_id: "140", ext: "m4a", height: null, vcodec: "none", acodec: "mp4a" },
       ],
       subtitles: {}, automatic_captions: {}, comments: [],
-    }, cfg.info);
+    }, base);
     process.stdout.write(JSON.stringify(info) + "\\n");
     return;
   }

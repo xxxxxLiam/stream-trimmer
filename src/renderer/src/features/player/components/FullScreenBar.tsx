@@ -29,7 +29,7 @@ export default function FullScreenBar({ c, flags }: Props) {
   const mac = isMacLike();
   return (
     <div
-      className={`absolute inset-x-0 bottom-0 border-t border-hairline bg-panel px-5 pb-2.5 pt-3.5 transition-transform duration-150 ${c.barVisible ? "translate-y-0" : "pointer-events-none translate-y-full"}`}
+      className={`absolute inset-x-[0px] bottom-[0px] border-t border-hairline bg-panel px-[20px] pb-[10px] pt-[14px] transition-transform duration-150 ${c.barVisible ? "translate-y-0" : "pointer-events-none translate-y-full"}`}
     >
       <Scrubber
         large
@@ -40,11 +40,11 @@ export default function FullScreenBar({ c, flags }: Props) {
         view={null}
         onSeek={(t) => player.seekTo(t)}
       />
-      <div className="relative mt-2.5 flex h-target items-center">
+      <div className="relative mt-[10px] flex h-target items-center">
         <span className="text-body tabular-nums">
           {clockTime(player.currentTime)} <span className="text-fg-dim">/ {clockTime(c.duration)}</span>
         </span>
-        <span className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
+        <span className="absolute left-1/2 flex -translate-x-1/2 items-center gap-[8px]">
           <TransportButton labelBelow={false} label={hoverLabel("loop", mac)} name="Loop" active={c.loop} pressed={c.loop} onClick={c.toggleLoop}>
             <LoopIcon />
           </TransportButton>
@@ -64,7 +64,7 @@ export default function FullScreenBar({ c, flags }: Props) {
             <VolumeIcon muted={player.muted} />
           </TransportButton>
         </span>
-        <span className="ml-auto flex items-center gap-2.5">
+        <span className="ml-auto flex items-center gap-[10px]">
           <ClipButton openUp />
           <TransportButton look="ghost" label="Exit full screen  Esc" name="Exit full screen (Esc)" onClick={c.toggleFullScreen}>
             <ExitFullScreenIcon />

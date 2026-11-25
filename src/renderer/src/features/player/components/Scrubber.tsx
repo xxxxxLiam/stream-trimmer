@@ -5,7 +5,7 @@
  *   Ice, flags are ticks and the playhead is a Frost line. Click or use arrow keys to move.
  */
 import type { KeyboardEvent, MouseEvent } from "react";
-import { clockTime } from "../utils/transport";
+import { clipPosition, clipToVideo, clockTime } from "../utils/transport";
 
 export type ScrubberProps = {
   duration: number;
@@ -17,15 +17,20 @@ export type ScrubberProps = {
   onSeek: (seconds: number) => void;
   /** The thicker, darker track used in full screen. */
   large?: boolean;
+  /** A joined clip's sections, in play order: the track is the clip, counted in clip time. */
+  joined?: readonly { start: number; end: number }[];
 };
 
 const pct = (v: number, d: number) => (d > 0 ? Math.min(100, Math.max(0, (v / d) * 100)) : 0);
 
-export default function Scrubber({ duration, playhead, range, flags, view, onSeek, large = false }: ScrubberProps) {
+export default function Scrubber({ duration, playhead, range, flags, view, onSeek, large = false, joined }: ScrubberProps) {
+  const clip = joined && joined.length >= 2 ? joined : null;
+  const pos = clip ? clipPosition(clip, playhead) : null;
   const seekFromPointer = (e: MouseEvent<HTMLDivElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
     if (box.width <= 0 || duration <= 0) return;
-    onSeek(Math.min(duration, Math.max(0, ((e.clientX - box.left) / box.width) * duration)));
+    const f = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
+    onSeek(clip && pos ? clipToVideo(clip, f * pos.total) : Math.min(duration, f * duration));
   };
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowLeft") onSeek(Math.max(0, playhead - 5));
@@ -46,33 +51,85 @@ export default function Scrubber({ duration, playhead, range, flags, view, onSee
       aria-valuetext={clockTime(playhead)}
       onClick={seekFromPointer}
       onKeyDown={onKey}
-      className={`relative flex-none cursor-pointer ${large ? "h-1 rounded-chip bg-hover" : "h-[5px] rounded-[3px] bg-raised"}`}
+      className={`relative flex-none cursor-pointer ${large ? "h-[4px] rounded-chip bg-hover" : "h-[5px] rounded-[3px] bg-raised"}`}
     >
-      {view ? (
+      {clip && pos ? <JoinedTrack sections={clip} at={pos.at} total={pos.total} playhead={playhead} large={large} /> : null}
+      {!clip && view ? (
         <span
-          className="absolute inset-y-0 rounded-[3px] bg-hover"
+          className="absolute inset-y-[0px] rounded-[3px] bg-hover"
           style={{ left: `${pct(view.start, duration)}%`, width: `${pct(view.end - view.start, duration)}%` }}
         />
       ) : null}
-      {range ? (
+      {!clip && range ? (
         <span
-          className="absolute inset-y-0 rounded-[2px] bg-ice"
+          className="absolute inset-y-[0px] rounded-[2px] bg-ice"
           style={{ left: `${pct(range.start, duration)}%`, width: `${pct(range.end - range.start, duration)}%` }}
         />
       ) : null}
-      {flags.map((f) => (
+      {(clip ? [] : flags).map((f) => (
         <span
           key={f}
           aria-hidden="true"
-          className="absolute -top-[5px] h-[14px] w-0.5 bg-fg-dim"
+          className="absolute -top-[5px] h-[14px] w-[2px] bg-fg-dim"
           style={{ left: `${pct(f, duration)}%` }}
         />
       ))}
+      {clip ? null : (
+        <span
+          aria-hidden="true"
+          className={`absolute w-[2px] bg-frost shadow-playhead ${large ? "-top-[7px] h-[18px]" : "-top-[4px] h-[13px]"}`}
+          style={{ left: `${pct(playhead, duration)}%` }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The track of a joined clip: one stretch per section, the one playing bright, a tick between, the playhead over it. */
+function JoinedTrack({
+  sections,
+  at,
+  total,
+  playhead,
+  large,
+}: {
+  sections: readonly { start: number; end: number }[];
+  at: number;
+  total: number;
+  playhead: number;
+  large: boolean;
+}) {
+  let offset = 0;
+  return (
+    <>
+      {sections.map((s, i) => {
+        const len = Math.max(0, s.end - s.start);
+        const left = (offset / total) * 100;
+        const width = (len / total) * 100;
+        offset += len;
+        const playing = playhead >= s.start && playhead < s.end;
+        return (
+          <span key={`${s.start}-${s.end}`}>
+            <span
+              aria-hidden="true"
+              className={`absolute inset-y-[0px] rounded-[3px] ${playing ? "bg-ice" : "bg-ice-tint-50"}`}
+              style={{ left: `${left}%`, width: `calc(${width}% - ${i < sections.length - 1 ? 3 : 0}px)` }}
+            />
+            {i < sections.length - 1 ? (
+              <span
+                aria-hidden="true"
+                className="absolute -top-[3px] h-[11px] w-[2px] bg-fg"
+                style={{ left: `calc(${left + width}% - 3px)` }}
+              />
+            ) : null}
+          </span>
+        );
+      })}
       <span
         aria-hidden="true"
-        className={`absolute w-0.5 bg-frost shadow-playhead ${large ? "-top-[7px] h-[18px]" : "-top-[4px] h-[13px]"}`}
-        style={{ left: `${pct(playhead, duration)}%` }}
+        className={`absolute w-[2px] bg-fg ${large ? "-top-[7px] h-[18px]" : "-top-[4px] h-[13px]"}`}
+        style={{ left: `${(at / total) * 100}%` }}
       />
-    </div>
+    </>
   );
 }

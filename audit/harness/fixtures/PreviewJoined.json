@@ -1,0 +1,65 @@
+{
+ "_doc": "A joined clip of two far-apart sections (1:12 to 1:30 and 10:04 to 10:20), folded, the preview in clip time at 0:09.",
+ "extends": "Preview",
+ "seed": {
+  "clipper.workspaces": {
+   "activeId": "ws_a",
+   "tabs": [
+    {
+     "id": "ws_a",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=podcast214",
+     "campaignId": "acme",
+     "segments": [
+      {
+       "start": 72,
+       "end": 90
+      },
+      {
+       "start": 604,
+       "end": 620
+      }
+     ]
+    },
+    {
+     "id": "ws_b",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=founder2",
+     "campaignId": "acme"
+    },
+    {
+     "id": "ws_c",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=townhall",
+     "campaignId": "nova"
+    }
+   ]
+  }
+ },
+ "stub": {
+  "vttFile": "podcast214-joined.vtt"
+ },
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "click": "button[aria-label='Loop']"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 81; window.__fakeYTPlayer.pauseVideo()"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "document.activeElement && document.activeElement.blur()"
+  },
+  {
+   "wait": 200
+  }
+ ]
+}

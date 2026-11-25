@@ -135,8 +135,10 @@ async function renderBoard(screen, opts = {}) {
       const width = Math.round(box.width);
       const height = Math.round(box.height);
       const png = await page.screenshot({ fullPage: true, clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } });
+      const dump = opts.dump ? await el.evaluate(new Function("el", "const f = " + require("./dumpLayout.cjs").DUMP_SRC + "; const r = el.getBoundingClientRect(); return f(r.x, r.y, el);")) : undefined;
       return {
         png,
+        dump,
         frame: { width, height, clip: { x: x0 - Math.round(box.x), y: y0 - Math.round(box.y), width: x1 - x0, height: y1 - y0 }, title: frame.title },
       };
     }

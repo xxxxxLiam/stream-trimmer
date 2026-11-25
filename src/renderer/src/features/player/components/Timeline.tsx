@@ -33,14 +33,14 @@ export default function Timeline() {
   }, [setWidth]);
 
   return (
-    <div id="ui-timeline" ref={laneBox} className="relative flex min-w-0 flex-1 flex-col border-y border-hairline bg-panel pb-2.5">
+    <div id="ui-timeline" ref={laneBox} className="relative flex min-w-[0px] flex-1 flex-col border-y border-hairline bg-panel pb-[10px]">
       <TimelineHeader c={c} />
       <TimelineRuler c={c} />
       {transcriptLane ? <TranscriptLane c={c} /> : null}
       <SourceLane c={c} />
       <ClipsLane c={c} />
       {c.folded && c.fold[0] ? (
-        <div className="absolute bottom-2 right-4 text-meta text-fg-dim">Zoom: 52 s each side of the fold</div>
+        <div className="absolute bottom-[8px] right-[16px] text-meta text-fg-dim">Zoom: 52 s each side of the fold</div>
       ) : null}
     </div>
   );

@@ -15,7 +15,10 @@ export type AxisPiece = { t0: number; t1: number; x0: number; x1: number; folded
 export type Axis = { pieces: AxisPiece[]; width: number };
 
 export const MIN_WINDOW_SECONDS = 30;
+/** Each section sits in a stretch this long (the board: "52 s each side of the fold"), centred. */
 export const FOLD_MARGIN_SECONDS = 52;
+/** A section longer than the stretch still gets at least this much either side. */
+export const FOLD_MIN_MARGIN_SECONDS = 8;
 export const FOLD_WIDTH = 100;
 export const FOLD_MIN_GAP_SECONDS = 120;
 
@@ -76,31 +79,37 @@ export function toT(axis: Axis, x: number): number | null {
   return last && !last.folded ? last.t1 : null;
 }
 
-export type Fold = { x: number; width: number; skipped: number; from: number; to: number };
+/** `skipped` is the stretch left out of view; `gap` is the footage between the two sections it sits between. */
+export type Fold = { x: number; width: number; skipped: number; gap: number; from: number; to: number };
 export type FoldedAxis = { axis: Axis; fold: Fold[] };
 
 /**
- * The folded layout for sections far apart, or null when nothing needs folding. Each section gets
- * a margin either side; the gap between two sections' margins folds when it is long enough.
+ * The folded layout for sections far apart, or null when nothing needs folding. Each section sits
+ * in a stretch of `stretch` seconds (centred, with at least `margin` either side); the gap between
+ * two stretches folds when it is long enough.
  */
 export function foldedAxis(
   sections: readonly Range[],
   duration: number,
   widthPx: number,
-  opts: { margin?: number; foldWidth?: number; minGap?: number } = {},
+  opts: { margin?: number; stretch?: number; foldWidth?: number; minGap?: number } = {},
 ): FoldedAxis | null {
-  const margin = opts.margin ?? FOLD_MARGIN_SECONDS;
+  const stretch = opts.stretch ?? FOLD_MARGIN_SECONDS;
+  const minMargin = opts.margin ?? FOLD_MIN_MARGIN_SECONDS;
   const foldWidth = opts.foldWidth ?? FOLD_WIDTH;
   const minGap = opts.minGap ?? FOLD_MIN_GAP_SECONDS;
   if (sections.length < 2) return null;
   const sorted = [...sections].sort((a, b) => a.start - b.start);
   // Merge sections whose margins touch into one window; what is left between windows may fold.
-  const windows: Win[] = [];
+  const windows: (Win & { sStart: number; sEnd: number })[] = [];
   for (const s of sorted) {
-    const w = { start: Math.max(0, s.start - margin), end: Math.min(duration || Infinity, s.end + margin) };
+    const margin = Math.max(minMargin, (stretch - (s.end - s.start)) / 2);
+    const w = { start: Math.max(0, s.start - margin), end: Math.min(duration || Infinity, s.end + margin), sStart: s.start, sEnd: s.end };
     const prev = windows[windows.length - 1];
-    if (prev && w.start - prev.end < minGap) prev.end = Math.max(prev.end, w.end);
-    else windows.push(w);
+    if (prev && w.start - prev.end < minGap) {
+      prev.end = Math.max(prev.end, w.end);
+      prev.sEnd = Math.max(prev.sEnd, s.end);
+    } else windows.push(w);
   }
   if (windows.length < 2) return null;
   const shown = windows.reduce((n, w) => n + (w.end - w.start), 0);
@@ -116,7 +125,7 @@ export function foldedAxis(
     const next = windows[i + 1];
     if (next) {
       pieces.push({ t0: w.end, t1: next.start, x0: x, x1: x + foldWidth, folded: true });
-      fold.push({ x, width: foldWidth, skipped: next.start - w.end, from: w.end, to: next.start });
+      fold.push({ x, width: foldWidth, skipped: next.start - w.end, gap: next.sStart - w.sEnd, from: w.end, to: next.start });
       x += foldWidth;
     }
   });

@@ -72,6 +72,7 @@ export function usePreviewController(onNextVideo: () => void) {
     player,
     duration,
     range,
+    sections,
     frameRef,
     loop: state.loop,
     fullScreen: state.fullScreen,

@@ -4,5 +4,5 @@
  * Description: The 96px label column at the left of every timeline lane.
  */
 export default function LaneLabel({ children }: { children?: string }) {
-  return <span className="w-24 flex-none pl-4 text-meta text-fg-dim">{children}</span>;
+  return <span className="w-[96px] flex-none pl-[16px] text-meta leading-[15px] text-fg-dim">{children}</span>;
 }
