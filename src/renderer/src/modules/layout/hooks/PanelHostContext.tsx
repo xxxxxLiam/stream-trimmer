@@ -25,6 +25,8 @@ export type PanelHost = {
   playhead: number;
   /** Make a clip from marked segments (Clip button). */
   cutSegments: (segments: Segment[]) => void;
+  /** Cut these sections again under this name, without touching the marks (Retry on a failed cut). */
+  cutAgain: (segments: Segment[], name: string) => void;
   /** Make a clip from a waiting moment in Export (resolves true once the file is saved). */
   cutBanked: (clip: BankedClip, projectName?: string) => Promise<boolean>;
   /** The "after cutting" hand-off settings for the open campaign. */
