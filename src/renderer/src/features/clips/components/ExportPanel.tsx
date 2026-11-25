@@ -26,7 +26,7 @@ export default function ExportPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
-      {c.making && <MakingRow kind="making" {...c.making} />}
+      {c.making && <MakingRow kind="making" {...c.making} onCancel={c.cancel} />}
       {c.failed && (
         <FailedRow
           failed={c.failed}

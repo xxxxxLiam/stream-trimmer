@@ -18,3 +18,9 @@ test("App opens it for pasted rows, and Export asks the host for it", () => {
   const exp = readFileSync("src/renderer/src/features/clips/components/ExportPanel.tsx", "utf8");
   assert.match(exp, /host\.openImport\(\)/);
 });
+
+test("C-4: the drawer has its own box to paste the sheet into, shown while there is nothing to review", () => {
+  const src = readFileSync("src/renderer/src/features/import/components/ImportDrawer.tsx", "utf8");
+  assert.match(src, /<textarea[\s\S]*aria-label="Paste rows from your sheet"/);
+  assert.match(src, /const showBox = empty \|\| typing/);
+});

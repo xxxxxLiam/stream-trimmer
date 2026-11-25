@@ -5,7 +5,7 @@
  *   workspace. Rows grouped by video, a "Needs a look" group with one action each, and one Ice
  *   button whose label is the count. Esc or a click outside closes it, so there is no Cancel.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Drawer } from "../../../shared/components/Drawer";
 import { DrawerHeader, SectionLabel, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 import { formatLength, formatTimecode } from "../../../shared/utils/segments";
@@ -19,7 +19,15 @@ export type ImportDrawerProps = {
 };
 
 function Body({ text, onClose }: { text: string; onClose: () => void }) {
-  const c = useImportController(text, onClose);
+  // The pasted rows can also be typed or pasted here: the drawer opened from "Import moments" has
+  // nothing yet. The box stays while the person is using it, and goes once there is a list to review.
+  const [draft, setDraft] = useState(text);
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    setDraft(text);
+    setTyping(false);
+  }, [text]);
+  const c = useImportController(draft, onClose);
   const videos = c.groups.length;
   const meta = [
     c.campaignName,
@@ -27,6 +35,7 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
     ...(c.newCampaigns.length ? [`adds campaign ${c.newCampaigns.join(", ")}`] : []),
   ].filter(Boolean).join(" · ");
   const empty = c.count === 0 && c.flagged.length === 0;
+  const showBox = empty || typing;
 
   return (
     <>
@@ -38,6 +47,19 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
             Copy format
           </button>
         </div>
+
+        {showBox && (
+          <textarea
+            aria-label="Paste rows from your sheet"
+            value={draft}
+            onChange={(e) => {
+              setTyping(true);
+              setDraft(e.target.value);
+            }}
+            placeholder="Paste the rows your AI made: video, start, end, name, rating, topic, tier, campaign"
+            className="h-[120px] w-full resize-none rounded-control border border-hairlineStrong bg-raised p-[12px] text-body leading-[normal] text-fg placeholder:text-fg-dim focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost"
+          />
+        )}
 
         {c.groups.map((g) => (
           <section key={g.videoId} aria-label={g.videoId}>
