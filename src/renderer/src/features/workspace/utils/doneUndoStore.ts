@@ -5,7 +5,8 @@
  *   open video Done switches to another video, which can remount the panel and would lose a line held
  *   in the panel's own state (B2-4).
  */
-export type DoneUndo = { id: string; title: string };
+/** `done`: moved to Done. `removed`: taken out of the list (its tab is brought back by Undo). */
+export type DoneUndo = { id: string; title: string; kind: "done" | "removed"; at: number };
 
 export function createDoneUndoStore(ms: number, schedule: (fn: () => void, ms: number) => unknown = setTimeout, cancel: (h: unknown) => void = (h) => clearTimeout(h as ReturnType<typeof setTimeout>)) {
   let value: DoneUndo | null = null;
@@ -23,9 +24,9 @@ export function createDoneUndoStore(ms: number, schedule: (fn: () => void, ms: n
         listeners.delete(l);
       };
     },
-    show(u: DoneUndo) {
+    show(u: { id: string; title: string; kind?: DoneUndo["kind"] }) {
       if (handle !== null) cancel(handle);
-      set(u);
+      set({ ...u, kind: u.kind ?? "done", at: Date.now() });
       handle = schedule(() => {
         handle = null;
         set(null);

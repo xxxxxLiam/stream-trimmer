@@ -24,6 +24,8 @@ export type VideoRow = {
   waiting: number;
   isOpen: boolean;
   done: boolean;
+  /** The video's link, for "Open on YouTube". */
+  url: string | null;
 };
 
 export function useVideosController() {
@@ -52,6 +54,7 @@ export function useVideosController() {
         waiting: waitingIn(bank, t.campaignId, t.url ? extractVideoId(t.url) : null, makingId),
         isOpen: t.id === ws.activeId,
         done: !!t.done,
+        url: t.url ?? null,
       };
     },
     [campaigns, bank, ws, makingId],
@@ -74,9 +77,36 @@ export function useVideosController() {
 
   const undoDone = useCallback(() => {
     if (!undo) return;
-    ws.setTabDone(undo.id, false);
+    if (undo.kind === "removed") ws.reopenTab(undo.id);
+    else ws.setTabDone(undo.id, false);
     doneUndoStore.clear();
   }, [ws, undo]);
+
+  /** Remove video: no question; the 8 s Undo brings the whole tab back, marks and waiting clips included. */
+  const removeVideo = useCallback(
+    (row: VideoRow) => {
+      if (!ws.closeTab(row.id, { silent: true })) return;
+      doneUndoStore.show({ id: row.id, title: row.title, kind: "removed" });
+    },
+    [ws],
+  );
+
+  const openOnYouTube = useCallback((row: VideoRow) => {
+    if (row.videoId) window.open(`https://www.youtube.com/watch?v=${row.videoId}`, "_blank", "noopener");
+  }, []);
+
+  const undoneDone = useCallback((row: VideoRow) => ws.setTabDone(row.id, false), [ws]);
+
+  /** Clicking the open video again closes it: the workspace goes back to empty, its marks stay on the video. */
+  const toggleOpen = useCallback(
+    (row: VideoRow) => {
+      if (!row.isOpen) return ws.selectTab(row.id);
+      const blank = ws.tabs.find((t) => !t.url && t.id !== row.id);
+      if (blank) ws.selectTab(blank.id);
+      else ws.addTab();
+    },
+    [ws],
+  );
 
   const submitValue = useCallback((raw: string) => {
     const value = raw.trim();
@@ -131,6 +161,10 @@ export function useVideosController() {
     doneOpen,
     toggleDone: () => setDoneOpen((v) => !v),
     select: ws.selectTab,
+    toggleOpen,
+    removeVideo,
+    openOnYouTube,
+    undoneDone,
     doneVideo,
     undo,
     undoDone,

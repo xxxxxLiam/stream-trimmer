@@ -2,18 +2,21 @@
  * File: HistoryPanel.tsx
  * Path: src/renderer/src/features/downloads/components/HistoryPanel.tsx
  * Description: The History panel: every clip already made, grouped by day, with the pill search.
- *   Rows show a thumbnail slot, name, "length · campaign · time" and three icon buttons.
+ *   Rows show a thumbnail slot, name, "length · campaign · time" and a ⋯ menu (Show in Finder, In editor, Go to source).
  */
 import HandoffRow from "../../clips/components/HandoffRow";
 import { useHandoffNotice } from "../../clips/hooks/useHandoffNotice";
 import { getClipDestination } from "../../player/hooks/useClipDestination";
 import PillSearch from "../../../shared/components/PillSearch";
-import RowIconButton from "../../../shared/components/RowIconButton";
+import ActionRow from "../../../shared/components/ActionRow";
 import { IconInEditor, IconJumpToSource, IconShowFile } from "../../../shared/components/rowIcons";
 import { clipTitle } from "../../../shared/utils/downloads";
 import { useHistoryController } from "../hooks/useHistoryController";
 import { cacheNote } from "../utils/cacheText";
 import { rowMeta } from "../utils/historyRows";
+
+const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
+const SHOW_LABEL = IS_MAC ? "Show in Finder" : "Show in File Explorer";
 
 export default function HistoryPanel() {
   const h = useHistoryController();
@@ -46,30 +49,30 @@ export default function HistoryPanel() {
                 <span>{g.entries.length}</span>
               </div>
               {g.entries.map((e) => (
-                <div
+                <ActionRow
                   key={e.id}
-                  id={g === h.groups[0] && e === g.entries[0] ? "ui-saved-clip" : undefined}
-                  className="mx-[6px] my-[3px] flex items-center gap-[6px] rounded-control bg-raised py-[6px] pl-[8px] pr-[6px]"
+                  id={`history:${e.id}`}
+                  name={clipTitle(e.label)}
+                  className="mx-[6px] my-[3px]"
+                  actions={[
+                    { key: "show", label: SHOW_LABEL, icon: <IconShowFile />, onSelect: () => h.show(e), disabled: !e.path || h.missing[e.id] },
+                    { key: "editor", label: "In editor", icon: <IconInEditor />, onSelect: () => h.inEditor(e), disabled: !e.path || h.missing[e.id] },
+                    { key: "source", label: "Go to source", icon: <IconJumpToSource />, onSelect: () => h.jump(e), disabled: !h.canJump(e) },
+                  ]}
                 >
-                  <span className="h-[26px] w-[40px] flex-none rounded-chip bg-hover" aria-hidden="true" />
-                  <div className="min-w-0 flex-1">
-                    <div className={`truncate text-body font-medium leading-[normal] ${h.missing[e.id] ? "text-disabled" : ""}`}>{clipTitle(e.label)}</div>
-                    <div className="mt-[2px] truncate text-meta leading-[normal] text-fg-dim">
-                      {h.missing[e.id] ? "File missing. It was moved or deleted." : rowMeta(e)}
+                  <div
+                    id={g === h.groups[0] && e === g.entries[0] ? "ui-saved-clip" : undefined}
+                    className="flex items-center gap-[6px] py-[6px] pl-[8px] pr-[2px]"
+                  >
+                    <span className="h-[26px] w-[40px] flex-none rounded-chip bg-hover" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <div className={`truncate text-body font-medium leading-[normal] ${h.missing[e.id] ? "text-disabled" : ""}`}>{clipTitle(e.label)}</div>
+                      <div className="mt-[2px] truncate text-meta leading-[normal] text-fg-dim">
+                        {h.missing[e.id] ? "File missing. It was moved or deleted." : rowMeta(e)}
+                      </div>
                     </div>
                   </div>
-                  <span className="flex flex-none gap-[2px]">
-                    <RowIconButton label="Jump to source" onClick={() => h.jump(e)} disabled={!h.canJump(e)}>
-                      <IconJumpToSource />
-                    </RowIconButton>
-                    <RowIconButton label="Show in Finder" onClick={() => h.show(e)} disabled={!e.path || h.missing[e.id]}>
-                      <IconShowFile />
-                    </RowIconButton>
-                    <RowIconButton label="In editor" onClick={() => h.inEditor(e)} disabled={!e.path || h.missing[e.id]}>
-                      <IconInEditor />
-                    </RowIconButton>
-                  </span>
-                </div>
+                </ActionRow>
               ))}
             </section>
           ))

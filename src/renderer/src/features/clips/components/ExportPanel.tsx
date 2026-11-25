@@ -109,6 +109,7 @@ export default function ExportPanel() {
                 lengthNote={underMinimum(clip, c.lengthRule, c.campaignName)}
                 onSelect={() => c.select(clip)}
                 onMake={() => void c.make(clip)}
+                onRename={(label) => c.rename(clip, label)}
                 onRemove={() => c.remove(clip)}
               />
             );

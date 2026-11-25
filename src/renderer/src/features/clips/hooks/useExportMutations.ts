@@ -160,10 +160,15 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     s.setFailed(null);
   }, [s, campaignId, vid]);
 
+  const rename = useCallback(
+    (clip: BankedClip, label: string) => bankStore.rename(campaignId, vid, clip.id, label),
+    [campaignId, vid],
+  );
+
   const remove = useCallback(
     (clip: BankedClip) => bankStore.remove(campaignId, vid, clip.id),
     [campaignId, vid],
   );
 
-  return { select, make, stop, undo, remove, retry, resume, changeFolder, showFolder, folder: where, showInBrowser, saveForLater, signIn };
+  return { select, make, stop, undo, rename, remove, retry, resume, changeFolder, showFolder, folder: where, showInBrowser, saveForLater, signIn };
 }
