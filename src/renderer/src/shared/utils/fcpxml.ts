@@ -560,8 +560,9 @@ export interface FcpClip {
 
 /** Clip name: the id plus its label, joined with a plain hyphen. */
 export function clipName(clip: Pick<FcpClip, "id" | "label">): string {
-  const label = (clip.label ?? "").trim();
-  return label ? `${clip.id} - ${label}` : clip.id;
+  // One name everywhere: the clip's own (its file's name, no extension, no id prefix).
+  const label = (clip.label ?? "").trim().replace(/\.(mp4|mp3|mov|m4a)$/i, "");
+  return label || clip.id;
 }
 
 /** Notes: the source link, then every segment's SOURCE timecodes in order. */
@@ -732,9 +733,6 @@ export function groupByVideo(clips: Pick<FcpClip, "sourceUrl" | "sourceTitle">[]
 /** A keyword value: commas separate keywords in Final Cut, so a title's own comma becomes a space. */
 const keywordText = (name: string) => name.replace(/,/g, " ").replace(/\s+/g, " ").trim();
 
-/** The folder name for a video's projects; the folder for its raw clips carries the video's own name. */
-const projectsFolder = (name: string) => `${name} projects`;
-
 function legacyEvents(
   mediaEvent: string,
   projectEvent: string,
@@ -776,8 +774,10 @@ function laidOutEvents(o: {
     ...(withFolder ? [`      <keyword-collection name="${attrText(keywordText(g.name))}"/>`] : []),
     ...(withFolder && hasProjects
       ? [
-          `      <smart-collection name="${attrText(projectsFolder(g.name))}" match="any">`,
-          ...g.indexes.map((i) => `        <match-text rule="is" scope="names" value="${attrText(o.projectNames[i])}"/>`),
+          // Named exactly like the keyword collection, and matching by the video's name (written into each
+          // project's note), so a later import of another clip from the same video joins it.
+          `      <smart-collection name="${attrText(keywordText(g.name))}" match="any">`,
+          `        <match-text rule="includes" scope="notes" value="${attrText(keywordText(g.name))}"/>`,
           `      </smart-collection>`,
         ]
       : []),
@@ -788,7 +788,7 @@ function laidOutEvents(o: {
   switch (o.layout) {
     case "flat":
       return event(
-        o.eventName.trim() || "Clips",
+        o.eventName.trim() || DEFAULT_EXPORT_EVENT,
         o.groups.flatMap((g) => body(g, false)),
       );
     case "video":
@@ -889,8 +889,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
     mediaItems.push(
       `      <asset-clip ref="${assetId}" name="${name}" start="0s" duration="${duration}" ` +
         `format="${formatId}" tcFormat="NDF">` + (notes ? `
-        <note>${xmlEscape(noEmDash(notes))}</note>` : "") + `
-        <keyword start="0s" duration="${duration}" value="Raw"/>` +
+        <note>${xmlEscape(noEmDash(notes))}</note>` : "") +
         (folders && videoOf.has(index)
           ? `\n        <keyword start="0s" duration="${duration}" value="${attrText(keywordText(videoOf.get(index) as string))}"/>`
           : !layout && clip.keyword?.trim()
@@ -917,6 +916,8 @@ export function buildFcpxml(input: FcpxmlInput): string {
         [
           `      <project name="${attrText(projectNames[index])}">`,
           `        <sequence format="${tlFormat}" duration="${tlDuration}"${seq}>`,
+          // The video's name, so the video's smart collection finds this project (layouts A and C).
+          ...(folders && videoOf.has(index) ? [`          <note>${xmlEscape(keywordText(videoOf.get(index) as string))}</note>`] : []),
           `          <spine>`,
           `            <asset-clip ref="${assetId}" offset="0s" name="${name}" start="0s" ` +
             `duration="${tlDuration}" tcFormat="NDF"` +

@@ -48,8 +48,10 @@ export function useDrawerFocus(root: RefObject<HTMLElement | null>, open: boolea
         // Focus already moved on to something else (a tip card, a dialog): leave it there.
         const now = document.activeElement;
         if (now && now !== document.body) return;
-        const el = back && back.isConnected ? (back as HTMLElement) : document.querySelector<HTMLElement>(fallback);
-        el?.focus?.();
+        // The opener first; the fallback only when the opener is gone or cannot take focus (hidden).
+        const opener = back && back.isConnected ? (back as HTMLElement) : null;
+        opener?.focus?.();
+        if (!opener || document.activeElement === document.body || document.activeElement === null) document.querySelector<HTMLElement>(fallback)?.focus?.();
       });
     };
   }, [open, fallback]);

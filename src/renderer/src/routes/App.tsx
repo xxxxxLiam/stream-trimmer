@@ -18,7 +18,6 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
-import { loadLastLayout } from "../shared/utils/lastLayout";
 import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
@@ -44,6 +43,7 @@ import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
 import { setMakingName } from "../shared/utils/clipNameStore";
+import { setCutAttempt } from "../shared/utils/cutAttempt";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
@@ -88,10 +88,9 @@ function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings
 const EDITOR_KEY = "clipper.editorHandoff";
 
 /** "After cutting" settings, kept per campaign beside the other campaign fields. */
-/** A campaign with no Final Cut settings yet starts with the layout picked last, the way a new campaign gets the last look. */
+/** A campaign with no Final Cut settings yet has the default layout (A) until it chooses: it never follows the layout another campaign picked. */
 function editorSettingsOf(raw: unknown): EditorHandoffSettings {
-  const settings = normalizeEditorSettings(raw);
-  return raw === undefined ? { ...settings, layout: loadLastLayout() ?? settings.layout } : settings;
+  return normalizeEditorSettings(raw);
 }
 
 function useEditorSettings(campaignId: string | null) {
@@ -381,12 +380,15 @@ function Layout({ active }: { active: boolean }) {
   // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
   // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
-    async (segments: Segment[]) => {
+    async (segments: Segment[], retryName?: string) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
       const startSettings = withDestination(editorRef.current);
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
-      const name = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      // A retry keeps the failed attempt's name; a new cut takes the lane's, else a suggested one.
+      const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      // Recorded before anything starts: the marks are already cleared, so Retry and Save for later read this.
+      setCutAttempt({ name, segments });
       const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
       setMakingName(name);
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
@@ -432,7 +434,8 @@ function Layout({ active }: { active: boolean }) {
         const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
         if (!ok) break;
         madeAny = true;
-        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName, clip.id);
+        // The Final Cut clip carries the clip's name, the file's, not the bank id.
+        afterSaved(nameForLanguage(baseId, plan), undefined, clip.segments, startSettings, projectName, clip.id);
       }
       return madeAny;
     },
@@ -487,6 +490,7 @@ function Layout({ active }: { active: boolean }) {
   const panelHost: PanelHost = {
     playhead,
     cutSegments: cutMarked,
+    cutAgain: (segs, name) => void cutQueue.current.enqueue(() => cutClip(segs, name)),
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
@@ -506,6 +510,7 @@ function Layout({ active }: { active: boolean }) {
       sourceTitle: info?.title,
       clipsDir: folders.clipsDir || saveDir || undefined,
       clips: sessionClips,
+      settingsFor: editorSettingsFor,
     },
     // Not wired yet: the videos list (Left panels) provides the next video, and the campaign form
     // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".

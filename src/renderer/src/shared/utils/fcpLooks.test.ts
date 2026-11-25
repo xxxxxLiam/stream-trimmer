@@ -5,6 +5,8 @@
  *   and the old single pasted look moves into the list without anyone losing it.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 import { parseLook } from "../../../../common/utils/fcpLook";
 import { sampleExport } from "../../../../common/utils/fcpLook.fixture";
@@ -67,11 +69,12 @@ test("D-4: identical texts are stored once, different ones as 'My look 2'", () =
   }
 });
 
-test("D-4: a per-campaign text that does not parse marks nothing migrated", () => {
+test("D-4 (D2-4): a per-campaign text that does not parse is skipped, the readable one still moves", () => {
   const [acme, beta] = campaigns();
   const out = migratePastedLook([acme, beta], [], { [acme.id]: { applyLook: true, lookXml: sampleExport() }, [beta.id]: { applyLook: true, lookXml: "garbage" } }, 9, ids);
-  assert.equal(out.migrated, false);
-  assert.equal(out.looks.length, 0);
+  assert.equal(out.migrated, true);
+  assert.equal(out.looks.length, 1);
+  assert.deepEqual(out.unread, [beta.id]);
 });
 
 test("D-9: a new campaign gets only the look it is handed, never the last campaign's", () => {
@@ -118,13 +121,14 @@ test("migration never overrides a campaign's own pick, and nothing pasted is a q
   const out = migratePastedLook(base, [], { applyLook: true, lookXml: sampleExport() }, 9, ids);
   assert.equal(out.campaigns[0].fcpLookId, "mine");
   assert.equal(out.campaigns[1].fcpLookId, out.looks[0].id);
-  assert.deepEqual(migratePastedLook(base, [], {}), { campaigns: base, looks: [], migrated: true });
+  assert.deepEqual(migratePastedLook(base, [], {}), { campaigns: base, looks: [], migrated: true, unread: [] });
 });
 
-test("a pasted look that no longer parses is not lost: nothing is marked migrated", () => {
+test("a pasted look that no longer parses never blocks the move; it stays in the old settings and is named", () => {
   const out = migratePastedLook(campaigns(), [], { applyLook: true, lookXml: "garbage" });
-  assert.equal(out.migrated, false);
+  assert.equal(out.migrated, true);
   assert.equal(out.looks.length, 0);
+  assert.deepEqual(out.unread, ["*"]);
 });
 
 test("D-9: the last look picked is what a new campaign starts with (wired in the campaign context)", async () => {
@@ -142,4 +146,28 @@ test("the list and a campaign's look id survive the settings round trip; a malfo
   assert.deepEqual(normalizeSavedLooks(broken), []);
   const withId = campaigns().map((c) => ({ ...c, fcpLookId: "l-1" }));
   assert.equal(normalizeCampaigns(JSON.parse(JSON.stringify(withId)))[0].fcpLookId, "l-1");
+});
+
+test("D2-4: one unreadable old paste never stops the look move; a switched-on one is named", () => {
+  const campaigns = [{ id: "acme", name: "Acme", fcpLookId: "l-scale" }, { id: "nova", name: "Nova" }] as never[];
+  const broken = "<fcpxml version=\"1.10\"><resources>";
+  const off = migratePastedLook(campaigns, [], { acme: { applyLook: false, lookXml: "" }, nova: { applyLook: false, lookXml: broken } });
+  assert.equal(off.migrated, true);
+  assert.deepEqual(off.unread, [], "switched off: nothing to tell");
+  const on = migratePastedLook(campaigns, [], { acme: { applyLook: false, lookXml: "" }, nova: { applyLook: true, lookXml: broken } });
+  assert.equal(on.migrated, true);
+  assert.deepEqual(on.unread, ["nova"]);
+  assert.equal(on.campaigns[0].fcpLookId, "l-scale", "a look already picked in the form is kept");
+});
+
+test("D2-4: a look picked in the form is used whether or not the move has run", () => {
+  const src = readFileSync(join(process.cwd(), "src/renderer/src/features/handoff/components/EditorHandoff.tsx"), "utf8");
+  assert.match(src, /if \(!campaign\?\.fcpLookId && !readSetting<boolean>\(KEY_LOOK_MIGRATED, false\)\)/);
+});
+
+test("D-15: a TextEdit .rtf look is named from its file without the extension or the copy suffix", () => {
+  assert.equal(lookNameFromFile("TextEdit copy.rtf"), "My look");
+  assert.equal(lookNameFromFile("Acme grade copy.rtf"), "Acme grade");
+  assert.equal(lookNameFromFile("Acme grade copy 2.rtf"), "Acme grade");
+  assert.equal(lookNameFromFile("Acme grade.fcpxmld"), "Acme grade");
 });

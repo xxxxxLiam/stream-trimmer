@@ -160,3 +160,20 @@ test("F-9 and F-16: one report per click, the note goes with the report, Replay 
   const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
   assert.match(app, /onReplay: \(\) => \{ closeHelp\(\); tips\.replay\(\); \}/);
 });
+
+test("F2-3: Report a problem shows a counter, stops at 2,000 characters, and Send waits for a note", () => {
+  const empty = renderToStaticMarkup(<HelpReport {...report} note="" />);
+  assert.match(empty, /0 \/ 2000/);
+  assert.match(empty, /maxLength="2000"/);
+  assert.match(empty, /<button[^>]*aria-label="Send report"[^>]*disabled=""/);
+  const some = renderToStaticMarkup(<HelpReport {...report} note="It stopped." />);
+  assert.match(some, /11 \/ 2000/);
+  assert.doesNotMatch(some, /<button[^>]*aria-label="Send report"[^>]*disabled=""/);
+  assert.match(some, /aria-label="Copy details"/, "Copy details stays available");
+});
+
+test("F2-8: the Paste key chip on Start uses a token, not an opacity modifier", () => {
+  const src = readFileSync(join(process.cwd(), "src/renderer/src/features/start/components/ColdStart.tsx"), "utf8");
+  assert.doesNotMatch(src, /opacity-(?!0")\d+/, "no dimmed text (the blinking caret's opacity-0 is not text)");
+  assert.match(src, /<span className="text-meta font-normal text-bg">\{p\.pasteKey\}<\/span>/);
+});

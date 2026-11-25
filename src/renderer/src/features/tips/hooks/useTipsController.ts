@@ -6,29 +6,17 @@
  *   through it, and replays the tips of the panels that are open. Never two at once.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { TIPS, type TipStep } from "../utils/tipRegistry";
+import { setSeen, setTipsOn, useSeen, useTipsOn } from "../utils/tipsStore";
 import { findTarget } from "../utils/findTarget";
-import {
-  TIPS_ON_KEY,
-  TIPS_SEEN_KEY,
-  forgetOpen,
-  markSeen,
-  nextTip,
-  normalizeSeen,
-  type Seen,
-} from "../utils/tipsSeen";
+import { forgetOpen, markSeen, nextTip } from "../utils/tipsSeen";
 
 const present = (selector: string) =>
   typeof document !== "undefined" && !!document.querySelector(selector);
 
 export function useTipsController(ready: boolean) {
-  const [on, setOn] = useState<boolean>(
-    () => readSetting<boolean>(TIPS_ON_KEY, true) !== false,
-  );
-  const [seen, setSeen] = useState<Seen>(() =>
-    normalizeSeen(readSetting<unknown>(TIPS_SEEN_KEY, {})),
-  );
+  const on = useTipsOn();
+  const seen = useSeen();
   const [step, setStep] = useState(0);
   const [tick, setTick] = useState(0);
   // Help's "Show me in Clipr": one answer's steps run as tip cards on the real controls. Never saved as seen.
@@ -74,24 +62,19 @@ export function useTipsController(ready: boolean) {
     else endTour();
   }, [tick, tour, tourStep, endTour]);
 
-  const saveSeen = (next: Seen) => {
-    setSeen(next);
-    writeSetting(TIPS_SEEN_KEY, next);
-  };
+  const saveSeen = setSeen;
   const finish = useCallback(() => {
     if (tip) saveSeen(markSeen(seen, tip));
     setStep(0);
   }, [tip, seen]);
   const turnOff = useCallback(() => {
     setTour(null);
-    setOn(false);
-    writeSetting(TIPS_ON_KEY, false);
+    setTipsOn(false);
     setStep(0);
   }, []);
   const replay = useCallback(() => {
     setTour(null);
-    setOn(true);
-    writeSetting(TIPS_ON_KEY, true);
+    setTipsOn(true);
     setStep(0);
     saveSeen(forgetOpen(TIPS, seen, present));
   }, [seen]);

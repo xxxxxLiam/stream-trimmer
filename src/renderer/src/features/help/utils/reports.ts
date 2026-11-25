@@ -9,7 +9,7 @@ import { redact } from "../../../shared/utils/diagnostics";
 
 export type PendingReport = { id: string; at: string; note: string; details: string };
 
-const MAX_NOTE = 2000;
+export const MAX_NOTE = 2000;
 
 /** Cuts to `max` whole characters, so an emoji (a surrogate pair, or a joined sequence) is never split in half. */
 export function cutNote(text: string, max: number): string {

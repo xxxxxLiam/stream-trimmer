@@ -3,6 +3,7 @@
  * Description: The Layout row: four templates, each previewed as a tree with the campaign's real names; the
  *   choice is stored on the campaign, defaults to A, and a new campaign starts with the last one used.
  */
+import { exampleClipName } from "../hooks/useFinalCutLayout";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -52,12 +53,25 @@ test("the choice lives in the campaign's Final Cut settings, A by default, and o
   assert.deepEqual([...layoutsFor("capcut")], []);
 });
 
-test("wiring: the picker writes the settings the generator reads; a campaign with none yet starts with the last layout; Event shows only for A and D", () => {
+test("wiring: the picker writes the settings the generator reads; a campaign with none yet starts with the default layout, not another campaign's; Event shows only for A and D", () => {
   const dir = new URL("../../", import.meta.url).pathname;
-  assert.match(readFileSync(`${dir}../routes/App.tsx`, "utf8"), /layout: loadLastLayout\(\) \?\? settings\.layout/);
+  assert.doesNotMatch(readFileSync(`${dir}../routes/App.tsx`, "utf8"), /loadLastLayout/);
   assert.match(readFileSync(`${dir}settings/hooks/useFinalCutLayout.ts`, "utf8"), /rememberLastLayout\(id\)/);
   const drawer = readFileSync(`${dir}settings/components/SettingsDrawer.tsx`, "utf8");
   assert.match(drawer, /\{ \.\.\.activeFcp, layout: id \}/);
   assert.match(drawer, /showEvent: fcp\.layout === "export" \|\| fcp\.layout === "flat"/);
   assert.match(readFileSync(`${dir}settings/components/SettingsCampaign.tsx`, "utf8"), /showEvent !== false/);
+});
+
+test("D2-10: the preview says Sep, names the clip from the video, and the list takes arrows and Esc", () => {
+  const dir = new URL("../../", import.meta.url).pathname;
+  const hook = readFileSync(`${dir}settings/hooks/useFinalCutLayout.ts`, "utf8");
+  assert.match(hook, /day: dayLabel\(Date\.now\(\)\)/);
+  assert.doesNotMatch(hook, /Intl\.DateTimeFormat/);
+  assert.equal(exampleClipName("The honest version of pricing today"), "The honest version");
+  assert.equal(exampleClipName(undefined), "Your first clip");
+  const view = readFileSync(`${dir}settings/components/FinalCutLayout.tsx`, "utf8");
+  assert.match(view, /onKeyDown=\{onListKey\}/);
+  assert.match(view, /e\.key === "Escape"[\s\S]{0,80}e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*p\.onToggleOpen\(\)/);
+  assert.match(view, /e\.key === "ArrowDown"/);
 });

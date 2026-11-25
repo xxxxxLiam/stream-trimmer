@@ -17,6 +17,8 @@ export type FinalCutLookProps = {
   /** Plain words for what the current look carries, e.g. "Scale 120%, Colour Board". */
   found: string;
   problem: string;
+  /** One sentence when an old pasted look could not be moved; empty otherwise. */
+  unreadNote?: string;
   open: boolean;
   guide: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -59,7 +61,7 @@ export default function FinalCutLook(p: FinalCutLookProps) {
       <input
         ref={p.inputRef}
         type="file"
-        accept=".fcpxml,.xml,.txt"
+        accept=".fcpxml,.xml,.txt,.rtf"
         className="sr-only"
         tabIndex={-1}
         aria-label="Final Cut export file"
@@ -152,6 +154,7 @@ export default function FinalCutLook(p: FinalCutLookProps) {
         </div>
       )}
 
+      {p.unreadNote && !p.problem && <p className="m-[0px] text-meta text-fg-dim">{p.unreadNote}</p>}
       {p.found && !p.problem && <p className="m-[0px] text-meta text-fg-dim">Found: {p.found}</p>}
       {p.problem && (
         <p role="alert" className="m-[0px] text-meta text-error">
