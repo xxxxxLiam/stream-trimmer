@@ -6,7 +6,7 @@
  *   No global Clips folder row (Liam, 25 Nov), no Editor row, no quality row, no crash switch.
  */
 import { ChevronRow, DrawerHeader, SectionLabel, SwitchRow, drawerBody } from "../../../shared/components/DrawerRows";
-import { IconGear } from "../../../shared/components/icons";
+import { ChevronRight } from "react-bootstrap-icons";
 import type { AppPrefs } from "../utils/settingsPrefs";
 
 export type CampaignRow = { id: string; name: string; summary: string; languages: string | null };
@@ -42,8 +42,8 @@ export default function SettingsTopList(p: SettingsTopListProps) {
         >
           <span className="min-w-[0px] flex-1 truncate">{r.name}</span>
           <span className="text-meta text-fg-dim">{r.summary}</span>
-          {/* Liam, 25 Nov: a gear at the far right says "this campaign's settings", the same as in the campaign menu. */}
-          <span className="inline-flex text-fg-dim"><IconGear /></span>
+          {/* Liam, 25 Nov: a chevron, like every other row that opens something; the gear stays in the top-left campaign menu only. */}
+          <span className="inline-flex text-fg-dim"><ChevronRight width={16} height={16} aria-hidden="true" focusable="false" /></span>
         </button>
       ))}
       {p.rows.length === 0 && <p className="m-[0px] py-[8px] text-meta text-fg-dim">No campaigns yet.</p>}
