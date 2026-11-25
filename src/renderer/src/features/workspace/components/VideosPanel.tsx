@@ -2,40 +2,51 @@
  * File: VideosPanel.tsx
  * Path: src/renderer/src/features/workspace/components/VideosPanel.tsx
  * Description: The Videos panel (left group). One video is open at a time; the rest wait here.
- *   Pick one to open it, hover one for the ✕ "Done with this video", paste a link to open that
+ *   Pick one to open it, ⋯ on a row opens Mark done, Open on YouTube and Remove video, paste a link to open that
  *   video. Done videos fold away with an 8 s Undo line. Logic lives in useVideosController.
  */
 import VideoThumb from "../../../shared/components/VideoThumb";
 import type { KeyboardEvent } from "react";
+import ActionRow, { type RowAction } from "../../../shared/components/ActionRow";
 import { IconClose, IconSearch } from "../../../shared/components/PanelIcons";
+import { IconOpenOnSite, IconRemove, IconUndo } from "../../../shared/components/rowIcons";
+import UndoRing, { UNDO_SECONDS } from "../../../shared/components/UndoRing";
+import { useCountdown } from "../../../shared/hooks/useCountdown";
 import { useVideosController, type VideoRow } from "../hooks/useVideosController";
+
+type VideosController = ReturnType<typeof useVideosController>;
 
 function subline(r: VideoRow): string {
   const status = r.waiting > 0 ? `${r.waiting} waiting` : r.done ? "all made" : "nothing waiting";
   return r.campaign ? `${r.campaign} · ${status}` : status;
 }
 
-function Row({
-  row,
-  onOpen,
-  onDone,
-}: {
-  row: VideoRow;
-  onOpen: () => void;
-  onDone?: () => void;
-}) {
+function Row({ row, v }: { row: VideoRow; v: VideosController }) {
+  const actions: RowAction[] = [
+    row.done
+      ? { key: "done", label: "Move back to open", icon: <IconUndo />, onSelect: () => v.undoneDone(row) }
+      : { key: "done", label: "Mark done", icon: <IconClose />, onSelect: () => v.doneVideo(row) },
+    {
+      key: "youtube",
+      label: "Open on YouTube",
+      icon: <IconOpenOnSite />,
+      onSelect: () => v.openOnYouTube(row),
+      disabled: !row.videoId,
+    },
+    { key: "remove", label: "Remove video", icon: <IconRemove />, onSelect: () => v.removeVideo(row), danger: true },
+  ];
   return (
-    <div
-      className={
-        "group relative mx-[10px] mb-[6px] flex items-center gap-[10px] rounded-control border bg-raised p-[8px] " +
-        (row.isOpen ? "border-ice shadow-row" : "border-transparent")
-      }
+    <ActionRow
+      id={`video:${row.id}`}
+      name={row.title}
+      actions={actions}
+      className={"mx-[10px] mb-[6px] border " + (row.isOpen ? "border-ice shadow-row" : "border-transparent")}
     >
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => v.toggleOpen(row)}
         aria-current={row.isOpen ? "true" : undefined}
-        className="flex min-w-[0px] flex-1 items-center gap-[10px] text-left"
+        className="flex w-full min-w-[0px] items-center gap-[10px] p-[8px] text-left"
       >
         <VideoThumb videoId={row.videoId} />
         <span className="min-w-[0px]">
@@ -49,23 +60,24 @@ function Row({
           <span className="mt-[2px] block text-meta leading-[normal] text-fg-dim">{subline(row)}</span>
         </span>
       </button>
-      {onDone && (
-        <span className="relative hidden flex-none group-focus-within:flex group-hover:flex">
-          <button
-            type="button"
-            aria-label="Done with this video"
-            onClick={onDone}
-            className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-control border border-hairlineStrong bg-panel text-fg hover:bg-hover"
-          >
-            <IconClose />
-          </button>
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute -top-[30px] right-[-4px] z-10 whitespace-nowrap rounded-chip border border-hairlineStrong bg-hover px-[8px] py-[4px] text-meta leading-[normal] text-fg"
-          >
-            Done with this video
-          </span>
-        </span>
+    </ActionRow>
+  );
+}
+
+/** "Removed … " with the 8 s ring, or "Moved … to Done · Undo". */
+function UndoLine({ v }: { v: VideosController }) {
+  const undo = v.undo;
+  const left = useCountdown(undo ? undo.at : null, UNDO_SECONDS);
+  if (!undo) return null;
+  return (
+    <div role="status" className="-mt-[3px] flex items-center gap-[6px] px-[14px] pt-[8px] text-meta leading-[normal] text-fg-dim">
+      {undo.kind === "removed" ? `Removed "${undo.title}"` : `Moved "${undo.title}" to Done ·`}
+      {undo.kind === "removed" ? (
+        <UndoRing secondsLeft={left} onUndo={v.undoDone} icon={<IconUndo />} />
+      ) : (
+        <button type="button" onClick={v.undoDone} className="h-[32px] text-meta leading-[normal] text-ice">
+          Undo
+        </button>
       )}
     </div>
   );
@@ -148,20 +160,13 @@ export default function VideosPanel() {
         {v.rows.open
           .filter((r) => !(v.opening && r.isOpen))
           .map((r) => (
-            <Row key={r.id} row={r} onOpen={() => v.select(r.id)} onDone={() => v.doneVideo(r)} />
+            <Row key={r.id} row={r} v={v} />
           ))}
         {v.filtered && v.rows.open.length + doneCount === 0 && (
           <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">No video matches.</p>
         )}
 
-        {v.undo && (
-          <div role="status" className="-mt-[3px] flex items-center gap-[6px] px-[14px] pt-[8px] text-meta leading-[normal] text-fg-dim">
-            Moved "{v.undo.title}" to Done ·
-            <button type="button" onClick={v.undoDone} className="h-[32px] text-meta leading-[normal] text-ice">
-              Undo
-            </button>
-          </div>
-        )}
+        <UndoLine v={v} />
 
         {doneCount > 0 && (
           <button
@@ -180,7 +185,7 @@ export default function VideosPanel() {
         )}
         {/* Closed, the fold still shows its first video (boards 03.2.1 and 03.2.6); open shows them all. */}
         {(v.doneOpen ? v.rows.done : v.rows.done.slice(0, 1)).map((r) => (
-          <Row key={r.id} row={r} onOpen={() => v.select(r.id)} />
+          <Row key={r.id} row={r} v={v} />
         ))}
       </div>
     </div>
