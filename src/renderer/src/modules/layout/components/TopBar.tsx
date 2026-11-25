@@ -43,7 +43,7 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
 
   return (
     <header
-      className={`topbar relative flex h-[53px] shrink-0 items-center gap-[12px] border-b border-hairline ${barIsTitleBar(chrome) ? "topbar-drag" : ""}`}
+      className={`topbar relative z-40 flex h-[53px] shrink-0 items-center gap-[12px] border-b border-hairline ${barIsTitleBar(chrome) ? "topbar-drag" : ""}`}
       style={{ paddingLeft: topBarPaddingLeft(chrome), paddingRight: topBarPaddingRight(chrome) }}
       data-lights={lightsShowing(chrome) || undefined}
     >
