@@ -584,7 +584,7 @@ function Layout({ active }: { active: boolean }) {
         setChannelOpen(true);
       },
     },
-    { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
+    { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined, openVideoId: videoId ?? null },
   );
   const openCampaignSettings = (campaignId: string) => {
     setSettingsStartAt(campaignId);
