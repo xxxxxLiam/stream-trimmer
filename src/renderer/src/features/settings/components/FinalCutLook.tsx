@@ -26,15 +26,14 @@ export type FinalCutLookProps = {
   onFile: (file: File) => void;
   onPick: (id: string | null) => void;
   onRemove: (id: string) => void;
-  /** Ids that a campaign uses; those cannot be deleted. */
-  usedIds: string[];
+  /** Look id -> names of the campaigns that use it; those looks cannot be deleted. */
+  usedBy: Record<string, string[]>;
 };
 
 const STEPS = [
-  "In Final Cut, make a project with one clip. Add your usual colour, zoom, volume and audio settings to that clip. Don't cut it.",
-  "Choose File, then Export XML, and save it. Final Cut saves a .fcpxmld package.",
-  "Right-click the package, choose Show Package Contents, and find Info.fcpxml. Don't double-click it, that imports it.",
-  "Drop Info.fcpxml here, or click Choose file.",
+  "In Final Cut, make a project with one clip. Add your usual colour, zoom and volume to that clip. Don't cut it.",
+  "Choose File, then Export XML, and save it.",
+  "Drop the saved file here, or click Choose file.",
 ];
 
 const pill = "h-target rounded-[22px] border border-ice px-[16px] text-body leading-[normal] text-fg hover:bg-hover";
@@ -127,10 +126,10 @@ export default function FinalCutLook(p: FinalCutLookProps) {
                   <button
                     type="button"
                     aria-label={`Delete ${l.name}`}
-                    aria-disabled={p.usedIds.includes(l.id)}
-                    title={p.usedIds.includes(l.id) ? "A campaign uses this look" : undefined}
+                    aria-disabled={!!p.usedBy[l.id]}
+                    title={p.usedBy[l.id] ? `Used by ${p.usedBy[l.id].join(", ")}` : undefined}
                     onClick={() => p.onRemove(l.id)}
-                    className={`h-target px-[8px] text-meta ${p.usedIds.includes(l.id) ? "text-disabled" : "text-fg-dim hover:text-fg"}`}
+                    className={`h-target px-[8px] text-meta ${p.usedBy[l.id] ? "text-disabled" : "text-fg-dim hover:text-fg"}`}
                   >
                     Delete
                   </button>

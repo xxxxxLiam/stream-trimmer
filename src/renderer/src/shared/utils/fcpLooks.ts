@@ -21,6 +21,8 @@ export type SavedLook = {
 
 export const KEY_LOOKS = "clipper.fcpLooks";
 export const KEY_LOOK_MIGRATED = "clipper.fcpLookMigrated";
+/** The look picked or uploaded last, which a new campaign starts with. */
+export const KEY_LAST_LOOK = "clipper.fcpLastLookId";
 /** What the old single pasted look is called once it is in the list. */
 export const MIGRATED_NAME = "My look";
 
@@ -46,7 +48,7 @@ export function normalizeSavedLooks(raw: unknown): SavedLook[] {
   return out;
 }
 
-/** "Acme grade.fcpxmld" -> "Acme grade". */
+/** "Acme grade.fcpxmld" -> "Acme grade"; a file with no name of its own is "My look". */
 export function lookNameFromFile(fileName: string): string {
   const name = fileName.replace(/\.(fcpxmld|fcpxml|txt|xml)$/i, "").trim();
   return name || "My look";
@@ -66,6 +68,8 @@ export function newLookId(): string {
   return `l-${raw.replace(/-/g, "").slice(0, 12)}`;
 }
 
+const sameLook = (a: Look, b: Look): boolean => a.version === b.version && a.clip === b.clip && JSON.stringify(a.effects) === JSON.stringify(b.effects);
+
 /** Adds a look to the list; the name is the file's, made different from every other look's. */
 export function addSavedLook(
   list: readonly SavedLook[],
@@ -73,6 +77,9 @@ export function addSavedLook(
   now: number = Date.now(),
   makeId: () => string = newLookId,
 ): { looks: SavedLook[]; saved: SavedLook } {
+  // The same file again is the same look: reuse it rather than saving "Acme grade 2".
+  const same = list.find((l) => sameLook(l.look, input.look));
+  if (same) return { looks: [...list], saved: same };
   const saved: SavedLook = { id: makeId(), name: uniqueLookName(list, lookNameFromFile(input.fileName)), look: input.look, addedAt: now };
   return { looks: [...list, saved], saved };
 }
@@ -94,39 +101,86 @@ export function lookForCampaign(campaign: Pick<Campaign, "fcpLookId"> | undefine
   return looks.find((l) => l.id === campaign.fcpLookId)?.look;
 }
 
+type LegacyEntry = { applyLook?: boolean; lookXml?: string };
+
 /**
- * One time: today's single pasted look becomes the saved look "My look", and every campaign that had
- * "Apply my look" on points to it. A switched-off look is still kept in the list. A pasted text that no
- * longer parses is left where it is and nothing is marked migrated, so it is not lost either.
+ * The old pasted looks in `clipper.editorHandoff`, in both shapes the app has stored: one entry per
+ * campaign ({ <campaignId>: { applyLook, lookXml } }, what real installs hold) and the flat single entry
+ * ({ applyLook, lookXml }). Entries without text are skipped.
+ */
+export function legacyLookEntries(raw: unknown): { campaignId: string | null; apply: boolean; text: string }[] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+  const o = raw as Record<string, unknown>;
+  const entry = (v: unknown): { apply: boolean; text: string } | null => {
+    if (!v || typeof v !== "object") return null;
+    const e = v as LegacyEntry;
+    const text = typeof e.lookXml === "string" ? e.lookXml.trim() : "";
+    return text ? { apply: e.applyLook === true, text } : null;
+  };
+  if (typeof o.lookXml === "string" || typeof o.applyLook === "boolean") {
+    const e = entry(o);
+    return e ? [{ campaignId: null, ...e }] : [];
+  }
+  return Object.entries(o).flatMap(([id, v]) => {
+    const e = entry(v);
+    return e ? [{ campaignId: id, ...e }] : [];
+  });
+}
+
+/**
+ * One time: the old pasted looks become saved looks. Identical texts are stored once, as "My look";
+ * different ones follow as "My look 2" and so on. Every campaign that had "Apply my look" on points at
+ * its look (the flat shape points every campaign without one). A switched-off look is still kept in the
+ * list. A text that no longer parses leaves everything where it is and nothing is marked migrated, so it
+ * is not lost either.
  */
 export function migratePastedLook(
   campaigns: readonly Campaign[],
   looks: readonly SavedLook[],
-  legacy: { applyLook?: boolean; lookXml?: string },
+  legacy: unknown,
   now: number = Date.now(),
   makeId: () => string = newLookId,
 ): { campaigns: Campaign[]; looks: SavedLook[]; migrated: boolean } {
-  const text = (legacy.lookXml ?? "").trim();
-  if (!text) return { campaigns: [...campaigns], looks: [...looks], migrated: true };
-  let look: Look;
-  try {
-    look = parseLook(text);
-  } catch {
-    return { campaigns: [...campaigns], looks: [...looks], migrated: false };
+  const entries = legacyLookEntries(legacy);
+  if (entries.length === 0) return { campaigns: [...campaigns], looks: [...looks], migrated: true };
+  const parsed: { campaignId: string | null; apply: boolean; text: string; look: Look }[] = [];
+  for (const e of entries) {
+    try {
+      parsed.push({ ...e, look: parseLook(e.text) });
+    } catch {
+      return { campaigns: [...campaigns], looks: [...looks], migrated: false };
+    }
   }
-  const { looks: next, saved } = addSavedLook(looks, { fileName: MIGRATED_NAME, look }, now, makeId);
-  const point = legacy.applyLook === true;
-  return {
-    campaigns: campaigns.map((c) => (point && !c.fcpLookId ? { ...c, fcpLookId: saved.id } : c)),
-    looks: next,
-    migrated: true,
-  };
+  let list = [...looks];
+  const idByText = new Map<string, string>();
+  for (const e of parsed) {
+    if (idByText.has(e.text)) continue;
+    const { looks: next, saved } = addSavedLook(list, { fileName: MIGRATED_NAME, look: e.look }, now, makeId);
+    list = next;
+    idByText.set(e.text, saved.id);
+  }
+  const next = campaigns.map((c) => {
+    if (c.fcpLookId) return c;
+    const mine = parsed.find((e) => e.apply && e.campaignId === c.id) ?? parsed.find((e) => e.apply && e.campaignId === null);
+    return mine ? { ...c, fcpLookId: idByText.get(mine.text) } : c;
+  });
+  return { campaigns: next, looks: list, migrated: true };
 }
 
 // ---- persistence ------------------------------------------------------------------------
 
 export function loadSavedLooks(): SavedLook[] {
   return normalizeSavedLooks(readSetting<unknown>(KEY_LOOKS, []));
+}
+
+/** The last look picked or uploaded, if it still exists. */
+export function loadLastLookId(looks: readonly SavedLook[] = loadSavedLooks()): string | undefined {
+  const id = readSetting<unknown>(KEY_LAST_LOOK, "");
+  return typeof id === "string" && looks.some((l) => l.id === id) ? id : undefined;
+}
+
+export function rememberLastLook(id: string): void {
+  writeSetting(KEY_LAST_LOOK, id);
 }
 
 export function saveSavedLooks(looks: readonly SavedLook[]): void {

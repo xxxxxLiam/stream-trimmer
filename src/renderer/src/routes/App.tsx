@@ -93,7 +93,16 @@ function useEditorSettings(campaignId: string | null) {
     },
     [campaignId],
   );
-  return [settings, setSettings] as const;
+  // Any campaign's settings, for the Settings drawer (every campaign's Final Cut fields show there).
+  const settingsFor = useCallback((id: string) => normalizeEditorSettings(all[id]), [all]);
+  const setSettingsFor = useCallback((id: string, next: EditorHandoffSettings) => {
+    setAll((prev) => {
+      const merged = { ...prev, [id]: next };
+      writeSetting(EDITOR_KEY, merged);
+      return merged;
+    });
+  }, []);
+  return [settings, setSettings, settingsFor, setSettingsFor] as const;
 }
 
 function SavedToast() {
@@ -251,7 +260,7 @@ function Layout({ active }: { active: boolean }) {
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
 
-  const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
+  const [editorSettings, setEditorSettings, editorSettingsFor, setEditorSettingsFor] = useEditorSettings(campaign?.id ?? null);
   // Which audio languages the next Clip makes, remembered per campaign. No dubs: one plain clip.
   const [audioSel, setAudioSel] = useAudioLanguageState(campaign?.id ?? null);
   const languagePlans = useMemo(() => planLanguages(info?.audioTracks, audioSel), [info?.audioTracks, audioSel]);
@@ -434,7 +443,7 @@ function Layout({ active }: { active: boolean }) {
       onClose={closeSettings}
       startAt={settingsStartAt}
       tracks={info?.audioTracks}
-      editor={{ campaignId: campaign?.id ?? null, settings: editorSettings, onChange: setEditorSettings }}
+      editor={{ settingsFor: editorSettingsFor, onChange: setEditorSettingsFor }}
     />
   );
   const dayHost = useDayHost();

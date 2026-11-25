@@ -7,7 +7,7 @@
  */
 import { useCallback, useRef, useState } from "react";
 import type { Campaign } from "../../../shared/utils/campaigns";
-import { addPickedLook, deleteSavedLook, loadSavedLooks, saveSavedLooks, type SavedLook } from "../../../shared/utils/fcpLooks";
+import { addPickedLook, deleteSavedLook, loadSavedLooks, rememberLastLook, saveSavedLooks, type SavedLook } from "../../../shared/utils/fcpLooks";
 import type { FcpLookFileResult } from "../../../../../common/types/fcpLook";
 import type { FinalCutLookProps } from "../components/FinalCutLook";
 
@@ -25,10 +25,12 @@ export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns
     (result: FcpLookFileResult) => {
       const added = addPickedLook(result);
       if (!added.ok) {
-        if (!added.cancelled) setProblem(added.reason);
+        // A cancelled pick is not a failure: the sentence from the last try goes away.
+        setProblem(added.cancelled ? "" : added.reason);
         return;
       }
       setProblem("");
+      rememberLastLook(added.id);
       setLooks(loadSavedLooks());
       if (campaignId) store.update(campaignId, { fcpLookId: added.id });
       setOpen(false);
@@ -48,13 +50,17 @@ export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns
     open,
     guide,
     inputRef,
-    usedIds: store.campaigns.flatMap((c) => (c.fcpLookId ? [c.fcpLookId] : [])),
+    usedBy: store.campaigns.reduce<Record<string, string[]>>((m, c) => {
+      if (c.fcpLookId) (m[c.fcpLookId] ??= []).push(c.name);
+      return m;
+    }, {}),
     onToggleOpen: () => setOpen((v) => !v),
     onToggleGuide: () => setGuide((v) => !v),
     onChoose: () => void api?.pickFinalCutLook?.().then(adopt),
     onFile: (file) => void api?.readFinalCutLook?.(file).then(adopt),
     onPick: (id) => {
       setProblem("");
+      if (id) rememberLastLook(id);
       store.update(campaign.id, { fcpLookId: id ?? undefined });
       setOpen(false);
     },
