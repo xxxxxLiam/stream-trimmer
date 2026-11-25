@@ -17,7 +17,7 @@ export function useMarkersController() {
   const clipper = useClipperContext();
   const { playhead, cutSegments } = usePanelHost();
   const { videoId, transcript, duration, startText, endText, downloading, error } = clipper;
-  const { flags } = useFlagsState(videoId);
+  const { flags, removeFlag } = useFlagsState(videoId);
   useSyncExternalStore(markerMemory.subscribe, markerMemory.get, markerMemory.get);
   const mem = markerMemory.for(videoId);
 
@@ -96,6 +96,9 @@ export function useMarkersController() {
     return () => window.removeEventListener("keydown", onKey);
   }, [trimNext]);
 
+  /** Remove a flag. The range it was trimmed to stays in the memory and in the In and Out boxes (B-9). */
+  const remove = useCallback((row: FlagRow) => removeFlag(row.at), [removeFlag]);
+
   const [clippedOpen, setClippedOpen] = useState(false);
 
   return {
@@ -104,6 +107,7 @@ export function useMarkersController() {
     canTrim: next !== null,
     trimNext,
     open,
+    remove,
     join,
     clippedOpen,
     toggleClipped: () => setClippedOpen((v) => !v),

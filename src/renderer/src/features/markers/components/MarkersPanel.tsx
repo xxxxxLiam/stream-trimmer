@@ -7,29 +7,8 @@
  */
 import PanelEmptyNote, { KeyChip } from "../../../modules/layout/components/PanelEmptyNote";
 import { IconChevronDown } from "../../../shared/components/PanelIcons";
-import { formatClock } from "../../../shared/utils/clock";
 import { useMarkersController } from "../hooks/useMarkersController";
-import type { FlagRow } from "../utils/markers";
-
-function Row({ row, onOpen, grouped }: { row: FlagRow; onOpen: () => void; grouped?: boolean }) {
-  const time = formatClock(row.at);
-  return (
-    <button
-      type="button"
-      aria-label={`Flag at ${time}${row.words ? `: ${row.words}` : ""}`}
-      onClick={onOpen}
-      className={
-        "flex min-h-target items-baseline gap-[10px] px-[10px] py-[8px] text-left text-body text-fg " +
-        (grouped
-          ? "w-full border-t border-hairline"
-          : "mx-[10px] mb-[6px] w-[calc(100%-20px)] rounded-control bg-raised")
-      }
-    >
-      <span className="flex-none text-meta leading-[1.35] tabular-nums [font-feature-settings:'tnum'] text-fg-dim">{time}</span>
-      <span className="leading-[1.35]">{row.words}</span>
-    </button>
-  );
-}
+import FlagRowItem from "./FlagRowItem";
 
 export default function MarkersPanel() {
   const m = useMarkersController();
@@ -48,7 +27,7 @@ export default function MarkersPanel() {
       <div className="min-h-[0px] flex-1 overflow-y-auto" tabIndex={0} aria-label="Flags">
         <div className="h-[9px]" />
         {open.map((r) => (
-          <Row key={r.at} row={r} onOpen={() => m.open(r)} />
+          <FlagRowItem key={r.at} row={r} onOpen={() => m.open(r)} onRemove={() => m.remove(r)} />
         ))}
 
         {ranged.length > 0 && (
@@ -69,7 +48,7 @@ export default function MarkersPanel() {
               </span>
             </div>
             {ranged.map((r) => (
-              <Row key={r.at} row={r} grouped onOpen={() => m.open(r)} />
+              <FlagRowItem key={r.at} row={r} grouped onOpen={() => m.open(r)} onRemove={() => m.remove(r)} />
             ))}
           </section>
         )}
@@ -87,7 +66,7 @@ export default function MarkersPanel() {
                 <IconChevronDown />
               </span>
             </button>
-            {m.clippedOpen && clipped.map((r) => <Row key={r.at} row={r} onOpen={() => m.open(r)} />)}
+            {m.clippedOpen && clipped.map((r) => <FlagRowItem key={r.at} row={r} onOpen={() => m.open(r)} onRemove={() => m.remove(r)} />)}
           </>
         )}
       </div>
