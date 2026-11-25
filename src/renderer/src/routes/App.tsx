@@ -484,12 +484,15 @@ function Layout({ active }: { active: boolean }) {
       const k = e.key.toLowerCase();
       if (k === "/" && !e.shiftKey) {
         e.preventDefault();
+        // F4-2: one right drawer at a time, as the Help button does.
+        setSettingsOpen(false);
         setHelpOpen((v) => !v);
       } else if (k === ";" && !e.shiftKey) {
         e.preventDefault();
         setSymbolsOpen((v) => !v);
       } else if (k === "," && !e.shiftKey) {
         e.preventDefault();
+        setHelpOpen(false);
         setSettingsOpen((v) => !v);
       } else if (k === "b" && !e.shiftKey && !e.altKey) {
         e.preventDefault();

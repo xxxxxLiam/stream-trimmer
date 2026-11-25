@@ -19,6 +19,8 @@ export type FinalCutLookProps = {
   problem: string;
   /** One sentence when an old pasted look could not be moved; empty otherwise. */
   unreadNote?: string;
+  /** One line after the same grade was uploaded again at a new size or rate. */
+  updatedNote?: string;
   open: boolean;
   guide: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -154,6 +156,7 @@ export default function FinalCutLook(p: FinalCutLookProps) {
         </div>
       )}
 
+      {p.updatedNote && !p.problem && <p role="status" className="m-[0px] text-meta text-fg-dim">{p.updatedNote}</p>}
       {p.unreadNote && !p.problem && <p className="m-[0px] text-meta text-fg-dim">{p.unreadNote}</p>}
       {p.found && !p.problem && <p className="m-[0px] text-meta text-fg-dim">Found: {p.found}</p>}
       {p.problem && (

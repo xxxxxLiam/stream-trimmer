@@ -54,7 +54,7 @@ function Row({
             type="button"
             aria-label="Done with this video"
             onClick={onDone}
-            className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-control border border-hairlineStrong bg-panel text-fg hover:bg-hover"
+            className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-control border border-hairlineStrong bg-panel text-fg hover:bg-hover"
           >
             <IconClose />
           </button>

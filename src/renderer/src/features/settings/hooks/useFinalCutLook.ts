@@ -17,6 +17,7 @@ type Campaigns = { campaigns: Campaign[]; update: (id: string, patch: Partial<Om
 export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns, onUploaded?: () => void): FinalCutLookProps | undefined {
   const [looks, setLooks] = useState<SavedLook[]>(() => loadSavedLooks());
   const [problem, setProblem] = useState("");
+  const [updated, setUpdated] = useState("");
   const [open, setOpen] = useState(false);
   const [guide, setGuide] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -31,6 +32,7 @@ export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns
         return;
       }
       setProblem("");
+      setUpdated(added.updated ? `Updated ${added.name} to its new size.` : "");
       rememberLastLook(added.id);
       setLooks(loadSavedLooks());
       if (campaignId) store.update(campaignId, { fcpLookId: added.id });
@@ -54,6 +56,7 @@ export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns
     found: current ? current.look.found.join(", ") : "",
     problem,
     unreadNote,
+    updatedNote: updated,
     open,
     guide,
     inputRef,

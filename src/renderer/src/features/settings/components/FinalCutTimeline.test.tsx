@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import FinalCutTimeline, { timelineLine } from "./FinalCutTimeline";
-import { normalizeTimeline, resolveTimeline } from "../../../shared/utils/fcpxml";
+import { dayLabel, normalizeTimeline, resolveTimeline } from "../../../shared/utils/fcpxml";
 import { addSavedLook } from "../../../shared/utils/fcpLooks";
 
 const noop = () => {};
@@ -83,5 +83,29 @@ test("D3-2: a stored legacy rate of 30 follows the video; a custom size keeps it
   assert.equal(normalizeTimeline({ kind: "vertical", fps: "30" }).fps, "source");
   assert.equal(normalizeTimeline({ kind: "look", fps: "30" }).fps, "source");
   assert.equal(normalizeTimeline({ kind: "custom", fps: "30" }).fps, "30");
-  assert.equal(normalizeTimeline({ kind: "vertical", fps: "24" }).fps, "24");
+  assert.equal(normalizeTimeline({ kind: "vertical", fps: "24" }).fps, "source");
+  assert.equal(normalizeTimeline({ kind: "vertical", fps: "25" }).fps, "source", "D4-2");
+  assert.equal(normalizeTimeline({ kind: "source", fps: "29.97" }).fps, "source", "D4-2");
+  assert.equal(normalizeTimeline({ kind: "look", fps: "25" }).fps, "source", "D4-2");
+});
+
+test("D4-3: the same grade at a new size updates the saved size and says so; an identical size says nothing", () => {
+  const old = { id: "l-1", name: "Acme grade", addedAt: 1, look: { version: "1.10", clip: "<c/>", effects: [], found: ["Scale"], format: { width: 1920, height: 1080, fps: "25" } } };
+  const bigger = { fileName: "Acme grade.fcpxml", look: { ...old.look, format: { width: 3840, height: 2160, fps: "25" } } };
+  const r = addSavedLook([old], bigger);
+  assert.equal(r.looks.length, 1);
+  assert.equal(r.updated, true);
+  assert.deepEqual(r.saved.look.format, { width: 3840, height: 2160, fps: "25" });
+  const same = addSavedLook([old], { fileName: "Acme grade.fcpxml", look: { ...old.look } });
+  assert.notEqual(same.updated, true);
+});
+
+test("D4-3: the look panel renders the updated note", () => {
+  const src = readFileSync(new URL("../hooks/useFinalCutLook.ts", import.meta.url), "utf8");
+  assert.match(src, /Updated \$\{added\.name\} to its new size\./);
+});
+
+test("D4-4: the preview names the day the way the file does (Sep, not Sept)", () => {
+  assert.equal(dayLabel(Date.UTC(2026, 8, 3, 12)), "3 Sep 2026");
+  assert.match(readFileSync(new URL("../hooks/useFinalCutLayout.ts", import.meta.url), "utf8"), /day: dayLabel\(Date\.now\(\)\)/);
 });

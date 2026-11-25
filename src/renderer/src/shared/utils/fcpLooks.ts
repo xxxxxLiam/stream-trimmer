@@ -92,14 +92,17 @@ export function addSavedLook(
   input: { fileName: string; look: Look },
   now: number = Date.now(),
   makeId: () => string = newLookId,
-): { looks: SavedLook[]; saved: SavedLook } {
+): { looks: SavedLook[]; saved: SavedLook; /** The same look was saved again and took a new size or rate. */ updated?: boolean } {
   // The same file again is the same look: reuse it rather than saving "Acme grade 2".
   const same = list.find((l) => sameLook(l.look, input.look));
   if (same) {
     // D3-1: a look saved before its size was read gains it when the same file is chosen again, instead of being skipped.
-    if (!same.look.format && input.look.format) {
-      const upgraded: SavedLook = { ...same, look: { ...same.look, format: input.look.format } };
-      return { looks: list.map((l) => (l.id === same.id ? upgraded : l)), saved: upgraded };
+    // D4-3: and the same grade exported again at another size or rate takes the new one, and says so.
+    const a = same.look.format;
+    const b = input.look.format;
+    if (b && (!a || a.width !== b.width || a.height !== b.height || a.fps !== b.fps)) {
+      const upgraded: SavedLook = { ...same, look: { ...same.look, format: b } };
+      return { looks: list.map((l) => (l.id === same.id ? upgraded : l)), saved: upgraded, updated: true };
     }
     return { looks: [...list], saved: same };
   }
@@ -215,9 +218,9 @@ export function saveSavedLooks(looks: readonly SavedLook[]): void {
  * The result of choosing or dropping a file (see `pickFinalCutLook`): added to the saved looks, and the
  * new look's id comes back for the campaign to point at. A refused file comes back as its one sentence.
  */
-export function addPickedLook(result: FcpLookFileResult): { ok: true; id: string; name: string } | { ok: false; reason: string; cancelled?: boolean } {
+export function addPickedLook(result: FcpLookFileResult): { ok: true; id: string; name: string; updated?: boolean } | { ok: false; reason: string; cancelled?: boolean } {
   if (!result.ok) return { ok: false, reason: result.reason, ...(result.cancelled ? { cancelled: true } : {}) };
-  const { looks, saved } = addSavedLook(loadSavedLooks(), { fileName: result.fileName, look: result.look });
+  const { looks, saved, updated } = addSavedLook(loadSavedLooks(), { fileName: result.fileName, look: result.look });
   saveSavedLooks(looks);
-  return { ok: true, id: saved.id, name: saved.name };
+  return { ok: true, id: saved.id, name: saved.name, ...(updated ? { updated: true } : {}) };
 }

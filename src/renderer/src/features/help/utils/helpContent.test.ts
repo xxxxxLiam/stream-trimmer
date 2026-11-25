@@ -159,7 +159,13 @@ test("V18-T-10: the zoom answer says where the buttons are", () => {
 });
 
 test("F3-5 and F3-7: bigger text and zoom in find the zoom answer; a dimmed Row uses the disabled token", () => {
-  for (const q of ["zoom in", "text bigger", "large text", "font size"]) assert.ok(searchHelp(q).answers.some((a) => a.id === "timeline-zoom"), q);
+  assert.ok(searchHelp("zoom in").answers.some((a) => a.id === "timeline-zoom"));
+  // F4-3: text-size words find the window zoom answer, not the timeline one.
+  for (const q of ["text bigger", "large text", "font size"]) {
+    const ids = searchHelp(q).answers.map((a) => a.id);
+    assert.ok(ids.includes("window-zoom"), q);
+    assert.ok(!ids.includes("timeline-zoom"), q);
+  }
   const row = readFileSync(join(ROOT, "shared/components/Row.tsx"), "utf8");
   assert.match(row, /dimmed: "border-transparent text-disabled"/);
   assert.doesNotMatch(row, /opacity-55/);
