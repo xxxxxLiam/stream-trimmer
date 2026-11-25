@@ -36,3 +36,12 @@ test("R2: one timeline controller feeds the Timeline panel and the fixed export 
   assert.match(bar, /h-\[60px\][^"]*border-t border-hairlineStrong bg-panel/);
   assert.ok(!/\b(m[xtblr]?-\[|rounded-)/.test(bar.match(/id="ui-export-bar" className="([^"]*)"/)![1]), "full bleed: no margin, no radius");
 });
+
+test("R2: the timeline is an inset rounded card above the fixed export bar", () => {
+  const timeline = readFileSync(new URL("../features/player/components/Timeline.tsx", import.meta.url), "utf8");
+  const cls = timeline.match(/id="ui-timeline"[^>]*className=\{?[`"]([^`"]*)[`"]/)![1];
+  assert.match(cls, /\bmx-\[8px\]/);
+  assert.match(cls, /\bmb-\[8px\]/);
+  assert.match(cls, /\brounded-panel\b/);
+  assert.ok(!/border-y/.test(cls));
+});
