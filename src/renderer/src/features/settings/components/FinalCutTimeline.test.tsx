@@ -46,3 +46,12 @@ test("uploading a look switches the timeline to it, and the editor page shows th
   assert.match(readFileSync(new URL("../hooks/useFinalCutLook.ts", import.meta.url), "utf8"), /onUploaded\?\.\(\)/);
   assert.match(readFileSync(new URL("./SettingsEditor.tsx", import.meta.url), "utf8"), /<FinalCutTimeline \{\.\.\.fc\.timeline\}/);
 });
+
+test("changing the kind never rewrites the frame rate (vertical follows the video)", () => {
+  const drawer = readFileSync(new URL("./SettingsDrawer.tsx", import.meta.url), "utf8");
+  assert.match(drawer, /timelineFormat: \{ \.\.\.fcp\.timelineFormat, kind \}/);
+  assert.doesNotMatch(drawer, /=== "source" \? "30"/);
+  const handoff = readFileSync(new URL("../../handoff/components/EditorHandoff.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(handoff, /=== "source" \? "30"/);
+  assert.match(handoff, /timelineFormat: \{ \.\.\.settings\.timelineFormat, kind \}/);
+});

@@ -95,7 +95,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
       kind: fcp.timelineFormat.kind,
       lookName: look?.saved.find((l) => l.id === look.currentId)?.name ?? "",
       lookFormat: lookFormat(campaign),
-      onPick: (kind) => editor.onChange(campaign.id, { ...fcp, timelineFormat: { ...fcp.timelineFormat, kind, fps: kind === "source" ? fcp.timelineFormat.fps : fcp.timelineFormat.fps === "source" ? "30" : fcp.timelineFormat.fps } }),
+      onPick: (kind) => editor.onChange(campaign.id, { ...fcp, timelineFormat: { ...fcp.timelineFormat, kind } }),
     },
   });
 
