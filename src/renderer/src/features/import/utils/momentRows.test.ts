@@ -95,3 +95,24 @@ test("a rating on a pasted row is kept in the bank", () => {
   const res = importClips({}, "c1", "v1", [{ line: 1, id: null, label: "One Two", segments: [{ start: 1, end: 9 }], rating: 8 }]);
   assert.equal(res.data.c1.v1[0].rating, 8);
 });
+
+test("C-13: import flags names the naming rule forbids, repeats, and names already in the bank", async () => {
+  const { flagNames } = await import("./momentRows");
+  const text = [
+    "https://www.youtube.com/watch?v=abcdefghijk\t0:10:00\t0:10:30\tHonest Version",
+    "https://www.youtube.com/watch?v=abcdefghijk\t0:11:00\t0:11:30\tToo many words here",
+    "https://www.youtube.com/watch?v=abcdefghijk\t0:12:00\t0:12:30\tBig Deal",
+    "https://www.youtube.com/watch?v=abcdefghijk\t0:13:00\t0:13:30\tbig deal",
+    "https://www.youtube.com/watch?v=abcdefghijk\t0:14:00\t0:14:30\t",
+    "https://www.youtube.com/watch?v=abcdefghijk\t0:15:00\t0:15:30\tBad/Name",
+  ].join("\n");
+  const rows = flagNames(parseMoments(text, { openVideoId: "abcdefghijk" }), [{ id: "b1", name: "Honest Version" }]);
+  const by = (k: number) => rows.find((r) => r.key === String(k))!;
+  assert.match(by(1).problem?.reason ?? "", /already in the bank/);
+  assert.match(by(2).problem?.reason ?? "", /exactly two/);
+  assert.match(by(3).problem?.reason ?? "", /Every name must be different/);
+  assert.match(by(4).problem?.reason ?? "", /Every name must be different/);
+  assert.equal(by(5).problem, undefined, "no name is allowed: it is named when it is made");
+  assert.match(by(6).problem?.reason ?? "", /not allowed/);
+  assert.ok(rows.every((r) => !r.problem || r.problem.fix === "skip"));
+});
