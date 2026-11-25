@@ -6,7 +6,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTimelineView } from "../hooks/TimelineControllerContext";
-import { TOOL_CURSORS, sourceLaneHeight } from "../utils/laneTools";
+import { cursorFor, sourceLaneHeight } from "../utils/laneTools";
 import { useTranscriptLane } from "../hooks/useTranscriptLane";
 import AudioLanes from "./AudioLanes";
 import ClipsLane from "./ClipsLane";
@@ -23,6 +23,20 @@ export default function Timeline() {
   const transcriptLane = useTranscriptLane();
   const { setWidth } = c;
   const [height, setHeight] = useState(0);
+  // Alt turns the zoom tool's click into a zoom out, and its cursor says so.
+  const [alt, setAlt] = useState(false);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => setAlt(e.altKey);
+    const off = () => setAlt(false);
+    window.addEventListener("keydown", on);
+    window.addEventListener("keyup", on);
+    window.addEventListener("blur", off);
+    return () => {
+      window.removeEventListener("keydown", on);
+      window.removeEventListener("keyup", on);
+      window.removeEventListener("blur", off);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const el = laneBox.current;
@@ -57,7 +71,8 @@ export default function Timeline() {
       {/* The tools act on this whole area, down to the empty space under the tracks. */}
       <div
         data-timeline-area
-        className={`relative flex min-h-[0px] flex-1 touch-none select-none flex-col ${TOOL_CURSORS[c.tool]}`}
+        className={`relative flex min-h-[0px] flex-1 touch-none select-none flex-col ${cursorFor(c.tool, alt)}`}
+        onClickCapture={c.onLaneClickCapture}
         onPointerDown={c.onLanePointerDown}
         onPointerMove={c.onLanePointerMove}
         onPointerUp={c.onLanePointerUp}

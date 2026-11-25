@@ -8,7 +8,7 @@ import { useState } from "react";
 
 export type Drag =
   | { kind: "range"; anchor: number }
-  | { kind: "edge"; edge: "start" | "end" }
+  | { kind: "edge"; edge: "start" | "end"; fixed: number }
   | { kind: "scrub" }
   | { kind: "pan"; startX: number; startFocus: number }
   | null;

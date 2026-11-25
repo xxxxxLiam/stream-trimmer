@@ -132,6 +132,7 @@ export function useClipperController() {
     pasteInto: range.pasteInto,
     setStartFromSeconds: range.setStartFromSeconds,
     setEndFromSeconds: range.setEndFromSeconds,
+    setRangeFromSeconds: range.setRangeFromSeconds,
     showTranscript: transcript.showTranscript,
     toggleTranscript: transcript.toggleTranscript,
     ensureTranscript: transcript.ensureTranscript,

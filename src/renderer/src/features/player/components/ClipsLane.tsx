@@ -91,7 +91,11 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
         label: b.label ?? timeName(b.start),
       })),
   ].filter((n) => shown(n.start, n.end));
-  const others = sections.map((x) => ({ ...span(x.start, x.end), label: "" }));
+  // The clip being built gets the same free-space naming (an 18 px bar on a long video would show "P").
+  if (sections.length === 1 && shown(sections[0].start, sections[0].end)) {
+    named.push({ key: "built", start: sections[0].start, end: sections[0].end, label: building(sections[0].start) });
+  }
+  const others = (sections.length === 1 ? [] : sections).map((x) => ({ ...span(x.start, x.end), label: "" }));
   const bars = [
     ...named.map((n) => ({ ...span(n.start, n.end), label: n.label })),
     ...others,
@@ -175,12 +179,15 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
               ) : null,
             )}
             {sections.length === 1 ? (
-              <ClipNameField
-                name={building(sections[0].start)}
-                onRename={rename}
-                className={`${BAR} rounded-chip border border-frost text-center font-medium text-fg`}
-                style={span(sections[0].start, sections[0].end)}
-              />
+              <>
+                <ClipNameField
+                  name={building(sections[0].start)}
+                  onRename={rename}
+                  className={`${BAR} rounded-chip border border-frost text-center font-medium ${placeOf("built").inside ? "text-fg" : "text-transparent focus:text-fg"}`}
+                  style={span(sections[0].start, sections[0].end)}
+                />
+                {outside("built", sections[0].start, sections[0].end, building(sections[0].start))}
+              </>
             ) : null}
             {sections.length > 1
               ? sections.map((s, i) => {
