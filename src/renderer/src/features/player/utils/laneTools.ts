@@ -116,15 +116,16 @@ export function placeLabels(bars: readonly LabelBar[], laneWidth: number): Label
  * into rows instead of drawn on top of each other. Bars in a cluster of overlaps share the cluster's row
  * count; a bar that overlaps nothing stays alone in one row, drawn full height as before.
  */
-export type RowSlot = { row: number; rows: number };
+export type RowSlot = { row: number; rows: number; from: number; to: number };
 export function packRows(bars: readonly { left: number; width: number }[]): RowSlot[] {
-  const out: RowSlot[] = bars.map(() => ({ row: 0, rows: 1 }));
+  const out: RowSlot[] = bars.map((b) => ({ row: 0, rows: 1, from: b.left, to: b.left + b.width }));
   const order = bars.map((_, i) => i).sort((a, b) => bars[a].left - bars[b].left || a - b);
   let cluster: number[] = [];
   let clusterRight = -Infinity;
   const rowRights: number[] = [];
   const flush = () => {
-    for (const i of cluster) out[i].rows = rowRights.length;
+    const from = Math.min(...cluster.map((i) => bars[i].left));
+    for (const i of cluster) Object.assign(out[i], { rows: rowRights.length, from, to: clusterRight });
     cluster = [];
     rowRights.length = 0;
     clusterRight = -Infinity;
