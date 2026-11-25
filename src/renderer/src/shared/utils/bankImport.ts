@@ -26,6 +26,8 @@ export type ParsedClip = {
   tier?: string;
   rating?: number;
   note?: string;
+  /** An out point past the video's end was moved to it: the end, in seconds. */
+  ranPastEnd?: number;
 };
 
 export type LineError = { line: number; text: string; reason: string };
@@ -158,6 +160,7 @@ function parseClipLine(
   }
 
   const segments: Segment[] = [];
+  let ranPastEnd: number | undefined;
   for (let i = 0; i < pairs.length; i++) {
     const [a, b] = pairs[i];
     const start = parseTimecode(a);
@@ -165,7 +168,14 @@ function parseClipLine(
     const n = pairs.length > 1 ? `Segment ${i + 1}: ` : "";
     if (start === null) return { ok: false, reason: `${n}${a} is not a valid time` };
     if (end === null) return { ok: false, reason: `${n}${b} is not a valid time` };
-    const check = checkRange({ start, end }, duration);
+    let check = checkRange({ start, end }, duration);
+    if (!check.ok && check.reason === "past-duration" && duration != null) {
+      // The in point is in the video: stop at the end and say so on the row. If it is not, nothing can be clipped.
+      if (start >= duration) return { ok: false, reason: `${n}This part isn’t in the video` };
+      ranPastEnd = duration;
+      segments.push({ start, end: duration });
+      continue;
+    }
     if (!check.ok) {
       const why =
         check.reason === "end-before-start"
@@ -207,6 +217,7 @@ function parseClipLine(
   if (category) clip.category = category;
   if (tier) clip.tier = tier;
   if (extras.length) clip.note = extras.join(" | ");
+  if (ranPastEnd !== undefined) clip.ranPastEnd = ranPastEnd;
   return { ok: true, clip };
 }
 

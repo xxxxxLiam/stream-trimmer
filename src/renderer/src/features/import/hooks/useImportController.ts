@@ -21,6 +21,7 @@ export function toParsed(r: MomentRow): ParsedClip {
     ...(r.category ? { category: r.category } : {}),
     ...(r.tier ? { tier: r.tier } : {}),
     ...(typeof r.rating === "number" ? { rating: r.rating } : {}),
+    ...(typeof r.ranPastEnd === "number" ? { ranPastEnd: r.ranPastEnd } : {}),
   };
 }
 

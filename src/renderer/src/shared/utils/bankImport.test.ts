@@ -114,7 +114,7 @@ test("a range past the video duration is reported only when duration is known", 
   assert.equal(known.clipCount, 1);
   assert.equal(known.errors.length, 1);
   assert.equal(known.errors[0].line, 2);
-  assert.match(known.errors[0].reason, /past the end of the video \(1:00:00\)/);
+  assert.match(known.errors[0].reason, /This part isn’t in the video/);
   assert.equal(parseBankImport(text).clipCount, 2);
   assert.equal(parseBankImport("59:00-1:00:00", { duration: 3600 }).clipCount, 1);
 });
@@ -308,4 +308,13 @@ test("empty and whitespace-only input", () => {
     assert.equal(p.clipCount, 0);
     assert.equal(p.errors.length, 0);
   }
+});
+
+test("an out point past the end stops at the end and is marked; an in point past the end is refused", () => {
+  const r = parseBankImport("Big Deal 0:59:00-1:05:00", { duration: 3600 });
+  assert.equal(r.errors.length, 0);
+  assert.deepEqual(r.clips[0].segments, [{ start: 3540, end: 3600 }]);
+  assert.equal(r.clips[0].ranPastEnd, 3600);
+  assert.equal(parseBankImport("0:59:00-1:00:00", { duration: 3600 }).clips[0].ranPastEnd, undefined, "a range that fits is not marked");
+  assert.match(parseBankImport("1:00:00-1:05:00", { duration: 3600 }).errors[0].reason, /This part isn’t in the video/);
 });

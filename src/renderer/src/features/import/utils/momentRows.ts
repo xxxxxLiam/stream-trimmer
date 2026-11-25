@@ -25,6 +25,8 @@ export type MomentRow = {
   category?: string;
   tier?: string;
   campaign?: string;
+  /** The out point was past the end of the video and was moved to it (seconds). */
+  ranPastEnd?: number;
   problem?: RowProblem;
 };
 
@@ -109,7 +111,11 @@ function rowFromCells(get: (k: string) => string, line: number, ctx: ParseContex
   else if (start === null || end === null) row.problem = { reason: "times not readable", fix: "skip" };
   else if (end < start) row.problem = { reason: "end before start", fix: "swap" };
   else if (end === start) row.problem = { reason: "no length", fix: "skip" };
-  else if (id === ctx.openVideoId && ctx.openDuration && end > ctx.openDuration) row.problem = { reason: "past the end of the video", fix: "skip" };
+  else if (id === ctx.openVideoId && ctx.openDuration && start >= ctx.openDuration) row.problem = { reason: "This part isn’t in the video", fix: "skip" };
+  else if (id === ctx.openVideoId && ctx.openDuration && end > ctx.openDuration) {
+    row.end = ctx.openDuration;
+    row.ranPastEnd = ctx.openDuration;
+  }
   return row;
 }
 
