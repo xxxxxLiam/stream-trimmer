@@ -6,6 +6,7 @@
  *   when it can." and Copy details still works.
  */
 import { DrawerHeader, drawerBodyRoomy, outlineButton } from "../../../shared/components/DrawerRows";
+import { MAX_NOTE } from "../utils/reports";
 import type { ReportState } from "../hooks/useReportMutations";
 
 export type HelpReportProps = {
@@ -46,12 +47,14 @@ export default function HelpReport(p: HelpReportProps) {
               id="report-note"
               rows={3}
               value={p.note}
+              maxLength={MAX_NOTE}
               onChange={(e) => p.onNote(e.target.value)}
               className="box-border h-[88px] resize-none rounded-control border border-hairlineStrong bg-raised p-[12px] text-body leading-[20px] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost"
             />
+            <span aria-live="polite" className="self-end text-meta text-fg-dim [font-variant-numeric:tabular-nums]">{p.note.length} / {MAX_NOTE}</span>
             <p className="m-[0px] text-meta text-fg-dim">Clipr adds the error, the version numbers and a cleaned log. Nothing is sent unless you press Send report.</p>
             <div className="flex gap-[8px]">
-              <button type="button" aria-label="Send report" onClick={p.onSend} className="h-target rounded-control bg-ice px-[16px] text-body font-medium text-bg">Send report</button>
+              <button type="button" aria-label="Send report" disabled={!p.note.trim()} onClick={p.onSend} className="h-target rounded-control bg-ice px-[16px] text-body font-medium text-bg disabled:bg-hover disabled:text-disabled">Send report</button>
               <button type="button" aria-label="Copy details" onClick={p.onCopy} className={outlineButton}>{p.copied ? "Copied" : "Copy details"}</button>
             </div>
             <p className="m-[0px] text-meta text-fg-dim">If the report can&apos;t be sent, Clipr keeps it and tries again later.</p>

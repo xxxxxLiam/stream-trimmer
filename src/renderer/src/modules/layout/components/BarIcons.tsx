@@ -41,6 +41,11 @@ export const IconScissors = () => (
     <path d="M5.8 10L12 2.5M10.2 10L4 2.5" />
   </Icon>
 );
+export const IconRange = () => (
+  <Icon>
+    <path d="M3.5 3v10M12.5 3v10M3.5 8h9M6 6l-2.5 2L6 10M10 6l2.5 2L10 10" />
+  </Icon>
+);
 export const IconFlag = () => (
   <Icon>
     <path d="M4 14V2M4 3h8l-2 3 2 3H4" />

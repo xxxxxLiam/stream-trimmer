@@ -37,3 +37,10 @@ test("Board 04.2: Export's + opens \"Add to Export\" with Import moments and Add
   const exp = readFileSync("src/renderer/src/features/clips/components/ExportPanel.tsx", "utf8");
   assert.doesNotMatch(exp, /Import moments/);
 });
+
+test("C2-14: closing the drawer puts the keyboard back on the + button, not on the page body", () => {
+  const src = readFileSync("src/renderer/src/features/import/components/ImportDrawer.tsx", "utf8");
+  assert.match(src, /querySelector<HTMLElement>\('button\[aria-label="Add to Export"\]'\)/);
+  assert.match(src, /const close = \(\) => \{\s*onClose\(\);\s*focusAddButton\(\);/);
+  assert.match(src, /e\.key === "Escape" && closeRef\.current\(\)/);
+});

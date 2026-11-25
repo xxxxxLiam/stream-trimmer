@@ -102,6 +102,8 @@ test("F-6: every shortcut listed is handled, and every handled shortcut is liste
     "features/player/hooks/useClipController.ts",
     "features/player/utils/transport.ts",
     "features/clips/utils/clipFailure.ts",
+    "features/workspace/utils/workspaceShortcuts.ts",
+    "features/transcript/components/TranscriptColumn.tsx",
   ].map(read).join("\n");
   const handled: Record<string, RegExp> = {
     "Space": /e\.key === " "/,
@@ -109,11 +111,16 @@ test("F-6: every shortcut listed is handled, and every handled shortcut is liste
     "I": /e\.key === "i"/,
     "O": /e\.key === "o"/,
     "M": /e\.key !== "m"/,
+    "A  B  S": /toolForKey\(e\)/,
+    "F  H  Z": /toolForKey\(e\)/,
     "Shift N": /e\.shiftKey && !e\.metaKey && !e\.ctrlKey && e\.key === "N"/,
     "⌘ Enter": /\(e\.metaKey \|\| e\.ctrlKey\) && e\.key === "Enter"/,
     "R": /toLowerCase\(\) !== "r"/,
     "⌘ R": /k === "r" && !e\.shiftKey/,
     "⌘ L": /modifier\) return k === "l"/,
+    "⌘ F": /e\.key\.toLowerCase\(\) === "f" && searchRef/,
+    "⌘ 1–9": /\/\^\[1-9\]\$\/\.test\(k\)/,
+    "⌘ Tab": /k === "tab"/,
     "⌘ ,": /k === "," && !e\.shiftKey/,
     "⌘ ;": /k === ";" && !e\.shiftKey/,
     "⌘ /": /k === "\/" && !e\.shiftKey/,
@@ -125,4 +132,20 @@ test("F-6: every shortcut listed is handled, and every handled shortcut is liste
   }
   for (const k of Object.keys(handled)) assert.ok(SHORTCUTS.some((s) => s.keys === k), `${k} is handled but not listed`);
   assert.ok(!SHORTCUTS.some((s) => s.keys === "⌘ B"), "nothing handles Ctrl/⌘ B");
+});
+
+test("F2-4: transcript, speed, quota, layout, panels, fit and zoom find an answer; lut is not resolution; Undo says 8 seconds", () => {
+  const first = (q: string) => searchHelp(q).answers[0]?.id;
+  assert.equal(first("transcript"), "find-in-transcript");
+  assert.equal(first("speed"), "speed");
+  assert.equal(first("quota"), "quota");
+  assert.equal(first("layout"), "fcp-layout");
+  assert.ok(searchHelp("panels").answers.some((a) => a.id === "panels"));
+  assert.ok(searchHelp("fit").answers.some((a) => a.id === "timeline-zoom"));
+  assert.ok(searchHelp("zoom").answers.some((a) => a.id === "timeline-zoom"));
+  assert.ok(!searchHelp("lut").answers.some((a) => a.id === "sign-in"), "a typed word matches the start of a word, not its middle");
+  assert.ok(searchHelp("cookies.txt").answers.some((a) => a.id === "sign-in"), "file names still match");
+  const undo = HELP_ANSWERS.find((a) => a.id === "undo-clip")!;
+  assert.match(JSON.stringify(undo.groups), /8 seconds/);
+  assert.doesNotMatch(JSON.stringify(undo.groups), /5 seconds/);
 });

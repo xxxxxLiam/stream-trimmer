@@ -108,7 +108,7 @@ export default function ColdStart(p: ColdStartProps) {
                 />
                 <button type="button" onClick={p.onPasteButton} className="inline-flex h-[40px] items-center gap-[8px] rounded-control bg-ice px-[14px] text-body font-medium text-bg">
                   Paste
-                  <span className="text-meta opacity-70">{p.pasteKey}</span>
+                  <span className="text-meta font-normal text-bg">{p.pasteKey}</span>
                 </button>
                 {p.opening && <PreparingLine />}
               </div>

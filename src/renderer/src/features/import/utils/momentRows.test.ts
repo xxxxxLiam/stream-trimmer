@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COPY_FORMAT, parseMoments, resolveRows } from "./momentRows";
+import { COPY_FORMAT, checkImportNames, parseMoments, resolveRows } from "./momentRows";
 
 const A = "https://www.youtube.com/watch?v=aaaaaaaaaaa";
 const B = "https://youtu.be/bbbbbbbbbbb";
@@ -115,4 +115,16 @@ test("C-13: import flags names the naming rule forbids, repeats, and names alrea
   assert.equal(by(5).problem, undefined, "no name is allowed: it is named when it is made");
   assert.match(by(6).problem?.reason ?? "", /not allowed/);
   assert.ok(rows.every((r) => !r.problem || r.problem.fix === "skip"));
+});
+
+test("C2-12: skipping one of two rows with the same name frees the other, and a rename clears its flag", () => {
+  const parsed = parseMoments(["name\tstart\tend", "Hard Truth\t0:01:00\t0:01:30", "Hard Truth\t0:05:00\t0:05:30"].join("\n"), ctx);
+  const flagged = checkImportNames(parsed, [], new Set(), new Map());
+  assert.ok(flagged.every((r) => r.problem?.name), "both are flagged while both count");
+  const afterSkip = checkImportNames(parsed, [], new Set([flagged[0].key]), new Map());
+  assert.equal(afterSkip[1].problem, undefined, "the twin is no longer flagged against the skipped line");
+  assert.equal(resolveRows(afterSkip, new Set(), new Set([flagged[0].key])).good.length, 1);
+  const afterRename = checkImportNames(parsed, [], new Set(), new Map([[flagged[1].key, "Second Take"]]));
+  assert.deepEqual(afterRename.map((r) => r.problem), [undefined, undefined]);
+  assert.equal(afterRename[1].name, "Second Take");
 });

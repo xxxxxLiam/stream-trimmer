@@ -29,6 +29,8 @@ import {
   lineOverlaps,
   snapRangeByIndex,
   snapRangeToWords,
+  foldForSearch,
+  isClickDrag,
   type LinePoint,
   type TimeRange,
 } from "../utils/transcript";
@@ -71,9 +73,9 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 
 /** Wrap occurrences of `q` inside one line in <mark>. Cross-line hits are marked by the row ring. */
 function highlight(text: string, q: string): ReactNode {
-  const needle = q.trim().toLowerCase();
+  const needle = foldForSearch(q.trim());
   if (!needle) return text;
-  const lower = text.toLowerCase();
+  const lower = foldForSearch(text);
   if (lower.length !== text.length) return text; // case-mapping changed length; skip rather than misplace
   const out: ReactNode[] = [];
   let at = 0;
@@ -242,7 +244,7 @@ export default function TranscriptColumn({
       dragRef.current = null;
       setDrag(null);
       if (!d || !commit) return;
-      if (d.a === d.b) {
+      if (d.a === d.b && isClickDrag(d.pa, d.pb)) {
         const line = w.all[d.a];
         if (line) {
           lastAnchor.current = d.a;

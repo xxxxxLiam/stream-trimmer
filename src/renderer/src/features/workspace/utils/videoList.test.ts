@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { matchesVideoQuery, nextOpenId, nextWaitingId, setDone, splitVideos, waitingIn, looksLikeLink, linkKind } from "./videoList";
+import { matchesVideoQuery, nextOpenId, nextWaitingId, setDone, splitVideos, waitingIn, looksLikeLink, linkKind, linkInText } from "./videoList";
 import type { WorkspaceTab } from "../hooks/WorkspaceContext";
 import type { BankData } from "../../../shared/utils/bank";
 
@@ -100,4 +100,11 @@ test("a video just moved to Done goes first among the Done videos", () => {
   assert.deepEqual(splitVideos(setDone(tabs, "b", true)).done.map((t) => t.id), ["b", "c", "d"]);
   assert.deepEqual(splitVideos(setDone(tabs, "b", true)).open.map((t) => t.id), ["a"]);
   assert.deepEqual(splitVideos(setDone([{ id: "x", name: "" }, { id: "y", name: "" }], "x", true)).done.map((t) => t.id), ["x"]);
+});
+
+test("B2-5: the video link inside pasted share text is pulled out", () => {
+  assert.equal(linkInText("Watch this! https://youtu.be/abc123 – so good"), "https://youtu.be/abc123");
+  assert.equal(linkInText("check (m.youtube.com/watch?v=abc123), wow"), "m.youtube.com/watch?v=abc123");
+  assert.equal(linkInText("just some words"), null);
+  assert.equal(linkInText("see https://example.com/page"), null);
 });

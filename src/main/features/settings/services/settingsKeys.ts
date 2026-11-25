@@ -28,6 +28,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.fcpLastLayout",
   "clipper.fcpLastLookId",
   "clipper.fcpLookMigrated",
+  "clipper.fcpLookUnread",
   "clipper.fcpLooks",
   "clipper.flags",
   "clipper.markerMemory",
@@ -44,17 +45,28 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.workspaces",
 ]);
 
-/** Largest value (as JSON) one write may carry. The biggest honest value is the download history. */
-export const MAX_VALUE_BYTES = 2_000_000;
+/**
+ * Largest value (as JSON) one write may carry. The bank is the biggest honest value (about 300 bytes a moment), so this
+ * holds roughly 50,000 moments: years of a clipper's day. A value over it is refused AND reported (E2-4), never dropped quietly.
+ */
+export const MAX_VALUE_BYTES = 16_000_000;
+
+export type WriteCheck = "ok" | "not-allowed" | "too-large";
+
+/** Why a page may or may not write `key` = `value`, so a refusal can say which. */
+export function checkPageWrite(key: unknown, value: unknown): WriteCheck {
+  if (typeof key !== "string" || !PAGE_KEYS.has(key)) return "not-allowed";
+  if (value === null || value === undefined) return "ok";
+  try {
+    const json = JSON.stringify(value);
+    if (typeof json !== "string") return "not-allowed";
+    return json.length <= MAX_VALUE_BYTES ? "ok" : "too-large";
+  } catch {
+    return "not-allowed";
+  }
+}
 
 /** Whether a page may write `key` = `value`. Main's own writes go straight to the store and skip this. */
 export function pageMayWrite(key: unknown, value: unknown): boolean {
-  if (typeof key !== "string" || !PAGE_KEYS.has(key)) return false;
-  if (value === null || value === undefined) return true;
-  try {
-    const json = JSON.stringify(value);
-    return typeof json === "string" && json.length <= MAX_VALUE_BYTES;
-  } catch {
-    return false;
-  }
+  return checkPageWrite(key, value) === "ok";
 }

@@ -62,3 +62,13 @@ test("E-10: a surname after a space, a JSON-style session cookie, a visitor head
   // Ordinary lines stay readable.
   assert.match(out("engine on http://127.0.0.1:5174/ ok, version 2026.11.23"), /127\.0\.0\.1:5174.*2026\.11\.23/);
 });
+
+test("E2-8: a network share path is removed, plain or as it prints inside JSON, and the rest of the line stays", () => {
+  const out = (s: string) => redact(s, { homeDir: null });
+  assert.doesNotMatch(out("cannot open \\\\fileserver\\home\\jane\\x.mp4"), /fileserver|jane/);
+  assert.doesNotMatch(out('{"path":"\\\\\\\\fileserver\\\\home\\\\jane\\\\x.mp4","ok":1}'), /fileserver|jane/);
+  assert.match(out('{"path":"\\\\\\\\fileserver\\\\home\\\\jane\\\\x.mp4","ok":1}'), /"ok":1/);
+  assert.doesNotMatch(out("saved to \\\\NAS01\\Clips\\Jane Doe\\a.mp4"), /NAS01|Jane|Doe/);
+  // A lone escaped backslash in ordinary text is not a share.
+  assert.match(out("line one\\nline two"), /line one\\nline two/);
+});

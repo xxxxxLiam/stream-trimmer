@@ -42,6 +42,8 @@ try {
     // Send report (crash screen) and Report a problem (Help): { kind, note?, error }. Kept for a later launch if the relay is unreachable.
     sendReport: (payload: unknown) => ipcRenderer.invoke(IPC.reportSend, payload),
     // ISO time of the copy this launch restored the settings from, or null.
+    // "unreadable" (the file could not be read and there was no copy), "missing" (no file, no copy) or null.
+    settingsLost: () => ipcRenderer.invoke(IPC.settingsLost),
     settingsRestoredAt: () => ipcRenderer.invoke(IPC.settingsRestoredAt),
     pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),
     // Ready-made folders for a fresh install; the renderer only asks when the
@@ -101,6 +103,12 @@ try {
     // be pointed at that browser's cookie store instead of an imported file.
     openYouTubeSignIn: () => ipcRenderer.invoke(IPC.shellOpenYouTubeSignIn),
     openSymbols: () => ipcRenderer.invoke(IPC.symbolsOpen),
+    getWindowChrome: () => ipcRenderer.invoke(IPC.windowChrome),
+    onFullScreen: (cb: (fullScreen: boolean) => void) => {
+      const listener = (_e: unknown, on: unknown) => cb(!!on);
+      ipcRenderer.on(IPC.windowFullScreen, listener);
+      return () => ipcRenderer.removeListener(IPC.windowFullScreen, listener);
+    },
     getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
     getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 

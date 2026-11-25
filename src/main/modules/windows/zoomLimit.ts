@@ -31,3 +31,8 @@ export function isZoomInChord(input: { type?: string; key: string; control?: boo
 export function zoomInBlocked(currentLevel: number, contentWidth: number): boolean {
   return currentLevel + 0.5 > zoomLevelOf(maxZoomFactor(contentWidth)) + 1e-9;
 }
+
+/** The zoom level one Zoom In step reaches, or null when that would pass the limit (every route to zoom-in uses this). */
+export function zoomInTarget(currentLevel: number, contentWidth: number): number | null {
+  return zoomInBlocked(currentLevel, contentWidth) ? null : currentLevel + 0.5;
+}

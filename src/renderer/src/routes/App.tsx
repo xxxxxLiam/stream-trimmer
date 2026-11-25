@@ -18,7 +18,6 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
-import { loadLastLayout } from "../shared/utils/lastLayout";
 import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
@@ -38,12 +37,15 @@ import { readSetting, writeSetting } from "../shared/utils/persist";
 import { bankStore, clipsFor, type BankedClip } from "../shared/utils/bank";
 import { clipNameFor } from "../features/clips/utils/cutNaming";
 import { createSerialQueue } from "../features/clips/utils/serialQueue";
+import { pickedRangeOf } from "../features/player/utils/pickedRange";
+import { clipSections } from "../features/player/utils/clipDestination";
 import { matchingMoment } from "../features/clips/utils/finishBankedCut";
 import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
-import { setMakingName } from "../shared/utils/clipNameStore";
+import { setMakingClipId, setMakingName } from "../shared/utils/clipNameStore";
+import { setCutAttempt } from "../shared/utils/cutAttempt";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
@@ -88,10 +90,9 @@ function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings
 const EDITOR_KEY = "clipper.editorHandoff";
 
 /** "After cutting" settings, kept per campaign beside the other campaign fields. */
-/** A campaign with no Final Cut settings yet starts with the layout picked last, the way a new campaign gets the last look. */
+/** A campaign with no Final Cut settings yet has the default layout (A) until it chooses: it never follows the layout another campaign picked. */
 function editorSettingsOf(raw: unknown): EditorHandoffSettings {
-  const settings = normalizeEditorSettings(raw);
-  return raw === undefined ? { ...settings, layout: loadLastLayout() ?? settings.layout } : settings;
+  return normalizeEditorSettings(raw);
 }
 
 function useEditorSettings(campaignId: string | null) {
@@ -254,6 +255,11 @@ function Layout({ active }: { active: boolean }) {
     duration,
     setStartText,
     setEndText,
+    startText,
+    endText,
+    start: rangeStart,
+    end: rangeEnd,
+    validationError,
     setUrl,
     flushAutoLoad,
     transcript,
@@ -381,14 +387,21 @@ function Layout({ active }: { active: boolean }) {
   // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
   // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
-    async (segments: Segment[]) => {
+    async (segments: Segment[], retryName?: string) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
       const startSettings = withDestination(editorRef.current);
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
-      const name = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      // A retry keeps the failed attempt's name; a new cut takes the lane's, else a suggested one.
+      const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      // Recorded before anything starts: the marks are already cleared, so Retry and Save for later read this.
+      setCutAttempt({ name, segments });
       const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
       setMakingName(name);
+      // A range that is a waiting moment is that moment: its id is what the use, the cut mark and Undo all key on.
+      const moment = cutCampaignId ? matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments) : undefined;
+      const groupId = moment?.id ?? name;
+      setMakingClipId(moment?.id ?? null);
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
       let madeAny = false;
       try {
@@ -397,15 +410,15 @@ function Layout({ active }: { active: boolean }) {
           const ok = await download({ segments: toCut, clipId: fileName, audioLanguage: plan.language });
           if (!ok) break;
           if (!madeAny && cutCampaignId) {
-            recordUse(videoId, segments, name, cutCampaignId);
-            const moment = matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments);
+            recordUse(videoId, segments, groupId, cutCampaignId);
             if (moment) bankStore.markCut(cutCampaignId, videoId, moment.id);
           }
           madeAny = true;
-          afterSaved(fileName, undefined, segments, startSettings, undefined, name);
+          afterSaved(fileName, undefined, segments, startSettings, undefined, groupId);
         }
       } finally {
         setMakingName(null);
+        setMakingClipId(null);
       }
     },
     [videoId, campaign, info?.title, downloads, duration, download, recordUse, afterSaved],
@@ -428,11 +441,20 @@ function Layout({ active }: { active: boolean }) {
       const startSettings = withDestination(editorRef.current);
       const baseId = projectName?.trim() || clip.id;
       let madeAny = false;
-      for (const plan of languagePlansRef.current) {
-        const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
-        if (!ok) break;
-        madeAny = true;
-        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName, clip.id);
+      // The Making row names the clip in hand, and it is out of Waiting only while this runs (a stop puts it back).
+      setMakingName(baseId);
+      setMakingClipId(clip.id);
+      try {
+        for (const plan of languagePlansRef.current) {
+          const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
+          if (!ok) break;
+          madeAny = true;
+          // The Final Cut clip carries the clip's name, the file's, not the bank id.
+          afterSaved(nameForLanguage(baseId, plan), undefined, clip.segments, startSettings, projectName, clip.id);
+        }
+      } finally {
+        setMakingName(null);
+        setMakingClipId(null);
       }
       return madeAny;
     },
@@ -458,6 +480,9 @@ function Layout({ active }: { active: boolean }) {
       } else if (k === "," && !e.shiftKey) {
         e.preventDefault();
         setSettingsOpen((v) => !v);
+      } else if (k === "b" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        addMomentRef.current();
       } else if (k === "r" && !e.shiftKey) {
         e.preventDefault();
         revealRef.current();
@@ -484,16 +509,36 @@ function Layout({ active }: { active: boolean }) {
     openPanelById(id);
     window.setTimeout(() => document.getElementById(tabDomId(id))?.focus(), 0);
   };
+  // Add a moment / Ctrl B: bank what is marked now (a just-marked In and Out, else the committed
+  // sections), waiting, under the lane's name or a suggested one. The marks stay, so Clip still works.
+  const addMoment = () => {
+    if (!campaign?.id || !videoId) return;
+    const range = pickedRangeOf({ startText, endText, start: rangeStart, end: rangeEnd, validationError });
+    const sections = clipSections(tabSegments, range);
+    if (sections.length === 0) return;
+    const taken = [
+      ...downloads.map((d) => d.label.replace(/\.[^.]+$/, "")),
+      ...clipsFor(bankStore.get(), campaign.id, videoId).map((c) => c.label),
+    ];
+    const label = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+    bankStore.importClips(campaign.id, videoId, [{ line: 1, id: null, label, segments: sections }]);
+  };
+  const addMomentRef = useRef(addMoment);
+  addMomentRef.current = addMoment;
+  const openSignIn = () => {
+    setHelpStartAt("signin");
+    setSettingsOpen(false);
+    setHelpOpen(true);
+  };
   const panelHost: PanelHost = {
     playhead,
     cutSegments: cutMarked,
+    cutAgain: (segs, name) => void cutQueue.current.enqueue(() => cutClip(segs, name)),
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
-    addMoment: () => {
-      if (!campaign?.id || !videoId || tabSegments.length === 0) return;
-      bankStore.importClips(campaign.id, videoId, [{ line: 1, id: null, label: "", segments: tabSegments.map((x) => ({ start: x.start, end: x.end })) }]);
-    },
+    openSignIn,
+    addMoment,
     openChannel: (url) => {
       if (url) channel.setChannelUrl(url);
       setChannelOpen(true);
@@ -506,6 +551,7 @@ function Layout({ active }: { active: boolean }) {
       sourceTitle: info?.title,
       clipsDir: folders.clipsDir || saveDir || undefined,
       clips: sessionClips,
+      settingsFor: editorSettingsFor,
     },
     // Not wired yet: the videos list (Left panels) provides the next video, and the campaign form
     // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".
@@ -538,7 +584,7 @@ function Layout({ active }: { active: boolean }) {
         setChannelOpen(true);
       },
     },
-    { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
+    { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined, openVideoId: videoId ?? null },
   );
   const openCampaignSettings = (campaignId: string) => {
     setSettingsStartAt(campaignId);
@@ -547,11 +593,6 @@ function Layout({ active }: { active: boolean }) {
   };
 
   // The footer pill and the "Downloaded at 360p" toast both open Help on its sign-in page.
-  const openSignIn = () => {
-    setHelpStartAt("signin");
-    setSettingsOpen(false);
-    setHelpOpen(true);
-  };
 
   return (
     <>

@@ -4,6 +4,9 @@
  * Description: The History panel: every clip already made, grouped by day, with the pill search.
  *   Rows show a thumbnail slot, name, "length · campaign · time" and three icon buttons.
  */
+import HandoffRow from "../../clips/components/HandoffRow";
+import { useHandoffNotice } from "../../clips/hooks/useHandoffNotice";
+import { getClipDestination } from "../../player/hooks/useClipDestination";
 import PillSearch from "../../../shared/components/PillSearch";
 import RowIconButton from "../../../shared/components/RowIconButton";
 import { IconInEditor, IconJumpToSource, IconShowFile } from "../../../shared/components/rowIcons";
@@ -14,10 +17,20 @@ import { rowMeta } from "../utils/historyRows";
 
 export default function HistoryPanel() {
   const h = useHistoryController();
+  // In editor on a row answers here too, not only on the Export tab (a failure is never silent).
+  const handoff = useHandoffNotice(null, true);
 
   return (
     <div id="clips-panel" className="flex min-h-0 flex-1 flex-col">
       <PillSearch placeholder="Search clips, campaigns, videos" pills={h.pills} onPillsChange={h.setPills} count={h.count} />
+      {handoff.handoffNotice && (
+        <HandoffRow
+          notice={handoff.handoffNotice}
+          tried={getClipDestination()}
+          onShowInFolder={handoff.showInFolder}
+          onSendTo={handoff.sendTo}
+        />
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {h.total === 0 ? (
           <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">

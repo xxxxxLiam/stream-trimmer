@@ -50,8 +50,8 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
     if (dir) void window.electronAPI?.showInFolder(dir);
   }, [dir]);
 
-  // Another video that is already open: the way back when this link will not open.
-  const other = [...ws.tabs].reverse().find((t) => t.id !== ws.activeId && !!t.url && !t.done);
+  // The video you were on: the way back when this link will not open. Never "the last one in the list".
+  const backId = ws.backTargetFor(ws.activeId);
 
   const platform = typeof navigator === "undefined" ? "" : navigator.platform;
   return {
@@ -80,7 +80,7 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
     // A stale engine error never shows for text that is not a video; the not-a-video sentence shows only for pasted or submitted text.
     problem: !url || loadingInfo ? "" : extractVideoId(url) ? (error ? plainOpenError(error) : "") : submitted === url.trim() ? NOT_A_VIDEO : "",
     onRetryOpen: searchNow,
-    backTo: other ? { label: ws.labelFor(other.id), onBack: () => ws.selectTab(other.id) } : null,
+    backTo: backId ? { label: ws.labelFor(backId), onBack: () => ws.goBack(ws.activeId) } : null,
     folderLabel: folderChipLabel(dir),
     onOpenFolder,
   };

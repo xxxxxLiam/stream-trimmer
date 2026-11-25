@@ -17,3 +17,19 @@ test("the shell shows the line on launch", () => {
   const app = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
   assert.match(app, /<SettingsRestoredNote \/>/);
 });
+
+import { lostNote, savedRefusedNote } from "./restoredNote";
+
+test("E2-3 / E2-4: lost settings and a refused save each get one plain line", () => {
+  assert.match(lostNote("unreadable"), /couldn't read your saved settings.*kept/);
+  assert.match(lostNote("missing"), /couldn't find your saved settings/);
+  assert.equal(lostNote(null), "");
+  assert.match(savedRefusedNote("clipper.bank", "too-large"), /couldn't save your bank.*too much/);
+  assert.match(savedRefusedNote("clipper.flags", "write-failed"), /couldn't save your latest changes.*space/);
+});
+
+test("E2-3 / E2-4: the note component listens for both", () => {
+  const src = readFileSync(new URL("../components/SettingsRestoredNote.tsx", import.meta.url), "utf8");
+  assert.match(src, /settingsLost/);
+  assert.match(src, /onSaveRefused/);
+});

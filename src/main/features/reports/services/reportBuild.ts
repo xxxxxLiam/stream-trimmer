@@ -34,7 +34,35 @@ export function validInput(raw: unknown): ReportInput | null {
   return { kind: r.kind, note: r.note as string | undefined, error: r.error };
 }
 
+/** The relay refuses a body over 32 KB; the app stays under this, so it never fails on size (E2-6). */
+export const FIT_BYTES = 30_000;
+const bytesOf = (r: RelayReport) => Buffer.byteLength(JSON.stringify(r), "utf8");
+
+/**
+ * Makes the report fit the relay: drops the oldest log lines first (the newest say most), then cuts the
+ * error and note from the end. Always returns something that fits; never throws.
+ */
+export function fitToRelay(report: RelayReport, limit: number = FIT_BYTES): RelayReport {
+  let r = report;
+  if (bytesOf(r) <= limit) return r;
+  let log = r.log;
+  while (log.length > 0 && bytesOf({ ...r, log }) > limit) log = log.slice(Math.max(1, Math.ceil(log.length / 10)));
+  r = { ...r, log };
+  for (let guard = 0; guard < 40 && bytesOf(r) > limit; guard++) {
+    r = {
+      ...r,
+      error: r.error.slice(0, Math.max(200, Math.floor(r.error.length * 0.7))),
+      ...(r.note ? { note: r.note.slice(0, Math.max(200, Math.floor(r.note.length * 0.7))) } : {}),
+    };
+  }
+  return r;
+}
+
 export function buildReport(input: ReportInput, ctx: ReportContext): RelayReport {
+  return fitToRelay(buildFullReport(input, ctx));
+}
+
+function buildFullReport(input: ReportInput, ctx: ReportContext): RelayReport {
   const log = ctx.logTail
     .split(/\r?\n/)
     .filter((l) => l.trim())

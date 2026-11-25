@@ -8,29 +8,41 @@
 import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
 
-export type ClipFailureKind = "stopped" | "disk" | "private" | "offline";
-export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater";
+export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "removed" | "refused";
+export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater" | "signIn";
 
 /** What a plain "the network is down" failure looks like in the engine's message (no YouTube error involved). */
 const OFFLINE = /no internet|offline|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENETUNREACH|getaddrinfo|network is unreachable|name resolution|unable to connect|timed out|connection (?:reset|refused|timed out)/i;
 
+/** The engine refuses a joined clip over the cap with this sentence (segments.ts). */
+const TOO_LONG = /capped at \d+ seconds|up to 10 minutes/i;
+
+/** The engine's words for a 403 or a failed fetch of the media itself (it has no code of its own). */
+const REFUSED = /refused the media request|HTTP Error 403|403 Forbidden/i;
+
 export function classifyClipFailure(code: string | undefined, message?: string): ClipFailureKind {
+  if (message && TOO_LONG.test(message)) return "toolong";
   if (code === "disk_full" || code === "save_folder_gone") return "disk";
   if (code === "private_video") return "private";
+  if (code === "sign_in_needed") return "signin";
+  if (code === "video_unavailable") return "removed";
+  if (code === "network_dropped") return "offline";
+  if (message && REFUSED.test(message)) return "refused";
   // Only a failure with no code of its own and a network cause in its words is "offline".
   if (!code && message && OFFLINE.test(message)) return "offline";
   return "stopped";
 }
 
 /** The engine's row state wins over the code: it knows whether the one retry was spent. */
-export function rowFailure(row: ClipRowState): { kind: ClipFailureKind; attempts: number; reason?: string } {
+export function rowFailure(row: ClipRowState): { kind: ClipFailureKind; attempts: number; reason?: string; retrying?: boolean } {
   if (row.state === "no-space") return { kind: "disk", attempts: 1 };
   if (row.state === "cannot-download") {
     return row.kind === "other"
       ? { kind: "private", attempts: 1, reason: row.reason }
       : { kind: "private", attempts: 1 };
   }
-  return { kind: "stopped", attempts: row.state === "failed-final" ? 2 : 1 };
+  // Only a row that says the engine IS retrying may promise it; a plain failure promises nothing.
+  return { kind: "stopped", attempts: row.state === "failed-final" ? 2 : 1, ...(row.state === "failed" && row.retrying ? { retrying: true } : {}) };
 }
 
 /** While the engine updates its tools and tries once more, the Making row says so. */
@@ -40,27 +52,32 @@ export function failureCopy(
   kind: ClipFailureKind,
   attempts: number,
   reasonOverride?: string,
+  retrying = false,
 ): { reason: string; detail: string } {
   if (kind === "disk") {
     return { reason: reasonOverride ?? "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
   }
+  if (kind === "toolong") return { reason: "Clips can be up to 10 minutes.", detail: "Shorten it and clip again." };
   if (kind === "offline") {
     return { reason: "No internet connection.", detail: attempts < 2 ? "Check your connection, then Retry." : "" };
   }
   if (kind === "private") {
     return { reason: reasonOverride ?? "This video is private, so it can’t be downloaded.", detail: "Your range is kept." };
   }
-  return {
-    reason: "YouTube stopped the download.",
-    detail: attempts < 2 ? RETRY_SENTENCE : "",
-  };
+  if (kind === "signin") return { reason: "YouTube wants you signed in for this video.", detail: "Sign in, then Retry. Your range is kept." };
+  if (kind === "removed") return { reason: "This video was removed or isn’t available.", detail: "Your range is kept." };
+  if (kind === "refused") return { reason: "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
+  // "Will try once more" is said only when the engine really is about to (retrying:true).
+  return { reason: "YouTube stopped the download.", detail: retrying ? RETRY_SENTENCE : "" };
 }
 
 /** Retry; after the retry also failed, Copy details joins it. */
 export function failureActions(kind: ClipFailureKind, attempts: number): FailureAction[] {
   if (kind === "disk") return ["changeFolder"];
-  if (kind === "private") return ["showInBrowser", "saveForLater"];
-  // Offline gets Retry too (no engine retry is promised), with Copy details once it failed again.
+  if (kind === "private" || kind === "removed") return ["showInBrowser", "saveForLater"];
+  if (kind === "toolong") return [];
+  if (kind === "signin") return attempts >= 2 ? ["signIn", "retry", "copyDetails"] : ["signIn", "retry"];
+  // The rest get Retry (no engine retry is promised), with Copy details once the Retry also failed.
   return attempts >= 2 ? ["retry", "copyDetails"] : ["retry"];
 }
 

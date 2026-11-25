@@ -14,7 +14,7 @@ import { useToolState } from "../../../modules/layout/hooks/useToolState";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
-import { grabbedEdge, scissorsClick, zoomStep } from "../utils/laneTools";
+import { clampX, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
 import { axisDuringDrag, axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
@@ -95,10 +95,10 @@ export function useTimelineController() {
     view,
   });
 
-  const timeAt = (e: PointerEvent<HTMLElement>): number | null => {
-    const box = e.currentTarget.getBoundingClientRect();
-    return toT(axis, e.clientX - box.left);
-  };
+  // The handlers sit on the whole timeline area (so a tool works in any part of it, including the
+  // space under the tracks); the lanes start after the label column, so x is measured from the right.
+  const laneLeft = (e: PointerEvent<HTMLElement>) => e.currentTarget.getBoundingClientRect().right - s.width;
+  const timeAt = (e: PointerEvent<HTMLElement>): number | null => toT(axis, e.clientX - laneLeft(e));
   const snap = (t: number, edge: "start" | "end") => Math.round(snapToWord(lines, t, edge));
 
   const setRange = (a: number, b: number) => {
@@ -112,9 +112,12 @@ export function useTimelineController() {
 
   /** Pointer down on the Source lane. What it does depends on the tool. */
   const onLanePointerDown = (e: PointerEvent<HTMLElement>) => {
+    // Buttons and fields inside the area (a clip label, the fold, the name box) keep their own clicks.
+    if ((e.target as HTMLElement).closest("button, input, textarea, [contenteditable='true']")) return;
+    const x = e.clientX - laneLeft(e);
+    if (x < 0 || x > s.width) return; // the label column is not the timeline
     const t = timeAt(e);
     if (t === null || !(duration > 0)) return;
-    const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     if (tools.tool === "flag") return flagsApi.addFlag(t);
     if (tools.tool === "zoom") {
@@ -136,24 +139,43 @@ export function useTimelineController() {
       }
       return;
     }
-    if (range) {
-      const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
-      if (edge) {
-        frozen.current = shown;
-        return s.setDrag({ kind: "edge", edge });
+    if (tools.tool === "range") {
+      // Select range: press and drag sets a range; a grabbed edge of the picked range resizes it.
+      if (range) {
+        const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
+        if (edge) {
+          frozen.current = shown;
+          return s.setDrag({ kind: "edge", edge });
+        }
       }
+      frozen.current = shown;
+      s.setDrag({ kind: "range", anchor: t });
+      s.setDragOrigin(e.clientX);
+      return;
     }
-    frozen.current = shown;
-    s.setDrag({ kind: "range", anchor: t });
-    s.setDragOrigin(e.clientX);
+    // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
+    s.setDrag({ kind: "scrub" });
+    clipper.requestSeek(Math.round(t));
   };
 
+  const lastScrub = useRef<number | null>(null);
   const onLanePointerMove = (e: PointerEvent<HTMLElement>) => {
     const d = s.drag;
     if (!d || e.buttons !== 1) return;
     if (d.kind === "pan") {
       const per = (win.end - win.start) / Math.max(1, s.width);
       s.setFocus(Math.min(duration, Math.max(0, d.startFocus - (e.clientX - d.startX) * per)));
+      return;
+    }
+    if (d.kind === "scrub") {
+      const at = toT(axis, clampX(e.clientX - laneLeft(e), s.width));
+      if (at !== null) {
+        const sec = Math.round(Math.min(Math.max(0, at), duration));
+        if (sec !== lastScrub.current) {
+          lastScrub.current = sec;
+          clipper.requestSeek(sec);
+        }
+      }
       return;
     }
     const t = timeAt(e);
@@ -166,14 +188,27 @@ export function useTimelineController() {
     }
   };
 
-  const onLanePointerUp = (e: PointerEvent<HTMLElement>) => {
+  const onLanePointerUp = () => {
     const d = s.drag;
     s.setDrag(null);
-    // A plain click on the lane moves the playhead; a drag already set the range.
-    if (d?.kind === "range" && Math.abs(e.clientX - s.dragOrigin) < DRAG_START_PX) {
-      const t = timeAt(e);
-      if (t !== null) clipper.requestSeek(Math.round(t));
+    lastScrub.current = null;
+    // A range drag that never moved sets nothing; one that moved already made the range.
+    if (d?.kind === "range") s.setScissorsStart(null);
+  };
+
+  /** Wheel and trackpad over the lane: pan sideways, Ctrl/Cmd zooms around the pointer. Returns true when used. */
+  const onLaneWheel = (e: WheelEvent, left: number): boolean => {
+    const act = wheelAction(e);
+    if (!act || !(duration > 0)) return false;
+    if (act.kind === "pan") {
+      const per = (win.end - win.start) / Math.max(1, s.width);
+      s.setFocus(Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + act.pixels * per)));
+    } else {
+      const at = toT(axis, e.clientX - left);
+      if (at !== null) s.setFocus(at);
+      tools.zoomBy(act.amount);
     }
+    return true;
   };
 
   const addSection = () => {
@@ -222,6 +257,7 @@ export function useTimelineController() {
     onLanePointerDown,
     onLanePointerMove,
     onLanePointerUp,
+    onLaneWheel,
     addSection,
     removeSection: (i: number) => store.remove(i),
     seek: (t: number) => clipper.requestSeek(t),

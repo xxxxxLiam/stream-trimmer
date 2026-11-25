@@ -6,6 +6,7 @@
  *   validated by the IPC handlers before they reach these functions.
  */
 import { describeSaveError } from "./saveError";
+import { savedResult } from "./savedFile";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -13,6 +14,7 @@ import path from "node:path";
 import electron from "electron";
 import {
   dragTarget,
+  existsWithin,
   moveWithoutOverwrite,
   resolveTarget,
   writeWithoutOverwrite,
@@ -57,7 +59,7 @@ export async function saveClip(payload: any) {
     await fsp.mkdir(path.dirname(dest.target as string), { recursive: true }); const target = await moveWithoutOverwrite(source, dest.target as string);
     await fsp.rm(path.dirname(source), { recursive: true, force: true });
     logger.log("clip", `saved ${path.basename(target)}`);
-    return { ok: true, path: target };
+    return savedResult(target);
   } catch (err: unknown) {
     logger.log("clip", `save failed: ${logger.describe(err)}`);
     return { ok: false, ...describeSaveError(err) };
@@ -76,10 +78,11 @@ export async function saveFile(payload: any) {
       logger.log("file", "refused save outside the chosen folders");
       return { ok: false, error: dest.error };
     }
+    if (payload?.data == null) throw Object.assign(new Error("no data"), { code: "NOTHING_TO_SAVE" });
     const buf = Buffer.from(payload.data);
     // "wx": never replace a file that is already there; " 2", " 3" instead.
     const target = await writeWithoutOverwrite(dest.target, buf);
-    return { ok: true, path: target };
+    return savedResult(target);
   } catch (err: any) {
     logger.log("file", `save failed: ${logger.describe(err)}`);
     return { ok: false, ...describeSaveError(err) };
@@ -124,16 +127,10 @@ export async function saveFiles(payload: any) {
 
 /**
  * Cheap existence probe so the Downloads list can dim rows whose file was
- * moved or deleted outside the app.
+ * moved or deleted outside the app. Only answers for paths inside the folders the person chose.
  */
 export function fileExists(targetPath: string): boolean {
-  try {
-    return typeof targetPath === "string" && targetPath
-      ? fs.existsSync(targetPath)
-      : false;
-  } catch {
-    return false;
-  }
+  return existsWithin(targetPath, saveRoots());
 }
 
 /**

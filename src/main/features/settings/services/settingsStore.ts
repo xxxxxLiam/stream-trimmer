@@ -13,7 +13,18 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { siblingDir as siblingDataDir } from "../../../../common/utils/siblingDir";
 import { allowedRoots } from "../../../shared/utils/pathSafety";
-import { APPROVED_ROOTS_KEY } from "./settingsKeys";
+import { APPROVED_ROOTS_KEY, PAGE_KEYS } from "./settingsKeys";
+
+/**
+ * Written by every save Clipr makes. A file with it is Clipr's own, so an empty one is the person's real state
+ * (they removed everything); a file without it (`{}`, a cleaner's leftovers, a foreign file) is not.
+ */
+const WRITTEN_KEY = "clipper.settingsWritten";
+
+/** True when `data` holds anything the person set: at least one key the page writes, with a value. */
+function hasUserData(data: any): boolean {
+  return !!data && typeof data === "object" && Object.keys(data).some((k) => PAGE_KEYS.has(k) && data[k] !== null && data[k] !== undefined);
+}
 
 
 /**
@@ -84,6 +95,8 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
   const removed = new Set<string>();
   // When this run restored the settings from the last good copy (ms of that copy), for the one line the app shows.
   let restoredAt: number | null = null;
+  // When this run found no saved settings although the person clearly had some, and could not restore them.
+  let lost: "unreadable" | "missing" | null = null;
 
   /**
    * Keeps a copy of a file we cannot read BEFORE anything replaces it, next to
@@ -116,19 +129,32 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     try {
       bytes = fs.readFileSync(filePath);
     } catch (err: any) {
-      if (err && err.code === "ENOENT") return { ok: true, data: {}, fromFile: false };
+      if (err && err.code === "ENOENT") {
+        // Deleted (antivirus, a cleaner, a mistake): the last good copy is what the person had.
+        const good = readBackup();
+        if (good) return { ok: true, data: good.data, fromFile: false, restoredAt: good.at };
+        return { ok: true, data: {}, fromFile: false };
+      }
       // Present but unreadable (permissions, a directory...): do not claim it
       // is empty, and do not write over it.
       return { ok: false, data: {}, fromFile: false };
     }
     const parsed = parseSettingsText(bytes.toString("utf8"));
-    if (parsed.status === "ok") return { ok: true, data: parsed.data, fromFile: true };
-    // Unreadable or emptied: the last good copy, if there is one, is what the person had.
+    if (parsed.status === "ok" && (hasUserData(parsed.data) || (parsed.data as any)[WRITTEN_KEY])) return { ok: true, data: parsed.data, fromFile: true };
+    // Unreadable, emptied, `{}` or only keys this app does not know: the last good copy is what the person had.
     const good = readBackup();
+    if (parsed.status === "ok") {
+      if (good) {
+        // Keep what was there (it may hold keys of a newer version), then use the good copy.
+        if (Object.keys(parsed.data).length > 0) preserve(bytes);
+        return { ok: true, data: good.data, fromFile: false, restoredAt: good.at };
+      }
+      return { ok: true, data: parsed.data, fromFile: true };
+    }
     if (parsed.status === "invalid") {
       const kept = preserve(bytes);
       if (good) return { ok: true, data: good.data, fromFile: false, restoredAt: good.at };
-      return { ok: kept, data: {}, fromFile: false };
+      return { ok: kept, data: {}, fromFile: false, unreadable: true };
     }
     if (good) return { ok: true, data: good.data, fromFile: false, restoredAt: good.at };
     return { ok: true, data: parsed.data, fromFile: true };
@@ -139,10 +165,21 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     try {
       const bak = `${filePath}.bak`;
       const parsed = parseSettingsText(fs.readFileSync(bak, "utf8"));
-      if (parsed.status !== "ok" || Object.keys(parsed.data).length === 0) return null;
+      if (parsed.status !== "ok" || !hasUserData(parsed.data)) return null;
       return { data: parsed.data, at: fs.statSync(bak).mtimeMs };
     } catch {
       return null;
+    }
+  }
+
+  /** A kept copy from an earlier launch, or a backup that holds nothing usable: proof the person had settings once. */
+  function leftovers(): boolean {
+    try {
+      const dir = path.dirname(filePath);
+      const base = path.basename(filePath);
+      return fs.readdirSync(dir).some((n) => n === `${base}.bak` || n.startsWith(`${base}.corrupt-`));
+    } catch {
+      return false;
     }
   }
 
@@ -159,10 +196,19 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     if (checked.restoredAt) {
       if (log) log("settings.json was unreadable; restored from the last good copy");
     }
+    lost = null;
+    if (!restoredAt && !hasUserData(raw) && !(raw as any)[WRITTEN_KEY]) {
+      const evidence = checked.unreadable ? "unreadable" : leftovers() ? "missing" : null;
+      // Said once: the save below marks the file as Clipr's own, so the next launch does not repeat it.
+      if (evidence) {
+        lost = evidence;
+        if (log && evidence === "missing") log("settings: no settings found, although there is a kept copy from before");
+      }
+    }
     removed.clear();
     loaded = true;
     // Write the migration back once, so the renderer and the file agree.
-    if (checked.restoredAt || JSON.stringify(raw) !== JSON.stringify(cache)) persist();
+    if (checked.restoredAt || lost || JSON.stringify(raw) !== JSON.stringify(cache)) persist();
     return cache;
   }
 
@@ -174,12 +220,12 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
       const onDisk = readFileChecked();
       // Never replace a file we could not read and could not keep a copy of.
       if (!onDisk.ok) return false;
-      const merged = { ...onDisk.data, ...cache };
+      const merged = { ...onDisk.data, ...cache, [WRITTEN_KEY]: 1 };
       for (const key of removed) delete merged[key];
       cache = merged;
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
       // Keep the file as it was as the last good copy before it is replaced.
-      if (onDisk.fromFile && Object.keys(onDisk.data).length > 0) {
+      if (onDisk.fromFile && hasUserData(onDisk.data)) {
         try {
           fs.copyFileSync(filePath, `${filePath}.bak`);
         } catch (err: unknown) {
@@ -240,7 +286,7 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     return saved;
   }
 
-  return { load, all, set, persist, onChange, restoredAt: () => restoredAt, path: filePath };
+  return { load, all, set, persist, onChange, restoredAt: () => restoredAt, lost: () => lost, path: filePath };
 }
 
 export {

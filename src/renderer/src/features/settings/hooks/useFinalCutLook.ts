@@ -6,8 +6,9 @@
  *   none), and deletes a look no campaign uses. A refused file or delete becomes one plain sentence.
  */
 import { useCallback, useRef, useState } from "react";
+import { readSetting } from "../../../shared/utils/persist";
 import type { Campaign } from "../../../shared/utils/campaigns";
-import { addPickedLook, deleteSavedLook, loadSavedLooks, rememberLastLook, saveSavedLooks, type SavedLook } from "../../../shared/utils/fcpLooks";
+import { KEY_LOOK_UNREAD, addPickedLook, deleteSavedLook, loadSavedLooks, rememberLastLook, saveSavedLooks, type SavedLook } from "../../../shared/utils/fcpLooks";
 import type { FcpLookFileResult } from "../../../../../common/types/fcpLook";
 import type { FinalCutLookProps } from "../components/FinalCutLook";
 
@@ -41,12 +42,16 @@ export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns
   if (!campaign) return undefined;
   const api = window.electronAPI;
   const current = looks.find((l) => l.id === campaign.fcpLookId);
+  // D2-4: an old pasted look that was switched on but could not be read is said once here, until a look is chosen.
+  const unread = readSetting<Record<string, boolean>>(KEY_LOOK_UNREAD, {});
+  const unreadNote = !campaign.fcpLookId && (unread[campaign.id] || unread["*"]) ? "Your old pasted look could not be read, so no look is applied. Choose your Final Cut export again." : "";
 
   return {
     saved: looks.map((l) => ({ id: l.id, name: l.name })),
     currentId: current?.id ?? null,
     found: current ? current.look.found.join(", ") : "",
     problem,
+    unreadNote,
     open,
     guide,
     inputRef,

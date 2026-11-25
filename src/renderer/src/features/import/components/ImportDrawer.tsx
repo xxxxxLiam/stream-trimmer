@@ -66,6 +66,7 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
   const [draft, setDraft] = useState(text);
   useEffect(() => setDraft(text), [text]);
   const c = useImportController(draft, onClose);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const videos = c.groups.length;
   const meta = [
     c.campaignName,
@@ -124,9 +125,36 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
               {c.flagged.map((m) => (
                 <li key={m.key} className="flex min-h-target items-center gap-[12px] border-b border-hairline">
                   <span className="min-w-[0px] flex-1">
-                    <span className="block truncate text-body">{m.name || `Line ${m.key}`}</span>
+                    {renaming === m.key ? (
+                      <input
+                        autoFocus
+                        aria-label={`New name for line ${m.key}`}
+                        defaultValue={m.name}
+                        className="h-[28px] w-full rounded-control border border-hairlineStrong bg-bg px-[8px] text-body text-fg"
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.stopPropagation();
+                            setRenaming(null);
+                          } else if (e.key === "Enter") {
+                            c.rename(m.key, e.currentTarget.value);
+                            setRenaming(null);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          c.rename(m.key, e.currentTarget.value);
+                          setRenaming(null);
+                        }}
+                      />
+                    ) : (
+                      <span className="block truncate text-body">{m.name || `Line ${m.key}`}</span>
+                    )}
                     <span className="block text-meta text-error">{m.problem?.reason}</span>
                   </span>
+                  {m.problem?.name && (
+                    <button type="button" className="text-meta text-ice hover:underline" onClick={() => setRenaming(m.key)}>
+                      Rename
+                    </button>
+                  )}
                   {m.problem?.fix === "swap" ? (
                     <button type="button" className="text-meta text-ice hover:underline" onClick={() => c.swap(m.key)}>
                       Swap times
@@ -159,21 +187,35 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
+/** Back to the + button the drawer was opened from, so the keyboard is not left on the page body. */
+function focusAddButton() {
+  window.setTimeout(() => {
+    const add = document.querySelector<HTMLElement>('button[aria-label="Add to Export"]') ?? document.querySelector<HTMLElement>('button[aria-label^="Add a panel"]');
+    add?.focus();
+  }, 0);
+}
+
 export default function ImportDrawer({ text, onClose }: ImportDrawerProps) {
   const open = text !== null;
+  const close = () => {
+    onClose();
+    focusAddButton();
+  };
+  const closeRef = useRef(close);
+  closeRef.current = close;
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
   if (text === null) return null;
   return (
     <div id="ui-import-drawer" className="absolute inset-0 z-40">
-      <div data-testid="import-backdrop" className="absolute inset-0 bg-bg-overlay-60" onClick={onClose} />
+      <div data-testid="import-backdrop" className="absolute inset-0 bg-bg-overlay-60" onClick={close} />
       <div className="absolute inset-y-0 right-0 max-w-full overflow-y-auto">
         <Drawer label="Import moments" padClass="px-[20px] pb-[20px] pt-[10px]">
-          <Body text={text} onClose={onClose} />
+          <Body text={text} onClose={close} />
         </Drawer>
       </div>
     </div>

@@ -12,7 +12,7 @@ test("C-1: the Clip button names the file from the lane's name, never from the c
 test("C-3: marked sections are padded by the campaign's extra seconds, and the recorded ranges are the marked ones", () => {
   assert.match(app, /padSections\(segments, extraSecondsFor\(cutCampaignId\)/);
   assert.match(app, /download\(\{ segments: toCut,/);
-  assert.match(app, /recordUse\(videoId, segments, name, cutCampaignId\)/);
+  assert.match(app, /recordUse\(videoId, segments, groupId, cutCampaignId\)/);
 });
 
 test("C-14: a Clip range that is a waiting moment marks it cut", () => {
@@ -22,5 +22,47 @@ test("C-14: a Clip range that is a waiting moment marks it cut", () => {
 
 test("C-5: a clip's language copies share its id in History", () => {
   assert.match(app, /clipId: groupId \?\? clipId/);
-  assert.match(app, /afterSaved\(fileName, undefined, segments, startSettings, undefined, name\)/);
+  assert.match(app, /afterSaved\(fileName, undefined, segments, startSettings, undefined, groupId\)/);
+});
+
+test("D2-7: Make this clip names the Final Cut clip after the file, not \"B01 - name\", so two videos' B01 moments never share a document", () => {
+  assert.match(app, /afterSaved\(nameForLanguage\(baseId, plan\), undefined, clip\.segments, startSettings, projectName, clip\.id\)/);
+  assert.doesNotMatch(app, /afterSaved\(nameForLanguage\(clip\.id, plan\), clip\.label/);
+});
+
+test("C2-2 / C2-3: every Clip-button cut records its range before it starts, and Retry re-cuts that range without clearing the marks", () => {
+  assert.match(app, /setCutAttempt\(\{ name, segments \}\);\s*\n\s*setMakingName\(name\)|setCutAttempt\(\{ name, segments \}\)/);
+  assert.match(app, /cutAgain: \(segs, name\) => void cutQueue\.current\.enqueue\(\(\) => cutClip\(segs, name\)\)/);
+  const mut = readFileSync("src/renderer/src/features/clips/hooks/useExportMutations.ts", "utf8");
+  assert.match(mut, /cutAgain\(f\.segments, f\.name\)/);
+  assert.doesNotMatch(mut, /cutSegments\(f\.segments\)/);
+  const eff = readFileSync("src/renderer/src/features/clips/hooks/useExportEffects.ts", "utf8");
+  assert.match(eff, /getCutAttempt\(\) \?\? s\.attempt\.current/);
+});
+
+test("C2-4: a Clip-button clip that is a waiting moment is recorded, grouped and so undone under the moment's id", () => {
+  assert.match(app, /const groupId = moment\?\.id \?\? name/);
+  assert.match(app, /recordUse\(videoId, segments, groupId, cutCampaignId\)/);
+  assert.match(app, /afterSaved\(fileName, undefined, segments, startSettings, undefined, groupId\)/);
+});
+
+test("C2-1 / F2-2 / C2-10: Add a moment and Ctrl B bank the just-marked range (else the sections) under a suggested name", () => {
+  assert.match(app, /clipSections\(tabSegments, range\)/);
+  assert.match(app, /pickedRangeOf\(\{ startText, endText/);
+  assert.match(app, /label,\s*segments: sections/);
+  assert.match(app, /k === "b" && !e\.shiftKey/);
+  assert.match(app, /^    addMoment,$/m);
+});
+
+test("C2-8: both cut paths set the making name and the making moment as they start and clear them when they end", () => {
+  assert.equal((app.match(/setMakingClipId\(null\)/g) ?? []).length, 2);
+  assert.match(app, /setMakingClipId\(clip\.id\)/);
+});
+
+test("C2-6: Change folder changes the folder the cut used (the campaign's) and then re-runs the cut", () => {
+  const mut = readFileSync("src/renderer/src/features/clips/hooks/useExportMutations.ts", "utf8");
+  assert.match(mut, /if \(campaignId\) await pickClipsDir\(campaignId\)/);
+  assert.match(mut, /latest\.current\.where !== before\) latest\.current\.retry\(\)/);
+  const eff = readFileSync("src/renderer/src/features/clips/hooks/useExportEffects.ts", "utf8");
+  assert.match(eff, /kind: classified !== "stopped" \? classified : \(fromRow\?\.kind \?\? classified\)/);
 });

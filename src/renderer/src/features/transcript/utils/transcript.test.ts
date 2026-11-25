@@ -14,6 +14,7 @@ import {
   lineIndexAt,
   normalizeTranscript,
   searchTranscript,
+  isClickDrag,
   snapRange,
   snapRangeByIndex,
   stepMatch,
@@ -389,4 +390,18 @@ describe("dragging snaps to words (B-10)", () => {
     assert.equal(across?.start, 10.9);
     assert.ok(across && across.end < 30 && across.end > 20, "ends mid-line, not at the end of the whole line");
   });
+});
+
+it("B2-7: search ignores accents both ways", () => {
+  const lines = [{ start: 0, end: 2, text: "Meet me at the café" }, { start: 2, end: 4, text: "naive plans" }, { start: 4, end: 6, text: "a naïve idea" }];
+  assert.deepEqual(searchTranscript(lines, "cafe").map((m) => m.line), [0]);
+  assert.deepEqual(searchTranscript(lines, "café").map((m) => m.line), [0]);
+  assert.deepEqual(searchTranscript(lines, "NAIVE").map((m) => m.line), [1, 2]);
+});
+
+it("B2-6: a drag inside one caption line is a drag, a still press is a click", () => {
+  assert.equal(isClickDrag({ line: 3, frac: 0.4 }, { line: 3, frac: 0.4 }), true);
+  assert.equal(isClickDrag({ line: 3, frac: 0.4 }, { line: 3, frac: 0.41 }), true);
+  assert.equal(isClickDrag({ line: 3, frac: 0.2 }, { line: 3, frac: 0.7 }), false);
+  assert.equal(isClickDrag({ line: 3, frac: 0.4 }, { line: 4, frac: 0.4 }), false);
 });

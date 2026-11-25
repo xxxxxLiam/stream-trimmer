@@ -24,12 +24,19 @@ export type UpdateStatusPayload =
   | { state: "error"; message: string; url?: string };
 
 /** Why a save failed: the disk is full, the folder can't be written, the folder is gone, or something else. */
-export type SaveFailureCode = "DISK_FULL" | "FOLDER_NOT_WRITABLE" | "FOLDER_GONE" | "SAVE_FAILED";
+export type SaveFailureCode =
+  | "DISK_FULL"
+  | "FOLDER_NOT_WRITABLE"
+  | "FOLDER_GONE"
+  | "FILE_NAME_INVALID"
+  | "NOTHING_TO_SAVE"
+  | "SAVE_FAILED";
 
 export interface ElectronAPI {
   isElectron: true;
   settingsSnapshot?: Record<string, unknown>;
-  setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean }>;
+  /** `reason` says why a write was refused: too large, a key the page may not write, or the disk write failed. */
+  setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean; reason?: "too-large" | "not-allowed" | "write-failed" }>;
   pickDirectory: () => Promise<string | null>; pickFcpLibrary?: () => Promise<string | null>;
   /** Folders to fall back to on a fresh install; null if they could not be made. */
   getDefaultFolders?: () => Promise<{ clipsDir: string; dataDir: string } | null>;
@@ -37,7 +44,7 @@ export interface ElectronAPI {
     dirPath: string;
     filename: string;
     data: ArrayBuffer | Uint8Array;
-  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
+  }) => Promise<{ ok: boolean; path?: string; fileName?: string; error?: string; code?: SaveFailureCode }>;
   /**
    * Moves a finished clip from the engine's temp directory to `dirPath`.
    * Only the path crosses the bridge, never the media.
@@ -46,7 +53,7 @@ export interface ElectronAPI {
     tempPath: string;
     dirPath: string;
     filename: string;
-  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
+  }) => Promise<{ ok: boolean; path?: string; fileName?: string; error?: string; code?: SaveFailureCode }>;
   saveFiles: (payload: {
     dirPath: string;
     folder: string;
@@ -158,6 +165,8 @@ export interface ElectronAPI {
   sendReport?: (payload: { kind: "crash" | "problem"; note?: string; error: string }) => Promise<{ ok: boolean; status?: "sent" | "kept" }>;
   /** ISO time when this launch restored the settings from the backup copy, else null. */
   settingsRestoredAt?: () => Promise<string | null>;
+  /** Why this launch started with nothing although the person had data: "unreadable" or "missing". Null when nothing was lost. */
+  settingsLost?: () => Promise<"unreadable" | "missing" | null>;
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
   revealDiagnostics?: () => Promise<{
     ok: boolean;
@@ -183,6 +192,13 @@ export interface ElectronAPI {
   onSignInSignal: (cb: (signal: SignInSignal) => void) => () => void;
   /** The silent browser sweep's result: true when one browser's YouTube sign-in was usable. */
   reportBrowserSignIn: (usable: boolean) => Promise<{ ok: boolean }>;
+  /**
+   * The main window's frame: whether the top bar carries the macOS traffic lights (macInset) or the
+   * Windows minimise, maximise and close buttons (winOverlay), and whether the window is full screen.
+   */
+  getWindowChrome: () => Promise<{ macInset: boolean; winOverlay: boolean; fullScreen: boolean }>;
+  /** Fires with true or false when the window enters or leaves full screen. */
+  onFullScreen: (cb: (fullScreen: boolean) => void) => () => void;
   /** Opens the small always-on-top Symbols and phrases window (one instance). Esc closes it. */
   openSymbols: () => Promise<{ ok: boolean }>;
   checkForUpdates: () => Promise<{
