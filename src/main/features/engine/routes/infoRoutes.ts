@@ -16,6 +16,7 @@ import { binaryError, fullErrMessage, logYtError } from "../utils/errors";
 import { describeInfoFailure } from "../utils/infoFailure";
 import { jsRuntimeProblem, markToolsReady } from "../services/toolStatus";
 import { infoSchema } from "../utils/schemas";
+import { isYouTubeLink } from "../utils/videoUrl";
 import { parseVttTranscript } from "../utils/vtt";
 import {
   describeMissingTranscript,
@@ -35,10 +36,13 @@ export function registerInfoRoutes(app: Express): void {
     // yt-dlp writes its cookie file back, so handing it the canonical path lets
     // a bad run wipe the saved sign-in.
     let options: Record<string, unknown> = {};
+    // Sign-in is YouTube's: Twitch and Kick links go out with no session.
+    const onYouTube = isYouTubeLink(parsed.data.url);
+    const cookieSource = onYouTube ? parsed.data.cookiesFromBrowser : undefined;
     try {
       const info = await withRunCookies(
-        cookieModeFor(parsed.data.cookiesFromBrowser),
-        resolveCookieOptions(parsed.data.cookiesFromBrowser),
+        cookieModeFor(cookieSource),
+        resolveCookieOptions(cookieSource),
         false,
         (cookies) => {
           options = {
@@ -61,9 +65,10 @@ export function registerInfoRoutes(app: Express): void {
         title: info.title,
         duration: info.duration,
         thumbnail: info.thumbnail,
+        uploader: info.uploader ?? info.channel ?? undefined,
         bitrates: computeBitrates(info),
-        audioTracks: audioTracksOf(info),
-        storyboards: storyboardsOf(info),
+        audioTracks: onYouTube ? audioTracksOf(info) : [],
+        storyboards: onYouTube ? storyboardsOf(info) : [],
       });
     } catch (e) {
       logYtError("/api/info", parsed.data.url, options, e);
@@ -76,6 +81,8 @@ export function registerInfoRoutes(app: Express): void {
     const parsed = infoSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ error: parsed.error.issues[0].message });
+    // Twitch and Kick have no transcript to fetch: say so without starting yt-dlp.
+    if (!isYouTubeLink(parsed.data.url)) return res.json({ lines: [], available: false });
     if (!binariesOk) return binaryError(res);
 
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "yttxt-"));

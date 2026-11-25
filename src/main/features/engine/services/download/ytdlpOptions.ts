@@ -125,15 +125,14 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
     ...commonOptions,
     ...cookies,
     ...formatOptions,
-    extractorArgs: clients,
+    ...(ctx.isYouTube ? { extractorArgs: clients } : {}),
     downloadSections: sectionArg(seg),
     forceKeyframesAtCuts: true,
     output: out,
-    // Make ffmpeg's range request look like the one that minted the URL.
-    addHeader: [
-      "Referer:https://www.youtube.com/",
-      "Origin:https://www.youtube.com",
-    ],
+    // Make ffmpeg's range request look like the one that minted the URL (YouTube only).
+    ...(ctx.isYouTube
+      ? { addHeader: ["Referer:https://www.youtube.com/", "Origin:https://www.youtube.com"] }
+      : {}),
   });
 
   // Attempt 2 (fallback): yt-dlp downloads the whole media itself (native
@@ -144,7 +143,7 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
   ): Record<string, unknown> => ({
     ...commonOptions,
     ...cookies,
-    extractorArgs: clients,
+    ...(ctx.isYouTube ? { extractorArgs: clients } : {}),
     // Fetch HLS with yt-dlp's own segment downloader so ffmpeg only ever sees
     // a local file. Older bundled ffmpeg builds crash fetching m3u8 themselves.
     hlsPreferNative: true,
