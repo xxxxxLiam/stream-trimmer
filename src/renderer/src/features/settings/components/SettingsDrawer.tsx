@@ -5,7 +5,7 @@
  *   panel while open and blocks nothing else. Rows with a chevron open a second view, switches flip in
  *   place, Back shows the parent's name, X and Escape close.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Drawer } from "../../../shared/components/Drawer";
 import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
@@ -25,6 +25,8 @@ import type { EditorHandoffSettings } from "../../../shared/utils/fcpxml";
 
 /** How long "Click again to delete" stays armed. */
 export const DELETE_ARM_MS = 5000;
+/** A second click this soon after the first is the same double-click, not a decision. */
+export const DELETE_GUARD_MS = 400;
 
 export type SettingsDrawerProps = {
   open: boolean;
@@ -56,6 +58,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   );
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
+  const armedAt = useRef(0);
   // A-7: the first click on Delete arms it for a few seconds only; leaving the view or closing the drawer disarms it.
   const viewKey = c.view.kind === "campaign" ? c.view.id : c.view.kind;
   useEffect(() => {
@@ -115,10 +118,14 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         confirmingDelete={confirming === campaign.id}
         onDelete={() => {
           if (confirming === campaign.id) {
+            if (Date.now() - armedAt.current < DELETE_GUARD_MS) return;
             setConfirming(null);
             c.campaigns.remove(campaign.id);
             dropCampaignPrefs(campaign.id, (k) => readSetting<Record<string, unknown>>(k, {}), writeSetting);
-          } else setConfirming(campaign.id);
+          } else {
+            armedAt.current = Date.now();
+            setConfirming(campaign.id);
+          }
         }}
         onBack={c.back}
         onClose={onClose}
