@@ -12,13 +12,14 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { parseTimestamp } from "../../../shared/utils/clip";
 import { wholeTranscriptText, wordsInRanges, type Line } from "../utils/transcript";
+import { saveText, transcriptFileName } from "../../../shared/utils/saveText";
 import { Copy } from "react-bootstrap-icons";
 
 export const COPIED_MS = 2000;
 
 export default function TranscriptCopyMenu({ lines }: { lines: readonly Line[] }) {
   const { openSymbols } = usePanelHost();
-  const { url, startText, endText } = useClipperContext();
+  const { url, startText, endText, info } = useClipperContext();
   const { segments } = useSegmentsState();
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -28,6 +29,14 @@ export default function TranscriptCopyMenu({ lines }: { lines: readonly Line[] }
     },
     [],
   );
+
+  const [said, setSaid] = useState("");
+  const download = async (text: string, kind: "whole" | "clip") => {
+    const res = await saveText(transcriptFileName(info?.title, kind), text);
+    setSaid(res.ok ? "Saved" : res.message);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaid(""), COPIED_MS);
+  };
 
   const copy = (text: string) => {
     void navigator.clipboard?.writeText(text);
@@ -47,6 +56,8 @@ export default function TranscriptCopyMenu({ lines }: { lines: readonly Line[] }
   const items: MenuItem[] = [
     { key: "whole", label: "Whole transcript", disabled: lines.length === 0, onSelect: () => copy(wholeTranscriptText(lines)) },
     { key: "clip", label: "This clip's words", disabled: !clipWords, onSelect: () => copy(clipWords) },
+    { key: "whole-txt", label: "Download whole transcript (.txt)", disabled: lines.length === 0, onSelect: () => void download(wholeTranscriptText(lines), "whole") },
+    { key: "clip-txt", label: "Download this clip's words (.txt)", disabled: !clipWords, onSelect: () => void download(clipWords, "clip") },
     { key: "link", label: "Source link", disabled: !url, onSelect: () => copy(url) },
     { kind: "separator", key: "sep" },
     { key: "symbols", label: "Symbols and phrases ›", onSelect: () => (window.electronAPI?.openSymbols ? void window.electronAPI.openSymbols() : openSymbols()) },
@@ -57,6 +68,8 @@ export default function TranscriptCopyMenu({ lines }: { lines: readonly Line[] }
       <PopoverMenu label="Copy" items={items} align="end" triggerClassName="icon-btn h-target w-target" pressedWhenOpen>
         {copied ? (
           <span className="text-meta text-ice">Copied</span>
+        ) : said ? (
+          <span className={`text-meta ${said === "Saved" ? "text-ice" : "text-error"}`}>{said}</span>
         ) : (
           <Copy width={16} height={16} aria-hidden="true" focusable="false" />
         )}
