@@ -19,6 +19,7 @@ import {
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
 import { useFlushPendingReports } from "../features/help/hooks/useReportMutations";
+import { loadLastLayout } from "../shared/utils/lastLayout";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
@@ -84,12 +85,18 @@ function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings
 const EDITOR_KEY = "clipper.editorHandoff";
 
 /** "After cutting" settings, kept per campaign beside the other campaign fields. */
+/** A campaign with no Final Cut settings yet starts with the layout picked last, the way a new campaign gets the last look. */
+function editorSettingsOf(raw: unknown): EditorHandoffSettings {
+  const settings = normalizeEditorSettings(raw);
+  return raw === undefined ? { ...settings, layout: loadLastLayout() ?? settings.layout } : settings;
+}
+
 function useEditorSettings(campaignId: string | null) {
   const [all, setAll] = useState<Record<string, unknown>>(() =>
     readSetting<Record<string, unknown>>(EDITOR_KEY, {}),
   );
   const settings: EditorHandoffSettings = campaignId
-    ? normalizeEditorSettings(all[campaignId])
+    ? editorSettingsOf(all[campaignId])
     : DEFAULT_EDITOR_SETTINGS;
   const setSettings = useCallback(
     (next: EditorHandoffSettings) => {
@@ -103,7 +110,7 @@ function useEditorSettings(campaignId: string | null) {
     [campaignId],
   );
   // Any campaign's settings, for the Settings drawer (every campaign's Final Cut fields show there).
-  const settingsFor = useCallback((id: string) => normalizeEditorSettings(all[id]), [all]);
+  const settingsFor = useCallback((id: string) => editorSettingsOf(all[id]), [all]);
   const setSettingsFor = useCallback((id: string, next: EditorHandoffSettings) => {
     setAll((prev) => {
       const merged = { ...prev, [id]: next };
@@ -361,6 +368,8 @@ function Layout({ active }: { active: boolean }) {
         projectName: projectName?.trim() || undefined,
         segments: segments.map((s) => ({ start: s.start, end: s.end })),
         sourceUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : sourceUrl || undefined,
+        sourceTitle: info?.title || undefined,
+        cutAt: Date.now(),
       };
       const cutFor = campaign?.id ?? null;
       setSessionByCampaign((prev) => addSessionClip(prev, cutFor, clip));
@@ -463,6 +472,7 @@ function Layout({ active }: { active: boolean }) {
       open={settingsOpen}
       onClose={closeSettings}
       startAt={settingsStartAt}
+      videoTitle={info?.title}
       tracks={info?.audioTracks}
       editor={{ settingsFor: editorSettingsFor, onChange: setEditorSettingsFor }}
     />

@@ -3,16 +3,29 @@
  * Path: src/main/features/engine/services/clipNames/clipNameSession.ts
  * Description: Holds the phrase table for the open video so a name suggestion is a cheap lookup. The
  *   table is built once when a transcript loads (`prepareNames`) and reused for every clip
- *   (`suggestName`). Only the few most recent videos are kept. Validates its input: it comes from the
+ *   (`suggestName`). The least recently used videos are dropped when many are open, never the one being named. Validates its input: it comes from the
  *   renderer over IPC.
  */
 import { buildNameTable, suggestClipName, type NameLine, type NameRange, type NameTable } from "./clipNames";
 
-const MAX_VIDEOS = 4;
+/** Most videos kept, and most transcript lines kept across them. The video being named is never dropped. */
+const MAX_VIDEOS = 16;
+const MAX_TOTAL_LINES = 400_000;
 const MAX_LINES = 100_000;
 const MAX_RANGES = 50;
 
 const cache = new Map<string, { table: NameTable; lines: NameLine[] }>();
+/** The video the last suggestion was for: the one open, so the one that must stay. */
+let openVideo: string | null = null;
+
+/** Drop the least recently used videos, never `keep` and never the open video, until the cache fits. */
+function evict(keep: string): void {
+  const total = () => [...cache.values()].reduce((n, e) => n + e.lines.length, 0);
+  for (const id of cache.keys()) {
+    if (cache.size <= MAX_VIDEOS && total() <= MAX_TOTAL_LINES) return;
+    if (id !== keep && id !== openVideo) cache.delete(id);
+  }
+}
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
@@ -32,7 +45,7 @@ export function prepareNames(videoId: unknown, rawLines: unknown): { ok: boolean
   if (!lines) return { ok: false, error: "The transcript lines are not valid." };
   cache.delete(videoId);
   cache.set(videoId, { table: buildNameTable(lines), lines });
-  while (cache.size > MAX_VIDEOS) cache.delete(cache.keys().next().value as string);
+  evict(videoId);
   return { ok: true };
 }
 
@@ -49,6 +62,12 @@ export function suggestName(p: {
   }
   const existing = Array.isArray(p.existing) ? p.existing.filter((s): s is string => typeof s === "string").slice(0, 1000) : [];
   const entry = typeof p.videoId === "string" ? cache.get(p.videoId) : undefined;
+  if (typeof p.videoId === "string" && entry) {
+    // Most recently used goes last, and this is the open video from now on.
+    cache.delete(p.videoId);
+    cache.set(p.videoId, entry);
+    openVideo = p.videoId;
+  }
   const name = suggestClipName({
     table: entry?.table ?? null,
     lines: entry?.lines ?? [],
@@ -63,4 +82,5 @@ export function suggestName(p: {
 /** For tests. */
 export function clearNameSessions(): void {
   cache.clear();
+  openVideo = null;
 }

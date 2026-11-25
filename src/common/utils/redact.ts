@@ -54,7 +54,7 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     id: "auth-headers",
     apply: (t) =>
       t.replace(
-        /\b((?:set-)?cookie|authorization|proxy-authorization)(\s*[:=]\s*)[^\n]*/gi,
+        /\b((?:set-)?cookie|authorization|proxy-authorization|x-goog-visitor-id|x-goog-pageid|x-youtube-identity-token|x-goog-authuser)(\s*[:=]\s*)[^\n]*/gi,
         "$1$2<redacted>",
       ),
   },
@@ -121,6 +121,15 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
       ),
   },
   {
+    // The same session cookie names as JSON keys: {"SAPISID":"..."}.
+    id: "cookie-json",
+    apply: (t) =>
+      t.replace(
+        /(["'](?:__Secure-|__Host-)?(?:[1-3]?PSID(?:CC|TS)?|[1-3]?PAPISID|SAPISID|APISID|HSID|SSID|SIDCC|SID|LOGIN_INFO|VISITOR_INFO1_LIVE)["']\s*:\s*)(?:"[^"\n]*"|'[^'\n]*')/g,
+        '$1"<redacted>"',
+      ),
+  },
+  {
     // The home directory, wherever it appears: first the exact one we were told,
     // then the usual shapes in case it was spelled differently inside engine output.
     id: "home-dir",
@@ -134,15 +143,22 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
         out = out.replace(new RegExp(`${spelled}(?![\\w-])`, "gi"), "~");
       }
       return out
-        .replace(/(?<![\w-])[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s"']+/gi, "~")
-        .replace(/(?<![\w~-])\/(?:Users|home)\/[^/\s"']+/g, "~")
+        // The user's folder name may hold spaces ("Jane Doe"): take it up to the next separator.
+        .replace(/(?<![\w-])[A-Za-z]:[\\/]+Users[\\/]+(?:[^\\/\n"'<>:|*?]+(?=[\\/])|[^\\/\s"'<>:|*?]+)/gi, "~")
+        .replace(/(?<![\w~-])\/(?:Users|home)\/(?:[^/\n"'<>:|*?]+(?=\/)|[^/\s"']+)/g, "~")
         // Linux root's home has no user name after it: /root/Videos is the home directory.
         .replace(/(?<![\w~-])\/root(?=[\\/\s"']|$)/g, "~");
     },
   },
   {
     id: "email",
-    apply: (t) => t.replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "<email>"),
+    apply: (t) => t.replace(/[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu, "<email>"),
+  },
+  {
+    // Addresses on the person's own network (the proxy or router in a log line). Loopback stays readable.
+    id: "lan-ip",
+    apply: (t) =>
+      t.replace(/(?<![\d.])(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}(?![\d.])/g, "<ip>"),
   },
 ];
 

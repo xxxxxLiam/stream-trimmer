@@ -12,6 +12,7 @@ import "./services/binaries";
 import { app } from "./app";
 import { registerRoutes } from "./routes/registerRoutes";
 import { sweepStaleCache } from "./services/resumeCache";
+import { reapOrphanedChildren } from "./services/childRegistry";
 
 export { isYouTubeUrl } from "./utils/youtubeUrl";
 export { appCookieFile, resolveCookieOptions } from "./services/cookies";
@@ -25,6 +26,8 @@ registerRoutes(app);
 // API on the user's LAN.
 app.listen(PORT, "127.0.0.1", () => {
   console.log(`[server] listening on http://127.0.0.1:${PORT}`);
+  // A hard kill of the app last time may have left a downloader running: stop it before the first run.
+  void reapOrphanedChildren().then((n) => n && console.log(`[server] stopped ${n} leftover process(es) from the last run`));
   const swept = sweepStaleCache();
   if (swept) console.log(`[server] swept ${swept} stale work folder(s)`);
 });

@@ -13,6 +13,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { ytReasonOf } from "../utils/ytReasons";
 
 export interface Segment {
   start: number;
@@ -357,6 +358,8 @@ export function pruneWorkDir(dir: string): void {
 export type FailureCode =
   | "stale_session"
   | "private_video"
+  | "sign_in_needed"
+  | "video_unavailable"
   | "network_dropped"
   | "out_point_past_end"
   | "save_folder_gone"
@@ -480,6 +483,8 @@ export interface FailureContext {
 const PATTERNS = {
   private:
     /private video|video is private|members[- ]only|join this channel|available to this channel'?s members|requires? (?:a )?(?:membership|payment)/i,
+  noFfmpeg: /ffprobe and ffmpeg not found|ffmpeg not found|ffmpeg is not installed/i,
+  permission: /EACCES|EPERM|permission denied/i,
   disk: /ENOSPC|no space left on device|not enough space|disk full/i,
   folder: /ENOTDIR|\bENOENT\b|no such file or directory|Errno 2\b/i,
   spawnMissing: /spawn [^\n]*ENOENT/i,
@@ -502,6 +507,44 @@ export function classifyFailure(
   const text = message || "";
   const kept = (extra?: string) => `${MARKED_KEPT}${extra ? ` ${extra}` : ""}`;
 
+  const reason = ytReasonOf(text);
+  if (reason && (reason.kind === "age" || reason.kind === "signin")) {
+    return failure(
+      "sign_in_needed",
+      403,
+      reason.sentence,
+      { id: "import_cookies", label: "Import cookies from a signed-in account" },
+      kept(),
+    );
+  }
+  if (reason && (reason.kind === "removed" || reason.kind === "region" || reason.kind === "live")) {
+    return failure(
+      "video_unavailable",
+      404,
+      reason.sentence,
+      { id: "retry", label: reason.kind === "live" ? "Try again once it has started" : "Try a different video" },
+      kept(),
+    );
+  }
+  if (reason?.kind === "refused") return refusedFailure("");
+  if (PATTERNS.noFfmpeg.test(text)) {
+    return failure(
+      "unknown",
+      500,
+      "Clipr's video tools are incomplete on this computer",
+      { id: "retry", label: "Restart Clipr to repair them" },
+      kept(),
+    );
+  }
+  if (!PATTERNS.disk.test(text) && PATTERNS.permission.test(text)) {
+    return failure(
+      "save_folder_gone",
+      500,
+      "Clipr can't write to that folder",
+      { id: "choose_folder", label: "Choose a folder" },
+      kept(),
+    );
+  }
   if (PATTERNS.private.test(text)) {
     return failure(
       "private_video",
@@ -571,11 +614,11 @@ export function classifyFailure(
 }
 
 /** A 403 or a failed fetch of the media itself: not one of the seven rows. */
-export function refusedFailure(tail: string): ClipFailure {
+export function refusedFailure(_tail = ""): ClipFailure {
   return failure(
     "unknown",
     500,
-    `YouTube refused the media request for this video${tail ? `: ${tail}` : ""}`,
+    "YouTube refused the media request for this video",
     { id: "retry", label: "Try again in a moment, or pick a different quality" },
     `${MARKED_KEPT} Anything already fetched is on disk.`,
   );

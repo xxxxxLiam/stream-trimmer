@@ -73,6 +73,7 @@ test("a removed key stays removed, and corrupt files do not throw", () => {
   store.set("clipper.saveDir", null);
   assert.equal(createSettingsStore(file).load()["clipper.saveDir"], undefined);
 
+  fs.rmSync(`${file}.bak`, { force: true }); // with a good copy it would be restored (settingsSafety.test.ts)
   fs.writeFileSync(file, "{ not json");
   assert.deepEqual(createSettingsStore(file).load(), {});
 });
