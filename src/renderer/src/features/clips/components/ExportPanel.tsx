@@ -32,9 +32,12 @@ export default function ExportPanel() {
         <FailedRow
           failed={c.failed}
           failure={c.failure}
+          campaignName={c.campaignName}
+          signedIn={c.signedIn}
           onAction={(a) => {
             if (a === "retry") c.retry();
             else if (a === "changeFolder") void c.changeFolder();
+            else if (a === "showFolder") c.showFolder();
             else if (a === "showInBrowser") c.showInBrowser();
             else if (a === "signIn") c.signIn();
             else c.saveForLater();

@@ -77,3 +77,10 @@ test("Free space: the check runs before anything is fetched, only for a clear me
   const clip = readFileSync("src/renderer/src/features/player/utils/clipDestination.ts", "utf8");
   assert.doesNotMatch(clip, /freeMb|checkFreeSpace/);
 });
+
+test("the folder check runs before the free-space check and the request, and Clip is never dimmed by it", async () => {
+  const fs = await import("node:fs");
+  const src = fs.readFileSync(new URL("../modules/clipper/hooks/useClipDownloadMutations.ts", import.meta.url), "utf8");
+  const folder = src.indexOf("checkFolder");
+  assert.ok(folder > 0 && folder < src.indexOf("checkFreeSpace") && folder < src.indexOf("new EventSource("));
+});
