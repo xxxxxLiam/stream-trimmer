@@ -145,10 +145,13 @@ export default function BottomBar({
           <button
             type="button"
             id="ui-sign-in-pill"
-            className="inline-flex h-[28px] items-center rounded-control border border-ice px-[10px] text-meta text-fg hover:bg-ice-tint-12"
+            aria-label="Sign in for 1080p: opens Help"
+            className={`${VALUE_BUTTON} group`}
             onClick={onSignIn}
           >
-            Sign in for 1080p
+            <span className="inline-flex h-[28px] items-center whitespace-nowrap rounded-[14px] border border-ice px-[12px] text-meta font-medium text-ice group-hover:bg-ice-tint-12">
+              Sign in for 1080p
+            </span>
           </button>
         ) : null}
         {problem ? (

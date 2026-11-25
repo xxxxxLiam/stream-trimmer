@@ -43,8 +43,19 @@ function loadFixture(name) {
   return JSON.parse(fs.readFileSync(f, "utf8").replace(/"\$NOW"/g, String(Date.now())));
 }
 
-async function runSteps(win, steps) {
+async function runSteps(win, steps, app) {
   for (const s of steps || []) {
+    // {"send": [channel, payload]}: the main process pushes an IPC event to the window, for states
+    // that only the main process starts (an update ready, the sign-in signal).
+    if (s.send && app) {
+      await app.evaluate(({ BrowserWindow }, [channel, payload]) => {
+        for (const w of BrowserWindow.getAllWindows()) {
+          const u = w.webContents.getURL();
+          if (u.includes("127.0.0.1") || u.includes("localhost")) w.webContents.send(channel, payload);
+        }
+      }, s.send);
+      continue;
+    }
     if (s.click) await win.click(s.click);
     else if (s.fill) await win.fill(s.fill[0], s.fill[1]);
     else if (s.press) await win.keyboard.press(s.press);
@@ -114,7 +125,7 @@ async function screenshotApp(screen, frame, fx, useWindow) {
       console.warn(`window content is ${inner.join("x")}, wanted ${win0.width}x${win0.height}`);
     }
     await a.win.waitForSelector(fx.waitFor || "#root *");
-    await runSteps(a.win, fx.steps);
+    await runSteps(a.win, fx.steps, a.app);
     await a.win.waitForTimeout(400);
     return await a.win.screenshot({ clip: await appRegion(a.win, frame, fx, useWindow) });
   } finally {
