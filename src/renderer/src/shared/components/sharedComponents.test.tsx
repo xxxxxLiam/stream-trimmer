@@ -127,6 +127,12 @@ test("UndoRing drains with the seconds left", () => {
   assert.match(html(<UndoRing secondsLeft={4.2} onUndo={() => {}} icon={glyph} />), /aria-label="Undo, 5 seconds left"/);
 });
 
+test("the logo's glow is not cropped by its own box: the svg lets it overflow", () => {
+  assert.match(html(<BrandMark glow />), /overflow:\s*visible/);
+  const lockup = html(<BrandLockup size={64} glow />);
+  assert.match(lockup, /<svg[^>]*style="[^"]*overflow:\s*visible/);
+});
+
 test("BrandMark is the two-blade mark in Frost over Ice; the lockup adds the name", () => {
   const h = html(<BrandMark />);
   assert.equal(h.match(/<path/g)?.length, 2);
