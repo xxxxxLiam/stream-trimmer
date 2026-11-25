@@ -67,3 +67,18 @@ test("names are safe on Mac and Windows", () => {
   assert.equal(safeFileName("CON"), "CON clip");
   assert.ok(safeFileName("x".repeat(200)).length <= 80);
 });
+
+// The renderer asserts this same table for the saved name (projectName.test.ts): the lane's fallback is the file's name.
+const TITLE_NAMES: [string, string][] = [
+  ["Podcast #214, the long talk", "Podcast Long"],
+  ["How I Made $10k in 30 days", "How Made"],
+  ["THE GREATEST SPEECH EVER GIVEN", "Greatest Speech"],
+  ["日本語 の タイトル", "日本語 タイトル"],
+  ["214", "Clip"],
+];
+
+test("the lane fallback for each kind of title is the name the file gets (C2-7)", () => {
+  for (const [title, name] of TITLE_NAMES) {
+    assert.equal(suggestClipName({ table: null, lines: [], ranges: range, videoTitle: title }), name, title);
+  }
+});
