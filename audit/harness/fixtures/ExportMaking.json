@@ -152,11 +152,11 @@
   "exitCode": 0,
   "progress": [
    0,
-   58
+   59
   ],
   "writeMedia": true,
   "progressDelayMs": 50,
-  "holdMs": 120000
+  "holdMs": 60000
  },
  "waitFor": "#root *",
  "steps": [
@@ -167,7 +167,10 @@
    "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-label=\"Make this clip\"]')];b[0].click()})()"
   },
   {
-   "wait": 3000
+   "waitFor": "[role=progressbar][aria-label*='%']"
+  },
+  {
+   "wait": 600
   }
  ],
  "mask": [
