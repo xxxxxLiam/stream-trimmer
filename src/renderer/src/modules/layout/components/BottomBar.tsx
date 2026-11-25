@@ -16,10 +16,13 @@ import {
   IconScissors,
   IconZoomTool,
 } from "./BarIcons";
+import { useNextClipName } from "../hooks/useNextClipName";
 import { useToolState, type TimelineTool } from "../hooks/useToolState";
 import {
   audioButtonLabel,
   makesText,
+  nameForLanguage,
+  planLanguages,
   shortenPath,
   toggleLanguage,
   type AudioTrackInfo,
@@ -71,17 +74,27 @@ export default function BottomBar({
   const hasDubs = !!tracks && tracks.some((t) => t.kind !== "original");
   const [problem, setProblem] = useState("");
 
-  const audioItems: MenuItem[] = (tracks ?? []).map((t) => {
-    const ticked = t.kind === "original" ? !(selectedLanguages ?? []).includes(`-${t.language}`) : (selectedLanguages ?? []).includes(t.language);
-    const tag = t.kind === "auto-dubbed" ? " · Auto-dubbed" : t.kind === "creator-dub" ? " · Creator dub" : "";
-    return {
-      key: t.language,
-      label: `${t.label}${t.kind === "original" ? " (original)" : ""}${tag}`,
-      checked: ticked,
-      keepOpen: true,
-      onSelect: () => onSelectLanguages(toggleLanguage(tracks ?? [], selectedLanguages, t.language)),
-    };
-  });
+  const clipName = useNextClipName();
+  const plans = planLanguages(tracks, selectedLanguages);
+  const audioItems: MenuItem[] = [
+    ...(tracks ?? []).map<MenuItem>((t) => {
+      const ticked = t.kind === "original" ? !(selectedLanguages ?? []).includes(`-${t.language}`) : (selectedLanguages ?? []).includes(t.language);
+      return {
+        key: t.language,
+        label: t.kind === "original" ? "Original" : t.label,
+        detail: t.kind === "original" ? t.label : t.kind === "auto-dubbed" ? "Auto-dubbed" : "Creator dub",
+        checked: ticked,
+        keepOpen: true,
+        onSelect: () => onSelectLanguages(toggleLanguage(tracks ?? [], selectedLanguages, t.language)),
+      };
+    }),
+    ...(clipName
+      ? ([
+          { kind: "separator", key: "sep-note" },
+          { kind: "note", key: "note", label: `${makesText(plans.length)}: ${plans.map((p) => nameForLanguage(clipName, p)).join(", ")}` },
+        ] as MenuItem[])
+      : []),
+  ];
 
   return (
     <div className="relative m-[8px] flex h-[54px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-[6px] text-meta text-fg-dim">
@@ -110,10 +123,12 @@ export default function BottomBar({
             label={`Audio: ${audioButtonLabel(tracks!, selectedLanguages)}`}
             items={audioItems}
             side="above"
-            align="start"
+            align="center"
+            menuWidth={290}
+            boxes
             triggerClassName={VALUE_BUTTON}
             pressedWhenOpen={false}
-            heading="Make a clip for each ticked language"
+            heading="Audio languages"
           >
             <span className={VALUE_FACE}>
               {audioButtonLabel(tracks!, selectedLanguages)}

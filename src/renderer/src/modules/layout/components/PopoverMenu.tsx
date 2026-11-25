@@ -10,6 +10,7 @@ import { useDismissEffects } from "../../../shared/hooks/useDismissEffects";
 export type MenuItem =
   | { kind: "separator"; key: string }
   | { kind: "heading"; key: string; label: string }
+  | { kind: "note"; key: string; label: string }
   | {
       kind?: "item";
       key: string;
@@ -17,6 +18,8 @@ export type MenuItem =
       /** A tick shows when set (true or false keeps the room so labels line up). */
       checked?: boolean;
       disabled?: boolean;
+      /** Dim text at the right edge of the row. */
+      detail?: string;
       /** Keep the menu open after picking, for a list of ticks. */
       keepOpen?: boolean;
       onSelect: () => void;
@@ -31,7 +34,7 @@ export type PopoverMenuProps = {
   children: ReactNode;
   items: MenuItem[];
   /** Which edge of the trigger the menu lines up with. */
-  align?: "start" | "end";
+  align?: "start" | "end" | "center";
   /** Where the menu opens relative to the trigger. Default below. */
   side?: "below" | "above";
   triggerClassName?: string;
@@ -39,6 +42,8 @@ export type PopoverMenuProps = {
   heading?: string;
   /** Fixed menu width in px (the Panels menu is 260 on the board); default is a 200px minimum. */
   menuWidth?: number;
+  /** Ticks drawn as boxes (filled Ice when on) instead of a bare tick, for a list of choices. */
+  boxes?: boolean;
   /** Marks the trigger as pressed while the menu is open (top bar active state). */
   pressedWhenOpen?: boolean;
   /** Show the label beside the icon while the menu is open (the top bar's "on" look). */
@@ -55,6 +60,7 @@ export default function PopoverMenu({
   triggerClassName = "icon-btn",
   heading,
   menuWidth,
+  boxes = false,
   pressedWhenOpen = true,
   labelWhenOpen = false,
 }: PopoverMenuProps) {
@@ -63,7 +69,7 @@ export default function PopoverMenu({
   const trigger = useRef<HTMLButtonElement>(null);
   const menuId = useId();
   const close = useCallback(() => setOpen(false), []);
-  const hasTicks = items.some((i) => i.kind !== "separator" && i.kind !== "heading" && i.checked !== undefined);
+  const hasTicks = items.some((i) => i.kind !== "separator" && i.kind !== "heading" && i.kind !== "note" && i.checked !== undefined);
   useDismissEffects(root, open, close);
 
   const rows = () => Array.from(root.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)') ?? []);
@@ -119,13 +125,17 @@ export default function PopoverMenu({
           onKeyDown={onMenuKey}
           style={menuWidth ? { width: menuWidth } : undefined}
           className={`absolute z-40 rounded-panel border border-hairlineStrong bg-raised p-[6px] ${menuWidth ? "" : "min-w-[200px]"} ${
-            side === "below" ? "top-full mt-[2px]" : "bottom-full mb-[4px]"
-          } ${align === "end" ? "right-0" : "left-0"}`}
+            side === "below" ? "top-full mt-[2px]" : "bottom-full mb-[2px]"
+          } ${align === "end" ? "right-0" : align === "center" ? "left-1/2 -translate-x-1/2" : "left-0"}`}
         >
           {heading ? <div className="px-[10px] pb-[4px] pt-[6px] text-meta text-fg-dim">{heading}</div> : null}
           {items.map((item) =>
             item.kind === "separator" ? (
               <div key={item.key} role="separator" className="mx-[4px] my-[6px] h-px bg-hairline" />
+            ) : item.kind === "note" ? (
+              <div key={item.key} className="px-[10px] pb-[6px] pt-[4px] text-meta leading-[1.5] text-fg-dim">
+                {item.label}
+              </div>
             ) : item.kind === "heading" ? (
               <div key={item.key} className="px-[10px] pb-[4px] pt-[6px] text-meta text-fg-dim">
                 {item.label}
@@ -148,6 +158,20 @@ export default function PopoverMenu({
                 }}
               >
                 {item.checked === undefined ? null : (
+                  boxes ? (
+                    <span
+                      aria-hidden
+                      className={`inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-chip ${
+                        item.checked ? "bg-ice" : "border-[1.5px] border-hairlineStrong"
+                      }`}
+                    >
+                      {item.checked ? (
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="var(--c-bg)" strokeWidth="2">
+                          <path d="M2 6.5l2.5 2.5L10 3.5" />
+                        </svg>
+                      ) : null}
+                    </span>
+                  ) : (
                   <span className="flex w-[16px] shrink-0 justify-center">
                     {item.checked ? (
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--ice)" strokeWidth="1.8" aria-hidden="true">
@@ -155,8 +179,10 @@ export default function PopoverMenu({
                       </svg>
                     ) : null}
                   </span>
+                  )
                 )}
                 <span>{item.label}</span>
+                {item.detail ? <span className="ml-auto text-meta text-fg-dim">{item.detail}</span> : null}
               </button>
             ),
           )}

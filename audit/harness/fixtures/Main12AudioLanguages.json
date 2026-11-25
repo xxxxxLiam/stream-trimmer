@@ -153,6 +153,18 @@
      "acodec": "mp4a",
      "language": "es",
      "format_note": "Spanish (dubbed-auto)"
+    },
+    {
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "pt",
+     "format_note": "Portuguese (dubbed-auto)"
+    },
+    {
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "hi",
+     "format_note": "Hindi (creator dub)"
     }
    ]
   },
