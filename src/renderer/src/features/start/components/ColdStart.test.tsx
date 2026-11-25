@@ -33,8 +33,8 @@ const html = (p: Partial<ColdStartProps> = {}) => renderToStaticMarkup(<ColdStar
 
 test("empty: logo, name, promise, glowing box, Paste with its key, both chips and the folder chip", () => {
   const h = html();
-  assert.match(h, /aria-label="Clipr logo"/);
-  assert.match(h, />Clipr</);
+  assert.match(h, /aria-label="Clipr"/);
+  assert.match(h, /id="r-cut"/, "lockup C: the r is cut, its top piece its own path");
   assert.match(h, /Only the seconds you need/);
   assert.match(h, /placeholder="Paste a YouTube link"/);
   assert.match(h, /shadow-box/);
