@@ -10,9 +10,14 @@ import electron from "electron";
 import { isDev } from "../../shared/utils/env";
 import { rememberUiPort } from "./symbolsWindow";
 import { isAppUrl, isSafeExternalUrl } from "./navigationGuard";
+import os from "node:os";
 import { createCrashRecovery, crashedUrl } from "./crashRecovery";
+import { crashFallbackUrl, fallbackAction, isFallbackUrl } from "./crashFallback";
+import { createFallbackController } from "./crashFallbackActions";
+import { readLogScrubbed } from "../../features/diagnostics/services/diagnosticsService";
+import { sendReport } from "../../features/reports/services/reportService";
 
-const { BrowserWindow, shell } = electron;
+const { BrowserWindow, shell, clipboard, app: electronApp } = electron;
 
 let mainWindow: Electron.BrowserWindow | null = null;
 let splashWindow: Electron.BrowserWindow | null = null;
@@ -138,17 +143,44 @@ export async function createWindow(port: number) {
   // elsewhere is stopped (a page that kept the preload bridge could otherwise reach the person's files).
   const stayInApp = (event: Electron.Event, url: string) => {
     if (isAppUrl(url, appOrigins)) return;
+    // The static crash page's own links, and only from that page (E2-2).
+    const action = fallbackAction(url);
+    if (action) {
+      event.preventDefault();
+      if (mainWindow && !mainWindow.isDestroyed() && isFallbackUrl(mainWindow.webContents.getURL())) void fallback.run(action);
+      return;
+    }
     event.preventDefault();
     toBrowser(url);
   };
+  const loadInWindow = (url: string) => {
+    if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(url).catch(() => undefined);
+  };
+  const crashError = "The window's page process stopped twice within a minute.";
+  const fallback = createFallbackController({
+    appUrl,
+    load: loadInWindow,
+    send: async () => ((await sendReport({ kind: "crash", error: crashError })).status === "sent" ? "sent" : "kept"),
+    copy: () =>
+      clipboard.writeText(
+        `Clipr ${electronApp.getVersion()} on ${process.platform} ${os.release()}\n${crashError}\n\n${readLogScrubbed(60)}`,
+      ),
+  });
   mainWindow.webContents.on("will-navigate", stayInApp);
   mainWindow.webContents.on("will-redirect", stayInApp);
 
   // If the page process dies, reload it once with the crashed flag so the app can say so (and offer Send report).
   const recovery = createCrashRecovery();
   mainWindow.webContents.on("render-process-gone", (_e: unknown, details: Electron.RenderProcessGoneDetails) => {
-    if (recovery.onGone(details?.reason ?? "crashed") !== "reload") return;
-    if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(crashedUrl(appUrl)).catch(() => undefined);
+    const what = recovery.onGone(details?.reason ?? "crashed");
+    if (what === "leave") return;
+    // A second death inside a minute gets the static page, which has no script to die again.
+    if (what === "fallback") {
+      fallback.reset();
+      loadInWindow(crashFallbackUrl());
+      return;
+    }
+    loadInWindow(crashedUrl(appUrl));
   });
 
   if (isDev) {
