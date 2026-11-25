@@ -677,10 +677,42 @@ for (const version of ["1.10", "1.11", "1.12", "1.13"]) {
 }
 
 test("the look's DTD check can fail (mutation guard: an element the DTD does not know is rejected)", { skip: !hasXmllint }, () => {
-  const look = parseLook(sampleExport({ clipChildren: '<adjust-transform scale="1.2 1.2"/><not-a-final-cut-element/>' }));
+  const parsed = parseLook(sampleExport());
+  const look = { ...parsed, clip: `${parsed.clip}\n<not-a-final-cut-element/>` };
   const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: { ...PROJECT, look } });
   assert.notEqual(validate(xml.replace(/<fcpxml version="[\d.]+">/, '<fcpxml version="1.10">')), "");
 });
+
+// D-6: a look export whose clip carries a connected clip or a title still gives valid projects.
+const TITLE_EFFECT = '    <effect id="r6" name="Basic Title" uid=".../Basic Title.moti"/>';
+const BUSY_EXPORTS: Record<string, { clipChildren: string; effects?: string }> = {
+  "a connected clip": {
+    clipChildren: `<adjust-transform scale="1.2 1.2"/>
+      <asset-clip ref="r2" lane="1" offset="0s" name="Broll" duration="2s"><adjust-volume amount="-96dB"/></asset-clip>
+      <adjust-volume amount="-3dB"/>`,
+  },
+  "a title": {
+    clipChildren: `<adjust-transform scale="1.2 1.2"/>
+      <title ref="r6" lane="1" offset="0s" name="Basic Title" duration="5s"><text><text-style ref="ts1">Title</text-style></text><text-style-def id="ts1"><text-style font="Helvetica" fontSize="63"/></text-style-def></title>`,
+    effects: `${TITLE_EFFECT}\n    <effect id="r3" name="Color Board" uid=".../Color Board"/>`,
+  },
+  "nested clips two deep": {
+    clipChildren: `<asset-clip ref="r2" lane="1" offset="0s" name="Outer" duration="2s"><asset-clip ref="r2" lane="2" offset="0s" name="Inner" duration="1s"><adjust-volume amount="-96dB"/></asset-clip></asset-clip>
+      <adjust-transform scale="1.2 1.2"/>
+      <filter-video ref="r3" name="Color Board"><param name="Exposure" key="1" value="0.1"/></filter-video>`,
+  },
+};
+
+for (const [what, o] of Object.entries(BUSY_EXPORTS)) {
+  for (const version of ["1.10", "1.11", "1.12", "1.13"]) {
+    test(`a look export with ${what} (version ${version}) gives projects that validate against the DTD`, { skip: !hasXmllint }, () => {
+      const look = parseLook(sampleExport({ version, ...o }));
+      assert.doesNotMatch(look.clip, /<asset-clip|<title|lane=/, "nothing connected is carried");
+      const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: { ...PROJECT, look } });
+      assert.equal(validate(xml.replace(/<fcpxml version="[\d.]+">/, '<fcpxml version="1.10">')), "");
+    });
+  }
+}
 
 test("D-1: the event is the campaign's Event, or the campaign name while that is blank", () => {
   assert.equal(importLayout({ mediaEvent: "Acme exports" }, { campaignName: "Acme" }).eventName, "Acme exports");

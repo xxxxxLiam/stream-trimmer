@@ -8,6 +8,8 @@
 import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import { readFcpLookFile } from "../features/editor/services/fcpLookFile";
+import { checkEditorRequest, type EditorRequest } from "../features/editor/services/editorPaths";
+import { saveRoots } from "../features/files/services/saveRoots";
 import {
   copyFiles,
   installedApps,
@@ -26,16 +28,24 @@ export function registerEditorHandlers() {
     try {
       return await fn(payload);
     } catch (err: any) {
-      return { ok: false, error: err && err.message ? err.message : String(err) };
+      return { ok: false, error: err && err.message ? `The editor step did not finish: ${err.message}` : "The editor step did not finish." };
     }
   };
   ipcMain.handle(IPC.editorInstalled, guard(async () => ({ ok: true, apps: installedApps(), offered: offeredEditors() })));
   ipcMain.handle(IPC.editorProbe, guard((file: unknown) => probeMedia(file)));
-  ipcMain.handle(IPC.editorWriteFcpxml, guard((payload: unknown) => writeFcpxml(payload || {})));
-  ipcMain.handle(IPC.editorOpenWith, guard((payload: unknown) => openWithApp(payload || {}, { showFile: (f: string) => shell.showItemInFolder(f) })));
-  ipcMain.handle(IPC.editorReveal, guard((target: unknown) => reveal(target, { shell })));
-  ipcMain.handle(IPC.editorCopyFiles, guard((payload: unknown) => copyFiles(payload || {})));
+  const checked = (kind: EditorRequest, run: (payload: unknown) => unknown) =>
+    guard((payload: unknown) => {
+      const verdict = checkEditorRequest(kind, payload, saveRoots());
+      return verdict.ok ? run(payload) : { ok: false, error: verdict.error };
+    });
+  ipcMain.handle(IPC.editorWriteFcpxml, checked("writeFcpxml", (p) => writeFcpxml((p as object) || {})));
+  ipcMain.handle(
+    IPC.editorOpenWith,
+    checked("openWith", (p) => openWithApp((p as object) || {}, { showFile: (f: string) => shell.showItemInFolder(f) })),
+  );
+  ipcMain.handle(IPC.editorReveal, checked("reveal", (t) => reveal(t, { shell })));
+  ipcMain.handle(IPC.editorCopyFiles, checked("copyFiles", (p) => copyFiles((p as object) || {})));
   // A dropped file or bundle: the renderer sends its path, main reads and checks it.
   ipcMain.handle(IPC.fcpLookRead, (_e: unknown, picked: unknown) => readFcpLookFile(picked));
-  ipcMain.handle(IPC.editorPathExists, guard((target: unknown) => pathExists(target)));
+  ipcMain.handle(IPC.editorPathExists, checked("pathExists", (t) => pathExists(t)));
 }
