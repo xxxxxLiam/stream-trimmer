@@ -4,7 +4,7 @@
  * Description: The top bar's icon-only Panels menu: a tick per panel (click to close or bring
  *   back), then Reset layout and Save layout.
  */
-import { Grid1x2 } from "react-bootstrap-icons";
+import { IconPanels } from "./BarIcons";
 import PopoverMenu, { type MenuItem } from "./PopoverMenu";
 import { hasSavedPanelLayout, restoreSavedPanelLayout, usePanelLayoutState } from "../hooks/usePanelLayoutState";
 import { isOpen } from "../utils/panelLayout";
@@ -34,7 +34,7 @@ export default function PanelsMenu({
   ];
   return (
     <PopoverMenu id="ui-panels-menu" label="Panels" items={items} triggerClassName={triggerClassName} labelWhenOpen>
-      <Grid1x2 size={16} />
+      <IconPanels />
     </PopoverMenu>
   );
 }

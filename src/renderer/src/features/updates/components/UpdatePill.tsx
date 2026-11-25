@@ -13,7 +13,7 @@ export default function UpdatePill() {
   const pill = updatePillFor(ready);
   if (!pill) return null;
   const cls =
-    "mr-1 inline-flex h-8 items-center rounded-control border border-ice px-3 text-meta text-fg hover:bg-ice-tint-12";
+    "mr-[4px] inline-flex h-[32px] items-center rounded-control border border-ice px-[12px] text-meta text-fg hover:bg-ice-tint-12";
   if (pill.kind === "download") {
     return (
       <a id="ui-update-pill" className={cls} href={pill.url} target="_blank" rel="noreferrer">

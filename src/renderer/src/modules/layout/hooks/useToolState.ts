@@ -18,7 +18,7 @@ export type ToolState = {
   fitRequests: number;
 };
 
-const INITIAL: ToolState = { tool: "pointer", zoom: 0, fitRequests: 0 };
+const INITIAL: ToolState = { tool: "clip", zoom: 0, fitRequests: 0 };
 let state: ToolState = INITIAL;
 const listeners = new Set<() => void>();
 

@@ -261,6 +261,15 @@
     color: var(--c-fg);
   }
 
+  /* The top bar's buttons are the 44px target the board draws (the shared icon button is 32px). */
+  .topbar .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .topbar .icon-btn:has(> .icon-label) {
+    width: auto;
+  }
+
   .chip {
     @apply inline-flex h-chip max-w-full items-center gap-1 rounded-chip border px-2 text-meta text-fg;
     background: var(--c-raised);

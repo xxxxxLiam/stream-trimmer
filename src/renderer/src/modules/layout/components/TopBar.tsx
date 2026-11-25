@@ -34,17 +34,17 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
   const today = todayCount(active);
 
   return (
-    <header className="relative flex h-[53px] shrink-0 items-center gap-3 border-b border-hairline pl-4 pr-3">
+    <header className="topbar relative flex h-[53px] shrink-0 items-center gap-[12px] border-b border-hairline pl-[16px] pr-[12px]">
       {active ? <CampaignChip menu={campaignMenu} /> : null}
       {today ? (
         <span id="ui-today-count" className="text-meta text-fg-dim">
           {today}
         </span>
       ) : null}
-      <span className="pointer-events-none absolute inset-x-0 truncate px-48 text-center text-body font-medium">
+      <span className="pointer-events-none absolute inset-x-0 truncate px-[192px] text-center text-body font-medium">
         {info?.title ?? ""}
       </span>
-      <div className="relative ml-auto flex items-center gap-0.5">
+      <div className="relative ml-auto flex items-center gap-[2px]">
         <UpdatePill />
         <PanelsMenu extraItems={panelsMenuExtras} />
         <HelpButton open={helpOpen} onToggle={onToggleHelp} />
@@ -58,7 +58,7 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
           onClick={onToggleSettings}
         >
           <IconSettingsGear />
-          {settingsOpen ? <span className="icon-label ml-2 text-body">Settings</span> : null}
+          {settingsOpen ? <span className="icon-label ml-[8px] text-body">Settings</span> : null}
         </button>
       </div>
     </header>

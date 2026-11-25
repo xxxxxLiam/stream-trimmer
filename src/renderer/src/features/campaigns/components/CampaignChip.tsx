@@ -30,7 +30,7 @@ export default function CampaignChip({ menu }: { menu?: ReactNode }) {
       <button
         type="button"
         id="ui-campaign-chip"
-        className="inline-flex h-11 max-w-[260px] items-center gap-2 rounded-control border border-hairline bg-raised pl-3 pr-2.5 text-body font-medium text-fg hover:bg-hover"
+        className="inline-flex h-[44px] max-w-[260px] items-center gap-[8px] rounded-control border border-hairline bg-raised pl-[12px] pr-[10px] text-body font-medium text-fg hover:bg-hover"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}

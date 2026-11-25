@@ -105,7 +105,7 @@ export default function PopoverMenu({
         }}
       >
         {children}
-        {open && labelWhenOpen ? <span className="icon-label ml-2 text-body">{label}</span> : null}
+        {open && labelWhenOpen ? <span className="icon-label ml-[8px] text-body">{label}</span> : null}
       </button>
       {open ? (
         <div
@@ -113,14 +113,14 @@ export default function PopoverMenu({
           role="menu"
           aria-label={label}
           onKeyDown={onMenuKey}
-          className={`surface-raised absolute z-40 min-w-[200px] border border-hairlineStrong py-1 ${
-            side === "below" ? "top-full mt-1" : "bottom-full mb-1"
+          className={`surface-raised absolute z-40 min-w-[200px] border border-hairlineStrong py-[4px] ${
+            side === "below" ? "top-full mt-[4px]" : "bottom-full mb-[4px]"
           } ${align === "end" ? "right-0" : "left-0"}`}
         >
-          {heading ? <div className="px-3 py-1 text-meta text-fg-dim">{heading}</div> : null}
+          {heading ? <div className="px-[12px] py-[4px] text-meta text-fg-dim">{heading}</div> : null}
           {items.map((item) =>
             item.kind === "separator" ? (
-              <div key={item.key} role="separator" className="my-1 border-t border-hairline" />
+              <div key={item.key} role="separator" className="my-[4px] border-t border-hairline" />
             ) : (
               <button
                 key={item.key}
@@ -128,7 +128,7 @@ export default function PopoverMenu({
                 role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
                 aria-checked={item.checked}
                 disabled={item.disabled}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-body text-fg hover:bg-hover disabled:text-disabled"
+                className="flex w-full items-center gap-[8px] px-[12px] py-[8px] text-left text-body text-fg hover:bg-hover disabled:text-disabled"
                 onClick={() => {
                   item.onSelect();
                   if (item.keepOpen) return;
@@ -137,7 +137,7 @@ export default function PopoverMenu({
                 }}
               >
                 {item.checked === undefined ? null : (
-                  <span className="flex w-4 shrink-0 justify-center text-ice">{item.checked ? <Check size={16} /> : null}</span>
+                  <span className="flex w-[16px] shrink-0 justify-center text-ice">{item.checked ? <Check size={16} /> : null}</span>
                 )}
                 <span>{item.label}</span>
               </button>

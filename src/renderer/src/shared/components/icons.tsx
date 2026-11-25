@@ -1,7 +1,7 @@
 /**
  * File: icons.tsx
  * Path: src/renderer/src/shared/components/icons.tsx
- * Description: One family of 16px stroke-only icons (1.5 stroke width), shared by
+ * Description: One family of 16px stroke-only icons (1.4 stroke width, as the boards draw them), shared by
  *   the shell. Decorative by default (aria-hidden); label the parent button.
  */
 import type { ReactNode, SVGProps } from "react";
@@ -14,7 +14,7 @@ export function Icon({ children, ...rest }: SVGProps<SVGSVGElement> & { children
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.5}
+      strokeWidth={1.4}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -28,9 +28,8 @@ export function Icon({ children, ...rest }: SVGProps<SVGSVGElement> & { children
 
 export const IconHelp = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
-    <circle cx="8" cy="8" r="6.25" />
-    <path d="M6.2 6.2a1.9 1.9 0 0 1 3.6.8c0 1.2-1.8 1.4-1.8 2.5" />
-    <path d="M8 11.4v.1" />
+    <circle cx="8" cy="8" r="6" />
+    <path d="M6.5 6.3a1.6 1.6 0 113 .7c-.6.4-1.5.8-1.5 1.7M8 11h0" />
   </Icon>
 );
 export const IconSettings = (p: SVGProps<SVGSVGElement>) => (

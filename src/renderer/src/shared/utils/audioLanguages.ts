@@ -85,9 +85,9 @@ export function toggleLanguage(
   return next;
 }
 
-/** The folder shortened from the left, "…/Clips/Acme", with the full path left for the tooltip. */
+/** The folder shortened from the left, "Clips/Acme" (the home folder dropped), with the full path left for the tooltip. */
 export function shortenPath(path: string, max = 28): string {
-  const clean = path.replace(/\\/g, "/").replace(/^\/(Users|home)\/[^/]+/, "~");
+  const clean = path.replace(/\\/g, "/").replace(/^\/(Users|home)\/[^/]+\/(?=.)/, "").replace(/^\/(Users|home)\/[^/]+\/?$/, "~");
   if (clean.length <= max) return clean;
   return `…${clean.slice(clean.length - (max - 1))}`;
 }

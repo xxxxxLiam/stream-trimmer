@@ -14,7 +14,7 @@ import type { PanelDefinition, PanelId } from "../utils/panelRegistry";
 export const tabDomId = (id: PanelId) => `panel-tab-${id}`;
 export const panelBodyDomId = (id: PanelId) => `panel-body-${id}`;
 
-const STRIP_BUTTON = "inline-flex h-11 w-9 items-center justify-center rounded-control text-fg-dim hover:text-fg";
+const STRIP_BUTTON = "inline-flex h-[44px] w-[36px] items-center justify-center rounded-control text-fg-dim hover:text-fg";
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -97,14 +97,14 @@ export default function PanelTabStrip({
     : [{ key: "none", label: "Every panel is open", disabled: true, onSelect: () => {} }];
 
   return (
-    <div className="flex h-11 shrink-0 items-stretch border-b border-hairline">
+    <div className="flex h-[44px] shrink-0 items-stretch border-b border-hairline">
       <div className="relative min-w-0 flex-1">
         <div
           ref={scroller}
           role="tablist"
           aria-label={label}
           onScroll={measure}
-          className="flex h-full min-w-0 items-stretch gap-[18px] overflow-x-auto overflow-y-hidden pl-3.5"
+          className="flex h-full min-w-0 items-stretch gap-[18px] overflow-x-auto overflow-y-hidden pl-[14px]"
         >
           {tabs.map((t) => {
             const selected = t.id === active;
@@ -128,10 +128,10 @@ export default function PanelTabStrip({
             );
           })}
         </div>
-        {fade.start ? <span aria-hidden data-fade="start" className="tab-fade pointer-events-none absolute inset-y-0 left-0 w-6" /> : null}
-        {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-6" /> : null}
+        {fade.start ? <span aria-hidden data-fade="start" className="tab-fade pointer-events-none absolute inset-y-0 left-0 w-[24px]" /> : null}
+        {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-[24px]" /> : null}
       </div>
-      <div className="flex shrink-0 items-center pr-1">
+      <div className="flex shrink-0 items-center pr-[4px]">
         <PopoverMenu label={`Add a panel to ${label.toLowerCase()}`} items={addItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
           <Plus size={14} />
         </PopoverMenu>
