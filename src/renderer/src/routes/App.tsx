@@ -18,6 +18,8 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
+import { useFlushPendingReports } from "../features/help/hooks/useReportMutations";
+import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
 import { CHANNEL_DATA_BUILT, useOwnerAccess } from "../shared/utils/ownerGate";
@@ -44,6 +46,7 @@ import {
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
+import SettingsRestoredNote from "../features/settings/components/SettingsRestoredNote";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
 import ImportDrawer from "../features/import/components/ImportDrawer";
@@ -56,7 +59,7 @@ import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
 import { getClipDestination } from "../features/player/hooks/useClipDestination";
-import { openInFor, toAfterCutting } from "../features/player/utils/clipDestination";
+import { settingsWithDestination } from "../features/player/utils/clipDestination";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
@@ -68,8 +71,7 @@ import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
 function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
-  const d = getClipDestination();
-  return { ...settings, afterCutting: toAfterCutting(d), openIn: openInFor(d) };
+  return settingsWithDestination(settings, getClipDestination());
 }
 
 const EDITOR_KEY = "clipper.editorHandoff";
@@ -93,7 +95,16 @@ function useEditorSettings(campaignId: string | null) {
     },
     [campaignId],
   );
-  return [settings, setSettings] as const;
+  // Any campaign's settings, for the Settings drawer (every campaign's Final Cut fields show there).
+  const settingsFor = useCallback((id: string) => normalizeEditorSettings(all[id]), [all]);
+  const setSettingsFor = useCallback((id: string, next: EditorHandoffSettings) => {
+    setAll((prev) => {
+      const merged = { ...prev, [id]: next };
+      writeSetting(EDITOR_KEY, merged);
+      return merged;
+    });
+  }, []);
+  return [settings, setSettings, settingsFor, setSettingsFor] as const;
 }
 
 function SavedToast() {
@@ -251,7 +262,7 @@ function Layout({ active }: { active: boolean }) {
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
 
-  const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
+  const [editorSettings, setEditorSettings, editorSettingsFor, setEditorSettingsFor] = useEditorSettings(campaign?.id ?? null);
   // Which audio languages the next Clip makes, remembered per campaign. No dubs: one plain clip.
   const [audioSel, setAudioSel] = useAudioLanguageState(campaign?.id ?? null);
   const languagePlans = useMemo(() => planLanguages(info?.audioTracks, audioSel), [info?.audioTracks, audioSel]);
@@ -434,7 +445,7 @@ function Layout({ active }: { active: boolean }) {
       onClose={closeSettings}
       startAt={settingsStartAt}
       tracks={info?.audioTracks}
-      editor={{ campaignId: campaign?.id ?? null, settings: editorSettings, onChange: setEditorSettings }}
+      editor={{ settingsFor: editorSettingsFor, onChange: setEditorSettingsFor }}
     />
   );
   const dayHost = useDayHost();
@@ -498,6 +509,7 @@ function Layout({ active }: { active: boolean }) {
 
   return (
     <>
+      <SettingsRestoredNote />
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
@@ -562,6 +574,7 @@ function Layout({ active }: { active: boolean }) {
 }
 
 function Shell() {
+  useFlushPendingReports();
   const { tabs, activeId, setTabCampaign } = useWorkspace();
 
   // No background polling. On launch we read the imported cookies.txt once
@@ -605,7 +618,7 @@ function Shell() {
 
 export default function App() {
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallback={(error) => <CrashScreenHost error={error} />}>
       <WorkspaceProvider>
         <CampaignProvider>
           <Shell />

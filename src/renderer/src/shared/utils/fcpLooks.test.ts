@@ -29,7 +29,55 @@ test("the name comes from the file name, and a repeat is made different", () => 
   assert.equal(lookNameFromFile(".xml"), "My look");
   const first = addSavedLook([], { fileName: "Acme grade.fcpxml", look }, 5, ids);
   assert.deepEqual({ name: first.saved.name, addedAt: first.saved.addedAt }, { name: "Acme grade", addedAt: 5 });
-  assert.equal(addSavedLook(first.looks, { fileName: "acme grade.fcpxml", look }, 6, ids).saved.name, "acme grade 2");
+  const other = { ...look, effects: [...look.effects, "Other"] };
+  assert.equal(addSavedLook(first.looks, { fileName: "acme grade.fcpxml", look: other }, 6, ids).saved.name, "acme grade 2");
+});
+
+test("D-10: the same file uploaded twice is one look, not 'Acme grade 2'", () => {
+  const first = addSavedLook([], { fileName: "Acme grade.fcpxml", look }, 5, ids);
+  const again = addSavedLook(first.looks, { fileName: "Acme grade copy.fcpxml", look: { ...look } }, 6, ids);
+  assert.equal(again.looks.length, 1);
+  assert.equal(again.saved.id, first.saved.id);
+});
+
+test("D-4: the real per-campaign shape (clipper.editorHandoff) keeps each campaign's look", () => {
+  const [acme, beta] = campaigns();
+  const legacy = {
+    [acme.id]: { afterCutting: "finalcut", applyLook: true, lookXml: sampleExport() },
+    [beta.id]: { applyLook: false, lookXml: "" },
+  };
+  const out = migratePastedLook([acme, beta], [], legacy, 9, ids);
+  assert.equal(out.migrated, true);
+  assert.equal(out.looks.length, 1);
+  assert.equal(out.looks[0].name, "My look");
+  assert.equal(out.campaigns[0].fcpLookId, out.looks[0].id);
+  assert.equal(out.campaigns[1].fcpLookId, undefined);
+});
+
+test("D-4: identical texts are stored once, different ones as 'My look 2'", () => {
+  const [acme, beta] = campaigns();
+  const diff = sampleExport().replace(/scale="[^"]*"/, 'scale="2 2"');
+  const same = migratePastedLook([acme, beta], [], { [acme.id]: { applyLook: true, lookXml: sampleExport() }, [beta.id]: { applyLook: true, lookXml: sampleExport() + "\n" } }, 9, ids);
+  assert.equal(same.looks.length, 1);
+  assert.equal(same.campaigns[0].fcpLookId, same.campaigns[1].fcpLookId);
+  if (diff !== sampleExport()) {
+    const two = migratePastedLook([acme, beta], [], { [acme.id]: { applyLook: true, lookXml: sampleExport() }, [beta.id]: { applyLook: true, lookXml: diff } }, 9, ids);
+    assert.deepEqual(two.looks.map((l) => l.name), ["My look", "My look 2"]);
+    assert.notEqual(two.campaigns[0].fcpLookId, two.campaigns[1].fcpLookId);
+  }
+});
+
+test("D-4: a per-campaign text that does not parse marks nothing migrated", () => {
+  const [acme, beta] = campaigns();
+  const out = migratePastedLook([acme, beta], [], { [acme.id]: { applyLook: true, lookXml: sampleExport() }, [beta.id]: { applyLook: true, lookXml: "garbage" } }, 9, ids);
+  assert.equal(out.migrated, false);
+  assert.equal(out.looks.length, 0);
+});
+
+test("D-9: a new campaign gets only the look it is handed, never the last campaign's", () => {
+  const withLook = campaigns().map((c) => ({ ...c, fcpLookId: "old" }));
+  assert.equal(createCampaign(withLook, { name: "Gamma" }).campaign.fcpLookId, undefined);
+  assert.equal(createCampaign(withLook, { name: "Delta", fcpLookId: "last-picked" }).campaign.fcpLookId, "last-picked");
 });
 
 test("a look is stored once and a campaign keeps only its id", () => {
@@ -79,10 +127,11 @@ test("a pasted look that no longer parses is not lost: nothing is marked migrate
   assert.equal(out.looks.length, 0);
 });
 
-test("a new campaign starts with the last look used", () => {
-  const base = campaigns().map((c, i) => (i === 0 ? { ...c, fcpLookId: "l-x" } : c));
-  assert.equal(createCampaign(base, { name: "Gamma" }).campaign.fcpLookId, "l-x");
-  assert.equal(createCampaign([], { name: "First" }).campaign.fcpLookId, undefined);
+test("D-9: the last look picked is what a new campaign starts with (wired in the campaign context)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const dir = new URL(".", import.meta.url).pathname;
+  assert.match(readFileSync(`${dir}../../features/campaigns/hooks/CampaignContext.tsx`, "utf8"), /fcpLookId: input\.fcpLookId \?\? loadLastLookId\(\)/);
+  assert.match(readFileSync(`${dir}../../features/settings/hooks/useFinalCutLook.ts`, "utf8"), /rememberLastLook\(added\.id\)[\s\S]*rememberLastLook\(id\)/);
 });
 
 test("the list and a campaign's look id survive the settings round trip; a malformed look is dropped", () => {

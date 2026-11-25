@@ -10,11 +10,11 @@ import { CopyFailureDiagnostics } from "../../../shared/components/DiagnosticsDi
 import type { DownloadFailureInfo } from "../../../modules/clipper/utils/clipperTypes";
 import { failureActions, failureCopy, type FailureAction } from "../utils/clipFailure";
 import type { FailedClip } from "../hooks/useExportState";
+import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../utils/pillClasses";
 
-const PILL = "inline-flex h-[30px] items-center whitespace-nowrap rounded-[15px] border px-[12px] text-meta font-medium leading-[normal]";
-const PRIMARY = `${PILL} border-ice text-ice`;
-const QUIET = `${PILL} border-hairlineStrong bg-panel text-fg`;
-const HIT = "inline-flex h-[44px] flex-none items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost";
+const PRIMARY = PRIMARY_PILL;
+const QUIET = QUIET_PILL;
+const HIT = PILL_HIT;
 
 const LABEL: Record<Exclude<FailureAction, "copyDetails">, string> = {
   retry: "Retry",

@@ -10,7 +10,9 @@ import { suggestProjectName } from "../utils/projectName";
 import { validateClipName } from "../utils/clipName";
 import PanelEmptyNote, { KeyChip } from "../../../modules/layout/components/PanelEmptyNote";
 import { useExportController } from "../hooks/useExportController";
+import { getClipDestination } from "../../player/hooks/useClipDestination";
 import FailedRow from "./FailedRow";
+import HandoffRow from "./HandoffRow";
 import MakingRow from "./MakingRow";
 import WaitingRow from "./WaitingRow";
 
@@ -46,6 +48,15 @@ export default function ExportPanel() {
           onUndo={c.undo}
           onShow={() => finishedEntry && actions.show(finishedEntry)}
           onInEditor={() => finishedEntry && actions.inEditor(finishedEntry)}
+        />
+      )}
+
+      {c.handoffNotice && (
+        <HandoffRow
+          notice={c.handoffNotice}
+          tried={getClipDestination()}
+          onShowInFolder={c.showInFolder}
+          onSendTo={c.sendTo}
         />
       )}
 

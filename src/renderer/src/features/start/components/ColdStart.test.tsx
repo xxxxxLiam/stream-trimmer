@@ -21,6 +21,9 @@ const base: ColdStartProps = {
   toolsStatus: "ready",
   onRetryTools: noop,
   problem: "",
+  onRetryOpen: noop,
+  opening: false,
+  backTo: null,
   folderLabel: "Downloads/Clipr",
   onOpenFolder: noop,
 };
@@ -77,4 +80,35 @@ test("App shows the cold start while no video is open", () => {
 test("the new-campaign offer waits for a video, so nothing covers the cold start", () => {
   const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
   assert.match(app, /open=\{active && !!info && !campaign && !campaignPromptDismissed\}/);
+});
+
+test("B-4: a failed open shows its sentence with Try again, and a way back when a video is open", () => {
+  const h = html({ value: "x", problem: "This video is private.", backTo: { label: "Acme podcast", onBack: noop } });
+  assert.match(h, /This video is private\./);
+  assert.match(h, />Try again</);
+  assert.match(h, /Back to Acme podcast/);
+  assert.doesNotMatch(html({ value: "x" }), /Try again/);
+});
+
+test("B-7: while the link opens the box says Opening… and runs the Preparing line", () => {
+  const h = html({ value: "x", opening: true });
+  assert.match(h, /Opening…/);
+  assert.match(h, /w-1\/4 bg-ice/);
+  assert.doesNotMatch(html({ value: "x", opening: true, problem: "old sentence" }), /old sentence/);
+  assert.doesNotMatch(html(), /Opening…/);
+});
+
+test("E-1: Try again re-asks the engine, and a pasted link is tried even before the tools are ready", async () => {
+  const { readFileSync } = await import("node:fs");
+  const dir = new URL("../hooks/", import.meta.url).pathname;
+  assert.match(readFileSync(`${dir}useToolsStatusQueries.ts`, "utf8"), /force \? "\/api\/tools\?retry=1"/);
+  const ctl = readFileSync(`${dir}useStartController.ts`, "utf8");
+  assert.doesNotMatch(ctl, /setHeld|held/);
+  assert.match(ctl, /onRetryOpen: searchNow/);
+});
+
+test("B-4: a link that has not opened is not saved as a video", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../workspace/hooks/WorkspaceContext.tsx", import.meta.url), "utf8");
+  assert.match(src, /if \(url && !opened\) return;/);
 });

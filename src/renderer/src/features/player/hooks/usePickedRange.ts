@@ -6,11 +6,8 @@
  */
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import type { Range } from "../../../shared/utils/segments";
+import { pickedRangeOf } from "../utils/pickedRange";
 
 export function usePickedRange(): Range | null {
-  const { startText, endText, start, end, validationError } = useClipperContext();
-  const touched = startText.trim() !== "" || endText.trim() !== "";
-  return touched && !validationError && Number.isFinite(start) && Number.isFinite(end) && end > start
-    ? { start, end }
-    : null;
+  return pickedRangeOf(useClipperContext());
 }
