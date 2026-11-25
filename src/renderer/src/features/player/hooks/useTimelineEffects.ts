@@ -77,15 +77,19 @@ export function useTimelineEffects(a: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.duration, a.framed?.start, a.framed?.end]);
 
-  // Zoomed in, the window follows the playhead once it runs off the edge.
+  // Zooming back out clears the centre.
   useEffect(() => {
-    if (a.zoom === 0) {
-      a.setFocus(null);
-      return;
-    }
+    if (a.zoom === 0) a.setFocus(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.zoom]);
+
+  // Zoomed in, the window follows the playhead once it runs off the edge. Only when the playhead
+  // moves: zooming or panning to look somewhere else must not snap the view back to it.
+  useEffect(() => {
+    if (a.zoom === 0) return;
     if (a.playhead < a.win.start || a.playhead > a.win.end) a.setFocus(a.playhead);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.zoom, a.playhead]);
+  }, [a.playhead]);
 
   useEffect(() => {
     publishTimelineView(a.view);

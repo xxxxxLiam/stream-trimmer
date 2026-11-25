@@ -4,8 +4,9 @@
  * Description: The timeline panel: header, ruler and the three lanes (Transcript, Source, Clips),
  *   full width under the preview. The tools and zoom come from the bottom bar's shared state.
  */
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useTimelineController } from "../hooks/useTimelineController";
+import { TOOL_CURSORS } from "../utils/laneTools";
 import { useTranscriptLane } from "../hooks/useTranscriptLane";
 import ClipsLane from "./ClipsLane";
 import SourceLane from "./SourceLane";
@@ -32,8 +33,21 @@ export default function Timeline() {
     return () => ro.disconnect();
   }, [setWidth]);
 
+  // A native listener over the whole timeline: React's wheel handler is passive and cannot keep the page
+  // from scrolling or zooming, and a trackpad pinch (Ctrl + wheel) must work wherever the pointer is.
+  const onWheel = c.onLaneWheel;
+  useEffect(() => {
+    const el = laneBox.current;
+    if (!el) return;
+    const h = (e: WheelEvent) => {
+      if (onWheel(e, el.getBoundingClientRect().left + LABEL_WIDTH)) e.preventDefault();
+    };
+    el.addEventListener("wheel", h, { passive: false });
+    return () => el.removeEventListener("wheel", h);
+  });
+
   return (
-    <div id="ui-timeline" ref={laneBox} className="relative flex min-w-[0px] flex-1 flex-col border-y border-hairline bg-panel pb-[10px]">
+    <div id="ui-timeline" ref={laneBox} className={`relative flex min-w-[0px] flex-1 flex-col border-y border-hairline bg-panel pb-[10px] ${TOOL_CURSORS[c.tool]}`}>
       <TimelineHeader c={c} />
       <TimelineRuler c={c} />
       {transcriptLane ? <TranscriptLane c={c} /> : null}

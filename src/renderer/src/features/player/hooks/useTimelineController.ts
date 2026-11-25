@@ -206,7 +206,7 @@ export function useTimelineController() {
     } else {
       const at = toT(axis, e.clientX - left);
       if (at !== null) s.setFocus(at);
-      tools.zoomBy(zoomStep(act.direction < 0));
+      tools.zoomBy(act.amount);
     }
     return true;
   };

@@ -9,7 +9,9 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const src = readFileSync(new URL("./useTimelineController.ts", import.meta.url), "utf8");
-const lane = readFileSync(new URL("../components/SourceLane.tsx", import.meta.url), "utf8");
+const lane = readFileSync(new URL("../components/Timeline.tsx", import.meta.url), "utf8");
+const effects = readFileSync(new URL("./useTimelineEffects.ts", import.meta.url), "utf8");
+const sourceLane = readFileSync(new URL("../components/SourceLane.tsx", import.meta.url), "utf8");
 const down = src.slice(src.indexOf("const onLanePointerDown"), src.indexOf("const onLanePointerMove"));
 
 test("pointer tool: a press moves the playhead and starts a scrub, with no range drag", () => {
@@ -27,4 +29,18 @@ test("scissors: a press starts a range drag and does not seek", () => {
 
 test("the lane listens for the wheel with a non-passive listener", () => {
   assert.match(lane, /addEventListener\("wheel"[\s\S]*passive: false/);
+});
+
+test("the cursor follows the tool over the whole timeline, not only the Source lane", () => {
+  assert.match(lane, /TOOL_CURSORS\[c\.tool\]/);
+});
+
+test("the Source outline wraps the filmstrip instead of sitting on it", () => {
+  assert.match(sourceLane, /left: x - 3/);
+});
+
+test("zooming does not snap the view back to the playhead: only the playhead moving does", () => {
+  const follow = effects.slice(effects.indexOf("the window follows the playhead"));
+  const deps = follow.slice(0, follow.indexOf("publishTimelineView")).match(/\}, \[([^\]]*)\]\)/g) ?? [];
+  assert.deepEqual(deps, ["}, [a.playhead])"]);
 });

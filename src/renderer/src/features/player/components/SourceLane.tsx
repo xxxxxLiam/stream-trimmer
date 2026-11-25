@@ -5,15 +5,12 @@
  *   in Ice with its glow, flags, the Frost playhead, and the fold. The lane is where the tools act:
  *   the pointer moves the playhead (click or drag), the scissors drag a range or click a start then an end, the wheel pans, the flag tool drops flags.
  */
-import { useEffect, useRef } from "react";
 import type { TimelineController } from "../hooks/useTimelineController";
 import { pickHintLead } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
 import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
 import LaneLabel from "./LaneLabel";
-
-const CURSORS = { pointer: "cursor-pointer", clip: "cursor-crosshair", flag: "cursor-cell", hand: "cursor-grab", zoom: "cursor-zoom-in" } as const;
 
 export default function SourceLane({ c }: { c: TimelineController }) {
   const covered = [...c.sections, ...c.used.filter((u) => u.end > u.start)].sort((a, b) => a.start - b.start);
@@ -28,25 +25,12 @@ export default function SourceLane({ c }: { c: TimelineController }) {
     const end = c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? c.duration;
     if (at < end) dim.push({ start: at, end });
   }
-  const laneRef = useRef<HTMLDivElement>(null);
-  const onWheel = c.onLaneWheel;
-  // A native listener: React's wheel handler is passive and cannot stop the page from scrolling.
-  useEffect(() => {
-    const el = laneRef.current;
-    if (!el) return;
-    const h = (e: WheelEvent) => {
-      if (onWheel(e, el.getBoundingClientRect().left)) e.preventDefault();
-    };
-    el.addEventListener("wheel", h, { passive: false });
-    return () => el.removeEventListener("wheel", h);
-  });
   return (
     <div className="flex h-[44px] items-center">
       <LaneLabel>Source</LaneLabel>
       <div
-        className={`relative h-full flex-1 touch-none select-none ${CURSORS[c.tool]}`}
+        className={`relative h-full flex-1 touch-none select-none`}
         data-lane="source"
-        ref={laneRef}
         onPointerDown={c.onLanePointerDown}
         onPointerMove={c.onLanePointerMove}
         onPointerUp={c.onLanePointerUp}
@@ -72,7 +56,8 @@ export default function SourceLane({ c }: { c: TimelineController }) {
                   key={`${s.start}-${s.end}`}
                   aria-hidden="true"
                   className="pointer-events-none absolute rounded-chip border-2 border-ice bg-ice-tint-12 shadow-range"
-                  style={{ left: x, width: Math.max(4, toX(c.axis, s.end) - x), top: c.joined ? 12 : 4, bottom: c.joined ? 12 : 4 }}
+                  // The outline wraps the filmstrip (32px, centred in the lane) instead of sitting on it.
+                  style={{ left: x - 3, width: Math.max(4, toX(c.axis, s.end) - x) + 6, top: c.joined ? 12 : 3, bottom: c.joined ? 12 : 3 }}
                 />
               );
             })}
