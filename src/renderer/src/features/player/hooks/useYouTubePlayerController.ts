@@ -183,11 +183,8 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
           host: "https://www.youtube-nocookie.com",
           playerVars: {
             rel: 0,
-            // Clipr has its own play, pause and seek bar, so YouTube's control bar is off. Its title strip and logo stay: the embed terms require them.
-            controls: 0,
-            disablekb: 1,
-            fs: 0,
-            iv_load_policy: 3,
+            // YouTube's own controls stay on (Liam, 25 Nov): they and the title strip show on pause and fade
+            // while playing. With controls off they never faded, and the embed terms forbid covering them.
             modestbranding: 1,
             playsinline: 1,
             origin: window.location.origin,
