@@ -7,7 +7,7 @@ import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { useCallback, useRef, useState } from "react";
 import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl, buildClipFilename, sanitizeFilename, type ClipFormat, type VideoInfo } from "../../../shared/utils/clip";
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
-import { connectionNow, cookiePayload, isSignedOut, markDisconnected, requestedQuality, useYouTubeConnection, whenSignInSettled } from "../../../shared/utils/youtubeConnection";
+import { connectionNow, cookiePayload, markDisconnected, requestedQuality, useYouTubeConnection, whenSignInSettled } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
 import { FOLDER_FAILURE, folderProblem } from "../../../shared/utils/folderCheck";
 import { ROOM_REASON, roomProblem } from "../../../shared/utils/freeSpace";
@@ -108,7 +108,10 @@ export function useClipDownloadMutations({
     setFailure(null);
     // A clip made in the first seconds waits for the launch sign-in check, then asks for the quality its result allows.
     await whenSignInSettled();
-    const quality = requestedQuality({ signedOut: isSignedOut(connectionNow()), format, quality: qualityArg });
+    // Whatever the check could not decide in time counts as signed out: 360p and the sign-in pill, never a 1080p
+    // request that goes out with no session and is refused.
+    const hadSession = connectionNow().connected;
+    const quality = requestedQuality({ signedOut: !hadSession, format, quality: qualityArg });
     const controller = new AbortController();
     downloadAbortRef.current = controller;
     // When the desktop app has somewhere to put the clip, the engine hands
@@ -340,6 +343,7 @@ export function useClipDownloadMutations({
           diagnostics: engineFailure?.diagnostics,
           row: engineFailure?.row,
           room: engineFailure?.room,
+          hadSession,
           attempt: {
             operation: "download clip",
             videoId: extractVideoId(url),

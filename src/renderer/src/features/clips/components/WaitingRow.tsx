@@ -20,6 +20,8 @@ export type WaitingRowProps = {
   onSelect: () => void;
   /** Already made: drawn dimmed with a Frost dot, as on the board; it can be loaded again but not remade here. */
   made?: boolean;
+  /** One dim line when the length is under the campaign's minimum ("8 s under Acme's 0:30"). */
+  lengthNote?: string;
   onMake: () => void;
   onRemove: () => void;
 };
@@ -28,7 +30,7 @@ const chip = "rounded-chip border border-hairlineStrong px-[4px] py-[1px] text-m
 // A made row is dimmed the board's way (0.6) with the disabled token, not an opacity modifier (CLAUDE.md).
 const madeChip = "rounded-chip border border-hairline px-[4px] py-[1px] text-meta leading-[normal] text-disabled";
 
-export default function WaitingRow({ clip, name, suggested, selected, made, onSelect, onMake, onRemove }: WaitingRowProps) {
+export default function WaitingRow({ clip, name, suggested, selected, made, lengthNote, onSelect, onMake, onRemove }: WaitingRowProps) {
   const edge = suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
   return (
     <div className="group relative mx-[6px] my-[2px]">
@@ -46,6 +48,7 @@ export default function WaitingRow({ clip, name, suggested, selected, made, onSe
         <span className="min-w-0">
           <span className={`block whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
           <span className={`mt-[2px] block whitespace-nowrap text-meta leading-[normal] ${made ? "text-disabled" : "text-fg-dim"}`}>{rangeLine(clip)}</span>
+          {lengthNote && !made && <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{lengthNote}</span>}
           {clip.ranPastEnd !== undefined && !made && (
             <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">Ran past the end; stops at {boardTime(clip.ranPastEnd)}</span>
           )}

@@ -24,3 +24,10 @@ test("A2-1: a rejected sign-in says so and offers Sign in", () => {
   assert.match(html, /aria-label="Sign in"/);
   assert.doesNotMatch(html, /YouTube stopped the download/);
 });
+
+test("C3-3: a failed Clip-button cut is kept as a waiting moment when another cut starts, never dropped", async () => {
+  const { readFileSync } = await import("node:fs");
+  const eff = readFileSync("src/renderer/src/features/clips/hooks/useExportEffects.ts", "utf8");
+  assert.match(eff, /!wasDownloading\.current && downloading && s\.failed && !s\.failed\.bankId/);
+  assert.match(eff, /bankStore\.importClips\(q\.campaignId, q\.vid, \[\{ line: 1, id: null, label: "", segments: f\.segments \}\]\)/);
+});
