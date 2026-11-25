@@ -28,6 +28,8 @@ import {
   isLineUsed,
   lineOverlaps,
   snapRangeByIndex,
+  snapRangeToWords,
+  type LinePoint,
   type TimeRange,
 } from "../utils/transcript";
 import { useTranscriptWindowState } from "../hooks/useTranscriptWindowState";
@@ -47,6 +49,23 @@ export type TranscriptColumnProps = {
 };
 
 const NO_RANGES: readonly TimeRange[] = [];
+
+/** How far along a row's text the pointer is (0 to 1): by the character under it, else by width. */
+function textFraction(e: PointerEvent<HTMLElement>): number {
+  const el = e.currentTarget.querySelector<HTMLElement>("[data-text]");
+  if (!el) return 0;
+  const len = (el.textContent ?? "").length;
+  const at = (document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(e.clientX, e.clientY);
+  if (at && len > 0 && el.contains(at.startContainer)) {
+    // Characters before the caret inside the span (marks split the text into several nodes).
+    const before = document.createRange();
+    before.selectNodeContents(el);
+    before.setEnd(at.startContainer, at.startOffset);
+    return Math.min(1, Math.max(0, before.toString().length / len));
+  }
+  const box = el.getBoundingClientRect();
+  return box.width > 0 ? Math.min(1, Math.max(0, (e.clientX - box.left) / box.width)) : 0;
+}
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -211,8 +230,9 @@ export default function TranscriptColumn({
   }, []);
 
   // ---- click to seek, drag to set a range -------------------------------------------------
-  const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
-  const dragRef = useRef<{ a: number; b: number } | null>(null);
+  type Drag = { a: number; b: number; pa: LinePoint; pb: LinePoint };
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const dragRef = useRef<Drag | null>(null);
   const lastAnchor = useRef<number | null>(null);
   const dragging = drag !== null;
 
@@ -231,7 +251,8 @@ export default function TranscriptColumn({
         }
         return;
       }
-      const r = snapRangeByIndex(w.all, d.a, d.b);
+      // The ends snap to words, not to whole caption lines.
+      const r = snapRangeToWords(w.all, d.pa, d.pb) ?? snapRangeByIndex(w.all, d.a, d.b);
       if (r) {
         lastAnchor.current = Math.min(d.a, d.b);
         setRange(r.start, r.end);
@@ -257,14 +278,18 @@ export default function TranscriptColumn({
     // Touch pointers are implicitly captured to the first element; release so enter fires on rows.
     (e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
     const a = e.shiftKey && lastAnchor.current != null ? lastAnchor.current : i;
-    dragRef.current = { a, b: i };
-    setDrag({ a, b: i });
+    const p = { line: i, frac: textFraction(e) };
+    const pa = a === i ? p : { line: a, frac: 0 };
+    dragRef.current = { a, b: i, pa, pb: p };
+    setDrag(dragRef.current);
   };
-  const onRowPointerEnter = (i: number) => {
+  const onRowPointerMove = (e: PointerEvent<HTMLButtonElement>, i: number) => {
     const d = dragRef.current;
-    if (!d || d.b === i) return;
-    dragRef.current = { a: d.a, b: i };
-    setDrag({ a: d.a, b: i });
+    if (!d) return;
+    const pb = { line: i, frac: textFraction(e) };
+    if (d.b === i && Math.abs(pb.frac - d.pb.frac) < 0.001) return;
+    dragRef.current = { ...d, b: i, pb };
+    setDrag(dragRef.current);
   };
   // Keyboard: Enter/Space seeks; Shift+Enter/Space extends a range from the last line chosen.
   const onRowClick = (e: MouseEvent<HTMLButtonElement>, i: number) => {
@@ -393,7 +418,7 @@ export default function TranscriptColumn({
                       data-line={i}
                       aria-current={isCurrent ? "true" : undefined}
                       onPointerDown={(e) => onRowPointerDown(e, i)}
-                      onPointerEnter={() => onRowPointerEnter(i)}
+                      onPointerMove={(e) => onRowPointerMove(e, i)}
                       onClick={(e) => onRowClick(e, i)}
                       className={
                         "mx-[10px] my-[3px] flex min-h-target w-[calc(100%-20px)] select-none items-baseline gap-[8px] rounded-control px-[10px] py-[8px] text-left text-body leading-[1.35] text-fg " +
@@ -405,7 +430,7 @@ export default function TranscriptColumn({
                       <span className="flex-none text-meta leading-[1.35] text-fg-dim">
                         {formatClock(line.start)}
                       </span>
-                      <span className={"min-w-[0px] flex-1 " + (isUsed ? "text-fg-dim" : "")}>
+                      <span data-text className={"min-w-[0px] flex-1 " + (isUsed ? "text-fg-dim" : "")}>
                         {matchLines.has(i) ? highlight(line.text, w.query) : line.text}
                       </span>
                       {isUsed && (

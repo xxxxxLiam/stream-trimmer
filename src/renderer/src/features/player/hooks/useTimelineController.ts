@@ -6,7 +6,7 @@
  *   data into one view model with its pointer handlers.
  */
 import { useSuggestedName } from "./useSuggestedName";
-import { useEffect, useMemo, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
@@ -16,7 +16,7 @@ import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
 import { grabbedEdge, scissorsClick, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
-import { axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis } from "../utils/timelineAxis";
+import { axisDuringDrag, axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
@@ -60,9 +60,16 @@ export function useTimelineController() {
   const total = sectionsLength(sections);
 
   const win = windowFor(duration, tools.zoom, s.focus ?? playhead);
-  const fold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
-  const axis: Axis = fold ? fold.axis : linearAxis(win, s.width);
-  const view = tools.zoom > 0 && !fold ? win : null;
+  const liveFold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
+  const live = { axis: (liveFold ? liveFold.axis : linearAxis(win, s.width)) as Axis, fold: liveFold?.fold ?? ([] as Fold[]), folded: !!liveFold };
+  // The axis the pointer went down on stays for the whole drag: the drag itself creates a range, which
+  // would fold the timeline under the pointer. It folds after pointer-up.
+  const frozen = useRef<typeof live | null>(null);
+  if (!s.drag || s.drag.kind === "pan") frozen.current = null;
+  const shown = axisDuringDrag(frozen.current, live);
+  const axis = shown.axis;
+  const folded = shown.folded;
+  const view = tools.zoom > 0 && !folded ? win : null;
   const ticks = axisTicks(axis);
 
   const used: readonly NamedRange[] = videoId && active ? (active.usedRanges[videoId] ?? []) : [];
@@ -131,8 +138,12 @@ export function useTimelineController() {
     }
     if (range) {
       const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
-      if (edge) return s.setDrag({ kind: "edge", edge });
+      if (edge) {
+        frozen.current = shown;
+        return s.setDrag({ kind: "edge", edge });
+      }
     }
+    frozen.current = shown;
     s.setDrag({ kind: "range", anchor: t });
     s.setDragOrigin(e.clientX);
   };
@@ -188,8 +199,8 @@ export function useTimelineController() {
     tool: tools.tool,
     zoom: tools.zoom,
     axis,
-    fold: fold?.fold ?? [],
-    folded: !!fold,
+    fold: shown.fold,
+    folded,
     openFold: () => s.setFoldOpen(true),
     ticks,
     view,
