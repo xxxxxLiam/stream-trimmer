@@ -10,6 +10,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import HelpAnswer from "./HelpAnswer";
+import { tourOf } from "./HelpDrawer";
 import HelpReport, { type HelpReportProps } from "./HelpReport";
 import HelpShortcuts from "./HelpShortcuts";
 import HelpSignIn from "./HelpSignIn";
@@ -51,11 +52,55 @@ test("no match says so and offers Report a problem", () => {
   assert.doesNotMatch(h, /Common questions/);
 });
 
-test("an opened answer has Back to Help and its paragraphs", () => {
-  const a = HELP_ANSWERS[0];
-  const h = renderToStaticMarkup(<HelpAnswer answer={a} onBack={noop} onClose={noop} />);
+test("an opened answer: Back to Help, numbered steps, pictures with an Ice ring, one note, Show me pinned", () => {
+  const a = HELP_ANSWERS.find((x) => x.id === "where-clip")!;
+  const h = renderToStaticMarkup(<HelpAnswer answer={a} onBack={noop} onClose={noop} onShowMe={noop} />);
   assert.match(h, /aria-label="Back to Help"/);
-  assert.match(h, /Only that part downloads/);
+  assert.match(h, /<ol start="1"/);
+  assert.match(h, />1<\/span><span>Open History\.</);
+  assert.match(h, />2<\/span><span>Click the folder icon on the clip’s row\.</);
+  assert.equal((h.match(/outline-ice/g) ?? []).length, 2, "one ringed control in each of the two pictures");
+  assert.match(h, /aria-hidden="true"[^>]*class="ml-\[30px\]/, "pictures are decorative");
+  assert.match(h, /Change it in Settings › Clips folder\./);
+  assert.match(h, /aria-label="Show me in Clipr: closes Help and runs these steps on the real controls"/);
+  assert.match(h, /tabindex="0" aria-label="Answer"/, "the steps scroll by keys");
+});
+
+test("a long answer groups its steps under plain labels and numbering carries on", () => {
+  const a = HELP_ANSWERS.find((x) => x.id === "send-final-cut")!;
+  const h = renderToStaticMarkup(<HelpAnswer answer={a} onBack={noop} onClose={noop} onShowMe={noop} />);
+  assert.match(h, />Once per campaign</);
+  assert.match(h, />Each clip</);
+  assert.match(h, /<ol start="4"/, "the second group continues at 4");
+  assert.match(h, />5<\/span><span>Final Cut opens with the clip in the Export event\./);
+  assert.match(h, /Only on a Mac\. Not tested against a real Final Cut yet\./);
+});
+
+test("every answer is steps and at most one short note, never paragraphs", () => {
+  for (const a of HELP_ANSWERS) {
+    const steps = a.groups.flatMap((g) => g.steps);
+    assert.ok(steps.length >= 1 && steps.length <= 6, `${a.id} has ${steps.length} steps`);
+    for (const s of steps) assert.ok(s.text.length <= 130, `${a.id}: a step is a sentence, not a paragraph`);
+    if (a.note) assert.ok(a.note.length <= 120, `${a.id}'s note is short`);
+    assert.ok(!("paras" in a));
+  }
+  assert.deepEqual(HELP_ANSWERS.filter((a) => !a.searchOnly).map((a) => a.id), ["make-clip", "clip-greyed", "where-clip", "join-parts", "dubbed-audio"]);
+});
+
+test("Show me in Clipr: only steps that name a real control become tip cards, in order, with the real action", () => {
+  const where = tourOf(HELP_ANSWERS.find((x) => x.id === "where-clip")!);
+  assert.deepEqual(where.map((s) => s.text), ["Open History.", "Click the folder icon on the clip’s row."]);
+  assert.deepEqual(where[0].advanceOn, { click: "target" });
+  assert.equal(where[0].withText, "History");
+  const make = tourOf(HELP_ANSWERS.find((x) => x.id === "make-clip")!);
+  assert.deepEqual(make[1].advanceOn, { keys: ["o"] });
+  const fc = tourOf(HELP_ANSWERS.find((x) => x.id === "send-final-cut")!);
+  assert.equal(fc.length, 4, "the last step has no control to ring, so it is left out");
+  const view = readFileSync(join(process.cwd(), "src/renderer/src/features/tips/hooks/useTipsController.ts"), "utf8");
+  assert.match(view, /endTour/);
+  assert.match(view, /#ui-help-button/, "focus returns to Help's button when the walk ends");
+  const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
+  assert.match(app, /onShowMe: \(steps\) => \{ closeHelp\(\); tips\.startTour\(steps\); \}/);
 });
 
 const report: HelpReportProps = { note: "Clip stopped at 61%.", onNote: noop, state: "writing", copied: false, onSend: noop, onCopy: noop, onBack: noop, onClose: noop };

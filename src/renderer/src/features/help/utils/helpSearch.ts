@@ -5,7 +5,7 @@
  *   question, its answer, the More rows and the shortcut names, ignoring case and word order, with a
  *   small list of editor words. Matches keep the list order.
  */
-import { HELP_ANSWERS, HELP_MORE, SHORTCUTS, type HelpAnswer, type HelpMoreId } from "./helpContent";
+import { HELP_ANSWERS, HELP_MORE, SHORTCUTS, answerText, type HelpAnswer, type HelpMoreId } from "./helpContent";
 
 function words(text: string): string[] {
   return text
@@ -29,7 +29,7 @@ export type HelpResults = { answers: HelpAnswer[]; more: HelpMoreId[] };
 export function searchHelp(query: string): HelpResults {
   const q = query.trim();
   if (!q) return { answers: HELP_ANSWERS.filter((a) => !a.searchOnly), more: HELP_MORE.map((m) => m.id) };
-  const answers = HELP_ANSWERS.filter((a) => matches(q, [a.question, ...a.paras, ...a.synonyms].join(" ")));
+  const answers = HELP_ANSWERS.filter((a) => matches(q, [answerText(a), ...a.synonyms].join(" ")));
   // Key names count too: Ctrl or Cmd for ⌘, and the key itself ("enter", "space").
   const shortcutText = SHORTCUTS.map((s) => `${s.does} ${s.keys.replace("⌘", "ctrl cmd command")}`).join(" ");
   const more = HELP_MORE.filter((m) =>

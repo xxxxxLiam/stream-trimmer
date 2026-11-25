@@ -119,6 +119,11 @@ export default function VideosPanel() {
           </button>
         )}
       </div>
+      {v.linkError && (
+        <p role="alert" className="m-[0px] -mt-[4px] mb-[6px] px-[24px] text-meta text-error">
+          {v.linkError}
+        </p>
+      )}
 
       <div className="min-h-[0px] flex-1 overflow-y-auto">
         {v.opening && (

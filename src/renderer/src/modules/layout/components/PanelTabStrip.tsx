@@ -22,6 +22,8 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 export const PANEL_DRAG_TYPE = "application/x-clipr-panel";
 
 export type PanelTabStripProps = {
+  /** A panel's own + menu (Export: Import moments, Add a moment) in place of "Add a panel". */
+  addMenu?: { label: string; items: MenuItem[]; width?: number };
   /** Names the strip for screen readers, e.g. "Left panels". */
   label: string;
   tabs: PanelDefinition[];
@@ -39,6 +41,7 @@ export type PanelTabStripProps = {
 };
 
 export default function PanelTabStrip({
+  addMenu,
   label,
   tabs,
   active,
@@ -170,7 +173,14 @@ export default function PanelTabStrip({
         {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-[32px]" /> : null}
       </div>
       <div className="flex shrink-0 items-center">
-        <PopoverMenu label={`Add a panel to ${label.toLowerCase()}`} items={addItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
+        <PopoverMenu
+          label={addMenu?.label ?? `Add a panel to ${label.toLowerCase()}`}
+          items={addMenu?.items ?? addItems}
+          menuWidth={addMenu?.width}
+          tight={Boolean(addMenu)}
+          pressedWhenOpen={Boolean(addMenu)}
+          triggerClassName={addMenu ? `${STRIP_BUTTON} aria-pressed:bg-hover aria-pressed:text-fg` : STRIP_BUTTON}
+        >
           <IconPlus />
         </PopoverMenu>
         <PopoverMenu label={`${label} menu`} items={menuItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>

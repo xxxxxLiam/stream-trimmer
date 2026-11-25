@@ -5,7 +5,6 @@
  *   with the suggested next on an Ice edge. Logic-free: everything comes from useExportController.
  */
 import { useEntryActions } from "../../../shared/hooks/useEntryActions";
-import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { suggestProjectName } from "../utils/projectName";
 import { validateClipName } from "../utils/clipName";
 import PanelEmptyNote, { KeyChip } from "../../../modules/layout/components/PanelEmptyNote";
@@ -20,7 +19,6 @@ const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platfor
 
 export default function ExportPanel() {
   const c = useExportController();
-  const host = usePanelHost();
   const actions = useEntryActions();
   const finishedEntry = c.finishedEntry;
 
@@ -95,12 +93,6 @@ export default function ExportPanel() {
         <p role="alert" className="mx-[10px] my-[8px] rounded-control border border-error px-[12px] py-[8px] text-meta text-error">
           {c.notice}
         </p>
-      )}
-
-      {!c.gate && (c.waiting.length > 0 || c.made.length > 0) && (
-        <button type="button" onClick={() => host.openImport()} className="mx-[6px] mt-[4px] h-[44px] rounded-control px-[8px] text-left text-meta text-fg-dim hover:text-fg">
-          Import moments
-        </button>
       )}
     </div>
   );

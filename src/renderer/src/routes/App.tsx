@@ -482,6 +482,10 @@ function Layout({ active }: { active: boolean }) {
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
+    addMoment: () => {
+      if (!campaign?.id || !videoId || tabSegments.length === 0) return;
+      bankStore.importClips(campaign.id, videoId, [{ line: 1, id: null, label: "", segments: tabSegments.map((x) => ({ start: x.start, end: x.end })) }]);
+    },
     openChannel: (url) => {
       if (url) channel.setChannelUrl(url);
       setChannelOpen(true);
@@ -576,7 +580,7 @@ function Layout({ active }: { active: boolean }) {
             <PanelWorkspace />
             {active && (
               <>
-                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); } }} />
+                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); }, onShowMe: (steps) => { closeHelp(); tips.startTour(steps); } }} />
                 {settingsDrawer}
                 <ImportDrawer text={importText} onClose={() => setImportText(null)} />
                 {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}

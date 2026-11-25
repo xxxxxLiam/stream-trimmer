@@ -11,7 +11,7 @@ import { extractVideoId } from "../../../shared/utils/clip";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
-import { looksLikeLink, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
+import { linkKind, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
 
 /** How long "Moved … to Done · Undo" stays. */
 export const UNDO_MS = 8000;
@@ -35,6 +35,8 @@ export function useVideosController() {
   const [pills, setPills] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [doneOpen, setDoneOpen] = useState(false);
+  /** One line under the search when a pasted link cannot be opened (B-6). */
+  const [linkError, setLinkError] = useState("");
   const [undo, setUndo] = useState<{ id: string; title: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,7 +89,13 @@ export function useVideosController() {
   const submit = useCallback(() => {
     const value = text.trim();
     if (!value) return;
-    if (looksLikeLink(value)) {
+    const kind = linkKind(value);
+    if (kind === "bad") {
+      setLinkError("That isn't a YouTube video link");
+      return;
+    }
+    setLinkError("");
+    if (kind === "video") {
       const vid = extractVideoId(value);
       const same = vid ? ws.tabs.find((t) => t.url && extractVideoId(t.url) === vid) : undefined;
       if (same) {
@@ -105,7 +113,11 @@ export function useVideosController() {
     rows,
     pills,
     text,
-    setText,
+    setText: (t: string) => {
+      setText(t);
+      setLinkError("");
+    },
+    linkError,
     submit,
     removePill: (p: string) => setPills((all) => all.filter((x) => x !== p)),
     clearFilters: () => {

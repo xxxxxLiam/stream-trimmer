@@ -8,6 +8,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TipStep } from "../utils/tipRegistry";
+import { findTarget } from "../utils/findTarget";
 import { clickAdvances, keyAdvances, typingInField } from "../utils/tipAdvance";
 
 export type TipCardProps = {
@@ -15,6 +16,9 @@ export type TipCardProps = {
   total: number;
   text: string;
   target: string;
+  withText?: string;
+  /** Help's Show me names its steps "Step 1 of 2"; a first-use tip says "1 of 3". */
+  longLabel?: boolean;
   advanceOn?: TipStep["advanceOn"];
   onNext: () => void;
   onBack: () => void;
@@ -29,6 +33,8 @@ export default function TipCard({
   total,
   text,
   target,
+  withText,
+  longLabel,
   advanceOn,
   onNext,
   onBack,
@@ -38,13 +44,21 @@ export default function TipCard({
   const [box, setBox] = useState<Box | null>(null);
   const last = step + 1 >= total;
 
+  // Measure now, then keep looking: a menu the step opens, or a panel that moves, changes where the control is.
   useLayoutEffect(() => {
-    const el = document.querySelector(target);
-    if (!el) return setBox(null);
-    el.scrollIntoView({ block: "nearest" });
-    const r = el.getBoundingClientRect();
-    setBox({ top: r.top, left: r.left, width: r.width, height: r.height });
-  }, [target]);
+    let first = true;
+    const measure = () => {
+      const el = findTarget(target, withText);
+      if (!el) return setBox((b) => (b ? null : b));
+      if (first) el.scrollIntoView({ block: "nearest" });
+      first = false;
+      const r = el.getBoundingClientRect();
+      setBox((b) => (b && b.top === r.top && b.left === r.left && b.width === r.width && b.height === r.height ? b : { top: r.top, left: r.left, width: r.width, height: r.height }));
+    };
+    measure();
+    const t = window.setInterval(measure, 300);
+    return () => window.clearInterval(t);
+  }, [target, withText]);
 
   const next = useRef(onNext);
   next.current = onNext;
@@ -52,7 +66,7 @@ export default function TipCard({
   // The real action finishes the step. The action itself is never cancelled; the card moves on a beat later.
   useEffect(() => {
     if (!advanceOn) return;
-    const step: TipStep = { target, text, advanceOn };
+    const step: TipStep = { target, withText, text, advanceOn };
     let t: number | undefined;
     const go = () => {
       window.clearTimeout(t);
@@ -62,7 +76,7 @@ export default function TipCard({
       if (!typingInField(e.target) && keyAdvances(step, e)) go();
     };
     const onClick = (e: MouseEvent) => {
-      if (clickAdvances(step, e.target as Element | null)) go();
+      if (clickAdvances(step, e.target as Element | null, findTarget(target, withText))) go();
     };
     window.addEventListener("keydown", onKey);
     document.addEventListener("click", onClick);
@@ -71,7 +85,7 @@ export default function TipCard({
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("click", onClick);
     };
-  }, [advanceOn, target, text]);
+  }, [advanceOn, target, withText, text]);
 
   // Only while focus is inside the card. Enter needs no handler: it presses the focused button.
   const onCardKey = (e: React.KeyboardEvent) => {
@@ -110,7 +124,7 @@ export default function TipCard({
         onKeyDown={onCardKey}
       >
         <span className="text-meta text-fg-dim">
-          {step + 1} of {total}
+          {longLabel ? `Step ${step + 1} of ${total}` : `${step + 1} of ${total}`}
         </span>
         <p className="m-[0px] text-body text-fg">{text}</p>
         <div className="flex items-center justify-between gap-[8px]">

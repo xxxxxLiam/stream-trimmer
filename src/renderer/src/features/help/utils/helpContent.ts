@@ -6,10 +6,28 @@
  *   app's own source, so renaming a control without updating Help fails the check.
  */
 
+/** A small picture of the control a step names, drawn from the app's own parts (HelpStepPicture). */
+export type HelpPic = "paste" | "clip" | "history" | "row-folder" | "add-section" | "audio" | "languages" | "clip-arrow" | "final-cut";
+
+/** What Show me in Clipr does for a step: ring this control on the real screen. */
+export type ShowStep = {
+  /** CSS selector of the real control. */
+  target: string;
+  /** When several controls match the selector, the one whose text or label is this. */
+  withText?: string;
+  /** Finish the step by the real action: "click" (the ringed control), or keys such as "o". */
+  advance?: "click" | string[];
+};
+
+export type HelpStep = { text: string; pic?: HelpPic; show?: ShowStep };
+
 export type HelpAnswer = {
   id: string;
   question: string;
-  paras: string[];
+  /** Numbered steps, as few as possible. A long answer splits them under plain labels; numbering carries on. */
+  groups: { label?: string; steps: HelpStep[] }[];
+  /** At most one short note, under the steps. */
+  note?: string;
   /** Control labels the answer names, exactly as the app shows them. */
   labels: string[];
   /** Words people use for this that are not in the answer. */
@@ -18,68 +36,125 @@ export type HelpAnswer = {
   searchOnly?: boolean;
 };
 
+/** Every step of an answer, in order. */
+export const stepsOf = (a: HelpAnswer): HelpStep[] => a.groups.flatMap((g) => g.steps);
+
+/** All the words of an answer, for the search. */
+export const answerText = (a: HelpAnswer): string => [a.question, ...stepsOf(a).map((s) => s.text), a.note ?? ""].join(" ");
+
+const TIMELINE: ShowStep = { target: "#ui-timeline" };
+const CLIP: ShowStep = { target: "#ui-cut", advance: "click" };
+
 export const HELP_ANSWERS: HelpAnswer[] = [
   {
     id: "make-clip",
     question: "How do I make a clip?",
-    paras: [
-      "Paste a YouTube link. Mark where the clip starts and ends: press I and O, drag on the timeline, or use the scissors tool. Then press Clip.",
-      "Only that part downloads, into your campaign’s folder.",
+    groups: [
+      {
+        steps: [
+          { text: "Paste a YouTube link.", pic: "paste", show: { target: 'input[type="url"]' } },
+          { text: "Press I at the start and O at the end, or drag on the timeline.", show: { ...TIMELINE, advance: ["o"] } },
+          { text: "Press Clip.", pic: "clip", show: CLIP },
+        ],
+      },
     ],
+    note: "Only that part downloads.",
     labels: ["Clip"],
     synonyms: ["download", "export", "save", "cut", "start", "begin", "new", "mark", "range"],
   },
   {
     id: "clip-greyed",
     question: "Why is Clip greyed out?",
-    paras: [
-      "Clip needs a start and an end, and the part has to be long enough.",
-      "Hover over Clip to see what’s missing, for example “Set an end first: click the timeline or press O”.",
-    ],
+    groups: [{ steps: [{ text: "Set a start and an end.", show: TIMELINE }, { text: "Make the part long enough.", show: { target: "#ui-cut" } }] }],
+    note: "Hover over Clip to see what’s missing.",
     labels: ["Clip"],
     synonyms: ["grey", "gray", "disabled", "can't", "cant", "cannot", "dimmed", "won't", "wont", "stuck"],
   },
   {
     id: "where-clip",
     question: "Where did my clip go?",
-    paras: [
-      "Into your campaign’s folder. You can change it in Settings, under Clips folder.",
-      "While you work it’s listed in Export, and later in History. Click the folder icon on its row to show it in Finder (File Explorer on Windows).",
-      "If you picked an editor in the Clip menu, the clip opens there too. Some editors, such as CapCut, can’t take a project from Clipr. Then Clip opens the editor and shows the file in Finder (File Explorer on Windows), so you can drag it in.",
+    groups: [
+      {
+        steps: [
+          { text: "Open History.", pic: "history", show: { target: '[role="tab"]', withText: "History", advance: "click" } },
+          { text: "Click the folder icon on the clip’s row.", pic: "row-folder", show: { target: '[aria-label="Show in Finder"]' } },
+        ],
+      },
     ],
-    labels: ["Settings", "Clips folder", "Export", "History", "Clip"],
+    note: "Clips save to your campaign’s folder. Change it in Settings › Clips folder.",
+    labels: ["History", "Settings", "Clips folder"],
     synonyms: ["download", "export", "save", "find", "folder", "missing", "lost", "location"],
   },
   {
     id: "join-parts",
     question: "How do I join two parts into one clip?",
-    paras: [
-      "Mark the first part and press + section to lock it in. Then mark the second part. The parts show in play order with the total length, and the skipped bit in between isn’t downloaded.",
-      "Press Clip joined to get one file. In Markers, two flags that both have a range can be joined with Join.",
+    groups: [
+      {
+        steps: [
+          { text: "Mark the first part, then press + section.", pic: "add-section", show: { target: "#ui-add-segment", advance: "click" } },
+          { text: "Mark the second part.", show: TIMELINE },
+          { text: "Press Clip. You get one file.", show: CLIP },
+        ],
+      },
     ],
-    labels: ["+ section", "Clip joined", "Markers", "Join"],
+    note: "The skipped bit isn’t downloaded.",
+    labels: ["+ section", "Clip"],
     synonyms: ["merge", "combine", "stitch", "two", "together", "one file"],
   },
   {
     id: "dubbed-audio",
     question: "How do I get dubbed audio?",
-    paras: [
-      "If a video has dubbed audio, the bar at the bottom shows an audio button, such as Original. Click it and tick the languages you want.",
-      "The sentence then says how many clips Clip will make, for example “Makes 2 clips”, and you get one per language, such as “Honest Version” and “Honest Version ES”, in the same folder. Clipr remembers your ticks for each campaign.",
-      "To hear a dub while you watch, use the gear in the video player.",
+    groups: [
+      {
+        steps: [
+          { text: "Click the audio button in the bottom bar.", pic: "audio", show: { target: '[aria-label^="Audio:"]', advance: "click" } },
+          { text: "Tick the languages you want.", pic: "languages", show: { target: '[aria-label^="Audio:"]' } },
+          { text: "Press Clip.", pic: "clip", show: CLIP },
+        ],
+      },
     ],
-    labels: ["Original", "Clip"],
+    note: "You get one clip per language.",
+    labels: ["Clip"],
     synonyms: ["dub", "language", "languages", "translation", "translate", "spanish", "audio", "voice"],
+  },
+  {
+    id: "send-final-cut",
+    question: "How do I send clips to Final Cut Pro?",
+    searchOnly: true,
+    groups: [
+      {
+        label: "Once per campaign",
+        steps: [
+          { text: "Click the arrow beside Clip.", pic: "clip-arrow", show: { target: '#ui-cut [aria-haspopup="menu"]', advance: "click" } },
+          { text: "Tick Final Cut Pro.", pic: "final-cut", show: { target: '[role^="menuitem"]', withText: "Final Cut Pro" } },
+          { text: "Open the campaign’s settings and choose your Final Cut library.", show: { target: "#ui-campaign-chip" } },
+        ],
+      },
+      {
+        label: "Each clip",
+        steps: [{ text: "Mark the part, then press Clip.", show: CLIP }, { text: "Final Cut opens with the clip in the Export event." }],
+      },
+    ],
+    note: "Only on a Mac. Not tested against a real Final Cut yet.",
+    labels: ["Clip", "Final Cut Pro"],
+    synonyms: ["final cut", "fcp", "editor", "premiere", "davinci", "resolve", "capcut", "handoff", "send", "open in"],
   },
   {
     id: "final-cut-look",
     question: "How do I make my Final Cut projects look like mine?",
     searchOnly: true,
-    paras: [
-      "In Final Cut, make a project with one clip. Add your usual colour, zoom, volume and audio settings to it, and don’t cut it. Choose File, then Export XML, and save it.",
-      "Right-click the saved package, choose Show Package Contents, and find Info.fcpxml. Then open Settings, pick your campaign, and under Your look choose that file or drop it on the row.",
-      "Each campaign has its own look, and a look you have uploaded can be picked again for another campaign.",
+    groups: [
+      {
+        label: "In Final Cut",
+        steps: [
+          { text: "Make a project with one clip. Add your usual colour, zoom, volume and audio settings, and don’t cut it." },
+          { text: "Choose File, then Export XML, and save it." },
+          { text: "Right-click the saved package, choose Show Package Contents, and find Info.fcpxml." },
+        ],
+      },
+      { label: "In Clipr", steps: [{ text: "Open Settings, pick your campaign, and under Your look choose that file or drop it on the row." }] },
     ],
+    note: "Each campaign has its own look, and a look you have uploaded can be picked again for another campaign.",
     labels: ["Settings", "Your look"],
     synonyms: ["look", "template", "preset", "colour grade", "color grade", "lut", "zoom", "volume", "final cut", "xml", "style"],
   },
@@ -87,10 +162,16 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     id: "sign-in",
     question: "How do I sign in for 1080p?",
     searchOnly: true,
-    paras: [
-      "Clipr asks YouTube for 1080p when you’re signed in, and gets 360p when you’re not. Signing in to YouTube in Chrome, Edge, Firefox or Brave is usually enough: Clipr looks for it when it opens.",
-      "If it can’t find one, press Sign in for 1080p at the bottom of the window. Export your cookies.txt as the page says, then drop it there or choose the file.",
+    groups: [
+      {
+        steps: [
+          { text: "Sign in to YouTube in Chrome, Edge, Firefox or Brave. Clipr looks for it when it opens." },
+          { text: "If it can’t find one, press Sign in for 1080p at the bottom of the window." },
+          { text: "Export your cookies.txt as that page says, then drop it there or choose the file." },
+        ],
+      },
     ],
+    note: "Signed out, clips come down at 360p.",
     labels: ["Sign in for 1080p"],
     synonyms: ["cookies", "cookie", "cookies.txt", "login", "log in", "account", "youtube", "360p", "1080p", "quality", "resolution", "age", "restricted", "members", "bot"],
   },
@@ -98,10 +179,8 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     id: "undo-clip",
     question: "How do I undo a clip?",
     searchOnly: true,
-    paras: [
-      "Right after a clip is made its row says Undo, with a ring counting down 5 seconds. Press the ring and the clip is taken back.",
-      "After that, the file is in your campaign’s folder like any other.",
-    ],
+    groups: [{ steps: [{ text: "Right after a clip is made, press the Undo ring on its row. It counts down 5 seconds." }] }],
+    note: "After that, the file is in your campaign’s folder like any other.",
     labels: ["Undo"],
     synonyms: ["undo", "oops", "mistake", "delete", "remove", "take back", "cancel", "wrong", "by mistake"],
   },

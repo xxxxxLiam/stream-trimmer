@@ -23,10 +23,12 @@ export function keyAdvances(step: TipStep, e: KeyLike): boolean {
   );
 }
 
-/** True when the click landed on (or inside) the control the step waits for. */
-export function clickAdvances(step: TipStep, target: Element | null): boolean {
+/** True when the click landed on (or inside) the control the step waits for ("target": the ringed control). */
+export function clickAdvances(step: TipStep, clicked: Element | null, ringed: Element | null = null): boolean {
   const sel = step.advanceOn?.click;
-  return !!sel && !!target?.closest(sel);
+  if (!sel || !clicked) return false;
+  if (sel === "target") return !!ringed && ringed.contains(clicked);
+  return !!clicked.closest(sel);
 }
 
 /** A key typed into a field is never the action. */
