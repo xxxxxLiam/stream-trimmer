@@ -10,7 +10,7 @@ import { cx } from "../utils/cx";
 
 export function KeyHint({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-chip border border-hairlineStrong bg-raised px-[5px] text-meta font-semibold">
+    <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-chip border border-hairlineStrong bg-raised px-[5px] text-meta font-semibold text-fg">
       {children}
     </span>
   );
@@ -30,7 +30,7 @@ export default function Tooltip({ id, children, keyHint, className }: TooltipPro
       id={id}
       role="tooltip"
       className={cx(
-        "inline-flex items-center gap-2 whitespace-nowrap rounded-control border border-hairlineStrong bg-hover py-1.5 pl-2.5 pr-2 text-meta text-fg",
+        "inline-flex items-center gap-[8px] whitespace-nowrap rounded-control border border-hairlineStrong bg-hover py-[6px] pl-[10px] pr-[8px] text-meta text-fg",
         className,
       )}
     >

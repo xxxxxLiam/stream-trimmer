@@ -40,6 +40,10 @@ export function usePreviewEffects(a: Args) {
   const { player, videoId, tabActive, duration, seekRequest, loop, sections, fullScreen } = a;
   const playerRef = useRef(player);
   playerRef.current = player;
+  // The key listener outlives a render, so it reads the latest handlers (I and O use the playhead
+  // as it is now, not as it was when the listener was added).
+  const argsRef = useRef(a);
+  argsRef.current = a;
 
   // The transcript highlight and the timeline follow the playhead; only the visible tab writes.
   useEffect(() => {
@@ -96,17 +100,17 @@ export function usePreviewEffects(a: Args) {
       if (e.altKey || typing(e)) return;
       if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.key === "N") {
         e.preventDefault();
-        a.onNextVideo();
+        argsRef.current.onNextVideo();
         return;
       }
       if (!e.metaKey && !e.ctrlKey && (e.key === "i" || e.key === "I")) {
         e.preventDefault();
-        a.setIn();
+        argsRef.current.setIn();
         return;
       }
       if (!e.metaKey && !e.ctrlKey && (e.key === "o" || e.key === "O")) {
         e.preventDefault();
-        a.setOut();
+        argsRef.current.setOut();
         return;
       }
       const act = keyAction(e.key, e.metaKey || e.ctrlKey, e.repeat);
@@ -114,7 +118,7 @@ export function usePreviewEffects(a: Args) {
       const p = playerRef.current;
       if (act.kind === "loop") {
         e.preventDefault();
-        a.toggleLoop();
+        argsRef.current.toggleLoop();
       } else if (act.kind === "toggle") {
         e.preventDefault();
         if (!e.repeat) (p.playing ? p.pause : p.play)();

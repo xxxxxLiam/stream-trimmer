@@ -17,7 +17,7 @@ export default function TranscriptLane({ c }: { c: TimelineController }) {
   const shown = lines.filter((l) => l.end >= first && l.start <= last);
   const inRange = (start: number) => c.sections.some((s) => start >= s.start && start < s.end);
   return (
-    <div className="flex h-8 items-center">
+    <div className="flex h-[32px] items-center">
       <LaneLabel>Transcript</LaneLabel>
       <div className="relative h-full flex-1 overflow-hidden">
         {shown.map((l) => {
@@ -29,7 +29,7 @@ export default function TranscriptLane({ c }: { c: TimelineController }) {
             <span
               key={`${l.start}-${l.text}`}
               title={l.text}
-              className={`absolute top-[5px] h-[22px] overflow-hidden text-ellipsis whitespace-nowrap rounded-chip px-1.5 text-meta leading-[22px] ${on ? "bg-ice-tint-15 text-fg shadow-[inset_0_0_0_1px_var(--ice-tint-50)]" : "text-fg-dim"}`}
+              className={`absolute top-[5px] h-[22px] overflow-hidden text-ellipsis whitespace-nowrap rounded-chip px-[6px] text-meta leading-[22px] ${on ? "bg-ice-tint-15 text-fg shadow-[inset_0_0_0_1px_var(--ice-tint-50)]" : "text-fg-dim"}`}
               style={{ left: x, width: w }}
             >
               {l.text}

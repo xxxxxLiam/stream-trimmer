@@ -40,7 +40,7 @@ export default function Filmstrip({
               return (
                 <span
                   key={i}
-                  className="absolute inset-y-0 bg-hover"
+                  className="absolute inset-y-[0px] bg-hover"
                   style={{
                     left: i * tileW,
                     width: tileW - 1,

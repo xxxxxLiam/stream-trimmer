@@ -24,7 +24,7 @@ import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
 
 export const DRAG_START_PX = 3;
-const dash = "–:––:––";
+const dash = "—";
 
 export function useTimelineController() {
   const clipper = useClipperContext();
@@ -49,6 +49,7 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [store.segments, range?.start, range?.end],
   );
+  const startPicked = clipper.startText.trim() !== "" && Number.isFinite(clipper.start) && clipper.start >= 0 && !range;
   const joined = sections.length >= 2;
   const existingNames = useMemo(
     () => [...(videoId && active ? (active.usedRanges[videoId] ?? []) : []), ...store.banked].map((r) => (r as { label?: string }).label ?? "").filter(Boolean),
@@ -201,10 +202,12 @@ export function useTimelineController() {
     waiting,
     scissorsStart: s.scissorsStart,
     opening: !!videoId && !clipper.info && clipper.loadingInfo,
-    firstClipHint: !!clipper.info && !range && store.segments.length === 0 && used.length === 0,
-    inText: range ? clockTime(range.start) : dash,
+    firstClipHint: !!clipper.info && !startPicked && !range && store.segments.length === 0 && used.length === 0,
+    startPicked,
+    start: clipper.start,
+    inText: range ? clockTime(range.start) : startPicked ? clockTime(clipper.start) : dash,
     outText: range ? clockTime(range.end) : dash,
-    lengthText: total > 0 ? lengthLabel(total) : lengthLabel(0),
+    lengthText: total > 0 ? lengthLabel(total) : dash,
     onLanePointerDown,
     onLanePointerMove,
     onLanePointerUp,

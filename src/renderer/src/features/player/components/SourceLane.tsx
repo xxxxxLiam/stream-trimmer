@@ -7,11 +7,11 @@
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { toX } from "../utils/timelineAxis";
+import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
 import LaneLabel from "./LaneLabel";
 
 const CURSORS = { pointer: "cursor-pointer", clip: "cursor-crosshair", flag: "cursor-cell", hand: "cursor-grab", zoom: "cursor-zoom-in" } as const;
-const FIRST_CLIP_HINT = "Drag on the timeline, or press I and O, to pick the part you want. Then Clip.";
 
 export default function SourceLane({ c }: { c: TimelineController }) {
   const covered = [...c.sections, ...c.used.filter((u) => u.end > u.start)].sort((a, b) => a.start - b.start);
@@ -27,7 +27,7 @@ export default function SourceLane({ c }: { c: TimelineController }) {
     if (at < end) dim.push({ start: at, end });
   }
   return (
-    <div className="flex h-11 items-center">
+    <div className="flex h-[44px] items-center">
       <LaneLabel>Source</LaneLabel>
       <div
         className={`relative h-full flex-1 touch-none select-none ${CURSORS[c.tool]}`}
@@ -38,14 +38,14 @@ export default function SourceLane({ c }: { c: TimelineController }) {
       >
         {c.opening ? null : (
           <>
-            <Filmstrip axis={c.axis} levels={c.storyboards} height={32} />
+            {c.firstClipHint ? null : <Filmstrip axis={c.axis} levels={c.storyboards} height={32} />}
             {dim.map((d) => {
               const x = toX(c.axis, d.start);
               return (
                 <span
                   key={`${d.start}-${d.end}`}
                   aria-hidden="true"
-                  className="pointer-events-none absolute bg-bg-overlay-60"
+                  className="pointer-events-none absolute bg-bg-overlay-50"
                   style={{ left: x, width: toX(c.axis, d.end) - x, top: 6, bottom: 6 }}
                 />
               );
@@ -65,14 +65,14 @@ export default function SourceLane({ c }: { c: TimelineController }) {
               <span
                 key={f}
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1 h-[10px] w-0.5 bg-fg-dim"
+                className="pointer-events-none absolute top-[4px] h-[10px] w-[2px] bg-fg-dim"
                 style={{ left: toX(c.axis, f) }}
               />
             ))}
             {c.duration > 0 ? (
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -bottom-1 -top-1 border-l border-dashed border-frost"
+                className="pointer-events-none absolute -bottom-[4px] -top-[4px] border-l border-dashed border-frost"
                 style={{ left: toX(c.axis, c.playhead) }}
               />
             ) : null}
@@ -83,18 +83,27 @@ export default function SourceLane({ c }: { c: TimelineController }) {
                 aria-label={`Open the folded ${Math.floor(f.skipped / 60)}:${String(Math.round(f.skipped % 60)).padStart(2, "0")}`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={c.openFold}
-                className="absolute inset-y-0 flex items-center justify-between border-x border-hairline-strong px-2 text-meta text-fg-dim"
+                className="absolute inset-y-[0px] flex items-center justify-between border-x border-hairlineStrong px-[8px] text-meta text-fg-dim"
                 style={{ left: f.x, width: f.width }}
               >
-                <span aria-hidden="true" className="my-1 w-[3px] self-stretch" style={{ background: "repeating-linear-gradient(180deg, var(--c-fg-dim) 0 3px, transparent 3px 6px)" }} />
+                <span aria-hidden="true" className="my-[4px] w-[3px] self-stretch" style={{ background: "repeating-linear-gradient(180deg, var(--c-fg-dim) 0 3px, transparent 3px 6px)" }} />
                 click to open
-                <span aria-hidden="true" className="my-1 w-[3px] self-stretch" style={{ background: "repeating-linear-gradient(180deg, var(--c-fg-dim) 0 3px, transparent 3px 6px)" }} />
+                <span aria-hidden="true" className="my-[4px] w-[3px] self-stretch" style={{ background: "repeating-linear-gradient(180deg, var(--c-fg-dim) 0 3px, transparent 3px 6px)" }} />
               </button>
             ))}
             {c.firstClipHint ? (
-              <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-meta text-fg-dim">
-                <span className="rounded-chip bg-bg-overlay-80 px-2.5 py-1">{FIRST_CLIP_HINT}</span>
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-body text-fg-dim">
+                <span>
+                  Drag on the timeline, or press <KeyHint>I</KeyHint> and <KeyHint>O</KeyHint>, to pick the part you want. Then Clip.
+                </span>
               </span>
+            ) : null}
+            {c.startPicked && c.duration > 0 ? (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute w-[3px] bg-ice"
+                style={{ left: toX(c.axis, c.start) - 1, top: 2, bottom: 2 }}
+              />
             ) : null}
           </>
         )}

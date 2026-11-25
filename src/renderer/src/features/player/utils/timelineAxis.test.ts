@@ -53,7 +53,9 @@ test("sections far apart fold the skipped part into a marked strip", () => {
   assert.ok(f);
   assert.equal(f!.fold.length, 1);
   assert.equal(f!.fold[0].width, 100);
-  assert.equal(f!.fold[0].skipped, 600 - 52 - (82 + 52));
+  // Each section sits centred in a 52 s stretch: 64 to 82 gets 17 s either side, 600 to 616 gets 18 s (the stretches are 47 to 99 and 582 to 634).
+  assert.equal(f!.fold[0].skipped, 582 - 99);
+  assert.equal(f!.fold[0].gap, 600 - 82);
   // Both sections sit left and right of the fold, in order, at one scale.
   const a = toX(f!.axis, 64);
   const b = toX(f!.axis, 82);

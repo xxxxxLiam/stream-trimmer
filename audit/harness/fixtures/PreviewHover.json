@@ -1,0 +1,63 @@
+{
+ "_doc": "The hover label with its key over Forward 5 s (Main02dHoverLabel).",
+ "extends": "Preview",
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4324"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "i"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4366"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "o"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "click": "button[aria-label='Loop']"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4351; window.__fakeYTPlayer.pauseVideo()"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "click": "button:text-is('Fit')"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "document.activeElement && document.activeElement.blur()"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "hover": "button[aria-label='Forward 5 seconds']"
+  },
+  {
+   "wait": 300
+  }
+ ]
+}

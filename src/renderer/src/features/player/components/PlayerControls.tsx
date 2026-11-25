@@ -22,7 +22,7 @@ export default function PlayerControls({ c }: { c: PreviewController }) {
   const mac = isMacLike();
   return (
     <div className="relative flex flex-none items-center justify-between">
-      <span className="flex gap-2.5">
+      <span className="flex gap-[10px]">
         <TransportButton
           label={hoverLabel("loop", mac)}
           name="Loop"
@@ -37,7 +37,7 @@ export default function PlayerControls({ c }: { c: PreviewController }) {
           {player.speed}x
         </TransportButton>
       </span>
-      <span className="absolute left-1/2 flex -translate-x-1/2 items-center gap-3.5">
+      <span className="absolute left-1/2 flex -translate-x-1/2 items-center gap-[14px]">
         <TransportButton look="ghost" label={hoverLabel("back", mac)} name="Back 5 seconds" onClick={() => c.step(-1)}>
           <BackIcon />
         </TransportButton>
@@ -54,7 +54,7 @@ export default function PlayerControls({ c }: { c: PreviewController }) {
           <ForwardIcon />
         </TransportButton>
       </span>
-      <span className="flex gap-2.5">
+      <span className="flex gap-[10px]">
         <TransportButton label={hoverLabel("volume", mac)} name="Volume" pressed={player.muted} onClick={player.toggleMute}>
           <VolumeIcon muted={player.muted} />
         </TransportButton>

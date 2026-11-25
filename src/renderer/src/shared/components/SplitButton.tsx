@@ -33,7 +33,7 @@ export default function SplitButton({
   describedBy,
 }: SplitButtonProps) {
   const half = disabled
-    ? "cursor-not-allowed bg-raised text-disabled"
+    ? "cursor-not-allowed border border-hairlineStrong bg-raised text-disabled"
     : cx("bg-ice text-bg hover:shadow-clip-hover", glowing && "shadow-cut");
   return (
     <span className="inline-flex gap-0.5">
@@ -53,7 +53,7 @@ export default function SplitButton({
         aria-expanded={menuExpanded}
         aria-disabled={disabled || undefined}
         onClick={disabled ? undefined : onOpenMenu}
-        className={cx("inline-flex h-target w-[34px] items-center justify-center rounded-r-pill", half)}
+        className={cx("inline-flex h-target w-[36px] items-center justify-center rounded-r-pill", half)}
       >
         {menuIcon}
       </button>

@@ -15,9 +15,9 @@ type Props = {
 };
 
 const PRIMARY =
-  "mt-3 inline-flex h-target items-center rounded-full bg-ice px-[22px] text-body font-medium text-bg";
+  "mt-[12px] inline-flex h-target items-center rounded-full bg-ice px-[22px] text-body font-medium text-bg";
 const SECONDARY =
-  "mt-3 inline-flex h-target items-center rounded-full border border-hairline-strong bg-raised px-[22px] text-body font-medium text-fg";
+  "mt-[12px] inline-flex h-target items-center rounded-full border border-hairlineStrong bg-raised px-[22px] text-body font-medium text-fg";
 
 export default function EndCard({ day, onNextVideo, onOpenBank, onOpenVideo }: Props) {
   const kind = endCardKind({ next: day.next, made: day.made, quota: day.quota });
@@ -26,22 +26,22 @@ export default function EndCard({ day, onNextVideo, onOpenBank, onOpenVideo }: P
   return (
     <div
       role="status"
-      className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-bg-overlay-80 px-6 text-center"
+      className="absolute inset-[0px] flex flex-col items-center justify-center gap-[6px] bg-bg-overlay-80 px-[24px] text-center"
     >
       {kind === "done" ? (
-        <div className="flex items-center gap-1.5 text-meta text-frost">
+        <div className="flex items-center gap-[6px] text-meta text-frost">
           <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M3 8.5l3 3 7-7" />
           </svg>
           Done for today
         </div>
       ) : (
-        <div className="text-meta text-fg-dim">Video finished</div>
+        <div className="text-meta leading-[15px] text-fg-dim">Video finished</div>
       )}
       {kind === "next" && day.next ? (
         <>
-          <div className="text-title">Next: {day.next.title}</div>
-          <div className="text-body text-fg-dim">
+          <div className="text-title leading-[26px]">Next: {day.next.title}</div>
+          <div className="text-body leading-[16px] text-fg-dim">
             {day.next.waiting} {day.next.waiting === 1 ? "moment" : "moments"} waiting in the bank
           </div>
           <button type="button" onClick={onNextVideo} className={PRIMARY}>
@@ -51,8 +51,8 @@ export default function EndCard({ day, onNextVideo, onOpenBank, onOpenVideo }: P
       ) : null}
       {kind === "done" ? (
         <>
-          <div className="text-title">That is all for {name} today</div>
-          <div className="text-body text-fg-dim">
+          <div className="text-title leading-[26px]">That is all for {name} today</div>
+          <div className="text-body leading-[16px] text-fg-dim">
             {day.made} of {day.quota} made, nothing waiting in the bank
           </div>
           <button type="button" onClick={onOpenBank} className={SECONDARY}>
@@ -62,8 +62,8 @@ export default function EndCard({ day, onNextVideo, onOpenBank, onOpenVideo }: P
       ) : null}
       {kind === "nothing" ? (
         <>
-          <div className="text-title">Nothing left in the bank for {name}</div>
-          <div className="text-body text-fg-dim">
+          <div className="text-title leading-[26px]">Nothing left in the bank for {name}</div>
+          <div className="text-body leading-[16px] text-fg-dim">
             {left && left > 0
               ? `${left} more ${left === 1 ? "clip is" : "clips are"} needed today. Find moments in another long video.`
               : "Find moments in another long video."}
