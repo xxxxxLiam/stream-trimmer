@@ -64,7 +64,7 @@ export default function ClipButton({ openUp = false, listenForKey = false }: { o
       {c.reason ? (
         <Tooltip
           id={tipId}
-          className={`pointer-events-none absolute right-[0px] z-20 hidden group-focus-within:inline-flex group-hover:inline-flex ${openUp ? "bottom-full mb-[10px]" : "top-full mt-[4px]"}`}
+          className={`pointer-events-none absolute right-[0px] z-20 ${c.reasonShown ? "inline-flex" : "hidden group-focus-within:inline-flex group-hover:inline-flex"} ${openUp ? "bottom-full mb-[10px]" : "top-full mt-[4px]"}`}
         >
           {c.reason}
         </Tooltip>

@@ -167,3 +167,11 @@ test("V18-T-9: every zoom step changes the view, and 100 is the closest stretch"
     assert.equal(spanOf(duration, 100), 30);
   }
 });
+
+import { spanFor } from "./timelineAxis";
+
+test("V18-T-9: zoom 90 and zoom 100 show visibly different spans on a 10-minute video", () => {
+  assert.ok(spanFor(600, 90) - spanFor(600, 100) >= 5);
+  assert.equal(spanFor(600, 100), 30);
+  assert.equal(spanFor(600, 0), 600);
+});

@@ -45,6 +45,7 @@ import { extraSecondsFor, padSections } from "../features/clips/utils/padSection
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
+import { dialogOpen } from "../shared/utils/dialogOpen";
 import { setMakingClipId, setMakingName } from "../shared/utils/clipNameStore";
 import { setCutAttempt } from "../shared/utils/cutAttempt";
 import OverlayLoader from "../shared/components/OverlayLoader";
@@ -519,6 +520,22 @@ function Layout({ active }: { active: boolean }) {
     openPanelById(id);
     window.setTimeout(() => document.getElementById(tabDomId(id))?.focus(), 0);
   };
+  // Ctrl/Cmd+F from anywhere: bring the Transcript tab forward and put the keyboard in its search box.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "f") return;
+      if (dialogOpen()) return;
+      e.preventDefault();
+      openPanelById("transcript");
+      window.setTimeout(() => {
+        const box = document.getElementById("ui-transcript-search") as HTMLInputElement | null;
+        box?.focus();
+        box?.select();
+      }, 0);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openPanelById]);
   // Add a moment / Ctrl B: bank what is marked now (a just-marked In and Out, else the committed
   // sections), waiting, under the lane's name or a suggested one. The marks stay, so Clip still works.
   const addMoment = () => {

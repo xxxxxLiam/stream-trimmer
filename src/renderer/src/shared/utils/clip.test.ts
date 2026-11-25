@@ -67,13 +67,12 @@ test("a range over the cap says so in plain words, and a range inside it says no
   assert.equal(overCapMessage(600), "");
 });
 
-test("In past Out starts a fresh range at that In; Out before In does the mirror", () => {
+test("In past Out starts a fresh range at that In; Out before In is stored and keeps the In", () => {
   assert.deepEqual(applyIn(4324, 2999), { start: 4324, clearEnd: true });
   assert.deepEqual(applyIn(100, 200), { start: 100, clearEnd: false });
   assert.deepEqual(applyIn(100, null), { start: 100, clearEnd: false });
-  assert.deepEqual(applyOut(50, 100), { end: 50, clearStart: true });
-  assert.deepEqual(applyOut(150, 100), { end: 150, clearStart: false });
-  assert.deepEqual(applyOut(5, null), { end: 5, clearStart: false });
+  // B3-1: an Out before the In is stored and never discards the In.
+  assert.deepEqual(applyOut(50), { end: 50 });
 });
 
 test("C-15: a file name that is a Windows device name is made safe on every OS", async () => {

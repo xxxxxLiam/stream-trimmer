@@ -54,6 +54,8 @@ export function useTimelineController() {
     [store.segments, range?.start, range?.end],
   );
   const startPicked = clipper.startText.trim() !== "" && Number.isFinite(clipper.start) && clipper.start >= 0 && !range;
+  // B3-1: an Out set before the In is stored, so the readout shows it instead of a dash.
+  const endPicked = clipper.endText.trim() !== "" && Number.isFinite(clipper.end) && clipper.end >= 0 && !range;
   const joined = sections.length >= 2;
   const existingNames = useMemo(
     () => [...(videoId && active ? (active.usedRanges[videoId] ?? []) : []), ...store.banked].map((r) => (r as { label?: string }).label ?? "").filter(Boolean),
@@ -167,6 +169,7 @@ export function useTimelineController() {
     }
     if (tools.tool === "range") {
       // Select range: press and drag sets a range; a grabbed edge of the picked range resizes it.
+      marksBeforeDrag.current = { start: clipper.startText, end: clipper.endText };
       if (range) {
         const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
         if (edge) {
@@ -184,6 +187,26 @@ export function useTimelineController() {
     s.setDrag({ kind: "scrub" });
     clipper.requestSeek(Math.round(t));
   };
+
+  // B3-2: Esc during a Select range drag puts the marks back as they were and ends the drag.
+  const marksBeforeDrag = useRef<{ start: string; end: string } | null>(null);
+  const dragKind = s.drag?.kind;
+  useEffect(() => {
+    if (dragKind !== "range" && dragKind !== "edge") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const before = marksBeforeDrag.current;
+      if (before) {
+        clipper.setStartText(before.start);
+        clipper.setEndText(before.end);
+      }
+      frozen.current = null;
+      s.setDrag(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragKind]);
 
   const lastScrub = useRef<number | null>(null);
   const onLanePointerMove = (e: PointerEvent<HTMLElement>) => {
@@ -281,7 +304,7 @@ export function useTimelineController() {
     startPicked,
     start: clipper.start,
     inText: range ? clockTime(range.start) : startPicked ? clockTime(clipper.start) : dash,
-    outText: range ? clockTime(range.end) : dash,
+    outText: range ? clockTime(range.end) : endPicked ? clockTime(clipper.end) : dash,
     lengthText: total > 0 ? lengthLabel(total) : dash,
     /** The whole joined clip in seconds, for the campaign's length rule. */
     totalSeconds: total,

@@ -112,6 +112,38 @@ export function placeLabels(bars: readonly LabelBar[], laneWidth: number): Label
 }
 
 /**
+ * V18-T-6: bars that overlap on the lane (a long video at Fit makes every clip about 18px) are stacked
+ * into rows instead of drawn on top of each other. Bars in a cluster of overlaps share the cluster's row
+ * count; a bar that overlaps nothing stays alone in one row, drawn full height as before.
+ */
+export type RowSlot = { row: number; rows: number };
+export function packRows(bars: readonly { left: number; width: number }[]): RowSlot[] {
+  const out: RowSlot[] = bars.map(() => ({ row: 0, rows: 1 }));
+  const order = bars.map((_, i) => i).sort((a, b) => bars[a].left - bars[b].left || a - b);
+  let cluster: number[] = [];
+  let clusterRight = -Infinity;
+  const rowRights: number[] = [];
+  const flush = () => {
+    for (const i of cluster) out[i].rows = rowRights.length;
+    cluster = [];
+    rowRights.length = 0;
+    clusterRight = -Infinity;
+  };
+  for (const i of order) {
+    const b = bars[i];
+    if (cluster.length && b.left >= clusterRight) flush();
+    let row = rowRights.findIndex((r) => b.left >= r);
+    if (row < 0) row = rowRights.push(0) - 1;
+    rowRights[row] = b.left + b.width;
+    out[i].row = row;
+    cluster.push(i);
+    clusterRight = Math.max(clusterRight, b.left + b.width);
+  }
+  flush();
+  return out;
+}
+
+/**
  * The Source lane is 44px at the default timeline size; when the timeline is made taller the picture
  * strip takes all the extra height (the Transcript and Clips lanes keep theirs).
  */

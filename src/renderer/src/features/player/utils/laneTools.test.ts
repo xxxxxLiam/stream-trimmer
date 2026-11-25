@@ -116,3 +116,28 @@ test("V18-T-8: a slider position maps to a zoom and stays inside 0 to 100", () =
   assert.equal(zoomFromX(500, 100, 100), 100);
   assert.equal(zoomFromX(150, 100, 0), 0);
 });
+
+import { packRows } from "./laneTools";
+
+test("V18-T-6: bars that overlap stack into rows; a lone bar stays full height", () => {
+  const slots = packRows([
+    { left: 0, width: 18 },
+    { left: 10, width: 18 },
+    { left: 20, width: 18 },
+    { left: 200, width: 18 },
+  ]);
+  assert.deepEqual(slots[0], { row: 0, rows: 2 });
+  assert.deepEqual(slots[1], { row: 1, rows: 2 });
+  assert.deepEqual(slots[2], { row: 0, rows: 2 }); // fits after the first ended at 18
+  assert.deepEqual(slots[3], { row: 0, rows: 1 });
+  assert.equal(new Set(slots.slice(0, 3).map((s) => `${s.row}`)).size, 2);
+});
+
+test("V18-T-6: packed rows never overlap inside a row", () => {
+  const bars = Array.from({ length: 30 }, (_, i) => ({ left: i * 5, width: 18 }));
+  const slots = packRows(bars);
+  for (let i = 0; i < bars.length; i++)
+    for (let j = i + 1; j < bars.length; j++)
+      if (slots[i].row === slots[j].row)
+        assert.ok(bars[j].left >= bars[i].left + bars[i].width || bars[i].left >= bars[j].left + bars[j].width);
+});

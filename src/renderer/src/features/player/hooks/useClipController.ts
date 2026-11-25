@@ -44,8 +44,20 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     endSet: endText.trim() !== "",
   });
 
+  // B2-9: Ctrl+Enter while Clip is blocked shows the same line the dimmed button shows on hover.
+  const [reasonShown, setReasonShown] = useState(false);
+  useEffect(() => {
+    if (!reasonShown) return;
+    const id = window.setTimeout(() => setReasonShown(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [reasonShown]);
+  useEffect(() => {
+    if (!reason) setReasonShown(false);
+  }, [reason]);
+
   const clip = () => {
-    if (!reason) host.cutSegments(toCut);
+    if (reason) return setReasonShown(true);
+    host.cutSegments(toCut);
   };
   const clipRef = useRef(clip);
   clipRef.current = clip;
@@ -65,6 +77,7 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
 
   return {
     reason,
+    reasonShown,
     clip,
     hasRange,
     destination,

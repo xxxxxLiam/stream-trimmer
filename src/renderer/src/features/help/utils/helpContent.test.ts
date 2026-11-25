@@ -118,7 +118,7 @@ test("F-6: every shortcut listed is handled, and every handled shortcut is liste
     "R": /toLowerCase\(\) !== "r"/,
     "⌘ R": /k === "r" && !e\.shiftKey/,
     "⌘ L": /modifier\) return k === "l"/,
-    "⌘ F": /e\.key\.toLowerCase\(\) === "f" && searchRef/,
+    "⌘ F": /e\.key\.toLowerCase\(\) !== "f"/,
     "⌘ 1–9": /\/\^\[1-9\]\$\/\.test\(k\)/,
     "⌘ Tab": /k === "tab"/,
     "⌘ ,": /k === "," && !e\.shiftKey/,
