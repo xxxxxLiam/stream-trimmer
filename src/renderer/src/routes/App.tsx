@@ -443,8 +443,8 @@ function Layout({ active }: { active: boolean }) {
           if (saved) made.push(saved);
         }
       } finally {
-        handOff(made, startSettings);
         clearInFlightCut();
+        handOff(made, startSettings);
         setMakingName(null);
         setMakingClipId(null);
       }
