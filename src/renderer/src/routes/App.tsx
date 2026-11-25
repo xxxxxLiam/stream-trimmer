@@ -274,8 +274,10 @@ function Layout({ active }: { active: boolean }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Tips never open beside the first-run campaign prompt: they wait for a campaign (or for the prompt to be dismissed).
   // Only the open video shows tips; a hidden video must not run the timer or point at its own controls.
-  const tips = useTipsController(!!info && active);
+  const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
+  const tips = useTipsController(!!info && active && (!!campaign || campaignPromptDismissed));
   const [importText, setImportText] = useState<string | null>(null);
   // The footer's "Sign in for 1080p" opens Help on its sign-in page.
   const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
@@ -284,7 +286,6 @@ function Layout({ active }: { active: boolean }) {
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
   // nobody is nagged: someone who just wants to paste a link and cut once never set a
   // campaign up, and that is a legitimate way to use the app.
-  const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
 
 
   const ownerAccess = useOwnerAccess();
