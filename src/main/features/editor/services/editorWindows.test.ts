@@ -65,8 +65,9 @@ test("a missing editor is named, says where it looked, and keeps the file", asyn
   assert.match(r.error, /saved at C:\\clips\\a\.mp4/);
 });
 
-test("an editor that takes the file is run directly with it as an argument, never through a shell", async () => {
+test("Premiere is opened empty and the clip is shown, never handed the .mp4 as a document (D-16)", async () => {
   let call: any[] = [];
+  const shown: string[] = [];
   const spawn = (cmd: string, args: string[], opts: any) => {
     call = [cmd, args, opts];
     const child: any = new EventEmitter();
@@ -74,10 +75,16 @@ test("an editor that takes the file is run directly with it as an argument, neve
     queueMicrotask(() => child.emit("spawn"));
     return child;
   };
-  const r: any = await ed.openWithApp({ app: "premiere", file: "C:\\clips\\a.mp4" }, { platform: "win32", ...deps, spawn, showFile: () => assert.fail("not needed") });
+  const r: any = await ed.openWithApp(
+    { app: "premiere", file: "C:\\clips\\a.mp4" },
+    { platform: "win32", ...deps, spawn, showFile: (f: string) => shown.push(f) },
+  );
   assert.equal(r.ok, true);
-  assert.deepEqual(call.slice(0, 2), [PREMIERE_25, ["C:\\clips\\a.mp4"]]);
+  assert.equal(r.opened, true, "says the editor started");
+  assert.equal(r.revealed, true, "says the file was shown");
+  assert.deepEqual(call.slice(0, 2), [PREMIERE_25, []]);
   assert.notEqual(call[2].shell, true);
+  assert.deepEqual(shown, ["C:\\clips\\a.mp4"]);
 });
 
 test("CapCut can't take a project: it opens empty and the file is shown", async () => {
@@ -96,6 +103,8 @@ test("CapCut can't take a project: it opens empty and the file is shown", async 
   );
   assert.equal(r.ok, true);
   assert.equal(r.shown, true);
+  assert.equal(r.opened, true);
+  assert.equal(r.revealed, true);
   assert.deepEqual(call, [CAPCUT, []]);
   assert.deepEqual(shown, ["C:\\clips\\a.mp4"]);
 });
@@ -115,4 +124,14 @@ test("a launch that fails says why and keeps the file", async () => {
 test("the file manager is named per system", () => {
   assert.equal(ed.fileManagerName("win32"), "File Explorer");
   assert.equal(ed.fileManagerName("darwin"), "Finder");
+});
+
+test("Premiere discovery sorts by the year as a number: 2025 beats CC 2019 (D-11)", () => {
+  const old = `${PF}\\Adobe\\Adobe Premiere Pro CC 2019\\Adobe Premiere Pro.exe`;
+  const fsImpl = fakeFs([old, PREMIERE_25], { [`${PF}\\Adobe`]: ["Adobe Premiere Pro CC 2019", "Adobe Premiere Pro 2025"] });
+  assert.equal(findWindowsEditor("premiere", { fsImpl, env, readRegistry: noRegistry }), PREMIERE_25);
+  // The beta has no year: the newest numbered one still wins, and the beta is used only when alone.
+  const beta = `${PF}\\Adobe\\Adobe Premiere Pro (Beta)\\Adobe Premiere Pro.exe`;
+  const both = fakeFs([beta, PREMIERE_24], { [`${PF}\\Adobe`]: ["Adobe Premiere Pro (Beta)", "Adobe Premiere Pro 2024"] });
+  assert.equal(findWindowsEditor("premiere", { fsImpl: both, env, readRegistry: noRegistry }), PREMIERE_24);
 });

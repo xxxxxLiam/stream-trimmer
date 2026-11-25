@@ -132,7 +132,7 @@ export interface ElectronAPI {
     openWith: (payload: {
       app: "finalcut" | "premiere" | "resolve" | "capcut";
       file?: string;
-    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; shown?: boolean; error?: string }>;
+    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; opened?: boolean; revealed?: boolean; shown?: boolean; error?: string }>;
     reveal: (target: string) => Promise<{ ok: boolean; error?: string }>;
     copyFiles: (payload: {
       dirPath: string;
