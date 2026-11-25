@@ -128,7 +128,7 @@
    }
   },
   "clipper.signInSkipped": true,
-  "clipper.tips.on": false
+  "clipper.tips.on": true
  },
  "stub": {
   "info": {
@@ -155,7 +155,13 @@
    "click": "#ui-help-button"
   },
   {
-   "wait": 600
+   "wait": 400
+  },
+  {
+   "hover": "#ui-help-drawer >> [aria-label='Where did my clip go?']"
+  },
+  {
+   "wait": 300
   }
  ],
  "mask": [],

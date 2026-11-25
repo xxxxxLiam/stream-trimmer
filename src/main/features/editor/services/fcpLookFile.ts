@@ -2,7 +2,7 @@
  * File: fcpLookFile.ts
  * Path: src/main/features/editor/services/fcpLookFile.ts
  * Description: Reads the Final Cut export a user picks or drops as their look: a .fcpxmld bundle (its
- *   Info.fcpxml), a .fcpxml, or a .txt / .xml holding the same text. Capped in size, read as UTF-8,
+ *   Info.fcpxml), a .fcpxml, or a .txt / .xml / .rtf holding the same text. Capped in size, read as UTF-8,
  *   checked with parseLook, and answered with the parsed look or one plain reason. No electron import.
  */
 import fsp from "node:fs/promises";
@@ -11,7 +11,7 @@ import { FCP_LOOK_MAX_BYTES, type FcpLookFileResult } from "../../../../common/t
 import { parseLook } from "../../../../common/utils/fcpLook";
 
 const WRONG_KIND =
-  "Choose a Final Cut export: a .fcpxmld bundle, a .fcpxml file, or a .txt or .xml copy of it.";
+  "Choose a Final Cut export: a .fcpxmld bundle, a .fcpxml file, or a .txt, .xml or .rtf copy of it.";
 const TOO_BIG = "That file is too big to be a Final Cut export.";
 const CANNOT_READ = "That file could not be read.";
 
@@ -29,7 +29,7 @@ async function locate(picked: string): Promise<{ file: string } | { reason: stri
     }
     return { file: inside };
   }
-  if (![".fcpxml", ".txt", ".xml"].includes(ext)) return { reason: WRONG_KIND };
+  if (![".fcpxml", ".txt", ".xml", ".rtf"].includes(ext)) return { reason: WRONG_KIND };
   return { file: picked };
 }
 

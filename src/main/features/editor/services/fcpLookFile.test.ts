@@ -46,6 +46,14 @@ test("a bare .fcpxml, a .txt copy and an .xml copy all give the same look, BOM o
   assert.deepEqual(bom.ok && bom.look, want.ok && want.look);
 });
 
+test("a TextEdit rich-text copy (.rtf) reads like the plain one", async () => {
+  const plain = await readFcpLookFile(put("p.txt", sampleExport()));
+  const rtf = "{\\rtf1\\ansi{\\fonttbl}\\f0 " + sampleExport().split("\n").join("\\\n") + "}";
+  const r = await readFcpLookFile(put("t.rtf", rtf));
+  assert.ok(r.ok && plain.ok);
+  assert.deepEqual(r.ok && r.look, plain.ok && plain.look);
+});
+
 test("each failure is one plain sentence: no clip, clip with no look, not XML, empty", async () => {
   assert.match(await reason(put("noclip.fcpxml", sampleExport({ noClip: true }))), /No video clip was found/);
   assert.match(await reason(put("nolook.fcpxml", sampleExport({ clipChildren: "" }))), /has no look on it/);

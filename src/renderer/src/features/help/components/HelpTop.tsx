@@ -52,7 +52,7 @@ export default function HelpTop(p: HelpTopProps) {
     <>
       <DrawerHeader title="Help" closeName="Help" onClose={p.onClose} />
       <div ref={listRef} onKeyDown={onKeyDown} className={drawerBody}>
-        <div className="relative mb-2 mt-1">
+        <div className="relative mb-[8px] mt-[4px]">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="absolute left-[14px] top-[14px] text-fg-dim">
             <circle cx="11" cy="11" r="6" />
             <path d="M16 16l4 4" />
@@ -67,18 +67,18 @@ export default function HelpTop(p: HelpTopProps) {
             placeholder="What do you need help with?"
             onChange={(e) => p.onQuery(e.target.value)}
             data-help-item
-            className="box-border h-target w-full rounded-[22px] border border-hairlineStrong bg-raised pl-10 pr-4 text-body text-fg outline-none"
+            className="box-border h-target w-full rounded-[22px] border border-hairlineStrong bg-raised pl-[40px] pr-[16px] text-body leading-[normal] text-fg outline-none"
           />
         </div>
         {!hasAny && (
-          <div role="status" className="flex flex-col items-start gap-1 py-2">
-            <span className="text-body">No answer for that yet</span>
+          <div role="status" className="flex flex-col items-start gap-[4px] py-[8px]">
+            <span className="text-body leading-[normal]">No answer for that yet</span>
             <button type="button" data-help-item onClick={() => p.onOpenMore("report")} className="h-target text-meta text-ice underline underline-offset-[3px]">
               Report a problem
             </button>
           </div>
         )}
-        {p.results.answers.length > 0 && <SectionLabel>Common questions</SectionLabel>}
+        {p.results.answers.length > 0 && <SectionLabel first>Common questions</SectionLabel>}
         {p.results.answers.map((a) => (
           <button
             key={a.id}
@@ -86,7 +86,7 @@ export default function HelpTop(p: HelpTopProps) {
             data-help-item
             aria-label={a.question}
             onClick={() => p.onOpenAnswer(a.id)}
-            className="-mx-2 flex h-target items-center gap-2 rounded-control bg-transparent px-2 text-left text-body text-fg hover:bg-hover"
+            className="-mx-[8px] flex h-target items-center gap-[8px] rounded-control bg-transparent px-[8px] text-left text-body leading-[normal] text-fg hover:bg-hover"
           >
             <span className="flex-1">{a.question}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-fg-dim">
@@ -97,17 +97,17 @@ export default function HelpTop(p: HelpTopProps) {
         {p.results.more.length > 0 && <SectionLabel>More</SectionLabel>}
         {HELP_MORE.filter((m) => p.results.more.includes(m.id)).map((m) =>
           m.id === "replay-tips" ? (
-            <div key={m.id} className="flex min-h-target items-center gap-2 border-b border-hairline">
-              <div className="flex flex-1 flex-col gap-0.5">
-                <span className="text-body">Replay tips</span>
+            <div key={m.id} className="flex min-h-target items-center gap-[8px] border-b border-hairline">
+              <div className="flex flex-1 flex-col gap-[2px]">
+                <span className="text-body leading-[normal]">Replay tips</span>
                 <span className="text-meta text-fg-dim">{p.tipsOn ? "Show tips on" : "Show tips off"}</span>
               </div>
-              <button type="button" data-help-item aria-label="Replay tips for this panel" onClick={p.onReplayTips} className="h-target bg-transparent px-1 text-meta text-ice">
+              <button type="button" data-help-item aria-label="Replay tips for this panel" onClick={p.onReplayTips} className="h-target bg-transparent px-[4px] text-meta text-ice">
                 Replay
               </button>
             </div>
           ) : m.id === "about" ? (
-            <button key={m.id} type="button" data-help-item aria-label={MORE_LABEL[m.id](p)} onClick={() => p.onOpenMore(m.id)} className="flex h-target items-center bg-transparent text-left text-body text-fg">
+            <button key={m.id} type="button" data-help-item aria-label={MORE_LABEL[m.id](p)} onClick={() => p.onOpenMore(m.id)} className="flex h-target items-center bg-transparent text-left text-body leading-[normal] text-fg">
               {MORE_LABEL[m.id](p)}
             </button>
           ) : (

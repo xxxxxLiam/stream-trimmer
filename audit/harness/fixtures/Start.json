@@ -1,6 +1,26 @@
 {
-  "_doc": "Parity fixture for the Start board. seed = settings.json written before launch; steps run after the window loads (click, fill, press, waitFor, wait, eval); waitFor = selector that means ready.",
-  "seed": { "clipper.dataDirConfirmed": true, "clipper.signInSkipped": true },
-  "waitFor": "#root *",
-  "steps": []
+ "_doc": "Parity fixture for the Start board. seed = settings.json written before launch; steps run after the window loads (click, fill, press, waitFor, wait, eval); waitFor = selector that means ready.",
+ "seed": {
+  "clipper.dataDirConfirmed": true,
+  "clipper.signInSkipped": true,
+  "clipper.clipsDir": "/home/liam/Downloads/Clipr"
+ },
+ "waitFor": "#root *",
+ "steps": [],
+ "stub": {
+  "info": {
+   "id": "podcast214",
+   "title": "Podcast #214, the long talk",
+   "duration": 8073,
+   "uploader": "The Long Talk"
+  },
+  "vttFile": "podcast214.vtt",
+  "exitCode": 0,
+  "progress": [
+   0,
+   50,
+   100
+  ],
+  "writeMedia": true
+ }
 }

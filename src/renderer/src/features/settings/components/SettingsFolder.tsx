@@ -10,17 +10,17 @@ export default function SettingsFolder(p: { label: string; problem: string; onCh
     <>
       <DrawerHeader closeName="Settings" title="Clips folder" back="Settings" onBack={p.onBack} onClose={p.onClose} />
       <div className={drawerBody}>
-      <div className="flex items-center gap-3 py-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-body">Clips folder</span>
+      <div className="flex items-center gap-[12px] py-[12px]">
+        <div className="flex min-w-[0px] flex-1 flex-col gap-[2px]">
+          <span className="text-body leading-[normal]">Clips folder</span>
           <span className="truncate text-meta text-fg-dim">{p.label}</span>
         </div>
         <button type="button" aria-label="Change the clips folder" onClick={p.onChange} className={outlineButton}>
           Change
         </button>
       </div>
-      {p.problem && <p role="alert" className="m-0 text-meta text-error">{p.problem}</p>}
-      <p className="m-0 text-meta text-fg-dim">A folder per campaign is made inside it. The folder button in the bottom bar changes this same folder.</p>
+      {p.problem && <p role="alert" className="m-[0px] text-meta text-error">{p.problem}</p>}
+      <p className="m-[0px] text-meta text-fg-dim">A folder per campaign is made inside it. The folder button in the bottom bar changes this same folder.</p>
       </div>
     </>
   );

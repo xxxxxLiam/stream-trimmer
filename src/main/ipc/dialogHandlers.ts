@@ -53,7 +53,7 @@ export function registerDialogHandlers() {
       message: "Pick the project you exported with File, then Export XML.",
       // A .fcpxmld is a package, which macOS treats as a file; elsewhere only files are offered.
       properties: process.platform === "darwin" ? ["openFile", "openDirectory"] : ["openFile"],
-      filters: [{ name: "Final Cut export", extensions: ["fcpxmld", "fcpxml", "txt", "xml"] }],
+      filters: [{ name: "Final Cut export", extensions: ["fcpxmld", "fcpxml", "txt", "xml", "rtf"] }],
     });
     if (res.canceled || res.filePaths.length === 0) return { ok: false, cancelled: true, reason: "" };
     return readFcpLookFile(res.filePaths[0]);

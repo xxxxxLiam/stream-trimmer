@@ -51,6 +51,8 @@ async function runSteps(win, steps) {
     else if (s.waitFor) await win.waitForSelector(s.waitFor);
     else if (s.wait) await win.waitForTimeout(s.wait);
     else if (s.eval) await win.evaluate(s.eval);
+    else if (s.hover) await win.hover(s.hover);
+    else if (s.log) console.log("log:", JSON.stringify(await win.evaluate(s.log)));
   }
 }
 
