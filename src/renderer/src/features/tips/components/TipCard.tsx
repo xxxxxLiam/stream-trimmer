@@ -1,7 +1,7 @@
 /**
  * File: TipCard.tsx
  * Path: src/renderer/src/features/tips/components/TipCard.tsx
- * Description: The first-use pointer card: a dotted Ice ring on the control, and a small card beside
+ * Description: The first-use pointer card: everything else dimmed, an Ice ring on the control, and a small card beside
  *   it with one sentence, "1 of 3", Next or Got it, "Skip step" and Next or Got it, and a "Turn off tips" link on every tip. A step that names a
  *   key or a control finishes when the person does it. Keys act only while focus is inside the card, so
  *   Enter on any other button keeps its own job.
@@ -106,9 +106,19 @@ export default function TipCard({
   );
   return (
     <>
+      {/* Liam, 25 Nov: everything but the focused control is dimmed, so the step is noticed. Four flat panels leave a
+          cut-out round the control; none takes a click, so the control and the page stay usable. */}
+      {[
+        { top: 0, left: 0, width: "100%", height: Math.max(0, box.top - 3) },
+        { top: box.top + box.height + 3, left: 0, width: "100%", height: "100%" },
+        { top: box.top - 3, left: 0, width: Math.max(0, box.left - 3), height: box.height + 6 },
+        { top: box.top - 3, left: box.left + box.width + 3, width: "100%", height: box.height + 6 },
+      ].map((r, i) => (
+        <div key={i} data-tip-scrim="" aria-hidden="true" className="pointer-events-none fixed z-[59] bg-bg-overlay-75" style={r} />
+      ))}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed z-[60] rounded-control border border-dotted border-ice"
+        className="pointer-events-none fixed z-[60] rounded-control border-2 border-ice"
         style={{
           top: box.top - 3,
           left: box.left - 3,
