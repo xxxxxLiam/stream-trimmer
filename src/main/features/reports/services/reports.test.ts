@@ -38,8 +38,11 @@ test("only a real report is accepted from the page", () => {
   for (const bad of [null, "x", {}, { kind: "other", error: "x" }, { kind: "crash", error: "" }, { kind: "crash", error: "x", note: 5 }]) assert.equal(validInput(bad), null);
 });
 
-test("with no relay address a report is kept and nothing is sent; the address is empty in this build", async () => {
-  assert.equal(RELAY_URL, "");
+test("the build points at the deployed relay: an https address with no trailing slash", () => {
+  assert.match(RELAY_URL, /^https:\/\/[^/\s]+$/);
+});
+
+test("with no relay address a report is kept and nothing is sent", async () => {
   const queue = createReportQueue(queueFile());
   let posts = 0;
   const s = createReportSender({ url: "", queue, post: async () => (posts++, true) });
