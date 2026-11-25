@@ -33,7 +33,7 @@ const EXTRACT = ([panelN, rootSel]) => {
     const cs = getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden") continue;
     const b = el.getBoundingClientRect();
-    if (b.width === 0 || b.height === 0) continue;
+    if (b.width === 0 || b.height === 0 || b.top >= rb.bottom) continue; // not visible: below the panel
     if (cs.position === "absolute" && b.width <= 1 && b.height <= 1) continue; // sr-only
     const rect = { x: q(b.x - rb.x), y: q(b.y - rb.y), w: q(b.width), h: q(b.height) };
     const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join("").replace(/\s+/g, " ").trim();
@@ -89,50 +89,10 @@ async function boardData(o) {
 }
 
 async function appData(o) {
-  const fx = (() => {
-    const f = path.join(REPO, "audit", "harness", "fixtures", `${o.fixture}.json`);
-    return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8").replace(/"\$NOW"/g, String(Date.now()))) : { seed: {}, steps: [] };
-  })();
-  let link = null;
-  let stubRoot;
-  if (fx.stub) {
-    const { execFileSync } = require("node:child_process");
-    stubRoot = fs.mkdtempSync(path.join(os.tmpdir(), "parity-stub-"));
-    execFileSync("node", [path.join(REPO, "audit", "harness", "make-stub-root.cjs"), stubRoot]);
-    fs.writeFileSync(path.join(stubRoot, "stub.json"), JSON.stringify(fx.stub));
-    fs.copyFileSync(path.join(REPO, "audit", "fixtures", "fixture.mp4"), path.join(stubRoot, "fixture.mp4"));
-    if (fx.stub.vttFile) fs.copyFileSync(path.join(REPO, "audit", "harness", "fixtures", fx.stub.vttFile), path.join(stubRoot, fx.stub.vttFile));
-    link = path.join(REPO, "node_modules", "electron", "dist", "resources", "bin");
-    fs.rmSync(link, { recursive: true, force: true });
-    fs.symlinkSync(path.join(stubRoot, "resources", "bin"), link);
-  }
-  const { launchApp } = require("../../audit/harness/app.cjs");
-  const a = await launchApp({ label: `elements-${o.screen}`, seed: fx.seed, cwd: stubRoot });
-  try {
-    const win = fx.window || { width: 1360, height: 760 };
-    await a.app.evaluate(({ BrowserWindow }, [w, h]) => {
-      for (const bw of BrowserWindow.getAllWindows()) {
-        if (!bw.webContents.getURL().includes("127.0.0.1") && !bw.webContents.getURL().includes("localhost")) continue;
-        bw.setMinimumSize(1, 1);
-        bw.setContentSize(w, h);
-      }
-    }, [win.width, win.height]);
-    await a.win.waitForTimeout(300);
-    await a.win.waitForSelector(fx.waitFor || "#root *");
-    for (const s of fx.steps || []) {
-      if (s.click) await a.win.click(s.click);
-      else if (s.fill) await a.win.fill(s.fill[0], s.fill[1]);
-      else if (s.press) await a.win.keyboard.press(s.press);
-      else if (s.waitFor) await a.win.waitForSelector(s.waitFor);
-      else if (s.wait) await a.win.waitForTimeout(s.wait);
-      else if (s.eval) await a.win.evaluate(s.eval);
-    }
-    await a.win.waitForTimeout(400);
-    return await a.win.evaluate(EXTRACT, [o.panel, "document"]);
-  } finally {
-    await a.close();
-    if (link) fs.rmSync(link, { recursive: true, force: true });
-  }
+  const { loadFixture, withApp } = require("./parity.cjs");
+  const fx = loadFixture(o.fixture);
+  const win = fx.window || { width: 1360, height: 760 };
+  return withApp(`elements-${o.screen}`, fx, win, (page) => page.evaluate(EXTRACT, [o.panel, "document"]));
 }
 
 const near = (a, b, t = 1) => Math.abs(a - b) <= t;
