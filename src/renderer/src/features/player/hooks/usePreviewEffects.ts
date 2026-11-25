@@ -10,7 +10,8 @@ import { PLAY_FROM_EVENT } from "../../../shared/utils/playFrom";
 import type { Range } from "../../../shared/utils/segments";
 import type { YouTubePlayerApi } from "./useYouTubePlayerController";
 import { BAR_HIDE_MS } from "./usePreviewState";
-import { keyAction, loopSeek, spacePresses, stepTarget } from "../utils/transport";
+import { dialogOpen } from "../../../shared/utils/dialogOpen";
+import { joinedStep, keyAction, loopSeek, spacePresses, stepTarget } from "../utils/transport";
 
 type Args = {
   player: YouTubePlayerApi;
@@ -34,12 +35,6 @@ type Args = {
 function typing(e: KeyboardEvent): boolean {
   const el = e.target as HTMLElement | null;
   return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
-}
-
-/** Space presses a focused button, switch, link or menu item; only on anything else does it play or pause. */
-export function onControl(e: KeyboardEvent): boolean {
-  const el = e.target as HTMLElement | null;
-  return !!el?.closest?.('button, a[href], summary, [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"], [role="option"], [role="tab"], [role="radio"]');
 }
 
 export function usePreviewEffects(a: Args) {
@@ -80,11 +75,25 @@ export function usePreviewEffects(a: Args) {
 
   // Loop: stay inside the clip; a joined clip plays its sections in order.
   useEffect(() => {
-    if (!loop) return;
+    if (!loop || sections.length >= 2) return; // a joined clip is handled below, looping or not
     const to = loopSeek(sections, player.currentTime);
     if (to !== null) player.seekTo(to, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loop, player.currentTime, sections]);
+
+  // A joined clip (sections with gaps between) plays only its sections: the gaps are jumped over while
+  // playing, and after the last section it loops or stops.
+  useEffect(() => {
+    if (!player.playing) return;
+    const step = joinedStep(sections, player.currentTime, loop);
+    if (!step) return;
+    if (step.kind === "seek") player.seekTo(step.to, true);
+    else {
+      player.pause();
+      player.seekTo(step.at);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player.playing, player.currentTime, sections, loop]);
 
   useEffect(() => {
     a.setLoop(false);
@@ -104,7 +113,7 @@ export function usePreviewEffects(a: Args) {
     };
     const onDown = (e: KeyboardEvent) => {
       if (e.altKey || typing(e)) return;
-      if (e.key === " " && onControl(e)) return;
+      if (e.key === " " && (spacePresses(e.target as HTMLElement | null) || dialogOpen())) return;
       if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.key === "N") {
         e.preventDefault();
         argsRef.current.onNextVideo();
@@ -127,8 +136,7 @@ export function usePreviewEffects(a: Args) {
         e.preventDefault();
         argsRef.current.toggleLoop();
       } else if (act.kind === "toggle") {
-        // A focused button, switch or menu item takes Space itself (it presses); only elsewhere it is play/pause.
-        if (spacePresses(e.target as HTMLElement | null)) return;
+        // Anywhere but typing, a switch or box, or a menu or list choice (checked above), Space is play/pause.
         e.preventDefault();
         if (!e.repeat) (p.playing ? p.pause : p.play)();
       } else if (act.kind === "pause") {

@@ -19,10 +19,10 @@ test("A-10: two links pasted together open the first, not a nonsense id", () => 
   assert.equal(extractVideoId("  https://youtu.be/aaaaaaaaaaa\n"), "aaaaaaaaaaa");
 });
 
-test("A-12: Space on a focused button or switch is left to the control, not the video", () => {
+test("A-12: Space is play/pause anywhere except typing, switches and boxes, menu choices and open dialogs", () => {
   const s = src("../../features/player/hooks/usePreviewEffects.ts");
-  assert.match(s, /if \(e\.key === " " && onControl\(e\)\) return;/);
-  assert.match(s, /\[role="switch"\]/);
+  assert.match(s, /if \(e\.key === " " && \(spacePresses\(e\.target as HTMLElement \| null\) \|\| dialogOpen\(\)\)\) return;/);
+  assert.doesNotMatch(s, /onControl/);
 });
 
 test("A-15: a name has a limit, a bad quota is capped, and delete drops the campaign's prefs", () => {

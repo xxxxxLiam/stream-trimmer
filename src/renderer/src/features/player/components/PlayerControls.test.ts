@@ -17,6 +17,6 @@ test("the middle group is a grid column, never absolutely centred over the side 
   assert.doesNotMatch(row, /absolute/);
 });
 
-test("Space is play/pause only when focus is not on something that Space presses (A-12)", () => {
+test("Space is play/pause everywhere but fields, switches and menu choices (A-12)", () => {
   assert.match(keys, /spacePresses\(e\.target/);
 });

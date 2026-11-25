@@ -111,15 +111,38 @@ test("clipToVideo is the way back from clip time", () => {
   for (const t of [72, 85, 604, 619]) assert.equal(clipToVideo(two, clipPosition(two, t).at), t);
 });
 
-test("Space presses a focused button, switch, link, menu item or field; elsewhere it is play and pause", () => {
+test("Space is play and pause from anywhere; it only keeps its own job in fields, switches, boxes and menu or list choices", () => {
   const el = (tagName: string, role?: string) => ({ tagName, getAttribute: (n: string) => (n === "role" && role ? role : null) });
-  assert.equal(spacePresses(el("BUTTON")), true);
-  assert.equal(spacePresses(el("DIV", "switch")), true);
-  assert.equal(spacePresses(el("A")), true);
-  assert.equal(spacePresses(el("DIV", "menuitemradio")), true);
-  assert.equal(spacePresses(el("INPUT")), true);
-  assert.equal(spacePresses({ tagName: "DIV", isContentEditable: true }), true);
-  assert.equal(spacePresses(el("DIV")), false);
-  assert.equal(spacePresses(el("BODY")), false);
+  // Anywhere: a plain button, a link, a tab, a panel row, the timeline, the page.
+  for (const e of [el("BUTTON"), el("A"), el("DIV", "tab"), el("DIV", "button"), el("DIV", "slider"), el("DIV"), el("BODY")]) assert.equal(spacePresses(e), false, `${e.tagName} ${e.getAttribute("role")}`);
   assert.equal(spacePresses(null), false);
+  // Where Space means something else.
+  for (const e of [el("INPUT"), el("TEXTAREA"), el("SELECT"), el("DIV", "switch"), el("DIV", "checkbox"), el("DIV", "menuitemradio"), el("DIV", "option"), el("DIV", "textbox")]) assert.equal(spacePresses(e), true, `${e.tagName} ${e.getAttribute("role")}`);
+  assert.equal(spacePresses({ tagName: "DIV", isContentEditable: true }), true);
+});
+
+import { joinedStep, SECTION_LEAD } from "./transport";
+
+test("a joined clip plays only its sections: gaps are jumped, the last section loops or stops", () => {
+  const two = [{ start: 100, end: 130 }, { start: 400, end: 420 }];
+  // Inside a section: left alone.
+  assert.equal(joinedStep(two, 110, false), null);
+  assert.equal(joinedStep(two, 410, true), null);
+  // Reaching the first section's end jumps over the gap to the second.
+  assert.deepEqual(joinedStep(two, 130 - SECTION_LEAD + 0.01, false), { kind: "seek", to: 400 });
+  assert.deepEqual(joinedStep(two, 131, false), { kind: "seek", to: 400 });
+  // Inside the gap or before the first section: forward to the next start.
+  assert.deepEqual(joinedStep(two, 200, false), { kind: "seek", to: 400 });
+  assert.deepEqual(joinedStep(two, 10, false), { kind: "seek", to: 100 });
+  // After the last: wraps to the first when looping, else stops at the end.
+  assert.deepEqual(joinedStep(two, 420 - SECTION_LEAD + 0.01, true), { kind: "seek", to: 100 });
+  assert.deepEqual(joinedStep(two, 421, true), { kind: "seek", to: 100 });
+  assert.deepEqual(joinedStep(two, 421, false), { kind: "stop", at: 420 });
+  assert.deepEqual(joinedStep(two, 420 - SECTION_LEAD + 0.01, false), { kind: "stop", at: 420 });
+  // Three sections in order.
+  const three = [...two, { start: 900, end: 910 }];
+  assert.deepEqual(joinedStep(three, 419.9, false), { kind: "seek", to: 900 });
+  // One section or none: not its job.
+  assert.equal(joinedStep([{ start: 1, end: 9 }], 50, true), null);
+  assert.equal(joinedStep([], 5, false), null);
 });
