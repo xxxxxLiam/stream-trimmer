@@ -5,6 +5,7 @@
  *   dropped while watching: time and the words said there. Flags with a range sit in one Ice
  *   group with a Join tag; clipped flags fold into "Clipped · N". Trim next flag (N) at the bottom.
  */
+import PanelEmptyNote, { KeyChip } from "../../../modules/layout/components/PanelEmptyNote";
 import { IconChevronDown } from "../../../shared/components/PanelIcons";
 import { formatClock } from "../../../shared/utils/clock";
 import { useMarkersController } from "../hooks/useMarkersController";
@@ -36,9 +37,9 @@ export default function MarkersPanel() {
 
   if (m.empty) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center">
-        <p className="m-0 text-body text-fg-dim">No flags yet. Press M while watching to drop one.</p>
-      </div>
+      <PanelEmptyNote>
+        No flags yet. Press <KeyChip>M</KeyChip> while watching to drop one.
+      </PanelEmptyNote>
     );
   }
 

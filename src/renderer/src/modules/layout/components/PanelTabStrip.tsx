@@ -7,7 +7,7 @@
  *   Delete closes, Alt+arrows reorder.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ThreeDots, Plus } from "react-bootstrap-icons";
+import { IconMore, IconPlus } from "./BarIcons";
 import PopoverMenu, { type MenuItem } from "./PopoverMenu";
 import type { PanelDefinition, PanelId } from "../utils/panelRegistry";
 
@@ -97,14 +97,14 @@ export default function PanelTabStrip({
     : [{ key: "none", label: "Every panel is open", disabled: true, onSelect: () => {} }];
 
   return (
-    <div className="flex h-[44px] shrink-0 items-stretch border-b border-hairline">
+    <div className="flex h-[44px] shrink-0 items-stretch gap-[4px] border-b border-hairline pl-[14px] pr-[4px]">
       <div className="relative min-w-0 flex-1">
         <div
           ref={scroller}
           role="tablist"
           aria-label={label}
           onScroll={measure}
-          className="flex h-full min-w-0 items-stretch gap-[18px] overflow-x-auto overflow-y-hidden pl-[14px]"
+          className="flex h-full min-w-0 items-stretch gap-[18px] overflow-x-auto overflow-y-hidden"
         >
           {tabs.map((t) => {
             const selected = t.id === active;
@@ -128,15 +128,15 @@ export default function PanelTabStrip({
             );
           })}
         </div>
-        {fade.start ? <span aria-hidden data-fade="start" className="tab-fade pointer-events-none absolute inset-y-0 left-0 w-[24px]" /> : null}
-        {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-[24px]" /> : null}
+        {fade.start ? <span aria-hidden data-fade="start" className="tab-fade pointer-events-none absolute inset-y-0 left-0 w-[32px]" /> : null}
+        {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-[32px]" /> : null}
       </div>
-      <div className="flex shrink-0 items-center pr-[4px]">
+      <div className="flex shrink-0 items-center">
         <PopoverMenu label={`Add a panel to ${label.toLowerCase()}`} items={addItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
-          <Plus size={14} />
+          <IconPlus />
         </PopoverMenu>
         <PopoverMenu label={`${label} menu`} items={menuItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
-          <ThreeDots size={14} />
+          <IconMore />
         </PopoverMenu>
       </div>
     </div>

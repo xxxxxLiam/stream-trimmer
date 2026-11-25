@@ -1,0 +1,213 @@
+{
+ "_doc": "Shared workspace fixture: an open video (stub yt-dlp, transcript from podcast214.vtt), two campaigns, a bank for the open video, three open videos. The stub answers every link with the same title and duration, so other rows read the same title; that is a stub limit, not an app bug. Use with --window and a board from the pending snapshot. tips are off; the open tab has the 1:12:04 to 1:12:46 range marked; mask paints the preview picture on both sides because it needs YouTube.",
+ "seed": {
+  "clipper.dataDirConfirmed": true,
+  "clipper.campaigns": [
+   {
+    "id": "acme",
+    "name": "Acme",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "ACM",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/home/liam/Downloads/Clipr/Acme",
+    "dataDir": "/tmp/Data/Acme",
+    "usedRanges": {
+     "podcast214": [
+      {
+       "start": 482,
+       "end": 515,
+       "clipId": "ACM-podcast214-01",
+       "at": "$NOW"
+      },
+      {
+       "start": 900,
+       "end": 940,
+       "clipId": "ACM-podcast214-02",
+       "at": "$NOW"
+      }
+     ]
+    },
+    "dailyQuota": 3
+   },
+   {
+    "id": "nova",
+    "name": "Nova",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "NOV",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/tmp/Clips/Nova",
+    "dataDir": "/tmp/Data/Nova",
+    "usedRanges": {},
+    "dailyQuota": 2
+   }
+  ],
+  "clipper.activeCampaign": "acme",
+  "clipper.workspaces": {
+   "activeId": "ws_a",
+   "tabs": [
+    {
+     "id": "ws_a",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=podcast214",
+     "campaignId": "acme",
+     "segments": [
+      {
+       "start": 4324,
+       "end": 4366
+      }
+     ]
+    },
+    {
+     "id": "ws_b",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=founder2",
+     "campaignId": "acme"
+    },
+    {
+     "id": "ws_c",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=townhall",
+     "campaignId": "nova"
+    }
+   ]
+  },
+  "clipper.bank": {
+   "acme": {
+    "podcast214": [
+     {
+      "id": "b1",
+      "label": "Honest Version",
+      "segments": [
+       {
+        "start": 4324,
+        "end": 4366
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T1",
+      "rating": 9.1
+     },
+     {
+      "id": "b2",
+      "label": "Big Deal",
+      "segments": [
+       {
+        "start": 2470,
+        "end": 2511
+       }
+      ],
+      "status": "banked",
+      "category": "Hustle",
+      "tier": "T2",
+      "rating": 8.4
+     },
+     {
+      "id": "b3",
+      "label": "Hot Take",
+      "segments": [
+       {
+        "start": 482,
+        "end": 515
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T3",
+      "rating": 7.0
+     }
+    ]
+   }
+  },
+  "clipper.signInSkipped": true,
+  "clipper.tips.on": false,
+  "clipper.audioLanguages": {
+   "acme": [
+    "es"
+   ]
+  },
+  "clipper.panelLayout": {
+   "groups": {
+    "left": {
+     "tabs": [
+      "videos",
+      "transcript",
+      "markers",
+      "export",
+      "history"
+     ],
+     "active": "videos"
+    },
+    "centre": {
+     "tabs": [
+      "preview",
+      "timeline"
+     ],
+     "active": "preview"
+    },
+    "right": {
+     "tabs": [],
+     "active": null
+    }
+   },
+   "sizes": {
+    "left": 300,
+    "right": 300,
+    "timeline": 197
+   }
+  }
+ },
+ "stub": {
+  "info": {
+   "id": "podcast214",
+   "title": "Podcast #214, the long talk",
+   "duration": 8073,
+   "uploader": "The Long Talk",
+   "formats": [
+    {
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "en",
+     "format_note": "English (original) (default)"
+    },
+    {
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "es",
+     "format_note": "Spanish (dubbed-auto)"
+    }
+   ]
+  },
+  "vttFile": "podcast214.vtt",
+  "exitCode": 0,
+  "progress": [
+   0,
+   50,
+   100
+  ],
+  "writeMedia": true
+ },
+ "waitFor": "#root *",
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "click": "#ui-panels-left [role=tab]:has-text('Videos')"
+  },
+  {
+   "wait": 400
+  }
+ ],
+ "region": {
+  "selector": "#ui-panels-left"
+ }
+}
