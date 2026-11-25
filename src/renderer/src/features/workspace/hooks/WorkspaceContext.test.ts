@@ -79,3 +79,21 @@ test("B-11: the picked In and Out are saved with the video and survive a relaunc
   const cleared = applyTabWork(saved, "a", { url: "https://www.youtube.com/watch?v=AAA", segments: [], picked: { start: "", end: "" } });
   assert.equal(cleared[0].picked, undefined);
 });
+
+import { readFileSync } from "node:fs";
+
+test("Liam 25 Nov: a link pasted into the top bar opens in the background; a failure keeps the workspace and the field says why", () => {
+  const ctx = readFileSync(new URL("./WorkspaceContext.tsx", import.meta.url), "utf8");
+  const add = readFileSync(new URL("./useAddVideoController.ts", import.meta.url), "utf8");
+  const field = readFileSync(new URL("../components/TopBarLinkField.tsx", import.meta.url), "utf8");
+  // addTab with a link does not switch to the new tab (that showed the cold start while it opened or failed).
+  assert.match(ctx, /if \(link\) \{[\s\S]*?setOpeningId\(id\);\s*\} else setActiveId\(id\);/);
+  // It is shown once it has opened, unless the user went elsewhere meanwhile.
+  assert.match(ctx, /if \(openingRef\.current === id\) \{[\s\S]*?if \(activeRef\.current === cameFromRef\.current\[id\]\) setActiveId\(id\);/);
+  // A failed open drops the tab, stays put, and hands the reason to the field.
+  assert.match(ctx, /failOpening[\s\S]*?setOpenFailure\(message \|\| "That link did not open\."\);[\s\S]*?setTabs\(\(prev\) => prev\.filter\(\(t\) => t\.id !== id\)\);/);
+  assert.match(ctx, /else if \(url && openError && !loadingInfo\) ws\.failOpening\(id, openError\);/);
+  assert.match(add, /problem: problem \|\| ws\.openFailure/);
+  assert.match(add, /if \(ws\.opening\) return;/);
+  assert.match(field, /Opening the video\. You stay here until it is ready\./);
+});

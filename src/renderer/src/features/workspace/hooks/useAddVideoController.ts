@@ -4,7 +4,7 @@
  * Description: The only hook TopBarLinkField calls. Holds the field's editing state and what Enter does (open or add the pasted video, or show why it can't). Esc puts the
  *   title back.
  */
-import { useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace } from "./WorkspaceContext";
@@ -20,6 +20,15 @@ export function useAddVideoController() {
   const [problem, setProblem] = useState("");
   const ref = useRef<RefObject<HTMLInputElement | null> | null>(null);
 
+  // A link that would not open puts the panel back with the reason, in the same place, ready to try again.
+  useEffect(() => {
+    if (!ws.openFailure) return;
+    setTextState((t) => t || title);
+    setEditing(true);
+    requestAnimationFrame(() => input()?.focus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.openFailure]);
+
   const input = () => ref.current?.current ?? null;
   const leave = () => {
     setEditing(false);
@@ -32,20 +41,25 @@ export function useAddVideoController() {
   const canAdd = !isTitle && action.kind === "open";
 
   const submit = () => {
+    if (ws.opening) return; // one link at a time: the panel already says it is opening
     if (isTitle || action.kind === "empty") return leave();
     if (action.kind === "error") return setProblem(action.message);
     if (action.existingId) {
       if (action.reopen) ws.setTabDone(action.existingId, false);
       ws.selectTab(action.existingId);
-    } else ws.addTab(action.target);
-    leave();
+      leave();
+      return;
+    }
+    // A new link opens in the background: the panel stays and says so until it has opened (or says why not).
+    ws.addTab(action.target);
   };
 
   return {
     title,
     editing,
     text,
-    problem,
+    problem: problem || ws.openFailure,
+    opening: ws.opening,
     canAdd,
     addsNew: canAdd && action.kind === "open" && !action.existingId,
     campaign: active?.name ?? "",
@@ -55,6 +69,7 @@ export function useAddVideoController() {
     setText: (v: string) => {
       setTextState(v);
       setProblem("");
+      ws.clearOpenFailure();
     },
     onFocus: () => {
       setTextState(title);

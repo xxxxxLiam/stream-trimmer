@@ -26,6 +26,7 @@ import { useTimelineView } from "../hooks/TimelineControllerContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { lengthVerdict, ruleOf } from "../../../shared/utils/lengthRule";
 import ClipButton from "./ClipButton";
+import InOutFields from "./InOutFields";
 
 const VALUE_BUTTON = "inline-flex h-[44px] items-center";
 const VALUE_FACE =
@@ -101,19 +102,13 @@ export default function ExportBar({
     <div id="ui-export-bar" className="flex h-[60px] shrink-0 items-center gap-[16px] border-t border-hairlineStrong bg-panel px-[16px] text-meta text-fg-dim">
       <div className="flex min-w-0 flex-1 items-center gap-[16px] overflow-hidden whitespace-nowrap text-fg">
         {chips.length === 0 ? (
-          <>
-            <span id="ui-mark-in" className={`text-section font-normal tabular-nums ${c.inText === "—" ? "text-fg-dim" : ""}`} aria-label={c.inText === "—" ? "No start" : "In"}>
-              {c.inText}
-            </span>
-            <span id="ui-mark-out" className={`text-section font-normal tabular-nums ${c.outText === "—" ? "text-fg-dim" : ""}`} aria-label={c.outText === "—" ? "No end" : "Out"}>
-              {c.outText}
-            </span>
-          </>
+          <InOutFields />
         ) : null}
         <span id="ui-stitched-total" className="inline-flex items-baseline gap-[8px]">
           <span className={`text-cliplength tabular-nums ${c.lengthText === "—" ? "text-fg-dim" : verdict.state === "out" ? "text-fg" : "text-ice"}`}>{c.lengthText}</span>
           <span className={`text-meta leading-[15px] ${verdict.state === "out" ? "text-fg" : "text-fg-dim"}`}>{verdict.label}</span>
         </span>
+        {chips.length === 0 && c.inText === "—" && c.outText === "—" ? <span className="text-meta text-fg-dim">Type or paste a time</span> : null}
         {overlap ? (
           <span id="ui-overlap-warning" role="status" className="text-meta text-fg-dim">
             Overlaps a clip already made

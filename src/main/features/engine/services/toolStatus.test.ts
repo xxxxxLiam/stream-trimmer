@@ -124,3 +124,77 @@ test("jsRuntimeProblem: a probe that found deno missing or broken is a problem, 
   setProbeForTest(null);
   resetToolProbesForTest();
 });
+
+// ---- Mac first run: a slow first answer is "still checking", not "could not start" ----------------
+
+import { MAX_PROBE_TIMEOUTS, refreshToolProbe, reportOf } from "./toolStatus";
+
+test("a probe that timed out is checking, not broken; a plain failure is still broken", () => {
+  assert.equal(reportOf({ path: "/x", ok: false, timedOut: true }).state, "checking");
+  assert.equal(reportOf({ path: "/x", ok: false }).state, "broken");
+});
+
+test("probeBinary reports a killed-by-timeout run as timedOut, and any other failure as plain", async () => {
+  const run = (err: Error) => (_f: string, _a: string[], _o: object, cb: (e: Error | null, s: string) => void) => cb(err, "");
+  const slow = Object.assign(new Error("timeout"), { killed: true, signal: "SIGTERM" });
+  assert.deepEqual(await probeBinary(process.execPath, "--version", run(slow)), { path: process.execPath, ok: false, timedOut: true });
+  assert.deepEqual(await probeBinary(process.execPath, "--version", run(new Error("x"))), { path: process.execPath, ok: false });
+});
+
+test("Liam on a Mac: a slow first run shows checking, then ready once the second run answers; the screen is never 'broken'", async () => {
+  resetToolProbesForTest();
+  let calls = 0;
+  setProbeForTest(async (_b, arg) => {
+    calls += 1;
+    const slowFirst = arg === "--version" && calls <= 3;
+    return slowFirst ? { path: "/x", ok: false, timedOut: true } : { path: "/x", ok: true, version: "v1" };
+  });
+  try {
+    const seen = new Set<string>();
+    let now = Date.now();
+    for (let i = 0; i < 6; i += 1) {
+      seen.add(currentToolStatus(now).overall);
+      await new Promise((r) => setTimeout(r, 10));
+      now += REPROBE_BACKOFF_MS + 1;
+    }
+    assert.ok(seen.has("checking"));
+    assert.ok(!seen.has("broken"), [...seen].join());
+    assert.equal(currentToolStatus(now).overall, "ready");
+  } finally {
+    setProbeForTest(null);
+    resetToolProbesForTest();
+  }
+});
+
+test("a tool that keeps timing out is reported broken after all, and a good answer survives one slow re-check", async () => {
+  resetToolProbesForTest();
+  setProbeForTest(async () => ({ path: "/x", ok: false, timedOut: true }));
+  try {
+    let now = Date.now();
+    let last = "";
+    for (let i = 0; i < MAX_PROBE_TIMEOUTS + 2; i += 1) {
+      last = currentToolStatus(now).overall;
+      await new Promise((r) => setTimeout(r, 10));
+      now += REPROBE_BACKOFF_MS + 1;
+    }
+    assert.equal(currentToolStatus(now).overall, "broken", last);
+  } finally {
+    setProbeForTest(null);
+    resetToolProbesForTest();
+  }
+  // After a good answer, a slow re-check (a fresh yt-dlp after the quiet update) keeps it.
+  resetToolProbesForTest();
+  let n = 0;
+  setProbeForTest(async () => (++n <= 3 ? { path: "/x", ok: true, version: "v1" } : { path: "/x", ok: false, timedOut: true }));
+  try {
+    currentToolStatus(Date.now());
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(currentToolStatus(Date.now()).overall, "ready");
+    refreshToolProbe();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(currentToolStatus(Date.now()).tools.ytdlp.state, "ready");
+  } finally {
+    setProbeForTest(null);
+    resetToolProbesForTest();
+  }
+});

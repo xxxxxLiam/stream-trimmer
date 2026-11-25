@@ -149,8 +149,15 @@ export type WorkspaceState = {
   backTargetFor: (id: string) => string | null;
   /** Leave a video that would not open: it is dropped and the one you came from is shown. */
   goBack: (id: string) => void;
-  /** The tab's link opened, so it is a real video now and is saved. */
+  /** The tab's link opened, so it is a real video now and is saved (and shown, if it was opening in the background). */
   markOpened: (id: string) => void;
+  /** A pasted link is opening in the background: you stay on the video you are on until it has opened. */
+  opening: boolean;
+  /** Why the last pasted link did not open (shown in the link field's panel), or "". */
+  openFailure: string;
+  /** The link a tab was opening would not open: the tab is dropped, you stay where you were, and the field says why. */
+  failOpening: (id: string, message: string) => void;
+  clearOpenFailure: () => void;
   /** Fold a video into Done, or bring it back. Marking the open one moves to the next open video. */
   setTabDone: (id: string, done: boolean) => void;
   /** Close a tab. False when the user backed out of the confirmation and nothing closed. */
@@ -200,6 +207,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [trying, setTrying] = useState<Trying>({});
   const cameFromRef = useRef(cameFrom);
   cameFromRef.current = cameFrom;
+  // A link pasted into the top bar opens in the background: the video you are on stays on screen until it has opened.
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const openingRef = useRef<string | null>(null);
+  openingRef.current = openingId;
+  const [openFailure, setOpenFailure] = useState("");
 
   useEffect(() => {
     writeSetting(STORE_KEY, savedWorkspace(tabs, activeId, trying, cameFrom));
@@ -213,12 +225,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setCameFrom((prev) => ({ ...prev, [id]: activeRef.current }));
     if (link) setTrying((prev) => ({ ...prev, [id]: true }));
     setTabs((prev) => [...prev, link ? { id, name: "", url: link } : { id, name: "" }]);
-    setActiveId(id);
+    if (link) {
+      // Stay on the open video; it is shown once the link has opened, and a failure never leaves the workspace.
+      setOpenFailure("");
+      setOpeningId(id);
+    } else setActiveId(id);
   }, []);
 
   const backTargetFor = useCallback((id: string) => backTarget(tabsRef.current, cameFromRef.current, id), []);
 
+  const failOpening = useCallback((id: string, message: string) => {
+    if (openingRef.current !== id) return;
+    setOpeningId(null);
+    setOpenFailure(message || "That link did not open.");
+    cancels.current.delete(id);
+    setTrying((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setTabs((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+  const clearOpenFailure = useCallback(() => setOpenFailure(""), []);
+
   const markOpened = useCallback((id: string) => {
+    if (openingRef.current === id) {
+      setOpeningId(null);
+      // Shown now, unless you went to another video while it opened: then it just joins the list.
+      if (activeRef.current === cameFromRef.current[id]) setActiveId(id);
+    }
     setTrying((prev) => {
       if (!prev[id]) return prev;
       const next = { ...prev };
@@ -405,6 +440,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       backTargetFor,
       goBack,
       markOpened,
+      opening: openingId !== null,
+      openFailure,
+      failOpening,
+      clearOpenFailure,
       setTabDone,
       closeTab,
       moveTab,
@@ -425,6 +464,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       backTargetFor,
       goBack,
       markOpened,
+      openingId,
+      openFailure,
+      failOpening,
+      clearOpenFailure,
       setTabDone,
       closeTab,
       moveTab,
@@ -518,6 +561,8 @@ function TabBridge({
   const endText = clipper?.endText ?? "";
   const downloading = clipper?.downloading ?? false;
   const opened = !!clipper?.info;
+  const openError = clipper?.error ?? "";
+  const loadingInfo = clipper?.loadingInfo ?? false;
 
   // Restore once, on mount, from what this tab last reported.
   const pending = useRef<string | null>(null);
@@ -546,6 +591,8 @@ function TabBridge({
     }
     if (!restored.current) return;
     if (opened) ws.markOpened(id);
+    // A link opening in the background that fails stays out of sight: the field says why.
+    else if (url && openError && !loadingInfo) ws.failOpening(id, openError);
     if (pickedPending.current) {
       // The saved In/Out waits for the video's info; reporting now would overwrite it with nothing.
       if (!clipper.info) return;
@@ -560,7 +607,7 @@ function TabBridge({
     if (url && !opened) return;
     ws.reportTabWork(id, { url, segments, picked: { start: startText, end: endText } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, url, segments, startText, endText, clipper?.info, opened]);
+  }, [id, url, segments, startText, endText, clipper?.info, opened, openError, loadingInfo]);
 
   return null;
 }
