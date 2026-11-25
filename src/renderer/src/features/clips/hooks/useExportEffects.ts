@@ -11,14 +11,17 @@ import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { clipTitle, getDownloads } from "../../../shared/utils/downloads";
 import { UNDO_SECONDS } from "../utils/exportRows";
 import { clipGroup } from "../utils/undoClip";
-import { classifyClipFailure, isRetryKey, rowFailure } from "../utils/clipFailure";
+import { classifyClipFailure, isRetryKey, isWaitingForConnection, rowFailure } from "../utils/clipFailure";
 import { getCutAttempt, setCutAttempt } from "../../../shared/utils/cutAttempt";
 import { withFinished, type ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
 export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
-  const { downloading, downloadPhase, error, failure } = useClipperContext();
+  const { downloading, downloadPhase, downloadProgress, error, failure } = useClipperContext();
+  // Where the bar stood while it was making, for a row that stops there.
+  const lastPercent = useRef(0);
+  if (downloading) lastPercent.current = downloadProgress;
   const { setSelectedId, setNotice, setFinished, setNow } = s;
 
   // New video or campaign: the selection and notices do not carry over.
@@ -52,6 +55,7 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
           setFinished((list) => withFinished(list, { entryId: newest.id, name: clipTitle(first.label), endsAt: Date.now() + UNDO_SECONDS * 1000 }));
         }
         s.setFailed(null);
+        s.setOffline(null);
         s.failCount.current = { key: "", count: 0 };
         s.attempt.current = null;
         setCutAttempt(null);
@@ -62,6 +66,15 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         s.failCount.current = { key, count: s.failCount.current.key === key ? s.failCount.current.count + 1 : 1 };
         const fromRow = failure?.row ? rowFailure(failure.row) : null;
         const classified = classifyClipFailure(failure?.code, failure?.message ?? error);
+        // The connection went: not a failure to act on. The clip's row says so and it carries on when back,
+        // unless it keeps failing while the machine says it is online (then the failure row with Retry is honest).
+        if (isWaitingForConnection(classified, s.failCount.current.count, navigator.onLine !== false)) {
+          s.setFailed(null);
+          s.setOffline({ ...a, percent: lastPercent.current });
+          wasDownloading.current = downloading;
+          return;
+        }
+        s.setOffline(null);
         s.setFailed({
           ...a,
           // The engine's row decides disk and cannot-download; a plain failure is named by its code.
@@ -70,6 +83,7 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
           attempts: Math.max(fromRow?.attempts ?? 1, s.failCount.current.count),
           retrying: fromRow?.retrying,
           final: fromRow?.final,
+          room: failure?.room,
           // A full or unwritable folder says so in the engine's own sentence.
           reason: (classified === "offline" || classified === "signin" || classified === "removed" ? undefined : fromRow?.reason) ?? (failure?.code === "disk_full" || failure?.code === "save_folder_gone" ? failure.message : undefined),
           message: error,
@@ -109,4 +123,20 @@ export function useRetryKey(active: boolean, retry: () => void) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, retry]);
+}
+
+/** A cut waiting for the connection carries on when it is back (the browser says so, or a quiet check finds it). */
+export function useOfflineResume(waiting: boolean, resume: () => void) {
+  useEffect(() => {
+    if (!waiting) return;
+    const go = () => {
+      if (navigator.onLine !== false) resume();
+    };
+    window.addEventListener("online", go);
+    const id = window.setInterval(go, 20_000);
+    return () => {
+      window.removeEventListener("online", go);
+      window.clearInterval(id);
+    };
+  }, [waiting, resume]);
 }

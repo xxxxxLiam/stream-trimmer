@@ -9,6 +9,7 @@ import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 import { connectionNow, cookiePayload, isSignedOut, markDisconnected, requestedQuality, useYouTubeConnection, whenSignInSettled } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
+import { ROOM_REASON, roomProblem } from "../../../shared/utils/freeSpace";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
 import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, saveFailure, videoUrlProblem } from "../utils/downloadErrors";
 import { type SavedFiles } from "./useSavedFilesState";
@@ -119,6 +120,22 @@ export function useClipDownloadMutations({
     downloadJobRef.current = jobId;
     let es: EventSource | null = null;
     try {
+      // Before anything is fetched: a folder that is clearly short of room says so on the clip's row, and the clip waits.
+      if (isElectron && saveDir && window.electronAPI?.checkFreeSpace) {
+        const seconds = segs.reduce((sum, r) => sum + Math.max(0, r.end - r.start), 0);
+        let answer: Awaited<ReturnType<NonNullable<typeof window.electronAPI.checkFreeSpace>>> | null = null;
+        try {
+          answer = await window.electronAPI.checkFreeSpace({ dirPath: saveDir, seconds, quality: String(quality), audio: format !== "mp4", segments: segs.length });
+        } catch {
+          /* no answer: the clip goes ahead */
+        }
+        const room = roomProblem(answer);
+        if (room) {
+          const refused = new DownloadFailureError(ROOM_REASON, "disk_full");
+          refused.room = room;
+          throw refused;
+        }
+      }
       es = new EventSource(
         apiUrl(`/api/download/progress?jobId=${encodeURIComponent(jobId)}`),
       );
@@ -310,6 +327,7 @@ export function useClipDownloadMutations({
           code: engineFailure?.code,
           diagnostics: engineFailure?.diagnostics,
           row: engineFailure?.row,
+          room: engineFailure?.room,
           attempt: {
             operation: "download clip",
             videoId: extractVideoId(url),

@@ -66,3 +66,14 @@ test("C2-6: Change folder changes the folder the cut used (the campaign's) and t
   const eff = readFileSync("src/renderer/src/features/clips/hooks/useExportEffects.ts", "utf8");
   assert.match(eff, /kind: classified !== "stopped" \? classified : \(fromRow\?\.kind \?\? classified\)/);
 });
+
+test("Free space: the check runs before anything is fetched, only for a clear measured shortfall, and never dims Clip", () => {
+  const dl = readFileSync("src/renderer/src/modules/clipper/hooks/useClipDownloadMutations.ts", "utf8");
+  const check = dl.indexOf("window.electronAPI.checkFreeSpace({");
+  const request = dl.indexOf("new EventSource(");
+  assert.ok(check > 0 && check < request, "the check comes before the progress stream and the request");
+  assert.match(dl, /const room = roomProblem\(answer\);\s*\n\s*if \(room\) \{/);
+  assert.match(dl, /\/\* no answer: the clip goes ahead \*\//);
+  const clip = readFileSync("src/renderer/src/features/player/utils/clipDestination.ts", "utf8");
+  assert.doesNotMatch(clip, /freeMb|checkFreeSpace/);
+});

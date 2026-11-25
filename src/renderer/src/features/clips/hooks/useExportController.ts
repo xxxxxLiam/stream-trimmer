@@ -12,7 +12,8 @@ import { suggestProjectName } from "../utils/projectName";
 import { useMakingClipId, useMakingName } from "../../../shared/utils/clipNameStore";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { isRetryingNote } from "../utils/clipFailure";
-import { useExportEffects, useRetryKey } from "./useExportEffects";
+import { UNDO_SECONDS } from "../utils/exportRows";
+import { useExportEffects, useOfflineResume, useRetryKey } from "./useExportEffects";
 import { useExportMutations } from "./useExportMutations";
 import { useExportQueries } from "./useExportQueries";
 import { useExportState } from "./useExportState";
@@ -27,12 +28,13 @@ export function useExportController() {
   const makingName = useMakingName();
   const makingId = useMakingClipId();
   useRetryKey(Boolean(state.failed), actions.retry);
+  useOfflineResume(Boolean(state.offline), actions.resume);
   const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
   // Each clip just made, with its own file and its own Undo seconds.
   const finished = state.finished.map((f) => {
     const entry = downloads.find((d) => d.id === f.entryId);
-    return { entryId: f.entryId, name: f.name, secondsLeft: Math.max(0, (f.endsAt - state.now) / 1000), entry, canShow: Boolean(entry?.path) };
+    return { entryId: f.entryId, name: f.name, secondsLeft: Math.max(0, Math.min(UNDO_SECONDS, (f.endsAt - Math.max(state.now, Date.now())) / 1000)), entry, canShow: Boolean(entry?.path) };
   });
 
   // A moment that is being made, failed, or just finished has its own row on top; it leaves the list
@@ -40,6 +42,7 @@ export function useExportController() {
   const onTop = new Set<string>();
   if (downloading && makingId) onTop.add(makingId);
   if (state.failed?.bankId && !downloading) onTop.add(state.failed.bankId);
+  if (state.offline?.bankId && !downloading) onTop.add(state.offline.bankId);
   for (const f of finished) if (f.entry?.clipId) onTop.add(f.entry.clipId);
   const waiting = queries.waiting.filter((c) => !onTop.has(c.id));
   const made = queries.made.filter((c) => !onTop.has(c.id));
@@ -67,12 +70,13 @@ export function useExportController() {
     cancel: actions.stop,
     selectedId: state.selectedId,
     // A failed clip has its own row; the generic "was not made" line would say it twice.
-    notice: state.failed && !downloading ? "" : state.notice,
+    notice: (state.failed || state.offline) && !downloading ? "" : state.notice,
     making: downloading
       ? { name: makingName ?? "New clip", percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote) }
       : null,
     finished,
     failed: state.failed && !downloading ? state.failed : null,
+    offline: state.offline && !downloading ? state.offline : null,
     failure,
   };
 }
