@@ -119,7 +119,7 @@ export default function TranscriptColumn({
 }: TranscriptColumnProps) {
   const clipper = useClipperContext();
   const { active: campaign } = useCampaign();
-  const { info, videoId, transcript, loadingTranscript, ensureTranscript, seekRequest } = clipper;
+  const { info, videoId, transcript, transcriptError, loadingTranscript, ensureTranscript, seekRequest } = clipper;
 
   // Load lazily the first time a video is present.
   useEffect(() => {
@@ -378,7 +378,7 @@ export default function TranscriptColumn({
         ) : !hasTranscript ? (
           <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">
             {transcript && transcript.length === 0
-              ? "No transcript available for this video."
+              ? (transcriptError ?? "No transcript available for this video.")
               : info
                 ? "No transcript loaded."
                 : "Load a video to see its transcript."}

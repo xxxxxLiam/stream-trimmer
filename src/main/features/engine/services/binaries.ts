@@ -134,6 +134,7 @@ function makeRunner(binary: string, source: string): YtResolved {
       child.on("close", (code, signal) => {
         const stdout = Buffer.concat(stdoutChunks).toString();
         const stderr = Buffer.concat(stderrChunks).toString();
+        (execaOpts?.onStderr as ((text: string) => void) | undefined)?.(stderr);
         if (code === 0) {
           // yt-dlp with --dump-single-json prints JSON to stdout.
           try {
