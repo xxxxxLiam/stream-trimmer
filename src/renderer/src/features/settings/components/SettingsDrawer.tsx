@@ -25,6 +25,7 @@ import { FOLDER_NOT_MADE_YET, folderChipLabel } from "../../../shared/utils/fold
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { lookForCampaign, loadSavedLooks } from "../../../shared/utils/fcpLooks";
 import { destinationLabel } from "../../player/utils/clipDestination";
+import { markSeen, type SetupSeen } from "../utils/editorSetup";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import { DEFAULT_DAILY_QUOTA, dropCampaignPrefs, toggleLanguage } from "../utils/settingsPrefs";
 import type { AudioTrack } from "../../../shared/utils/clip";
@@ -128,6 +129,14 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         finalCut={destination === "finalcut" ? fcpFields(campaign, editor.settingsFor(campaign.id)) : null}
         onBack={c.back}
         onClose={onClose}
+        onSkip={
+          c.fromPick && destination === "finalcut"
+            ? () => {
+                writeSetting("clipper.editorSetupSeen", markSeen(readSetting<SetupSeen>("clipper.editorSetupSeen", {}), campaign.id, destination));
+                onClose();
+              }
+            : undefined
+        }
       />
     );
   } else if (view.kind === "campaign" && campaign) {

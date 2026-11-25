@@ -34,6 +34,8 @@ export type SettingsEditorProps = {
   finalCut: FinalCutFields | null;
   onBack: () => void;
   onClose: () => void;
+  /** Present when the page opened because an editor was just picked: closes without setting it up. */
+  onSkip?: () => void;
 };
 
 const fieldInput = "h-target min-w-0 rounded-control border border-hairlineStrong bg-panel px-[12px] text-body leading-[normal] text-fg outline-none focus:border-ice-tint-50";
@@ -68,6 +70,14 @@ export default function SettingsEditor(p: SettingsEditorProps) {
             Nothing to set for {p.label} yet. Clip saves the clip and opens it in {p.label}.
           </p>
         )}
+        {p.onSkip ? (
+          <div className="flex flex-col items-start gap-[2px] pb-[12px]">
+            <button type="button" onClick={p.onSkip} className="h-target rounded-control px-[4px] text-body leading-[normal] text-fg-dim hover:bg-hover hover:text-fg">
+              Skip for now
+            </button>
+            <span className="px-[4px] text-meta leading-[normal] text-fg-dim">Not recommended: until this is set, clips cannot go into {p.label}.</span>
+          </div>
+        ) : null}
       </div>
     </>
   );
