@@ -92,6 +92,11 @@ export interface ElectronAPI {
     audio?: boolean;
     segments?: number;
   }) => Promise<{ ok: boolean; neededMb: number; freeMb: number | null }>;
+  /**
+   * Can Clipr write into this folder? `gone` is a missing folder or an unmounted drive; `refused` is a folder that is
+   * there but will not take a file (no permission, read-only). Run it when Clip is pressed and before a save.
+   */
+  checkFolder?: (payload: { dirPath: string }) => Promise<{ ok: true } | { ok: false; problem: "gone" | "refused" }>;
   startDrag?: (targetPath: string) => void;
   /** Reads the stored cookies.txt and reports whether a session is on disk. */
   probeYouTube?: () => Promise<{

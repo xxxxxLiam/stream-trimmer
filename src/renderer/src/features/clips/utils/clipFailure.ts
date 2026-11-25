@@ -23,7 +23,7 @@ const REFUSED = /refused the media request|HTTP Error 403|403 Forbidden/i;
 
 export function classifyClipFailure(code: string | undefined, message?: string): ClipFailureKind {
   if (message && TOO_LONG.test(message)) return "toolong";
-  if (code === "disk_full" || code === "save_folder_gone") return "disk";
+  if (code === "disk_full" || code === "save_folder_gone" || code === "folder_not_writable") return "disk";
   if (code === "private_video") return "private";
   if (code === "sign_in_needed" || code === "bot_check") return "signin";
   if (code === "video_unavailable" || code === "video_removed") return "removed";

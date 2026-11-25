@@ -66,6 +66,7 @@ test("classifier: each of the seven user-fixable rows is userFixable", () => {
     "save_folder_gone",
     "disk_full",
     "engine_behind",
+    "folder_not_writable",
   ]) {
     assert.equal(classifyFailureKind(code), "userFixable", code);
     assert.equal(needsDeveloper(code), false, code);
@@ -76,8 +77,8 @@ test("classifier: the pre-flight session failure is the same row", () => {
   assert.equal(classifyFailureKind("YOUTUBE_AUTH_REQUIRED"), "userFixable");
 });
 
-test("classifier: the allow-list is exactly those eight codes", () => {
-  assert.equal(USER_FIXABLE_CODES.length, 8);
+test("classifier: the allow-list is exactly those nine codes", () => {
+  assert.equal(USER_FIXABLE_CODES.length, 9);
 });
 
 test("classifier: join_failed and unknown need the developer", () => {
