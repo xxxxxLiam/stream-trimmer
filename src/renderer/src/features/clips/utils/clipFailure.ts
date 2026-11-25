@@ -60,25 +60,27 @@ export function failureCopy(
   reasonOverride?: string,
   retrying = false,
 ): { reason: string; detail: string } {
+  // The engine's sentence may lack its full stop; the detail follows it on the same line.
+  const ov = reasonOverride && !/[.!?]$/.test(reasonOverride.trim()) ? `${reasonOverride.trim()}.` : reasonOverride;
   if (kind === "disk") {
-    return { reason: reasonOverride ?? "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
+    return { reason: ov ?? "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
   }
   if (kind === "toolong") return { reason: "Clips can be up to 10 minutes.", detail: "Shorten it and clip again." };
   if (kind === "offline") {
     return { reason: "No internet connection.", detail: attempts < 2 ? "Check your connection, then Retry." : "" };
   }
   if (kind === "private") {
-    return { reason: reasonOverride ?? "This video is private, so it can’t be downloaded.", detail: "Your range is kept." };
+    return { reason: ov ?? "This video is private, so it can’t be downloaded.", detail: "Your range is kept." };
   }
   if (kind === "signin") return { reason: "YouTube wants you signed in for this video.", detail: "Sign in, then Retry. Your range is kept." };
   if (kind === "removed") return { reason: "This video was removed or isn’t available.", detail: "Your range is kept." };
-  if (kind === "refused") return { reason: reasonOverride ?? "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
+  if (kind === "refused") return { reason: ov ?? "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
   // "Will try once more" is said only when the engine really is about to (retrying:true).
-  if (kind === "ratelimited") return { reason: reasonOverride ?? "YouTube is asking Clipr to slow down.", detail: "Try again in a few minutes." };
-  if (kind === "format") return { reason: reasonOverride ?? "That quality isn’t available for this video.", detail: "Pick another quality, then Retry." };
-  if (kind === "tools") return { reason: reasonOverride ?? "Clipr’s download tools are missing.", detail: "Restart Clipr, then Retry." };
+  if (kind === "ratelimited") return { reason: ov ?? "YouTube is asking Clipr to slow down.", detail: "Try again in a few minutes." };
+  if (kind === "format") return { reason: ov ?? "That quality isn’t available for this video.", detail: "Pick another quality, then Retry." };
+  if (kind === "tools") return { reason: ov ?? "Clipr’s download tools are missing.", detail: "Restart Clipr, then Retry." };
   // The engine's own plain sentence when it sent one; "will try once more" only when it really is retrying.
-  return { reason: reasonOverride ?? "YouTube stopped the download.", detail: retrying ? RETRY_SENTENCE : "" };
+  return { reason: ov ?? "YouTube stopped the download.", detail: retrying ? RETRY_SENTENCE : "" };
 }
 
 /** Retry; after the retry also failed, Copy details joins it. */

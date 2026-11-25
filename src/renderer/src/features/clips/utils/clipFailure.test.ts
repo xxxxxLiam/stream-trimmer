@@ -124,3 +124,8 @@ test("E2-1 renderer half: the engine's new codes map, and a final row shows the 
   assert.deepEqual(failureActions("format", 1, true), ["retry", "copyDetails"]);
   assert.deepEqual(failureActions("offline", 1, true), ["retry"], "a kind with its own full sentence waits for the second failed Retry");
 });
+
+test("an engine sentence without its full stop gets one, so the next words do not run on", () => {
+  assert.equal(failureCopy("refused", 1, "YouTube refused the media request for this video").reason, "YouTube refused the media request for this video.");
+  assert.equal(failureCopy("stopped", 1, "Already ends well.").reason, "Already ends well.");
+});
