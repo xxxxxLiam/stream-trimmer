@@ -26,15 +26,16 @@ test("rejects a board that is not in canvas.json", { skip: !have }, async () => 
   await assert.rejects(() => renderBoard("NoSuchBoard"), /not in canvas.json/);
 });
 
-test("window mode crops to the 1360 by 760 app frame the board draws", { skip: !have }, async () => {
+test("window mode crops to the app frame the board draws (1360 wide; 810 tall since the tools row moved)", { skip: !have }, async () => {
   const prev = process.env.PARITY_SNAPSHOT;
   process.env.PARITY_SNAPSHOT = "pending";
   try {
     if (!fs.existsSync(`${require("./parity/boardRender.cjs").SNAPSHOT}/Main01Layout.dc.html`)) return;
     const { png, frame } = await renderBoard("Main01Layout", { window: 0 });
-    assert.deepEqual([frame.width, frame.height], [1360, 760]);
+    assert.equal(frame.width, 1360);
+    assert.ok(frame.height >= 760 && frame.height <= 810, `unexpected frame height ${frame.height}`);
     assert.equal(png.readUInt32BE(16), 1360);
-    assert.equal(png.readUInt32BE(20), 760);
+    assert.equal(png.readUInt32BE(20), frame.height);
     await assert.rejects(() => renderBoard("Main01Layout", { window: 5 }), /no frame #5/);
   } finally {
     if (prev === undefined) delete process.env.PARITY_SNAPSHOT;

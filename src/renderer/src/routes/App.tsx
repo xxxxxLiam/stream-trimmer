@@ -51,13 +51,15 @@ import DragOutHandle from "../shared/components/DragOutHandle";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
+  endLaunchCheck,
   restoreConnection,
   sweepBrowsers,
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
-import BottomBar from "../modules/layout/components/BottomBar";
+import ExportBar from "../features/player/components/ExportBar";
+import { TimelineControllerProvider } from "../features/player/hooks/TimelineControllerContext";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import SettingsRestoredNote from "../features/settings/components/SettingsRestoredNote";
 import TipCard from "../features/tips/components/TipCard";
@@ -130,11 +132,17 @@ export function lowQualityDetail(detail: string | undefined): boolean {
   return /at 360p\b/.test(detail ?? "");
 }
 
+export const SAVED_TOAST_MS = 10000;
+
 function SavedToast({ onSignIn }: { onSignIn?: () => void }) {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
     useClipperContext();
-  // Deliberately sticky: the notice stays until the user opens the folder or
-  // dismisses it explicitly. No auto-dismiss timer.
+  // It goes by itself after a while (A2-8), and sits above the footer so it never covers the sign-in pill.
+  useEffect(() => {
+    if (!savedNotice) return;
+    const t = window.setTimeout(dismissSavedNotice, SAVED_TOAST_MS);
+    return () => window.clearTimeout(t);
+  }, [savedNotice, dismissSavedNotice]);
   const canReveal = isElectron && Boolean(savedNotice?.path);
   return (
     <AnimatePresence>
@@ -145,7 +153,7 @@ function SavedToast({ onSignIn }: { onSignIn?: () => void }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-panel border border-hairline surface-raised px-4 py-3 shadow-panel"
+          className="fixed bottom-[88px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-panel border border-hairline surface-raised px-4 py-3 shadow-panel"
           role="status"
         >
           <CheckCircleFill size={16} className="shrink-0 text-accent" />
@@ -625,6 +633,7 @@ function Layout({ active }: { active: boolean }) {
         />
         )}
         <PanelHostProvider value={panelHost}>
+        <TimelineControllerProvider>
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
             <PanelWorkspace />
             {active && (
@@ -637,9 +646,8 @@ function Layout({ active }: { active: boolean }) {
               </>
             )}
           </div>
-        </PanelHostProvider>
         {active && (
-        <BottomBar
+        <ExportBar
           clipCount={languagePlans.length}
           tracks={info?.audioTracks}
           selectedLanguages={audioSel}
@@ -652,6 +660,8 @@ function Layout({ active }: { active: boolean }) {
           onSignIn={openSignIn}
         />
         )}
+        </TimelineControllerProvider>
+        </PanelHostProvider>
         </>
         )}
       </main>
@@ -676,7 +686,7 @@ function Shell() {
       restore: restoreConnection,
       sweep: sweepBrowsers,
       report: (usable) => window.electronAPI?.reportBrowserSignIn?.(usable),
-    });
+    }).finally(endLaunchCheck);
   }, []);
 
   return (

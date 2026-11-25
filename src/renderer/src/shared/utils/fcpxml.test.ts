@@ -891,7 +891,7 @@ test("D2-1: layouts A and C name the smart collection like the keyword collectio
     assert.ok(!xml.includes(" projects\""), "no second spelling or \"projects\" folder");
     // Every project of that video carries the name the collection looks for.
     assert.equal((xml.match(/<note>Podcast #214 the long talk<\/note>/g) ?? []).length >= 2, true);
-    assert.equal(dtdOk(xml), "");
+    if (hasXmllint) assert.equal(dtdOk(xml), "");
   }
 });
 

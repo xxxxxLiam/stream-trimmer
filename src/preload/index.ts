@@ -44,6 +44,9 @@ try {
     // ISO time of the copy this launch restored the settings from, or null.
     // "unreadable" (the file could not be read and there was no copy), "missing" (no file, no copy) or null.
     settingsLost: () => ipcRenderer.invoke(IPC.settingsLost),
+    // The one-time "Clipr has changed a lot" prompt: pending is true on the first launch after updating; answer is "fresh" or "keep".
+    startFreshPending: () => ipcRenderer.invoke(IPC.startFreshPending),
+    startFreshAnswer: (choice: unknown) => ipcRenderer.invoke(IPC.startFreshAnswer, choice),
     settingsRestoredAt: () => ipcRenderer.invoke(IPC.settingsRestoredAt),
     saveTextFile: (payload: unknown) => ipcRenderer.invoke(IPC.dialogSaveText, payload),
     pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),

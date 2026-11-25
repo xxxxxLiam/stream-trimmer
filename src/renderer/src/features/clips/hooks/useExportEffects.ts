@@ -69,8 +69,9 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
           // The row's count and our own: the second failed Retry shows Copy details either way.
           attempts: Math.max(fromRow?.attempts ?? 1, s.failCount.current.count),
           retrying: fromRow?.retrying,
+          final: fromRow?.final,
           // A full or unwritable folder says so in the engine's own sentence.
-          reason: fromRow?.reason ?? (failure?.code === "disk_full" || failure?.code === "save_folder_gone" ? failure.message : undefined),
+          reason: (classified === "offline" || classified === "signin" || classified === "removed" ? undefined : fromRow?.reason) ?? (failure?.code === "disk_full" || failure?.code === "save_folder_gone" ? failure.message : undefined),
           message: error,
           code: failure?.code,
         });

@@ -34,6 +34,8 @@ export const IPC = {
   ownerCheck: "owner:check",
   reportSend: "report:send",
   settingsAll: "settings:all",
+  startFreshAnswer: "startFresh:answer",
+  startFreshPending: "startFresh:pending",
   settingsLost: "settings:lost",
   settingsRestoredAt: "settings:restoredAt",
   settingsSet: "settings:set",

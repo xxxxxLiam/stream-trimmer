@@ -62,6 +62,8 @@ export interface YouTubeConnectionState {
    * Never cleared by a re-check, so asking again does not hide the manual route.
    */
   sweepEnded: boolean;
+  /** True from launch until the launch sign-in check (cookies, then browsers) has ended, in the desktop app. */
+  launching: boolean;
   /** The last imported cookies.txt was rejected (unreadable, or YouTube refused it). */
   importRejected: boolean;
 }
@@ -94,9 +96,41 @@ export function requestedQuality(input: { signedOut: boolean; format: string; qu
   return input.signedOut ? "360" : "1080";
 }
 
-/** No session and none being restored: every request goes out signed out. */
-export function isSignedOut(s: Pick<YouTubeConnectionState, "connected" | "restoring">): boolean {
-  return !s.connected && !s.restoring;
+/**
+ * No session, and nothing still looking for one: every request goes out signed out. While the launch check or a
+ * sweep runs the answer is "not yet", never "signed out", so a quick first clip is not sent at 360p with a
+ * sign-in toast just because the check had not finished.
+ */
+export function isSignedOut(s: Pick<YouTubeConnectionState, "connected" | "restoring"> & Partial<Pick<YouTubeConnectionState, "busy" | "launching">>): boolean {
+  return !s.connected && !s.restoring && s.busy !== true && s.launching !== true;
+}
+
+/** The current state, for code that decides at the moment of an action rather than at render. */
+export function connectionNow(): YouTubeConnectionState {
+  return state;
+}
+
+/** The launch check has ended (it found a session, found none, or failed): from here a missing session is real. */
+export function endLaunchCheck(): void {
+  if (state.launching || state.busy) set({ launching: false, busy: false, step: undefined });
+}
+
+/** Resolves once nothing is still looking for a session (or after `timeoutMs`), so a clip can pick its quality. */
+export function whenSignInSettled(timeoutMs = 20000): Promise<void> {
+  const pending = () => state.restoring || state.busy || state.launching;
+  if (!pending()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      listeners.delete(check);
+      resolve();
+    };
+    const check = () => {
+      if (!pending()) done();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    listeners.add(check);
+  });
 }
 
 export interface CookiePayload {
@@ -168,6 +202,7 @@ let state: YouTubeConnectionState = {
   expired: false,
   skipped: readSetting<boolean>(SKIPPED_KEY, false) === true,
   sweepEnded: false,
+  launching: electron() !== undefined,
   importRejected: false,
 };
 

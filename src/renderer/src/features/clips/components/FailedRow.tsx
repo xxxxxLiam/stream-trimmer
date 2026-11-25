@@ -32,7 +32,7 @@ export type FailedRowProps = {
 
 export default function FailedRow({ failed, failure, onAction }: FailedRowProps) {
   const copy = failureCopy(failed.kind, failed.attempts, failed.reason, failed.retrying);
-  const actions = failureActions(failed.kind, failed.attempts);
+  const actions = failureActions(failed.kind, failed.attempts, failed.final);
   return (
     <div
       role="group"
