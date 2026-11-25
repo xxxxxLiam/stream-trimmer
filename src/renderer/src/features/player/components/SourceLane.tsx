@@ -3,7 +3,7 @@
  * Path: src/renderer/src/features/player/components/SourceLane.tsx
  * Description: The Source lane: the filmstrip with unused footage dimmed, the picked range outlined
  *   in Ice with its glow, flags, the Frost playhead, and the fold. The lane is where the tools act:
- *   drag sets a range, the scissors click a start then an end, the flag tool drops flags.
+ *   the pointer moves the playhead (click or drag), the scissors drag a range or click a start then an end, the wheel pans, the flag tool drops flags.
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { pickHintLead } from "../utils/laneTools";
@@ -12,9 +12,7 @@ import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
 import LaneLabel from "./LaneLabel";
 
-const CURSORS = { pointer: "cursor-pointer", clip: "cursor-crosshair", flag: "cursor-cell", hand: "cursor-grab", zoom: "cursor-zoom-in" } as const;
-
-export default function SourceLane({ c }: { c: TimelineController }) {
+export default function SourceLane({ c, height = 44 }: { c: TimelineController; height?: number }) {
   const covered = [...c.sections, ...c.used.filter((u) => u.end > u.start)].sort((a, b) => a.start - b.start);
   // Unused footage is dimmed: everything not under a picked range or a made clip.
   const dim: { start: number; end: number }[] = [];
@@ -28,18 +26,15 @@ export default function SourceLane({ c }: { c: TimelineController }) {
     if (at < end) dim.push({ start: at, end });
   }
   return (
-    <div className="flex h-[44px] items-center">
+    <div className="flex items-center" style={{ height }}>
       <LaneLabel>Source</LaneLabel>
       <div
-        className={`relative h-full flex-1 touch-none select-none ${CURSORS[c.tool]}`}
+        className={`relative h-full flex-1`}
         data-lane="source"
-        onPointerDown={c.onLanePointerDown}
-        onPointerMove={c.onLanePointerMove}
-        onPointerUp={c.onLanePointerUp}
       >
         {c.opening ? null : (
           <>
-            {c.firstClipHint ? null : <Filmstrip axis={c.axis} levels={c.storyboards} height={32} />}
+            {c.firstClipHint ? null : <Filmstrip axis={c.axis} levels={c.storyboards} height={height - 12} />}
             {dim.map((d) => {
               const x = toX(c.axis, d.start);
               return (
@@ -58,7 +53,8 @@ export default function SourceLane({ c }: { c: TimelineController }) {
                   key={`${s.start}-${s.end}`}
                   aria-hidden="true"
                   className="pointer-events-none absolute rounded-chip border-2 border-ice bg-ice-tint-12 shadow-range"
-                  style={{ left: x, width: Math.max(4, toX(c.axis, s.end) - x), top: c.joined ? 12 : 4, bottom: c.joined ? 12 : 4 }}
+                  // The outline wraps the filmstrip (32px, centred in the lane) instead of sitting on it.
+                  style={{ left: x - 3, width: Math.max(4, toX(c.axis, s.end) - x) + 6, top: c.joined ? 12 : 3, bottom: c.joined ? 12 : 3 }}
                 />
               );
             })}

@@ -111,6 +111,8 @@ test("F-6: every shortcut listed is handled, and every handled shortcut is liste
     "I": /e\.key === "i"/,
     "O": /e\.key === "o"/,
     "M": /e\.key !== "m"/,
+    "A  B  S": /toolForKey\(e\)/,
+    "F  H  Z": /toolForKey\(e\)/,
     "Shift N": /e\.shiftKey && !e\.metaKey && !e\.ctrlKey && e\.key === "N"/,
     "⌘ Enter": /\(e\.metaKey \|\| e\.ctrlKey\) && e\.key === "Enter"/,
     "R": /toLowerCase\(\) !== "r"/,

@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef } from "react";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
-import { setZoom, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
+import { setTool, setZoom, toolForKey, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
 import type { Range } from "../../../shared/utils/segments";
 import { fitWindow, zoomForSpan, type Win } from "../utils/timelineAxis";
 import { arrivedFromElsewhere } from "../utils/rangeOrigin";
@@ -52,6 +52,21 @@ export function useTimelineEffects(a: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.playhead]);
 
+  // A, B, S, F, H, Z pick the tool (never while typing, never with a modifier).
+  useEffect(() => {
+    if (!tabActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
+      const t = toolForKey(e);
+      if (!t) return;
+      e.preventDefault();
+      setTool(t);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tabActive]);
+
   const fitSeen = useRef(a.fitRequests);
   // Fit: frame the picked range with room either side (the whole video when nothing is picked).
   useEffect(() => {
@@ -77,15 +92,19 @@ export function useTimelineEffects(a: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.duration, a.framed?.start, a.framed?.end]);
 
-  // Zoomed in, the window follows the playhead once it runs off the edge.
+  // Zooming back out clears the centre.
   useEffect(() => {
-    if (a.zoom === 0) {
-      a.setFocus(null);
-      return;
-    }
+    if (a.zoom === 0) a.setFocus(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.zoom]);
+
+  // Zoomed in, the window follows the playhead once it runs off the edge. Only when the playhead
+  // moves: zooming or panning to look somewhere else must not snap the view back to it.
+  useEffect(() => {
+    if (a.zoom === 0) return;
     if (a.playhead < a.win.start || a.playhead > a.win.end) a.setFocus(a.playhead);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.zoom, a.playhead]);
+  }, [a.playhead]);
 
   useEffect(() => {
     publishTimelineView(a.view);
