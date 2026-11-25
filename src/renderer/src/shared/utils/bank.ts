@@ -221,6 +221,13 @@ export function clearRanPastEnd(data: BankData, campaignId: string, videoId: str
   }));
 }
 
+/** A waiting moment's new name (the caller has already checked it against the naming rule). */
+export function renameClip(data: BankData, campaignId: string, videoId: string, clipId: string, label: string): BankData {
+  const list = clipsFor(data, campaignId, videoId);
+  if (!list.some((c) => c.id === clipId && c.label !== label)) return data;
+  return withClips(data, campaignId, videoId, list.map((c) => (c.id === clipId ? { ...c, label } : c)));
+}
+
 export type CutResult = { data: BankData; clip: BankedClip; ranges: Segment[] };
 
 /** Flip a clip to `cut` and return the ranges that must be appended to usedRanges. Null when there is no such clip. */
@@ -339,6 +346,7 @@ export type BankStore = {
   setStatus: (campaignId: string, videoId: string, clipId: string, status: BankStatus) => void;
   remove: (campaignId: string, videoId: string, clipId: string) => void;
   setNote: (campaignId: string, videoId: string, clipId: string, note: string) => void;
+  rename: (campaignId: string, videoId: string, clipId: string, label: string) => void;
   clearRanPastEnd: (campaignId: string, videoId: string, clipId: string) => void;
   /** Forget everything banked under a campaign (it was removed). */
   removeCampaign: (campaignId: string) => void;
@@ -374,6 +382,7 @@ export function createBankStore(io: BankIO): BankStore {
     setStatus: (c, v, id, s) => commit(setStatus(data, c, v, id, s)),
     remove: (c, v, id) => commit(removeClip(data, c, v, id)),
     setNote: (c, v, id, n) => commit(setNote(data, c, v, id, n)),
+    rename: (c, v, id, label) => commit(renameClip(data, c, v, id, label)),
     clearRanPastEnd: (c, v, id) => commit(clearRanPastEnd(data, c, v, id)),
     removeCampaign: (c) => commit(removeCampaignBank(data, c)),
   };
