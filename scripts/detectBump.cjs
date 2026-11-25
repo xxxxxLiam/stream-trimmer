@@ -64,9 +64,12 @@ function detectBump({ subjects = [], bodies = [] } = {}) {
  * [major] marker on the release commit, or a manual run with the level chosen.
  */
 function rangeFrom({ tag = "", logLines = [] } = {}) {
-  if (tag) return `${tag}..HEAD`;
+  // The previous `Release v...` commit wins over any tag: the tags that exist
+  // here are stale (v3.x), and measuring from one of them re-read ancient
+  // BREAKING CHANGE footers, so every release since v14 came out as a major.
   const prev = logLines.find((l) => /^[0-9a-f]+ Release v/.test(l.trim()));
-  return prev ? `${prev.trim().split(/\s+/)[0]}..HEAD` : null;
+  if (prev) return `${prev.trim().split(/\s+/)[0]}..HEAD`;
+  return tag ? `${tag}..HEAD` : null;
 }
 
 /** Reads the commit range since the last release and prints the bump. */
