@@ -25,6 +25,8 @@ export type WaitingRowProps = {
 };
 
 const chip = "rounded-chip border border-hairlineStrong px-[4px] py-[1px] text-meta leading-[normal] text-fg-dim";
+// A made row is dimmed the board's way (0.6) with the disabled token, not an opacity modifier (CLAUDE.md).
+const madeChip = "rounded-chip border border-hairline px-[4px] py-[1px] text-meta leading-[normal] text-disabled";
 
 export default function WaitingRow({ clip, name, suggested, selected, made, onSelect, onMake, onRemove }: WaitingRowProps) {
   const edge = suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
@@ -37,18 +39,18 @@ export default function WaitingRow({ clip, name, suggested, selected, made, onSe
         className={`flex min-h-[47px] w-full items-center gap-[8px] rounded-control border px-[8px] py-[6px] leading-[normal] text-left hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost ${edge}`}
       >
         <span
-          className={`size-[9px] flex-none rounded-[50%] border ${made ? "border-frost bg-frost" : "border-fg-dim"}`}
+          className={`size-[9px] flex-none rounded-[50%] border ${made ? "border-frost-tint-60 bg-frost-tint-60" : "border-fg-dim"}`}
           role="img"
           aria-label={made ? "Made" : "Waiting"}
         />
         <span className="min-w-0">
           <span className={`block whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
-          <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{rangeLine(clip)}</span>
+          <span className={`mt-[2px] block whitespace-nowrap text-meta leading-[normal] ${made ? "text-disabled" : "text-fg-dim"}`}>{rangeLine(clip)}</span>
         </span>
         <span className="ml-auto flex items-center gap-[3px]">
           {clip.rating !== undefined && <span className={`text-meta font-semibold leading-[normal] ${made ? "text-disabled" : ""}`}>{ratingText(clip.rating)}</span>}
-          {clip.category && <span className={chip}>{clip.category}</span>}
-          {clip.tier && <span className={chip}>{tierText(clip.tier)}</span>}
+          {clip.category && <span className={made ? madeChip : chip}>{clip.category}</span>}
+          {clip.tier && <span className={made ? madeChip : chip}>{tierText(clip.tier)}</span>}
         </span>
       </button>
       <span className="absolute right-[4px] top-1/2 hidden -translate-y-1/2 gap-[4px] rounded-control bg-raised group-focus-within:flex group-hover:flex">
