@@ -25,7 +25,7 @@ import {
   FRAME_RATE_CHOICES,
   buildSessionFcpxml,
   libraryLocation,
-  campaignEventName,
+  importLayout,
   resolveProjectNames,
   type AfterCutting,
   type FcpxmlProject,
@@ -97,7 +97,7 @@ export function projectOptions(
   settings: EditorHandoffSettings,
   ctx: { campaignId?: string | null; campaignName?: string; sourceTitle?: string },
 ): FcpxmlProject | undefined {
-  const eventName = campaignEventName(settings.mediaEvent, ctx.campaignName);
+  const { eventName } = importLayout(settings, ctx);
   if (!eventName) return undefined;
   return {
     eventName,
@@ -159,7 +159,7 @@ export async function exportFcpxml(
   if (ctx.clips.length === 0) {
     return { ok: false, message: "No clips yet. Cut one, then send it." };
   }
-  const eventName = campaignEventName(settings?.mediaEvent, ctx.campaignName);
+  const { eventName } = importLayout(settings ?? {}, ctx);
   return exportNamed(api, ctx, eventName, openWith, settings);
 }
 
@@ -171,9 +171,10 @@ async function exportNamed(
   settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
   const structured = settings;
-  // Each clip carries its source video's title: that is its keyword collection in the event.
+  // Each clip carries the keyword the layout gives its source video (its collection in the event).
+  const keyword = importLayout(structured ?? {}, ctx).keyword;
   const clips = ctx.clips.map((c) => {
-    const withTitle = { ...c, sourceTitle: c.sourceTitle ?? ctx.sourceTitle };
+    const withTitle = { ...c, keyword: c.keyword ?? keyword };
     return typedProjectNames.has(c.id) ? { ...withTitle, projectName: typedProjectNames.get(c.id) } : withTitle;
   });
   let built;
@@ -317,7 +318,7 @@ async function runAfterCuttingInner(
     }
   } else if (settings.afterCutting === "finalcut") {
     if (!api) return { ok: false, message: NEEDS_DESKTOP };
-    const eventName = campaignEventName(settings.mediaEvent, ctx.campaignName);
+    const { eventName } = importLayout(settings, ctx);
     outcome = await exportNamed(api, ctx, eventName, settings.afterCutting, settings);
   }
   if (api && settings.openIn && justSaved) {
@@ -463,7 +464,7 @@ export default function EditorHandoff({
     };
   }, [open]);
   const ctx: HandoffContext = { campaignId, campaignName, sourceTitle, clipsDir, clips };
-  const eventName = campaignEventName(settings.mediaEvent, campaignName);
+  const { eventName } = importLayout(settings, { campaignName, sourceTitle });
   const nextName = useNextProjectName();
   const libraryText = settings.fcpLibrary.trim();
   let libraryProblem = "";

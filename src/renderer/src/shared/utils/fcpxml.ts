@@ -180,17 +180,19 @@ export function resolveEventName(opts: {
 }
 
 /**
- * The Final Cut event a campaign's clips land in: the Event typed in the campaign's settings, or
- * the campaign's name while that is blank. One event per campaign; each source video is a keyword
- * collection inside it (see `keywordFor`).
+ * How a send is laid out in Final Cut, in ONE place: today every clip of a campaign goes into one
+ * event (the Event typed in the campaign's settings, else the campaign name) and each source video
+ * is a keyword collection inside it (its title, without the commas that split a keyword list). A
+ * layout setting switches this function; the sending code only calls it.
  */
-export function campaignEventName(mediaEvent: string | undefined, campaignName: string | undefined): string {
-  return resolveEventName({ from: "campaign", campaignName: (mediaEvent ?? "").trim() || campaignName });
-}
-
-/** The keyword (and keyword collection) a source video gets: its title, without the commas that split a keyword list. */
-export function keywordFor(sourceTitle: string | undefined): string {
-  return (sourceTitle ?? "").replace(/[,\u0000-\u001F]/g, " ").replace(/\s+/g, " ").trim();
+export function importLayout(
+  settings: { mediaEvent?: string },
+  ctx: { campaignName?: string; sourceTitle?: string },
+): { eventName: string; keyword: string } {
+  return {
+    eventName: resolveEventName({ from: "campaign", campaignName: (settings.mediaEvent ?? "").trim() || ctx.campaignName }),
+    keyword: (ctx.sourceTitle ?? "").replace(/[,\u0000-\u001F]/g, " ").replace(/\s+/g, " ").trim(),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -531,8 +533,8 @@ export interface FcpClip {
   sourceUrl?: string;
   /** Exact project name typed for this clip; wins over the campaign pattern. */
   projectName?: string;
-  /** Title of the source video: becomes this clip's keyword and keyword collection in the event. */
-  sourceTitle?: string;
+  /** Keyword and keyword collection this clip gets in the event (see `importLayout`); blank for none. */
+  keyword?: string;
   /** From ffprobe on this exact file. */
   media: MediaInfo;
 }
@@ -727,9 +729,9 @@ export function buildFcpxml(input: FcpxmlInput): string {
         `format="${formatId}" tcFormat="NDF">` + (notes ? `
         <note>${xmlEscape(noEmDash(notes))}</note>` : "") + `
         <keyword start="0s" duration="${duration}" value="Raw"/>` +
-        (keywordFor(clip.sourceTitle)
+        (clip.keyword?.trim()
           ? `
-        <keyword start="0s" duration="${duration}" value="${attrText(keywordFor(clip.sourceTitle))}"/>`
+        <keyword start="0s" duration="${duration}" value="${attrText(clip.keyword ?? "")}"/>`
           : "") +
         `
       </asset-clip>`,
@@ -770,7 +772,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
   const projectEvent = input.project?.eventName ?? "";
   const merged = !!input.project && projectEvent.trim() === mediaEvent.trim();
   // One keyword collection per source video, so each video's clips are one click away in the event.
-  const collections = [...new Set(input.clips.map((c) => keywordFor(c.sourceTitle)).filter(Boolean))].map(
+  const collections = [...new Set(input.clips.map((c) => (c.keyword ?? "").trim()).filter(Boolean))].map(
     (k) => `      <keyword-collection name="${attrText(k)}"/>`,
   );
   const events: string[] = [
@@ -837,8 +839,8 @@ export interface SessionClip {
   sourceUrl?: string;
   /** Exact project name for this clip, overriding the campaign pattern. */
   projectName?: string;
-  /** Title of the source video: this clip's keyword collection in the event. */
-  sourceTitle?: string;
+  /** Keyword and keyword collection this clip gets in the event (see `importLayout`). */
+  keyword?: string;
 }
 
 export interface SessionResult {

@@ -20,8 +20,7 @@ import {
   DEFAULT_PROJECT_PATTERN,
   buildFcpxml,
   buildSessionFcpxml,
-  campaignEventName,
-  keywordFor,
+  importLayout,
   libraryLocation,
   libraryPath,
   normalizeTimeline,
@@ -684,19 +683,19 @@ test("the look's DTD check can fail (mutation guard: an element the DTD does not
 });
 
 test("D-1: the event is the campaign's Event, or the campaign name while that is blank", () => {
-  assert.equal(campaignEventName("Acme exports", "Acme"), "Acme exports");
-  assert.equal(campaignEventName("  ", "Acme"), "Acme");
-  assert.equal(campaignEventName(undefined, "Acme"), "Acme");
-  assert.equal(campaignEventName("", undefined), "Clips");
+  assert.equal(importLayout({ mediaEvent: "Acme exports" }, { campaignName: "Acme" }).eventName, "Acme exports");
+  assert.equal(importLayout({ mediaEvent: "  " }, { campaignName: "Acme" }).eventName, "Acme");
+  assert.equal(importLayout({}, { campaignName: "Acme", sourceTitle: "Talk" }).eventName, "Acme", "never the video's title");
+  assert.equal(importLayout({ mediaEvent: "" }, {}).eventName, "Clips");
 });
 
 test("D-1: each source video is a keyword collection in the event, and its clips carry that keyword", () => {
   const xml = buildFcpxml({
     eventName: "Acme",
     clips: [
-      clip({ id: "A-01", sourceTitle: "Podcast #214, the long talk" }),
-      clip({ id: "A-02", path: "/x/a2.mp4", sourceTitle: "Podcast #214, the long talk" }),
-      clip({ id: "B-01", path: "/x/b1.mp4", sourceTitle: "Founder story" }),
+      clip({ id: "A-01", keyword: importLayout({}, { sourceTitle: "Podcast #214, the long talk" }).keyword }),
+      clip({ id: "A-02", path: "/x/a2.mp4", keyword: importLayout({}, { sourceTitle: "Podcast #214, the long talk" }).keyword }),
+      clip({ id: "B-01", path: "/x/b1.mp4", keyword: "Founder story" }),
     ],
   });
   assert.equal((xml.match(/<event /g) ?? []).length, 1);
@@ -704,7 +703,7 @@ test("D-1: each source video is a keyword collection in the event, and its clips
   assert.deepEqual(collections, ["Podcast #214 the long talk", "Founder story"], "one per video, commas dropped");
   const keywords = [...xml.matchAll(/<keyword [^>]*value="([^"]*)"/g)].map((m) => m[1]);
   assert.deepEqual(keywords, ["Raw", "Podcast #214 the long talk", "Raw", "Podcast #214 the long talk", "Raw", "Founder story"]);
-  assert.equal(keywordFor("a, b\nc"), "a b c");
+  assert.equal(importLayout({}, { sourceTitle: "a, b\nc" }).keyword, "a b c");
   // A clip with no known source video keeps just Raw, and no empty collection appears.
   const bare = buildFcpxml({ eventName: "Acme", clips: [clip()] });
   assert.doesNotMatch(bare, /keyword-collection/);
@@ -713,7 +712,7 @@ test("D-1: each source video is a keyword collection in the event, and its clips
 test("D-1: a document with keyword collections still validates against the FCPXML 1.10 DTD", { skip: !hasXmllint }, () => {
   const xml = buildFcpxml({
     eventName: "Acme",
-    clips: [clip({ sourceTitle: "Podcast" }), clip({ id: "B-01", path: "/x/b.mp4", sourceTitle: "Founder" })],
+    clips: [clip({ keyword: "Podcast" }), clip({ id: "B-01", path: "/x/b.mp4", keyword: "Founder" })],
     project: PROJECT,
   });
   assert.equal(validate(xml), "");
