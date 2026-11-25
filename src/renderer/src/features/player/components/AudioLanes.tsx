@@ -21,7 +21,7 @@ export default function AudioLanes({ c }: { c: TimelineController }) {
     <>
       {c.audioLanes.map((lane) => (
         <div key={lane.language} className="flex h-[32px] items-center" data-audio-lane={lane.language}>
-          <LaneLabel>Audio</LaneLabel>
+          <LaneLabel />
           <div className="relative h-[24px] flex-1">
             <span aria-hidden="true" className="absolute inset-y-0 rounded-chip bg-raised" style={{ left, width }} />
             {c.sections.map((s) => {

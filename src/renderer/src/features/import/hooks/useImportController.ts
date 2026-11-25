@@ -6,6 +6,7 @@
  *   (a campaign the paste names that does not exist yet is created first) and closes.
  */
 import { useMemo, useState } from "react";
+import { usePanelLayoutState } from "../../../modules/layout/hooks/usePanelLayoutState";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { bankStore, clipsFor } from "../../../shared/utils/bank";
@@ -28,6 +29,7 @@ export function toParsed(r: MomentRow): ParsedClip {
 export function useImportController(text: string, onClose: () => void) {
   const { videoId, duration } = useClipperContext();
   const { campaigns, active, create, setActiveId } = useCampaign();
+  const { open: openPanel } = usePanelLayoutState();
   const [swapped, setSwapped] = useState<ReadonlySet<string>>(new Set());
   const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
   const [renamed, setRenamed] = useState<ReadonlyMap<string, string>>(new Map());
@@ -40,7 +42,9 @@ export function useImportController(text: string, onClose: () => void) {
   }, [text, videoId, duration, active, skipped, renamed]);
   const r = useMemo(() => resolveRows(rows, swapped, skipped), [rows, swapped, skipped]);
 
-  const known = (name: string) => campaigns.find((c) => c.name.trim().toLowerCase() === name.trim().toLowerCase());
+  // Same campaign whatever the case, accents or spacing ("Tyler  Oliveira" = "tyler oliveira").
+  const key = (n: string) => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const known = (name: string) => campaigns.find((c) => key(c.name) === key(name));
   const newCampaigns = r.campaigns.filter((n) => !known(n));
   const count = r.good.length;
   const canBank = count > 0 && (Boolean(active) || r.good.every((m) => m.campaign));
@@ -49,12 +53,18 @@ export function useImportController(text: string, onClose: () => void) {
     if (!canBank) return;
     const made = new Map<string, string>();
     const keepActive = active?.id ?? null;
-    for (const name of newCampaigns) made.set(name.toLowerCase(), create({ name }).id);
+    for (const name of newCampaigns) made.set(key(name), create({ name }).id);
     if (made.size) setActiveId(keepActive);
+    const landed: string[] = [];
     for (const b of planBank(r.good)) {
-      const cid = b.campaignName ? (known(b.campaignName)?.id ?? made.get(b.campaignName.toLowerCase())) : keepActive;
-      if (cid) bankStore.importClips(cid, b.videoId, b.rows.map(toParsed));
+      const cid = b.campaignName ? (known(b.campaignName)?.id ?? made.get(key(b.campaignName))) : keepActive;
+      if (!cid) continue;
+      bankStore.importClips(cid, b.videoId, b.rows.map(toParsed));
+      landed.push(cid);
     }
+    // Show where they went: if none landed in the open campaign, move to the one that got them, and bring Export forward.
+    if (landed.length && !(keepActive && landed.includes(keepActive))) setActiveId(landed[0]);
+    openPanel("export");
     onClose();
   };
 

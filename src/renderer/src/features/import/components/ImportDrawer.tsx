@@ -171,7 +171,7 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
         )}
 
         {!empty && (
-          <div className="pt-[16px]">
+          <div className="sticky bottom-[0px] z-10 border-t border-hairline bg-panel pb-[20px] pt-[16px]">
             <button
               type="button"
               aria-disabled={!c.canBank}

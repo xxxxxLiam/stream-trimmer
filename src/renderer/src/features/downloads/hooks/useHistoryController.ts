@@ -11,6 +11,7 @@ import { historyClipCount, historyGroups } from "../../../shared/utils/historyLi
 import { useEntryActions } from "../../../shared/hooks/useEntryActions";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { playFrom } from "../../../shared/utils/playFrom";
+import { clearDownloads, removeDownload } from "../../../shared/utils/downloads";
 import type { DownloadEntry } from "../../../shared/utils/downloads";
 import { useHistoryCache } from "./useHistoryCache";
 import { useHistoryQueries } from "./useHistoryQueries";
@@ -40,5 +41,5 @@ export function useHistoryController() {
     fileName: () => "Clipr history.txt",
   });
 
-  return { pills, setPills, ...queries, cache, canJump, jump, show: actions.show, inEditor: actions.inEditor };
+  return { pills, setPills, ...queries, cache, canJump, jump, remove: removeDownload, clearAll: clearDownloads, show: actions.show, inEditor: actions.inEditor };
 }
