@@ -14,7 +14,6 @@ import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
 
 export function useClipController(opts: { listenForKey?: boolean } = {}) {
-  const { downloading } = useClipperContext();
   const range = usePickedRange();
   const host = usePanelHost();
   const { segments } = useSegmentsState();
@@ -38,7 +37,6 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
   const reason = clipReason({
     hasRange,
     segments: segments.length,
-    busy: !!downloading,
     rangeSeconds: range ? range.end - range.start : undefined,
   });
   const toCut = clipSections(segments, range);

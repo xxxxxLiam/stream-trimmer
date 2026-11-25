@@ -66,6 +66,7 @@ export default {
           DEFAULT: "rgb(184 228 234 / <alpha-value>)",
           "tint-35": "var(--frost-tint-35)",
           "tint-45": "var(--frost-tint-45)",
+          "tint-60": "var(--frost-tint-60)",
           "tint-80": "var(--frost-tint-80)",
         },
         // Failure only, as a 1px border and the sentence. Never the brand colour.

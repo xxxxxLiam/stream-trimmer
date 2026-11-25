@@ -459,11 +459,6 @@ function TabBridge({
   const downloading = clipper?.downloading ?? false;
   const opened = !!clipper?.info;
 
-  // A cut works on a snapshot of the list, so editing it mid-cut would not reach the file.
-  useLayoutEffect(() => {
-    store.setLocked(downloading);
-  }, [store, downloading]);
-
   // Restore once, on mount, from what this tab last reported.
   const pending = useRef<string | null>(null);
   const pickedPending = useRef<{ start: string; end: string } | null>(null);

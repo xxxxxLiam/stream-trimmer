@@ -37,6 +37,7 @@ import { addSessionClip, sessionClipsFor, type SessionClipsByCampaign } from "..
 import { readSetting, writeSetting } from "../shared/utils/persist";
 import { bankStore, clipsFor, type BankedClip } from "../shared/utils/bank";
 import { clipNameFor } from "../features/clips/utils/cutNaming";
+import { createSerialQueue } from "../features/clips/utils/serialQueue";
 import { matchingMoment } from "../features/clips/utils/finishBankedCut";
 import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
@@ -406,17 +407,22 @@ function Layout({ active }: { active: boolean }) {
       } finally {
         setMakingName(null);
       }
-      if (!madeAny) return;
-      clearSegments();
-      setStartText("");
-      setEndText("");
     },
-    [videoId, campaign, info?.title, downloads, duration, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
+    [videoId, campaign, info?.title, downloads, duration, download, recordUse, afterSaved],
   );
+  // Clips are made one after another. Pressing Clip hands the marked sections over and clears them at
+  // once, so the next clip can be marked while this one is making (a failed clip has its own Retry).
+  const cutQueue = useRef(createSerialQueue());
+  const cutMarked = (segs: Segment[]) => {
+    void cutQueue.current.enqueue(() => cutClip(segs));
+    clearSegments();
+    setStartText("");
+    setEndText("");
+  };
 
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
   // The column marks it cut and records the used ranges itself once this resolves true.
-  const cutBanked = useCallback(
+  const cutBankedNow = useCallback(
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
       const startSettings = withDestination(editorRef.current);
@@ -432,6 +438,8 @@ function Layout({ active }: { active: boolean }) {
     },
     [download, afterSaved],
   );
+  // The same line as Clip: a banked moment made while a clip is making waits its turn.
+  const cutBanked = (clip: BankedClip, projectName?: string) => cutQueue.current.enqueue(() => cutBankedNow(clip, projectName));
 
   // Shell-level shortcuts (BUILD-SPEC section 12). Active tab only.
   const revealRef = useRef(revealLastSaved);
@@ -478,7 +486,7 @@ function Layout({ active }: { active: boolean }) {
   };
   const panelHost: PanelHost = {
     playhead,
-    cutSegments: (segs) => void cutClip(segs),
+    cutSegments: cutMarked,
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
