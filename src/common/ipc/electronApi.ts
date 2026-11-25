@@ -37,8 +37,6 @@ export interface ElectronAPI {
   settingsSnapshot?: Record<string, unknown>;
   /** `reason` says why a write was refused: too large, a key the page may not write, or the disk write failed. */
   setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean; reason?: "too-large" | "not-allowed" | "write-failed" }>;
-  /** Before a clip starts: is the folder it lands in clearly short of room? `freeMb` is null when it could not be measured. */
-  checkFreeSpace?: (payload: { dirPath: string; seconds: number; quality: string; audio: boolean; segments: number }) => Promise<{ ok: boolean; neededMb: number; freeMb: number | null }>;
   /** Save a clip list as a .txt the person places in the native save dialog. */
   saveTextFile?: (payload: { name: string; text: string }) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
   pickDirectory: () => Promise<string | null>; pickFcpLibrary?: () => Promise<string | null>;
