@@ -1,5 +1,5 @@
 {
- "_doc": "Workspace fixture with the History tab opened and four saved clips; saved times are relative to when this file was generated (regenerate after midnight so Today and Yesterday group as drawn).",
+ "_doc": "Workspace fixture, History tab open, twelve saved Acme clips (3 today, 9 yesterday, all files present) and the Acme filter pill; times are $NOW placeholders.",
  "seed": {
   "clipper.dataDirConfirmed": true,
   "clipper.campaigns": [
@@ -114,7 +114,7 @@
     "label": "Honest Version.mp4",
     "path": "/tmp/Clips/Acme/Honest Version.mp4",
     "dir": "/tmp/Clips/Acme",
-    "savedAt": 1795550452750,
+    "savedAt": "$NOW-1m",
     "campaign": "Acme",
     "seconds": 42,
     "videoId": "stub",
@@ -126,7 +126,7 @@
     "label": "Big Deal.mp4",
     "path": "/tmp/Clips/Acme/Big Deal.mp4",
     "dir": "/tmp/Clips/Acme",
-    "savedAt": 1795550392750,
+    "savedAt": "$NOW-2m",
     "campaign": "Acme",
     "seconds": 41,
     "videoId": "stub",
@@ -138,7 +138,7 @@
     "label": "Hot Take.mp4",
     "path": "/tmp/Clips/Acme/Hot Take.mp4",
     "dir": "/tmp/Clips/Acme",
-    "savedAt": 1795550332750,
+    "savedAt": "$NOW-3m",
     "campaign": "Acme",
     "seconds": 33,
     "videoId": "stub",
@@ -150,11 +150,107 @@
     "label": "First Hire.mp4",
     "path": "/tmp/Clips/Acme/First Hire.mp4",
     "dir": "/tmp/Clips/Acme",
-    "savedAt": 1795463812750,
+    "savedAt": "$NOW-1d",
     "campaign": "Acme",
     "seconds": 35,
     "videoId": "stub",
     "clipId": "B04"
+   },
+   {
+    "id": "h5",
+    "kind": "clip",
+    "label": "Burn Rate.mp4",
+    "path": "/tmp/Clips/Acme/Burn Rate.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 39,
+    "videoId": "stub",
+    "clipId": "B05"
+   },
+   {
+    "id": "h6",
+    "kind": "clip",
+    "label": "Cold Open.mp4",
+    "path": "/tmp/Clips/Acme/Cold Open.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 28,
+    "videoId": "stub",
+    "clipId": "B06"
+   },
+   {
+    "id": "h7",
+    "kind": "clip",
+    "label": "Last Call.mp4",
+    "path": "/tmp/Clips/Acme/Last Call.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 44,
+    "videoId": "stub",
+    "clipId": "B07"
+   },
+   {
+    "id": "h8",
+    "kind": "clip",
+    "label": "Pricing Trap.mp4",
+    "path": "/tmp/Clips/Acme/Pricing Trap.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 31,
+    "videoId": "stub",
+    "clipId": "B08"
+   },
+   {
+    "id": "h9",
+    "kind": "clip",
+    "label": "Bad Hire.mp4",
+    "path": "/tmp/Clips/Acme/Bad Hire.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 37,
+    "videoId": "stub",
+    "clipId": "B09"
+   },
+   {
+    "id": "h10",
+    "kind": "clip",
+    "label": "Series A.mp4",
+    "path": "/tmp/Clips/Acme/Series A.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 46,
+    "videoId": "stub",
+    "clipId": "B10"
+   },
+   {
+    "id": "h11",
+    "kind": "clip",
+    "label": "The Pivot.mp4",
+    "path": "/tmp/Clips/Acme/The Pivot.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 29,
+    "videoId": "stub",
+    "clipId": "B11"
+   },
+   {
+    "id": "h12",
+    "kind": "clip",
+    "label": "Exit Plan.mp4",
+    "path": "/tmp/Clips/Acme/Exit Plan.mp4",
+    "dir": "/tmp/Clips/Acme",
+    "savedAt": "$NOW-1d",
+    "campaign": "Acme",
+    "seconds": 52,
+    "videoId": "stub",
+    "clipId": "B12"
    }
   ]
  },
@@ -184,6 +280,32 @@
   },
   {
    "wait": 500
+  },
+  {
+   "fill": [
+    "input[aria-label='Search clips, campaigns, videos']",
+    "Acme"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": 600
   }
+ ],
+ "touch": [
+  "/tmp/Clips/Acme/Honest Version.mp4",
+  "/tmp/Clips/Acme/Big Deal.mp4",
+  "/tmp/Clips/Acme/Hot Take.mp4",
+  "/tmp/Clips/Acme/First Hire.mp4",
+  "/tmp/Clips/Acme/Burn Rate.mp4",
+  "/tmp/Clips/Acme/Cold Open.mp4",
+  "/tmp/Clips/Acme/Last Call.mp4",
+  "/tmp/Clips/Acme/Pricing Trap.mp4",
+  "/tmp/Clips/Acme/Bad Hire.mp4",
+  "/tmp/Clips/Acme/Series A.mp4",
+  "/tmp/Clips/Acme/The Pivot.mp4",
+  "/tmp/Clips/Acme/Exit Plan.mp4"
  ]
 }

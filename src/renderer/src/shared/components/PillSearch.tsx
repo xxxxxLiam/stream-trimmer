@@ -30,7 +30,7 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
     <div className="flex flex-none flex-col">
       <label
         role="search"
-        className="mx-[10px] mb-[6px] mt-[10px] flex h-target items-center gap-2 rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
+        className="mx-[10px] mb-[6px] mt-[10px] flex h-[44px] items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
       >
         <IconSearch />
         <input
@@ -51,7 +51,7 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
         />
       </label>
       {pills.length > 0 && (
-        <div className="-mt-[6px] flex items-center px-3">
+        <div className="-mt-[6px] flex items-center px-[12px]">
           <div className="flex flex-wrap items-center">
             {pills.map((p) => (
               <button
@@ -59,9 +59,9 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
                 type="button"
                 aria-label={`Remove filter ${p}`}
                 onClick={() => onPillsChange(pills.filter((x) => x !== p))}
-                className="inline-flex h-target items-center"
+                className="inline-flex h-[44px] items-center"
               >
-                <span className="inline-flex h-[28px] items-center gap-1 rounded-[14px] border border-hairlineStrong bg-raised pl-3 pr-[6px] text-meta text-fg">
+                <span className="inline-flex h-[28px] items-center gap-[4px] rounded-[14px] border border-hairlineStrong bg-raised pl-[12px] pr-[6px] text-meta leading-[normal] text-fg">
                   {p}
                   <span className="inline-flex w-[18px] justify-center text-fg-dim">
                     <IconClose />
@@ -70,12 +70,12 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
               </button>
             ))}
           </div>
-          <button type="button" onClick={() => onPillsChange([])} className="ml-auto h-target text-meta text-fg">
+          <button type="button" onClick={() => onPillsChange([])} className="ml-auto h-[44px] text-meta leading-[normal] text-fg">
             Clear filters
           </button>
         </div>
       )}
-      <div role="status" className="px-[14px] pb-[2px] text-meta text-fg-dim">
+      <div role="status" className="px-[14px] pb-[2px] text-meta leading-[normal] text-fg-dim">
         {count}
       </div>
     </div>

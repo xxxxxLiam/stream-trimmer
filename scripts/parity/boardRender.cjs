@@ -148,4 +148,58 @@ async function renderBoard(screen, opts = {}) {
   }
 }
 
-module.exports = { renderBoard, boardFrame, SHIM, snapshotDir, get SNAPSHOT() { return snapshotDir(); } };
+/** Rects (relative to the panel, whole px) of the panel's rows: the tab strip, then each row of the body. */
+const MEASURE = (panel) => {
+  const base = panel.getBoundingClientRect();
+  const rows = [];
+  const add = (e, depth) => {
+    const r = e.getBoundingClientRect();
+    rows.push({ d: depth, x: Math.round(r.x - base.x), y: Math.round(r.y - base.y), w: Math.round(r.width), h: Math.round(r.height), t: (e.textContent || "").trim().replace(/\s+/g, " ").slice(0, 28) });
+  };
+  const walk = (e, depth) => {
+    for (const c of e.children) {
+      // A wrapper with one child (the tab panel, a panel body) adds nothing: look inside it.
+      if (c.children.length === 1 && c.getAttribute("role") !== "tablist" && depth < 3) {
+        walk(c, depth);
+        continue;
+      }
+      add(c, depth);
+      if (depth < 2 && c.children.length > 1 && !(c.getAttribute("role") === "tablist")) walk(c, depth + 1);
+    }
+  };
+  walk(panel, 0);
+  return rows;
+};
+
+/**
+ * Screenshot one panel of a board: the 14px-radius, overflow-hidden frame that is the smallest one
+ * containing `text` (e.g. "Waiting in this video"). Boards that crop a panel inside a bigger frame
+ * (the 356px right-panel crops) are compared panel to panel this way.
+ */
+async function renderBoardPanel(screen, text) {
+  const file = screen.endsWith(".dc.html") ? screen : `${screen}.dc.html`;
+  const frame = boardFrame(file);
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: frame.width, height: frame.height }, deviceScaleFactor: 1 });
+    await page.route("**/support.js", (r) => r.fulfill({ contentType: "text/javascript", body: SHIM }));
+    await page.goto("file://" + path.join(snapshotDir(), file));
+    await page.waitForSelector("html[data-board-ready]");
+    await page.evaluate(() => document.fonts && document.fonts.ready);
+    const handle = await page.evaluateHandle((t) => {
+      const frames = [...document.querySelectorAll("x-dc *")].filter((e) => {
+        const st = getComputedStyle(e);
+        return st.borderTopLeftRadius === "14px" && st.overflow === "hidden" && e.textContent.includes(t);
+      });
+      return frames.sort((a, b) => a.textContent.length - b.textContent.length)[0] || null;
+    }, text);
+    const el = handle.asElement();
+    if (!el) throw new Error(`${file} has no panel containing "${text}"`);
+    const boxes = await el.evaluate(MEASURE);
+    return { png: await el.screenshot(), frame: { title: frame.title }, boxes };
+  } finally {
+    await browser.close();
+  }
+}
+
+module.exports = { MEASURE, renderBoardPanel, renderBoard, boardFrame, SHIM, snapshotDir, get SNAPSHOT() { return snapshotDir(); } };

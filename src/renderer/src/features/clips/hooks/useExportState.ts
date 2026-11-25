@@ -21,6 +21,7 @@ export function useExportState() {
   const [notice, setNotice] = useState("");
   const [finished, setFinished] = useState<FinishedClip | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(UNDO_SECONDS);
+  const [makingId, setMakingId] = useState<string | null>(null);
   const [failed, setFailed] = useState<FailedClip | null>(null);
   const attempt = useRef<ClipAttempt | null>(null);
   const failCount = useRef({ key: "", count: 0 });
@@ -30,6 +31,7 @@ export function useExportState() {
     notice, setNotice,
     finished, setFinished,
     secondsLeft, setSecondsLeft,
+    makingId, setMakingId,
     failed, setFailed, attempt, failCount,
   };
 }

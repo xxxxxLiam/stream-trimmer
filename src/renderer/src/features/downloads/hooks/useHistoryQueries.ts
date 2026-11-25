@@ -13,7 +13,7 @@ export function useHistoryQueries(pills: readonly string[]) {
   const clips = useMemo(() => historyClips(downloads), [downloads]);
   const visible = useMemo(() => filterHistory(clips, pills), [clips, pills]);
   const groups = useMemo(() => groupByDay(visible, Date.now()), [visible]);
-  const count = pills.length > 0 ? `${visible.length} of ${countText(clips.length)}` : countText(clips.length);
+  const count = pills.length > 0 && visible.length !== clips.length ? `${visible.length} of ${countText(clips.length)}` : countText(clips.length);
 
   // Files can be moved or deleted outside the app, so probe when the list changes.
   const [missing, setMissing] = useState<Record<string, boolean>>({});

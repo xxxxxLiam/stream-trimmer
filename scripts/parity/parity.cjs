@@ -41,7 +41,12 @@ function loadFixture(name) {
   const f = path.join(REPO, "audit", "harness", "fixtures", `${name}.json`);
   if (!fs.existsSync(f)) return { seed: {}, steps: [] };
   // "$NOW" in a fixture becomes the current time in ms, so "made today" counts stay today.
-  const fx = JSON.parse(fs.readFileSync(f, "utf8").replace(/"\$NOW"/g, String(Date.now())));
+  // "$NOW-5m", "$NOW-2h", "$NOW-1d" are that long ago, so a "yesterday" row stays yesterday.
+  const unit = { m: 60_000, h: 3_600_000, d: 86_400_000 };
+  const now = Date.now();
+  const fx = JSON.parse(
+    fs.readFileSync(f, "utf8").replace(/"\$NOW(?:-(\d+)([mhd]))?"/g, (_m, n, u) => String(now - (n ? Number(n) * unit[u] : 0))),
+  );
   // "extends": another fixture's name. Its keys apply first; seed and stub merge one level down, and
   // every other key here replaces the base's.
   if (!fx.extends) return fx;
@@ -82,6 +87,11 @@ function makeStubRoot(fx) {
   execFileSync("node", [path.join(REPO, "audit", "harness", "make-stub-root.cjs"), root]);
   fs.writeFileSync(path.join(root, "stub.json"), JSON.stringify(fx.stub));
   fs.copyFileSync(path.join(REPO, "audit", "fixtures", "fixture.mp4"), path.join(root, "fixture.mp4"));
+  // fx.touch: absolute paths created as copies of the fixture clip, so History rows are not "missing".
+  for (const f of fx.touch || []) {
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.copyFileSync(path.join(REPO, "audit", "fixtures", "fixture.mp4"), f);
+  }
   if (fx.stub.vttFile) {
     fs.copyFileSync(path.join(REPO, "audit", "harness", "fixtures", fx.stub.vttFile), path.join(root, fx.stub.vttFile));
   }
@@ -105,11 +115,14 @@ async function appRegion(win, frame, fx, useWindow) {
   return frame.clip;
 }
 
-async function screenshotApp(screen, frame, fx, useWindow, dump) {
-  const win0 = fx.window || (useWindow ? { width: frame.width, height: frame.height } : { width: 1360, height: 760 });
+/**
+ * Launch the real app for a fixture (stub yt-dlp linked in when the fixture has one), size its window,
+ * run the fixture's steps, hand the page to `fn`, then close and unlink. One stubbed run at a time.
+ */
+async function withApp(screen, fx, win0, fn) {
   const { launchApp } = require("../../audit/harness/app.cjs");
   // The packaged-shape app looks for binaries in <electron>/dist/resources/bin, not under cwd, so a
-  // stub root is linked there for the run and removed after. One stubbed parity run at a time.
+  // stub root is linked there for the run and removed after.
   let link = null;
   let stubRoot;
   if (fx.stub) {
@@ -143,20 +156,26 @@ async function screenshotApp(screen, frame, fx, useWindow, dump) {
     await a.win.waitForSelector(fx.waitFor || "#root *");
     await runSteps(a.win, fx.steps, a.app);
     await a.win.waitForTimeout(400);
-    const clip = await appRegion(a.win, frame, fx, useWindow);
-    if (dump) {
-      const f = require("./dumpLayout.cjs").DUMP_SRC;
-      const d = await a.win.evaluate(new Function("p", "return (" + f + ")(p[0], p[1])"), [0, 0]).catch(() => null);
-      globalThis.__appDump = d;
-    }
-    return await a.win.screenshot({ clip });
+    return await fn(a.win);
   } finally {
     await a.close();
     if (link) fs.rmSync(link, { recursive: true, force: true });
   }
 }
 
-(async () => {
+async function screenshotApp(screen, frame, fx, useWindow, dump) {
+  const win0 = fx.window || (useWindow ? { width: frame.width, height: frame.height } : { width: 1360, height: 760 });
+  return withApp(screen, fx, win0, async (win) => {
+    const clip = await appRegion(win, frame, fx, useWindow);
+    if (dump) {
+      const f = require("./dumpLayout.cjs").DUMP_SRC;
+      globalThis.__appDump = await win.evaluate(new Function("p", "return (" + f + ")(p[0], p[1])"), [0, 0]).catch(() => null);
+    }
+    return win.screenshot({ clip });
+  });
+}
+
+async function main() {
   const o = args();
   const outDir = path.join(REPO, "audit", "out", "parity", o.screen + (o.window !== undefined ? `-window${o.window}` : o.el !== undefined ? `-el${o.el}` : ""));
   fs.mkdirSync(outDir, { recursive: true });
@@ -212,7 +231,13 @@ async function screenshotApp(screen, frame, fx, useWindow, dump) {
   const pct = ((bad / (b.width * b.height)) * 100).toFixed(2);
   console.log(`diff: ${bad} px (${pct}%) -> ${outDir}/side-by-side.png`);
   process.exitCode = bad === 0 ? 0 : 1;
-})().catch((e) => {
-  console.error(e);
-  process.exit(2);
-});
+}
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(2);
+  });
+}
+
+module.exports = { loadFixture, withApp };
