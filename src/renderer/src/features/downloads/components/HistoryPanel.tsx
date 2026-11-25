@@ -36,11 +36,11 @@ export default function HistoryPanel() {
                 <div
                   key={e.id}
                   id={g === h.groups[0] && e === g.entries[0] ? "ui-saved-clip" : undefined}
-                  className={`mx-[6px] my-[3px] flex items-center gap-[6px] rounded-control bg-raised py-[6px] pl-[8px] pr-[6px] ${h.missing[e.id] ? "opacity-60" : ""}`}
+                  className="mx-[6px] my-[3px] flex items-center gap-[6px] rounded-control bg-raised py-[6px] pl-[8px] pr-[6px]"
                 >
                   <span className="h-[26px] w-[40px] flex-none rounded-chip bg-hover" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-body font-medium">{clipTitle(e.label)}</div>
+                    <div className={`truncate text-body font-medium ${h.missing[e.id] ? "text-disabled" : ""}`}>{clipTitle(e.label)}</div>
                     <div className="mt-[2px] truncate text-meta leading-[normal] text-fg-dim">
                       {h.missing[e.id] ? "File missing. It was moved or deleted." : rowMeta(e)}
                     </div>
