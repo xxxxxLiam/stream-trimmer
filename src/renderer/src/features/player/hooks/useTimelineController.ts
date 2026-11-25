@@ -18,6 +18,7 @@ import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
 import { clampX, edgeScroll, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
+import { TOUCH_PX, movedRange, touching } from "../utils/sectionMove";
 import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, END_PAD_PX, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
@@ -72,6 +73,10 @@ export function useTimelineController() {
   // The room kept after the video's end (at Fit, and at the far right when zoomed in), as a share of the lane.
   const padFrac = s.width > 0 ? END_PAD_PX / s.width : 0;
   const win = windowFor(duration, tools.zoom, s.focus ?? playhead, padFrac);
+  // A range being moved reads as one with any section it touches, and only joins when the mouse is let go.
+  const movingDrag = s.drag?.kind === "move" && s.drag.moved ? s.drag : null;
+  const mergeHint =
+    movingDrag && range && s.width > 0 ? touching(range, store.segments, TOUCH_PX * ((win.end - win.start) / s.width)) : null;
   const liveFold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
   const live = { axis: (liveFold ? liveFold.axis : linearAxis(win, s.width)) as Axis, fold: liveFold?.fold ?? ([] as Fold[]), folded: !!liveFold };
   // The axis the pointer went down on stays for the whole drag: the drag itself creates a range, which
@@ -192,6 +197,20 @@ export function useTimelineController() {
       s.setDragOrigin(e.clientX);
       return;
     }
+    // On the Source lane the pointer also works the selected range: a grabbed edge resizes it, its body moves it
+    // (length kept). A press on the body that never moves is just a click, which goes to that spot.
+    if (range && target.closest('[data-lane="source"]')) {
+      const a = toX(axis, range.start);
+      const b = toX(axis, range.end);
+      const edge = grabbedEdge(x, a, b);
+      if (edge || (x >= a && x <= b)) {
+        marksBeforeDrag.current = { start: clipper.startText, end: clipper.endText };
+        frozen.current = shown;
+        s.setDragOrigin(e.clientX);
+        if (edge) return s.setDrag({ kind: "edge", edge, fixed: edge === "start" ? range.end : range.start });
+        return s.setDrag({ kind: "move", grab: t - range.start, len: range.end - range.start, pressedAt: t, moved: false });
+      }
+    }
     // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
     s.setDrag({ kind: "scrub" });
     clipper.requestSeek(Math.round(t));
@@ -201,7 +220,7 @@ export function useTimelineController() {
   const marksBeforeDrag = useRef<{ start: string; end: string } | null>(null);
   const dragKind = s.drag?.kind;
   useEffect(() => {
-    if (dragKind !== "range" && dragKind !== "edge") return;
+    if (dragKind !== "range" && dragKind !== "edge" && dragKind !== "move") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       const before = marksBeforeDrag.current;
@@ -267,7 +286,12 @@ export function useTimelineController() {
   const dragTo = (d: NonNullable<typeof s.drag>, clientX: number, left: number) => {
     const t = inVideo(toT(axis, clampX(clientX - left, s.width)));
     if (t === null) return;
-    if (d.kind === "edge") {
+    if (d.kind === "move") {
+      if (!d.moved && Math.abs(clientX - s.dragOrigin) < DRAG_START_PX) return;
+      if (!d.moved) s.setDrag({ ...d, moved: true });
+      const r = movedRange(d.len, d.grab, t, duration);
+      clipper.setRangeFromSeconds(r.start, r.end);
+    } else if (d.kind === "edge") {
       setRange(d.fixed, t);
     } else if (d.kind === "range" && Math.abs(clientX - s.dragOrigin) >= DRAG_START_PX) {
       setRange(d.anchor, t);
@@ -293,7 +317,7 @@ export function useTimelineController() {
       if (at !== null) clipper.requestSeek(Math.round(Math.min(Math.max(0, at), duration)));
     } else dragTo(d, pointer.current.clientX, pointer.current.left);
   };
-  const scrolling = dragKind === "scrub" || dragKind === "range" || dragKind === "edge";
+  const scrolling = dragKind === "scrub" || dragKind === "range" || dragKind === "edge" || dragKind === "move";
   useEffect(() => {
     if (!scrolling) return;
     const id = window.setInterval(() => scrollRef.current(), 40);
@@ -303,6 +327,15 @@ export function useTimelineController() {
   const onLanePointerUp = () => {
     const d = s.drag;
     s.setDrag(null);
+    if (d?.kind === "move") {
+      frozen.current = null;
+      if (!d.moved) clipper.requestSeek(Math.round(d.pressedAt));
+      else if (mergeHint) {
+        // Let go while touching: the sections become one range (the touched ones fold into it).
+        [...mergeHint.indices].sort((a, b) => b - a).forEach((i) => store.remove(i));
+        clipper.setRangeFromSeconds(mergeHint.union.start, mergeHint.union.end);
+      }
+    }
     lastScrub.current = null;
     // A range drag that never moved sets nothing; one that moved already made the range.
     if (d?.kind === "range") s.setScissorsStart(null);
@@ -365,6 +398,10 @@ export function useTimelineController() {
     opening: !!videoId && !clipper.info && clipper.loadingInfo,
     firstClipHint: !!clipper.info && !startPicked && !range && store.segments.length === 0 && used.length === 0,
     startPicked,
+    /** A selected range is being moved with the Pointer: it shows its times as a pill. */
+    moving: !!movingDrag,
+    /** The one range a moved range and the sections it touches would make if let go now. */
+    mergeHint: mergeHint?.union ?? null,
     start: clipper.start,
     inText: range ? clockTime(range.start) : startPicked ? clockTime(clipper.start) : dash,
     outText: range ? clockTime(range.end) : endPicked ? clockTime(clipper.end) : dash,
