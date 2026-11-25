@@ -14,7 +14,7 @@ import type { FinalCutLookProps } from "../components/FinalCutLook";
 
 type Campaigns = { campaigns: Campaign[]; update: (id: string, patch: Partial<Omit<Campaign, "id" | "usedRanges">>) => void };
 
-export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns): FinalCutLookProps | undefined {
+export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns, onUploaded?: () => void): FinalCutLookProps | undefined {
   const [looks, setLooks] = useState<SavedLook[]>(() => loadSavedLooks());
   const [problem, setProblem] = useState("");
   const [open, setOpen] = useState(false);
@@ -34,9 +34,11 @@ export function useFinalCutLook(campaign: Campaign | undefined, store: Campaigns
       rememberLastLook(added.id);
       setLooks(loadSavedLooks());
       if (campaignId) store.update(campaignId, { fcpLookId: added.id });
+      // A look that was just uploaded switches the Timeline to "From your look" by itself.
+      onUploaded?.();
       setOpen(false);
     },
-    [campaignId, store],
+    [campaignId, store, onUploaded],
   );
 
   if (!campaign) return undefined;

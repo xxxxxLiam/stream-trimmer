@@ -8,6 +8,7 @@
  */
 import { DrawerHeader, drawerBody } from "../../../shared/components/DrawerRows";
 import FinalCutLayout, { type FinalCutLayoutProps } from "./FinalCutLayout";
+import FinalCutTimeline, { type FinalCutTimelineProps } from "./FinalCutTimeline";
 import FinalCutLook, { type FinalCutLookProps } from "./FinalCutLook";
 
 export type FinalCutFields = {
@@ -19,6 +20,8 @@ export type FinalCutFields = {
   onEvent: (v: string) => void;
   /** The "Your look" block; shown when the look files can be read (needs the Engine look reader). */
   look?: FinalCutLookProps;
+  /** The "Timeline" switch under Your look. */
+  timeline?: FinalCutTimelineProps;
   /** The "Layout" row (how clips are laid out in Final Cut, with a preview). */
   layout?: FinalCutLayoutProps;
 };
@@ -58,6 +61,7 @@ export default function SettingsEditor(p: SettingsEditorProps) {
             )}
             {fc.layout && <FinalCutLayout {...fc.layout} />}
             {fc.look && <FinalCutLook {...fc.look} />}
+            {fc.timeline && <FinalCutTimeline {...fc.timeline} />}
           </div>
         ) : (
           <p className="m-[0px] py-[12px] text-body text-fg-dim">

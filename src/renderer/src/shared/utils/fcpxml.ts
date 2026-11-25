@@ -38,7 +38,8 @@ export type AfterCutting = "nothing" | "reveal" | "finalcut";
 
 export const AFTER_CUTTING_VALUES: readonly AfterCutting[] = ["nothing", "reveal", "finalcut"];
 
-export type TimelineKind = "vertical" | "source" | "custom";
+/** "look": the size and rate of the campaign's saved look (Engine reads it; until then the project is vertical). */
+export type TimelineKind = "vertical" | "source" | "custom" | "look";
 
 export interface TimelineFormat {
   kind: TimelineKind;
@@ -145,7 +146,7 @@ function dimension(v: unknown, fallback: number): number {
 export function normalizeTimeline(raw: unknown): TimelineFormat {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const kind: TimelineKind =
-    r.kind === "source" || r.kind === "custom" || r.kind === "vertical" ? r.kind : "vertical";
+    r.kind === "source" || r.kind === "custom" || r.kind === "vertical" || r.kind === "look" ? r.kind : "vertical";
   const fpsText = typeof r.fps === "string" ? r.fps.trim() : typeof r.fps === "number" ? String(r.fps) : "";
   let fps = DEFAULT_TIMELINE.fps;
   if (fpsText === "source" && kind === "source") fps = "source";

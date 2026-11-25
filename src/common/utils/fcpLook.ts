@@ -17,6 +17,8 @@ export interface Look {
   clip: string;
   /** Plain words for what was found, shown in the dialog. */
   found: string[];
+  /** The export's own frame size and rate (e.g. fps "25"), once Engine reads them; the Timeline switch names it. */
+  format?: { width: number; height: number; fps: string };
 }
 
 const NOT_AN_EXPORT =
