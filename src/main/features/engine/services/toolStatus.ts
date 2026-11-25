@@ -97,6 +97,16 @@ function probe(name: Name, now: number): void {
   });
 }
 
+/**
+ * Whether the JavaScript runtime yt-dlp needs (deno) is missing or won't start. Looks at the probe when there is one,
+ * and otherwise at whether the file is there at all; never runs anything.
+ */
+export function jsRuntimeProblem(): boolean {
+  const p = probes.deno;
+  if (p) return p.path === null || !("ok" in p) || !p.ok;
+  return denoPath() === null;
+}
+
 /** Starts the background probe (idempotent); never blocks. */
 export function startToolProbe(): void {
   if (started) return;

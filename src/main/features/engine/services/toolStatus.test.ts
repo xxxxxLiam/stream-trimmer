@@ -110,3 +110,17 @@ test("Try again (force) looks again at once, without waiting out the backoff", a
     resetToolProbesForTest();
   }
 });
+
+import { jsRuntimeProblem } from "./toolStatus";
+
+test("jsRuntimeProblem: a probe that found deno missing or broken is a problem, one that ran is not", async () => {
+  for (const [probe, want] of [[{ path: null }, true], [{ path: "/x", ok: false }, true], [{ path: "/x", ok: true, version: "deno 2" }, false]] as const) {
+    resetToolProbesForTest();
+    setProbeForTest(async (_b, arg) => (arg === "--version" ? (probe as Probe) : { path: "/y", ok: true, version: "x" }));
+    currentToolStatus(Date.now());
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(jsRuntimeProblem(), want, JSON.stringify(probe));
+  }
+  setProbeForTest(null);
+  resetToolProbesForTest();
+});
