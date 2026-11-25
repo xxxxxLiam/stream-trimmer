@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { axisTicks, fitWindow, foldedAxis, linearAxis, rulerTicks, toT, toX, windowFor, zoomForSpan } from "./timelineAxis";
+import { axisDuringDrag, axisTicks, fitWindow, foldedAxis, linearAxis, rulerTicks, toT, toX, windowFor, zoomForSpan } from "./timelineAxis";
 
 test("zoom 0 shows the whole video, more zoom shows less around the focus", () => {
   assert.deepEqual(windowFor(1000, 0, 500), { start: 0, end: 1000 });
@@ -85,4 +85,21 @@ test("zoomForSpan is the inverse of windowFor", () => {
   const w = windowFor(3600, z, 1800);
   assert.ok(Math.abs(w.end - w.start - 240) < 60);
   assert.equal(zoomForSpan(3600, 3600), 0);
+});
+
+test("a drag keeps the axis it began on, so a range made far from a locked section is not measured on a folded axis", () => {
+  const locked = [{ start: 3600, end: 3660 }];
+  const duration = 15300; // 4:15:00
+  const width = 1000;
+  const before = { axis: linearAxis(windowFor(duration, 0, 12000), width), folded: false };
+  const pointerEndX = (12045 / duration) * width;
+  const anchor = 12000;
+  // Mid-drag the range exists, so the live axis would be folded.
+  const live = foldedAxis([...locked, { start: anchor, end: anchor + 1 }], duration, width);
+  assert.ok(live, "the live axis folds once the drag has made a range");
+  const frozen = axisDuringDrag(before, { axis: live.axis, folded: true });
+  assert.equal(frozen, before);
+  assert.equal(Math.round(toT(frozen.axis, pointerEndX) ?? -1), 12045);
+  assert.notEqual(Math.round(toT(live.axis, pointerEndX) ?? -1), 12045);
+  assert.equal(axisDuringDrag(null, before), before);
 });

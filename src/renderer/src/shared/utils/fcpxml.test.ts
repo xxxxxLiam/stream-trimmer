@@ -41,6 +41,9 @@ import {
   snapFrameRate,
   sourceTimecode,
   xmlEscape,
+  groupByVideo,
+  dayLabel,
+  type FcpLayout,
   type FcpClip,
   type MediaInfo,
 } from "./fcpxml";
@@ -676,7 +679,154 @@ for (const version of ["1.10", "1.11", "1.12", "1.13"]) {
 }
 
 test("the look's DTD check can fail (mutation guard: an element the DTD does not know is rejected)", { skip: !hasXmllint }, () => {
-  const look = parseLook(sampleExport({ clipChildren: '<adjust-transform scale="1.2 1.2"/><not-a-final-cut-element/>' }));
+  const parsed = parseLook(sampleExport());
+  const look = { ...parsed, clip: `${parsed.clip}\n<not-a-final-cut-element/>` };
   const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: { ...PROJECT, look } });
   assert.notEqual(validate(xml.replace(/<fcpxml version="[\d.]+">/, '<fcpxml version="1.10">')), "");
+});
+
+// D-6: a look export whose clip carries a connected clip or a title still gives valid projects.
+const TITLE_EFFECT = '    <effect id="r6" name="Basic Title" uid=".../Basic Title.moti"/>';
+const BUSY_EXPORTS: Record<string, { clipChildren: string; effects?: string }> = {
+  "a connected clip": {
+    clipChildren: `<adjust-transform scale="1.2 1.2"/>
+      <asset-clip ref="r2" lane="1" offset="0s" name="Broll" duration="2s"><adjust-volume amount="-96dB"/></asset-clip>
+      <adjust-volume amount="-3dB"/>`,
+  },
+  "a title": {
+    clipChildren: `<adjust-transform scale="1.2 1.2"/>
+      <title ref="r6" lane="1" offset="0s" name="Basic Title" duration="5s"><text><text-style ref="ts1">Title</text-style></text><text-style-def id="ts1"><text-style font="Helvetica" fontSize="63"/></text-style-def></title>`,
+    effects: `${TITLE_EFFECT}\n    <effect id="r3" name="Color Board" uid=".../Color Board"/>`,
+  },
+  "nested clips two deep": {
+    clipChildren: `<asset-clip ref="r2" lane="1" offset="0s" name="Outer" duration="2s"><asset-clip ref="r2" lane="2" offset="0s" name="Inner" duration="1s"><adjust-volume amount="-96dB"/></asset-clip></asset-clip>
+      <adjust-transform scale="1.2 1.2"/>
+      <filter-video ref="r3" name="Color Board"><param name="Exposure" key="1" value="0.1"/></filter-video>`,
+  },
+};
+
+for (const [what, o] of Object.entries(BUSY_EXPORTS)) {
+  for (const version of ["1.10", "1.11", "1.12", "1.13"]) {
+    test(`a look export with ${what} (version ${version}) gives projects that validate against the DTD`, { skip: !hasXmllint }, () => {
+      const look = parseLook(sampleExport({ version, ...o }));
+      assert.doesNotMatch(look.clip, /<asset-clip|<title|lane=/, "nothing connected is carried");
+      const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: { ...PROJECT, look } });
+      assert.equal(validate(xml.replace(/<fcpxml version="[\d.]+">/, '<fcpxml version="1.10">')), "");
+    });
+  }
+}
+
+// ---- layouts: where clips and projects land in the editor ------------------------------------
+
+const DAY1 = new Date(2026, 10, 25, 9).getTime();
+const DAY2 = new Date(2026, 10, 26, 9).getTime();
+const TALK = { sourceUrl: "https://youtu.be/talk", sourceTitle: "Podcast #214, the long talk" };
+const MORNING = { sourceUrl: "https://youtu.be/morning", sourceTitle: "Morning routine" };
+const THREE = [
+  clip({ id: "ACM-talk-01", label: "Honest", path: "/c/1.mp4", ...TALK, cutAt: DAY1 }),
+  clip({ id: "ACM-morning-01", label: "Coffee", path: "/c/2.mp4", ...MORNING, cutAt: DAY1 }),
+  clip({ id: "ACM-talk-02", label: "Second", path: "/c/3.mp4", ...TALK, cutAt: DAY2 }),
+];
+
+/** Structure as data: event > folders and what each holds. */
+function shape(xml: string): { event: string; collections: string[]; smart: Record<string, string[]>; items: string[]; keywords: Record<string, string[]> }[] {
+  const py = `
+import sys,json,xml.etree.ElementTree as E
+r=E.fromstring(sys.stdin.buffer.read())
+out=[]
+for e in r.iter('event'):
+    out.append({'event':e.get('name'),
+      'collections':[k.get('name') for k in e.iterfind('keyword-collection')],
+      'smart':{s.get('name'):[m.get('value') for m in s.iterfind('match-text')] for s in e.iterfind('smart-collection')},
+      'items':[(c.tag+':'+c.get('name')) for c in e if c.tag in('asset-clip','project')],
+      'keywords':{c.get('name'):[k.get('value') for k in c.iterfind('keyword')] for c in e.iterfind('asset-clip')}})
+print(json.dumps(out))`;
+  return JSON.parse(execFileSync("python3", ["-I", "-c", py], { input: xml, encoding: "utf8" }));
+}
+const layoutXml = (layout: FcpLayout, eventName = "", project = true) =>
+  buildFcpxml({ eventName, layout, clips: THREE, ...(project ? { project: PROJECT } : {}) });
+const dtdOk = (xml: string) => validate(xml.replace(/<fcpxml version="[\d.]+">/, '<fcpxml version="1.10">'));
+
+test("layout A: one Export event, a folder per video holding its raw clips, projects gathered per video", () => {
+  const [event, ...rest] = shape(layoutXml("export"));
+  assert.equal(rest.length, 0, "one event for everything");
+  assert.equal(event.event, "Export", "blank campaign Event falls back to Export");
+  assert.deepEqual(event.collections, ["Podcast #214 the long talk", "Morning routine"], "a comma in a title becomes a space: commas split keywords");
+  assert.deepEqual(event.keywords["ACM-talk-01 - Honest"], ["Raw", "Podcast #214 the long talk"]);
+  assert.deepEqual(Object.keys(event.smart), ["Podcast #214, the long talk projects", "Morning routine projects"]);
+  assert.deepEqual(event.smart["Podcast #214, the long talk projects"], ["ACM-talk-01 Honest", "ACM-talk-02 Second"]);
+  assert.equal(event.items.filter((i) => i.startsWith("project:")).length, 3);
+});
+
+test("layout A uses the campaign's own Event name when it has one", () => {
+  assert.equal(shape(layoutXml("export", "Acme exports"))[0].event, "Acme exports");
+});
+
+test("layout B: one event per video, no folders", () => {
+  const events = shape(layoutXml("video"));
+  assert.deepEqual(events.map((e) => e.event), ["Podcast #214, the long talk", "Morning routine"]);
+  assert.deepEqual(events[0].collections, []);
+  assert.deepEqual(events[0].items, ["asset-clip:ACM-talk-01 - Honest", "project:ACM-talk-01 Honest", "asset-clip:ACM-talk-02 - Second", "project:ACM-talk-02 Second"]);
+});
+
+test("layout C: one event per day with a folder per video inside", () => {
+  const events = shape(layoutXml("day"));
+  assert.deepEqual(events.map((e) => e.event), ["25 Nov 2026", "26 Nov 2026"]);
+  assert.deepEqual(events[0].collections, ["Podcast #214 the long talk", "Morning routine"]);
+  assert.deepEqual(events[1].collections, ["Podcast #214 the long talk"]);
+  assert.equal(dayLabel(DAY1), "25 Nov 2026");
+});
+
+test("layout D: everything in the campaign's event, no folders", () => {
+  const [event, ...rest] = shape(layoutXml("flat", "Acme"));
+  assert.equal(rest.length, 0);
+  assert.equal(event.event, "Acme");
+  assert.deepEqual(event.collections, []);
+  assert.deepEqual(event.smart, {});
+  assert.equal(event.items.length, 6);
+  assert.equal(shape(layoutXml("flat"))[0].event, "Clips");
+});
+
+test("a clip never lands under another video's folder or event (D-5 / D-1)", () => {
+  const [a] = shape(layoutXml("export"));
+  const morning = a.keywords["ACM-morning-01 - Coffee"];
+  assert.ok(morning.includes("Morning routine") && !morning.includes("Podcast #214 the long talk"));
+  assert.deepEqual(shape(layoutXml("video")).find((e) => e.event === "Morning routine")?.items.filter((i) => i.startsWith("asset-clip")), ["asset-clip:ACM-morning-01 - Coffee"]);
+});
+
+test("without projects the folders still hold the raw clips and no smart collection is written", () => {
+  const [event] = shape(layoutXml("export", "", false));
+  assert.equal(event.collections.length, 2);
+  assert.deepEqual(event.smart, {});
+  assert.equal(event.items.every((i) => i.startsWith("asset-clip")), true);
+});
+
+test("two videos with the same title keep separate folders", () => {
+  const groups = groupByVideo([
+    { sourceUrl: "u1", sourceTitle: "Same" },
+    { sourceUrl: "u2", sourceTitle: "Same" },
+    { sourceUrl: "u1", sourceTitle: "Same" },
+    { sourceUrl: "u3" },
+  ]);
+  assert.deepEqual(groups.map((g) => g.name), ["Same", "Same 2", "Video 3"]);
+  assert.deepEqual(groups[0].indexes, [0, 2]);
+});
+
+for (const layout of ["export", "video", "day", "flat"] as const) {
+  test(`layout ${layout} validates against the DTD, with and without projects and a look`, { skip: !hasXmllint }, () => {
+    assert.equal(dtdOk(layoutXml(layout, "Acme")), "");
+    assert.equal(dtdOk(layoutXml(layout, "Acme", false)), "");
+    const look = parseLook(sampleExport());
+    assert.equal(dtdOk(buildFcpxml({ eventName: "", layout, clips: THREE, project: { ...PROJECT, look } })), "");
+  });
+}
+
+test("the layout check can fail (mutation guard: a keyword collection with no name is rejected)", { skip: !hasXmllint }, () => {
+  assert.notEqual(dtdOk(layoutXml("export").replace(/<keyword-collection name="[^"]*"\/>/, "<keyword-collection/>")), "");
+});
+
+test("an unknown stored layout falls back to the Export layout", () => {
+  assert.equal(normalizeEditorSettings({ layout: "weird" }).layout, "export");
+  assert.equal(normalizeEditorSettings({ layout: "day" }).layout, "day");
+  assert.equal(normalizeEditorSettings({}).layout, "export");
 });

@@ -148,10 +148,18 @@ export function usePreviewEffects(a: Args) {
     };
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
+    // A keyup can be lost (the window loses focus or is hidden while the key is down): stop then too.
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") stopShuttle();
+    };
+    window.addEventListener("blur", stopShuttle);
+    document.addEventListener("visibilitychange", onHidden);
     return () => {
       stopShuttle();
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", stopShuttle);
+      document.removeEventListener("visibilitychange", onHidden);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, videoId, duration]);

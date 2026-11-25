@@ -37,6 +37,8 @@ export function useEntryActions() {
             path: entry.path,
             segments: entry.segments ?? [],
             sourceUrl: entry.videoId ? `https://www.youtube.com/watch?v=${entry.videoId}` : undefined,
+            sourceTitle: entry.videoTitle || undefined,
+            cutAt: entry.savedAt || undefined,
           },
         ],
       });

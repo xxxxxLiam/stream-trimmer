@@ -5,6 +5,34 @@
  */
 export const MAX_CLIP_SECONDS = 600;
 
+function lengthWords(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
+/** Plain words for a range over the cap (the range stays; only Clip is held back), or "" when it fits. */
+export function overCapMessage(seconds: number): string {
+  return seconds > MAX_CLIP_SECONDS
+    ? `Clips can be up to ${MAX_CLIP_SECONDS / 60} minutes. This one is ${lengthWords(seconds)}.`
+    : "";
+}
+
+/**
+ * Setting In at `value` when Out is `end` (null when none): an In at or past Out starts a fresh range at
+ * that In with Out cleared. The point just set is never moved.
+ */
+export function applyIn(value: number, end: number | null): { start: number; clearEnd: boolean } {
+  return { start: value, clearEnd: end !== null && value >= end };
+}
+
+/** The mirror: an Out at or before In starts a fresh range ending there with In cleared. */
+export function applyOut(value: number, start: number | null): { end: number; clearStart: boolean } {
+  return { end: value, clearStart: start !== null && value <= start };
+}
+
 export type ClipFormat = "mp4" | "mp3";
 
 export type BitrateMap = Partial<Record<string, number>>; // kbps

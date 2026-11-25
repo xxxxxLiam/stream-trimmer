@@ -7,6 +7,7 @@
  *   and is never found here. Every location below is from the handoff plan and is NOT verified on a
  *   real Windows machine yet.
  */
+import { newestFirst } from "./editorVersion";
 import path from "node:path";
 
 export type WinEditorKey = "premiere" | "resolve" | "capcut";
@@ -39,8 +40,6 @@ const EXE: Record<WinEditorKey, string> = {
 
 const win = path.win32;
 
-/** Highest number wins, so "2025" beats "2024" and "10" beats "9". */
-const byVersionDesc = (a: string, b: string) => b.localeCompare(a, undefined, { numeric: true });
 
 function fromRegistry(exe: string, d: WinDeps): string | null {
   for (const hive of ["HKLM", "HKCU"]) {
@@ -69,7 +68,7 @@ function fromFolders(key: WinEditorKey, d: WinDeps): string | null {
       } catch {
         /* no Adobe folder here */
       }
-      for (const name of names.filter((n) => /^Adobe Premiere Pro/.test(n)).sort(byVersionDesc)) {
+      for (const name of names.filter((n) => /^Adobe Premiere Pro/.test(n)).sort(newestFirst)) {
         candidates.push(win.join(adobe, name, exe));
       }
     }

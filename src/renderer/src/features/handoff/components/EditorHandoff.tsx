@@ -172,6 +172,10 @@ async function exportNamed(
   settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
   const structured = settings;
+  // With a layout, the campaign's own Event field names the event ("Export" when blank). The video
+  // being open must not decide it: clips from other videos would land under this one.
+  const layout = structured?.layout;
+  const campaignEvent = layout ? structured?.mediaEvent ?? "" : eventName;
   const clips = ctx.clips.map((c) =>
     typedProjectNames.has(c.id) ? { ...c, projectName: typedProjectNames.get(c.id) } : c,
   );
@@ -186,13 +190,13 @@ async function exportNamed(
     };
     built = await buildSessionFcpxml(
       clips,
-      eventName,
+      campaignEvent,
       async (file) => {
         const r = await api.probe(file);
         if (!r.ok) throw new Error(r.error);
         return r;
       },
-      { library, libraryExists, project: structured ? projectOptions(structured, ctx) : undefined },
+      { library, libraryExists, layout, project: structured ? projectOptions(structured, ctx) : undefined },
     );
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };

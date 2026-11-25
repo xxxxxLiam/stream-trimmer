@@ -25,3 +25,8 @@ export function grabbedEdge(x: number, startX: number, endX: number): "start" | 
 
 export const ZOOM_STEP = 20;
 export const zoomStep = (alt: boolean) => (alt ? -ZOOM_STEP : ZOOM_STEP);
+
+/** How the first-clip hint says to pick a part, for the tool in hand: scissors click twice, the pointer drags. */
+export function pickHintLead(tool: string): string {
+  return tool === "clip" ? "Click to set the start, click again for the end" : "Drag on the timeline";
+}

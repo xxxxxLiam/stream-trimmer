@@ -6,6 +6,7 @@
  *   drag sets a range, the scissors click a start then an end, the flag tool drops flags.
  */
 import type { TimelineController } from "../hooks/useTimelineController";
+import { pickHintLead } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
 import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
@@ -94,7 +95,7 @@ export default function SourceLane({ c }: { c: TimelineController }) {
             {c.firstClipHint ? (
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-body text-fg-dim">
                 <span>
-                  Drag on the timeline, or press <KeyHint>I</KeyHint> and <KeyHint>O</KeyHint>, to pick the part you want. Then Clip.
+                  {pickHintLead(c.tool)}, or press <KeyHint>I</KeyHint> and <KeyHint>O</KeyHint>, to pick the part you want. Then Clip.
                 </span>
               </span>
             ) : null}
