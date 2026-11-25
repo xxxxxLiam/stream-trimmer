@@ -33,7 +33,12 @@ import {
 import { annotateDownload, getDownloads } from "../shared/utils/downloads";
 import { addSessionClip, sessionClipsFor, type SessionClipsByCampaign } from "../shared/utils/handoff";
 import { readSetting, writeSetting } from "../shared/utils/persist";
-import type { BankedClip } from "../shared/utils/bank";
+import { bankStore, clipsFor, type BankedClip } from "../shared/utils/bank";
+import { clipNameFor } from "../features/clips/utils/cutNaming";
+import { matchingMoment } from "../features/clips/utils/finishBankedCut";
+import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
+import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
+import { setMakingName } from "../shared/utils/clipNameStore";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
@@ -224,6 +229,7 @@ function Layout({ active }: { active: boolean }) {
     info,
     download,
     downloads,
+    duration,
     setStartText,
     setEndText,
     setUrl,
@@ -235,7 +241,6 @@ function Layout({ active }: { active: boolean }) {
     active: campaign,
     folders,
     update,
-    nextClipId,
     recordUse,
     pickClipsDir,
     pickDataDir,
@@ -329,13 +334,15 @@ function Layout({ active }: { active: boolean }) {
   // `settings` are the ones in force when the cut STARTED: a switch while it runs must not apply
   // the new campaign's "After cutting" choice to this campaign's clip.
   const afterSaved = useCallback(
-    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string) => {
+    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string, groupId?: string) => {
       const newest = getDownloads().find((d) => d.kind === "clip");
       if (newest) {
         annotateDownload(newest.id, {
           campaign: campaign?.name,
           campaignId: campaign?.id,
-          clipId,
+          // A clip and its language copies share one id, so Undo takes them all (the session clip
+          // keeps the per-language id).
+          clipId: groupId ?? clipId,
           segments: segments.map((s) => ({ start: s.start, end: s.end })),
           seconds: segments.reduce((sum, s) => sum + (s.end - s.start), 0),
           videoId: videoId ?? undefined,
@@ -366,32 +373,42 @@ function Layout({ active }: { active: boolean }) {
     [videoId, sourceUrl, campaign?.id, campaign?.name, info?.title, folders.clipsDir, saveDir],
   );
 
-  // Cut: name the clip from the campaign pattern, then record its ranges as used so the
-  // no-reuse check and the bank stay in agreement with no bookkeeping.
+  // Cut: the clip's name (typed on the lane, else suggested) is the file's name, the row's name and
+  // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
+  // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
     async (segments: Segment[]) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
       const startSettings = withDestination(editorRef.current);
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
-      const clipId = campaign ? nextClipId(videoId, taken) : null;
+      const name = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
+      setMakingName(name);
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
       let madeAny = false;
-      for (const plan of languagePlansRef.current) {
-        const base = clipId ?? (plan.suffix ? info?.title || "clip" : undefined);
-        const name = base ? nameForLanguage(base, plan) : undefined;
-        const ok = await download({ segments, clipId: name, audioLanguage: plan.language });
-        if (!ok) break;
-        if (!madeAny && cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
-        madeAny = true;
-        afterSaved(name ?? `clip-${Date.now()}`, undefined, segments, startSettings);
+      try {
+        for (const plan of languagePlansRef.current) {
+          const fileName = nameForLanguage(name, plan);
+          const ok = await download({ segments: toCut, clipId: fileName, audioLanguage: plan.language });
+          if (!ok) break;
+          if (!madeAny && cutCampaignId) {
+            recordUse(videoId, segments, name, cutCampaignId);
+            const moment = matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments);
+            if (moment) bankStore.markCut(cutCampaignId, videoId, moment.id);
+          }
+          madeAny = true;
+          afterSaved(fileName, undefined, segments, startSettings, undefined, name);
+        }
+      } finally {
+        setMakingName(null);
       }
       if (!madeAny) return;
       clearSegments();
       setStartText("");
       setEndText("");
     },
-    [videoId, campaign, info?.title, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
+    [videoId, campaign, info?.title, downloads, duration, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
   );
 
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
@@ -406,7 +423,7 @@ function Layout({ active }: { active: boolean }) {
         const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
         if (!ok) break;
         madeAny = true;
-        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName);
+        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName, clip.id);
       }
       return madeAny;
     },

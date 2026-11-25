@@ -13,10 +13,11 @@ import { bankStore, type BankedClip } from "../../../shared/utils/bank";
 import { getDownloads } from "../../../shared/utils/downloads";
 import { playFrom } from "../../../shared/utils/playFrom";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
-import { validateClipName } from "../utils/clipName";
 import { finishBankedCut } from "../utils/finishBankedCut";
 import { suggestProjectName } from "../utils/projectName";
-import { undoClip } from "../utils/undoClip";
+import { clipGroup, undoClip } from "../utils/undoClip";
+import { UNDO_SECONDS } from "../utils/exportRows";
+import { clipNameFor } from "../utils/cutNaming";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
@@ -24,7 +25,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   const seg = useSegmentsState();
   const { cutBanked, cutSegments } = usePanelHost();
   const { recordUse, forgetUse } = useCampaign();
-  const { removeDownload, pickSaveDir, saveDir } = useClipperContext();
+  const { removeDownload, pickSaveDir, saveDir, info } = useClipperContext();
   const { campaignId, vid } = q;
 
   const select = useCallback(
@@ -36,27 +37,44 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [seg, s],
   );
 
+  // Clips are made one after another: "Make this clip" while another is making joins the queue, and
+  // each one's name, Making row and Undo belong to it from the moment it starts.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const make = useCallback(
-    async (clip: BankedClip) => {
-      if (!campaignId || !vid) return;
-      // A clip's own label is its name when it is a good one; otherwise the offline suggestion.
-      const name = validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip);
-      s.setMakingName(name || clip.id);
-      s.setFailed(null);
-      s.setMakingId(clip.id);
-      s.attempt.current = { name: name || clip.id, segments: clip.segments, bankId: clip.id };
-      s.setNotice("");
-      s.setFinished(null);
-      clearAfterCuttingOutcome(); // the last clip's handoff answer is old news once the next one starts
-      try {
-        const ok = await cutBanked(clip, name);
-        if (ok) finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
-        else s.setNotice(`${name || clip.id} was not made. It is still waiting.`);
-      } catch {
-        s.setNotice(`${name || clip.id} was not made. It is still waiting.`);
-      }
+    (clip: BankedClip): Promise<void> => {
+      if (!campaignId || !vid) return Promise.resolve();
+      const run = async () => {
+        // One name: the clip's own when it is a good one, else the suggestion, else two words of the
+        // video's title. A name already saved for this video gets " 2".
+        const taken = getDownloads().map((d) => d.label.replace(/\.[^.]+$/, ""));
+        const name = clipNameFor({ candidates: [clip.label, suggestProjectName(clip)], videoTitle: info?.title, taken });
+        s.setMakingName(name);
+        s.setFailed(null);
+        s.setMakingId(clip.id);
+        s.attempt.current = { name, segments: clip.segments, bankId: clip.id };
+        s.setNotice("");
+        s.setFinished(null);
+        clearAfterCuttingOutcome(); // the last clip's handoff answer is old news once the next one starts
+        try {
+          const ok = await cutBanked(clip, name);
+          if (ok) {
+            finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
+            // Its own Undo, even when the next queued clip starts at once.
+            const newest = getDownloads().find((d) => d.kind === "clip");
+            if (newest) {
+              s.setFinished({ entryId: newest.id, name, endsAt: Date.now() + UNDO_SECONDS * 1000 });
+              s.setSecondsLeft(UNDO_SECONDS);
+            }
+          } else s.setNotice(`${name} was not made. It is still waiting.`);
+        } catch {
+          s.setNotice(`${name} was not made. It is still waiting.`);
+        }
+      };
+      const next = queue.current.then(run, run);
+      queue.current = next.catch(() => {});
+      return next;
     },
-    [campaignId, vid, cutBanked, recordUse, s],
+    [campaignId, vid, cutBanked, recordUse, s, info?.title],
   );
 
   const undo = useCallback(async () => {
@@ -64,7 +82,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     s.setFinished(null);
     if (!entry) return;
     const res = await undoClip({
-      entry,
+      entries: clipGroup(entry, getDownloads()),
       trashFile: window.electronAPI?.undoClip,
       forgetUse,
       backToWaiting: (c, v, id) => bankStore.setStatus(c, v, id, "banked"),

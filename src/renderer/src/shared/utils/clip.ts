@@ -216,6 +216,10 @@ export function sanitizeFilename(title: string | null | undefined): string {
     .replace(/^[.\s]+|[.\s]+$/g, "")
     .slice(0, 120)
     .trim();
+  // CON, PRN, AUX, NUL, COM1-9 and LPT1-9 are devices on Windows, with or without an extension. A
+  // name that is only one of them gets a plain word after it, on every OS, so a folder copied to
+  // Windows still opens.
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(cleaned.split(".")[0])) return `${cleaned} clip`;
   return cleaned || "clip";
 }
 

@@ -75,3 +75,13 @@ test("In past Out starts a fresh range at that In; Out before In does the mirror
   assert.deepEqual(applyOut(150, 100), { end: 150, clearStart: false });
   assert.deepEqual(applyOut(5, null), { end: 5, clearStart: false });
 });
+
+test("C-15: a file name that is a Windows device name is made safe on every OS", async () => {
+  const { sanitizeFilename } = await import("./clip");
+  assert.equal(sanitizeFilename("CON"), "CON clip");
+  assert.equal(sanitizeFilename("nul"), "nul clip");
+  assert.equal(sanitizeFilename("Com3"), "Com3 clip");
+  assert.equal(sanitizeFilename("LPT9"), "LPT9 clip");
+  assert.equal(sanitizeFilename("Con Air"), "Con Air", "only the bare device names");
+  assert.equal(sanitizeFilename("Console"), "Console");
+});

@@ -5,6 +5,7 @@
  *   mutations into what the screen shows: the Making row, the finished row with its Undo ring,
  *   and the waiting rows.
  */
+import { useMakingName } from "../../../shared/utils/clipNameStore";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { isRetryingNote } from "../utils/clipFailure";
 import { useExportEffects, useRetryKey } from "./useExportEffects";
@@ -19,6 +20,7 @@ export function useExportController() {
   useExportEffects(queries, state);
   const actions = useExportMutations(queries, state);
   const handoff = useHandoffNotice(queries.campaignId);
+  const makingByClipButton = useMakingName();
   useRetryKey(Boolean(state.failed), actions.retry);
   const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
@@ -42,7 +44,7 @@ export function useExportController() {
     selectedId: state.selectedId,
     notice: state.notice,
     making: downloading
-      ? { name: state.makingName, percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote) }
+      ? { name: state.makingId ? state.makingName : (makingByClipButton ?? state.makingName), percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote) }
       : null,
     finished: state.finished && !downloading ? { name: state.finished.name, secondsLeft: state.secondsLeft } : null,
     finishedEntry,

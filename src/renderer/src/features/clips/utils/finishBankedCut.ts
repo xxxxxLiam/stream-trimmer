@@ -22,3 +22,22 @@ export function finishBankedCut(args: {
   const res = args.markCut(args.campaignId, args.videoId, args.clipId);
   if (res) args.recordUse(args.videoId, res.ranges, args.clipId, args.campaignId);
 }
+
+type Range = { start: number; end: number };
+
+/**
+ * The waiting moment a Clip-button range is the same range as (every section within half a second),
+ * so cutting it by hand marks it cut instead of leaving it Waiting under a second label on the lane.
+ */
+export function matchingMoment<T extends { id: string; status: string; segments: readonly Range[] }>(
+  clips: readonly T[],
+  segments: readonly Range[],
+): T | undefined {
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
+  return clips.find(
+    (c) =>
+      c.status === "banked" &&
+      c.segments.length === segments.length &&
+      c.segments.every((s, i) => near(s.start, segments[i].start) && near(s.end, segments[i].end)),
+  );
+}

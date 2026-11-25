@@ -10,6 +10,7 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { clipTitle, getDownloads } from "../../../shared/utils/downloads";
 import { UNDO_SECONDS } from "../utils/exportRows";
+import { clipGroup } from "../utils/undoClip";
 import { classifyClipFailure, isRetryKey, rowFailure } from "../utils/clipFailure";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
@@ -44,7 +45,10 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
       if (downloadPhase === "done") {
         const newest = getDownloads().find((d) => d.kind === "clip");
         if (newest) {
-          setFinished({ entryId: newest.id, name: clipTitle(newest.label), endsAt: Date.now() + UNDO_SECONDS * 1000 });
+          // The clip's name is its first file's (the original), not the newest language copy's.
+          const files = clipGroup(newest, getDownloads());
+          const first = files[files.length - 1] ?? newest;
+          setFinished({ entryId: newest.id, name: clipTitle(first.label), endsAt: Date.now() + UNDO_SECONDS * 1000 });
           setSecondsLeft(UNDO_SECONDS);
         }
         s.setFailed(null);
