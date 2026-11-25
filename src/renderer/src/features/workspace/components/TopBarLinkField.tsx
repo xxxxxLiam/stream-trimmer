@@ -46,6 +46,8 @@ export default function TopBarLinkField() {
         >
           {c.problem ? (
             <p className="m-[0px] px-[8px] py-[6px] text-error">{c.problem}</p>
+          ) : c.opening ? (
+            <p className="m-[0px] px-[8px] py-[6px]">Opening the video. You stay here until it is ready.</p>
           ) : c.canAdd ? (
             <>
               <div className="flex h-[32px] items-center justify-between rounded-control bg-hover px-[8px] text-body text-fg">
