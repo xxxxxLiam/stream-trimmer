@@ -43,7 +43,8 @@ export function useExportController() {
     ...handoff,
     cancel: actions.stop,
     selectedId: state.selectedId,
-    notice: state.notice,
+    // A failed clip has its own row; the generic "was not made" line would say it twice.
+    notice: state.failed && !downloading ? "" : state.notice,
     making: downloading
       ? { name: state.makingId ? state.makingName : (makingByClipButton ?? state.makingName), percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote) }
       : null,
