@@ -49,6 +49,8 @@ const campaign: SettingsCampaignProps = {
   quota: 3,
   onQuota: noop,
   folderLabel: "Clipr/Acme",
+  lengthRule: {},
+  onLengthRule: noop,
   editor: null,
   onPatch: noop,
   onToggleLanguage: noop,
@@ -112,6 +114,17 @@ test("the editor view goes back to its campaign, and the drawer wires the button
   const drawer = read("features/settings/components/SettingsDrawer.tsx");
   assert.match(drawer, /onOpen: \(\) => c\.setView\(\{ kind: "editor", id: campaign\.id \}\)/);
   assert.match(drawer, /view\.kind === "editor" && campaign && hasEditorPage\(destination\)/);
+});
+
+test("campaign settings: an optional Clip length row, empty by default, with its hint; set values show as times", () => {
+  const empty = renderToStaticMarkup(<SettingsCampaign {...campaign} />);
+  assert.match(empty, /role="group" aria-label="Clip length"/);
+  assert.match(empty, /Leave empty if Acme has no length rule\./);
+  assert.doesNotMatch(empty, /aria-label="Shortest clip length"[^>]*value="[^"]/);
+  const set = renderToStaticMarkup(<SettingsCampaign {...campaign} lengthRule={{ min: 30, max: 60 }} />);
+  assert.match(set, /aria-label="Shortest clip length"[^>]*value="0:30"/);
+  assert.match(set, /aria-label="Longest clip length"[^>]*value="1:00"/);
+  assert.match(read("features/settings/components/SettingsDrawer.tsx"), /onLengthRule=\{\(patch\) => c\.campaigns\.update\(campaign\.id, patch\)\}/);
 });
 
 test("delete takes two clicks", () => {

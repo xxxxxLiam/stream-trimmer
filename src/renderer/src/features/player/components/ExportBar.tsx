@@ -22,6 +22,8 @@ import {
 } from "../../../shared/utils/audioLanguages";
 import { lengthLabel } from "../hooks/useTimelineController";
 import { useTimelineView } from "../hooks/TimelineControllerContext";
+import { useCampaign } from "../../campaigns/hooks/CampaignContext";
+import { lengthVerdict, ruleOf } from "../../../shared/utils/lengthRule";
 import ClipButton from "./ClipButton";
 
 const VALUE_BUTTON = "inline-flex h-[44px] items-center";
@@ -67,6 +69,8 @@ export default function ExportBar({
   onSignIn,
 }: ExportBarProps) {
   const c = useTimelineView();
+  const { active } = useCampaign();
+  const verdict = lengthVerdict(c.totalSeconds, ruleOf(active), active?.name ?? "");
   const chips = c.segments;
   const overlap = c.range ? findOverlaps(c.range, c.used).length > 0 : false;
   const hasDubs = !!tracks && tracks.some((t) => t.kind !== "original");
@@ -108,8 +112,8 @@ export default function ExportBar({
           </>
         ) : null}
         <span id="ui-stitched-total" className="inline-flex items-baseline gap-[8px]">
-          <span className={`text-cliplength tabular-nums ${c.lengthText === "—" ? "text-fg-dim" : "text-ice"}`}>{c.lengthText}</span>
-          <span className="text-meta leading-[15px] text-fg-dim">clip length</span>
+          <span className={`text-cliplength tabular-nums ${c.lengthText === "—" ? "text-fg-dim" : verdict.state === "out" ? "text-fg" : "text-ice"}`}>{c.lengthText}</span>
+          <span className={`text-meta leading-[15px] ${verdict.state === "out" ? "text-fg" : "text-fg-dim"}`}>{verdict.label}</span>
         </span>
         {overlap ? (
           <span id="ui-overlap-warning" role="status" className="text-meta text-fg-dim">

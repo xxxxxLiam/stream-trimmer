@@ -138,6 +138,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
               }
             : null
         }
+        lengthRule={{ min: campaign.lengthMinSec, max: campaign.lengthMaxSec }}
+        onLengthRule={(patch) => c.campaigns.update(campaign.id, patch)}
         onPatch={(patch) => c.patchCampaign(campaign.id, patch)}
         onToggleLanguage={(code) => c.patchCampaign(campaign.id, { languages: toggleLanguage(c.prefsFor(campaign.id).languages, code) })}
         onOpenFolder={() => {
