@@ -161,8 +161,14 @@ test("V18-T-6: overlapping clip bars are stacked into rows without text", () => 
   assert.match(clipsLane, /!stacked\(/);
 });
 
-test("B4-1: a stacked bar keeps a readable name beside the stack, for made, waiting and built clips", () => {
-  assert.equal((clipsLane.match(/\{stackedLabel\(/g) ?? []).length, 3);
+test("the Clips lane draws only the active clip, never the bank's waiting or made moments", () => {
+  assert.doesNotMatch(clipsLane, /c\.waiting\.map\(/);
+  assert.doesNotMatch(clipsLane, /c\.used\.map\(/);
+  assert.match(clipsLane, /const named: \{ key: string[^\n]*\[\];/);
+});
+
+test("B4-1: a stacked bar keeps a readable name beside the stack for the built clip", () => {
+  assert.equal((clipsLane.match(/\{stackedLabel\(/g) ?? []).length, 1);
   assert.match(clipsLane, /text-fg-dim"\s*\n\s*style=\{style\}/);
   assert.match(clipsLane, /laneRows > 1 \? 10 \+ laneRows \* ROW_H : 34/);
 });
