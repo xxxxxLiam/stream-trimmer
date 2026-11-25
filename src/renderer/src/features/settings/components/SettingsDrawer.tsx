@@ -40,11 +40,15 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   const viewId = c.view.kind === "campaign" ? c.view.id : null;
   const activeCampaign = c.campaigns.campaigns.find((x) => x.id === viewId);
   const look = useFinalCutLook(activeCampaign, c.campaigns);
-  const layout = useFinalCutLayout(activeCampaign, c.campaigns, {
-    library: activeCampaign ? folderChipLabel(editor.settingsFor(activeCampaign.id).fcpLibrary ?? "", 1) : "",
-    event: activeCampaign ? editor.settingsFor(activeCampaign.id).mediaEvent : "",
-    videoTitle,
-  });
+  const activeFcp = activeCampaign ? editor.settingsFor(activeCampaign.id) : undefined;
+  const layout = useFinalCutLayout(
+    activeCampaign,
+    {
+      layout: activeFcp?.layout ?? "export",
+      onLayout: (id) => activeCampaign && activeFcp && editor.onChange(activeCampaign.id, { ...activeFcp, layout: id }),
+    },
+    { library: activeFcp ? folderChipLabel(activeFcp.fcpLibrary ?? "", 1) : "", event: activeFcp?.mediaEvent ?? "", videoTitle },
+  );
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
   if (!open) return null;
@@ -66,9 +70,9 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
           destination === "finalcut"
             ? {
                 library: fcp.fcpLibrary ? (fcp.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
-                // "Export" stands in until the Event is edited (layouts A and D). Layouts B and C name events themselves.
-                event: fcp.mediaEvent || "Export",
-                showEvent: (campaign.fcpLayout ?? "export-event") === "export-event" || campaign.fcpLayout === "flat",
+                // Blank means "Export" (shown as the placeholder). Layouts video and day name their own events.
+                event: fcp.mediaEvent,
+                showEvent: fcp.layout === "export" || fcp.layout === "flat",
                 onChoose: () => {
                   void window.electronAPI?.pickFcpLibrary?.().then((p) => {
                     if (p) editor.onChange(campaign.id, { ...fcp, fcpLibrary: p });

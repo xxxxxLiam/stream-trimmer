@@ -134,7 +134,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           {p.finalCut.showEvent !== false && (
             <>
               <label htmlFor="fcp-event" className="text-meta text-fg-dim">Event</label>
-              <input id="fcp-event" type="text" value={p.finalCut.event} onChange={(e) => p.finalCut?.onEvent(e.target.value)} className={fieldInput} />
+              <input id="fcp-event" type="text" value={p.finalCut.event} placeholder="Export" onChange={(e) => p.finalCut?.onEvent(e.target.value)} className={fieldInput} />
             </>
           )}
           {p.finalCut.layout && <FinalCutLayout {...p.finalCut.layout} />}

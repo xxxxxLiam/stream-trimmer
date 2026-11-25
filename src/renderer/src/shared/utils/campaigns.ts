@@ -7,7 +7,6 @@
  */
 
 /** A source-video range already used by a published clip. Seconds. */
-import { isImportLayout, type ImportLayoutId } from "../../../../common/types/importLayout";
 export type UsedRange = {
   start: number;
   end: number;
@@ -40,8 +39,6 @@ export type Campaign = {
   dailyQuota?: number;
   /** Id of this campaign's Final Cut look in the saved looks (fcpLooks.ts); none when unset. */
   fcpLookId?: string;
-  /** How clips are laid out in Final Cut (common/types/importLayout.ts); the default when unset. */
-  fcpLayout?: ImportLayoutId;
 };
 
 export type CampaignInput = Partial<Omit<Campaign, "id" | "usedRanges">> & {
@@ -176,8 +173,6 @@ export function createCampaign(
     usedRanges: {},
     // The caller passes the last look picked, so a second client is one pick, not a second upload.
     ...(input.fcpLookId ? { fcpLookId: input.fcpLookId } : {}),
-    // The caller passes the last layout used, the same way as the look.
-    ...(input.fcpLayout ? { fcpLayout: input.fcpLayout } : {}),
   });
   return { campaigns: [...list, campaign], campaign };
 }
@@ -456,7 +451,6 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         usedRanges: used,
         ...(typeof r.dailyQuota === "number" && r.dailyQuota > 0 ? { dailyQuota: Math.floor(r.dailyQuota) } : {}),
         ...(typeof r.fcpLookId === "string" && r.fcpLookId ? { fcpLookId: r.fcpLookId } : {}),
-        ...(isImportLayout(r.fcpLayout) ? { fcpLayout: r.fcpLayout } : {}),
       }),
     );
   }

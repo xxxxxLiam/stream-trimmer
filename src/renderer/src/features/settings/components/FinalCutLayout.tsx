@@ -5,15 +5,15 @@
  *   list (name and one line each), and previews the result as a small tree built from the campaign's real
  *   names. Logic-free. Built with the shared parts until Design's drawing lands.
  */
-import type { ImportLayoutId } from "../../../../../common/types/importLayout";
+import type { FcpLayout } from "../../../shared/utils/fcpxml";
 import type { LayoutOption, TreeLine } from "../utils/importLayouts";
 
 export type FinalCutLayoutProps = {
   options: LayoutOption[];
-  current: ImportLayoutId;
+  current: FcpLayout;
   open: boolean;
   onToggleOpen: () => void;
-  onPick: (id: ImportLayoutId) => void;
+  onPick: (id: FcpLayout) => void;
   /** The tree for the chosen layout. */
   tree: TreeLine[];
 };
