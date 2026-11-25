@@ -80,6 +80,18 @@ export interface ElectronAPI {
    */
   undoClip?: (targetPath: string) => Promise<{ ok: boolean; error?: string }>;
   fileExists?: (targetPath: string) => Promise<boolean>;
+  /**
+   * Before a clip starts: does the folder it will land in (and the work folder, if tighter) have room? `ok` is false
+   * only when clearly short; `freeMb` is null when it can't be read (never a reason to warn). Same estimate as the
+   * engine's out-of-space sentence.
+   */
+  checkFreeSpace?: (payload: {
+    dirPath: string;
+    seconds: number;
+    quality: string | number;
+    audio?: boolean;
+    segments?: number;
+  }) => Promise<{ ok: boolean; neededMb: number; freeMb: number | null }>;
   startDrag?: (targetPath: string) => void;
   /** Reads the stored cookies.txt and reports whether a session is on disk. */
   probeYouTube?: () => Promise<{
