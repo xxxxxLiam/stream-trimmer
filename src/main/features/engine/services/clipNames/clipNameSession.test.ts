@@ -22,9 +22,9 @@ test("a prepared transcript names the range from what is said in it", () => {
   assert.deepEqual(ask(), { ok: true, name: "Red Shirt" });
 });
 
-test("a video that was never prepared gets the title plus a number, then 2", () => {
-  assert.deepEqual(ask(), { ok: true, name: "My Show 1" });
-  assert.deepEqual(ask({ existing: ["My Show 1"] }), { ok: true, name: "My Show 2" });
+test("a video that was never prepared gets two words of the title, then 2", () => {
+  assert.deepEqual(ask(), { ok: true, name: "Show" });
+  assert.deepEqual(ask({ existing: ["Show"] }), { ok: true, name: "Show 2" });
 });
 
 test("repeats get a quiet number, and skip walks to the next suggestion", () => {
@@ -41,7 +41,7 @@ test("bad input is refused, not thrown", () => {
   assert.equal(suggestName({ videoId: "v1", ranges: [{ start: 1 }] }).ok, false);
 });
 
-const nameFor = (id: string) => suggestName({ videoId: id, ranges: [{ start: 0, end: 20 }], videoTitle: "T" }).name;
+const nameFor = (id: string) => suggestName({ videoId: id, ranges: [{ start: 0, end: 20 }], videoTitle: "Tiny Title" }).name;
 
 test("seven videos open: the open one still gets its transcript name (C-2)", () => {
   for (const id of ["a", "b", "c", "d", "e", "f", "g"]) prepareNames(id, lines);
@@ -54,13 +54,13 @@ test("many videos open: the least recently used go, the one being named never do
   assert.equal(nameFor("open"), "Red Shirt");
   for (let i = 0; i < 30; i++) prepareNames(`other${i}`, lines);
   assert.equal(nameFor("open"), "Red Shirt", "still there after 30 more were loaded");
-  assert.equal(nameFor("other0"), "T 1", "the oldest of the others was dropped");
+  assert.equal(nameFor("other0"), "Tiny Title", "the oldest of the others was dropped");
   assert.equal(nameFor("other29"), "Red Shirt");
 });
 
 test("the title fallback is two words, without # or commas (C-2)", () => {
   const long = { videoTitle: "Podcast #214, the long talk about everything" };
-  assert.equal(ask(long).name, "Podcast 214 1");
-  assert.equal(ask({ ...long, existing: ["Podcast 214 1"] }).name, "Podcast 214 2");
-  assert.equal(ask({ videoTitle: "#### !!!" }).name, "Clip 1");
+  assert.equal(ask(long).name, "Podcast Long");
+  assert.equal(ask({ ...long, existing: ["Podcast Long"] }).name, "Podcast Long 2");
+  assert.equal(ask({ videoTitle: "#### !!!" }).name, "Clip");
 });

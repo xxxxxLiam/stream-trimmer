@@ -6,6 +6,7 @@
  *   validated by the IPC handlers before they reach these functions.
  */
 import { describeSaveError } from "./saveError";
+import { savedResult } from "./savedFile";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -58,7 +59,7 @@ export async function saveClip(payload: any) {
     await fsp.mkdir(path.dirname(dest.target as string), { recursive: true }); const target = await moveWithoutOverwrite(source, dest.target as string);
     await fsp.rm(path.dirname(source), { recursive: true, force: true });
     logger.log("clip", `saved ${path.basename(target)}`);
-    return { ok: true, path: target };
+    return savedResult(target);
   } catch (err: unknown) {
     logger.log("clip", `save failed: ${logger.describe(err)}`);
     return { ok: false, ...describeSaveError(err) };
@@ -81,7 +82,7 @@ export async function saveFile(payload: any) {
     const buf = Buffer.from(payload.data);
     // "wx": never replace a file that is already there; " 2", " 3" instead.
     const target = await writeWithoutOverwrite(dest.target, buf);
-    return { ok: true, path: target };
+    return savedResult(target);
   } catch (err: any) {
     logger.log("file", `save failed: ${logger.describe(err)}`);
     return { ok: false, ...describeSaveError(err) };

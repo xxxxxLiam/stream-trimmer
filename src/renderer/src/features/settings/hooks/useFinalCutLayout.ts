@@ -7,14 +7,17 @@
  */
 import { useState } from "react";
 import type { Campaign } from "../../../shared/utils/campaigns";
-import { clipIdExample } from "../../../shared/utils/campaigns";
 import { layoutsFor } from "../../../shared/utils/editorLayouts";
-import { DEFAULT_EXPORT_EVENT, type FcpLayout } from "../../../shared/utils/fcpxml";
+import { DEFAULT_EXPORT_EVENT, dayLabel, type FcpLayout } from "../../../shared/utils/fcpxml";
 import { rememberLastLayout } from "../../../shared/utils/lastLayout";
 import type { FinalCutLayoutProps } from "../components/FinalCutLayout";
 import { FINAL_CUT_LAYOUTS, layoutTree } from "../utils/importLayouts";
 
-const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+/** The preview's clip name: the open video's first words, the way a suggested clip name starts. */
+export function exampleClipName(videoTitle?: string): string {
+  const words = (videoTitle ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 3).join(" ");
+  return words || "Your first clip";
+}
 
 export function useFinalCutLayout(
   campaign: Campaign | undefined,
@@ -39,8 +42,8 @@ export function useFinalCutLayout(
       library: names.library || campaign.name,
       event: names.event || DEFAULT_EXPORT_EVENT,
       videos: [names.videoTitle || "Your first video"],
-      clip: clipIdExample(campaign.clipIdPattern, campaign.prefix),
-      day: DAY.format(new Date()),
+      clip: exampleClipName(names.videoTitle),
+      day: dayLabel(Date.now()),
     }),
   };
 }

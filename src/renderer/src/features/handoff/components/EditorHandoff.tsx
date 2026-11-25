@@ -113,9 +113,10 @@ export function projectOptions(
 
 function lookForCampaignId(campaignId: string | null | undefined, settings: EditorHandoffSettings) {
   const campaign = normalizeCampaigns(readSetting<unknown>("clipper.campaigns", [])).find((c) => c.id === campaignId);
-  // Before the one-time move, the old single pasted look still applies. A look that cannot be read
-  // throws its plain-words error.
-  if (!readSetting<boolean>(KEY_LOOK_MIGRATED, false)) {
+  // A look picked in the form always wins; the migration flag never gates it. Only a campaign with no look of its
+  // own, before the one-time move, still uses the old single pasted look (a look that cannot be read throws its
+  // plain-words error).
+  if (!campaign?.fcpLookId && !readSetting<boolean>(KEY_LOOK_MIGRATED, false)) {
     return settings.applyLook && settings.lookXml ? parseLook(settings.lookXml) : undefined;
   }
   return lookForCampaign(campaign, loadSavedLooks());

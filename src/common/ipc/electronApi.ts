@@ -44,7 +44,7 @@ export interface ElectronAPI {
     dirPath: string;
     filename: string;
     data: ArrayBuffer | Uint8Array;
-  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
+  }) => Promise<{ ok: boolean; path?: string; fileName?: string; error?: string; code?: SaveFailureCode }>;
   /**
    * Moves a finished clip from the engine's temp directory to `dirPath`.
    * Only the path crosses the bridge, never the media.
@@ -53,7 +53,7 @@ export interface ElectronAPI {
     tempPath: string;
     dirPath: string;
     filename: string;
-  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
+  }) => Promise<{ ok: boolean; path?: string; fileName?: string; error?: string; code?: SaveFailureCode }>;
   saveFiles: (payload: {
     dirPath: string;
     folder: string;
