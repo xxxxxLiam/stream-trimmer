@@ -8,7 +8,7 @@
 import { useCallback, useState } from "react";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { PENDING_REPORTS_KEY, addPending, makeReport, normalizePending, reportText, sendToRelay } from "../utils/reports";
-import { crashDetails } from "../utils/crashDetails";
+import { crashDetails, reopenUrl } from "../utils/crashDetails";
 
 async function diagnostics(): Promise<string> {
   try {
@@ -46,5 +46,5 @@ export function useCrashReport(error: Error) {
     }
   }, [build]);
 
-  return { state, copied, send, copy, reopen: () => window.location.reload() };
+  return { state, copied, send, copy, reopen: () => window.location.assign(reopenUrl(window.location.href)) };
 }

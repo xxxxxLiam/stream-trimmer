@@ -20,6 +20,7 @@ import {
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
 import { useFlushPendingReports } from "../features/help/hooks/useReportMutations";
 import { loadLastLayout } from "../shared/utils/lastLayout";
+import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
@@ -627,6 +628,8 @@ function Shell() {
 }
 
 export default function App() {
+  // The window was reloaded by the main process after its page process died: show the crash screen.
+  if (wasCrashed(window.location.search)) return <CrashScreenHost error={new Error(CRASHED_ERROR)} />;
   return (
     <ErrorBoundary fallback={(error) => <CrashScreenHost error={error} />}>
       <WorkspaceProvider>
