@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 
 export function KeyChip({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-chip border border-hairlineStrong bg-raised px-[5px] text-meta font-semibold text-fg">
+    <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-chip border border-hairlineStrong bg-raised px-[5px] text-meta font-semibold leading-[1.6] text-fg">
       {children}
     </span>
   );
