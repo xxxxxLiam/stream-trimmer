@@ -7,8 +7,8 @@
  */
 import { useCallback, useSyncExternalStore } from "react";
 
-export type TimelineTool = "pointer" | "clip" | "flag" | "hand" | "zoom";
-export const TIMELINE_TOOLS: readonly TimelineTool[] = ["pointer", "clip", "flag", "hand", "zoom"];
+export type TimelineTool = "pointer" | "clip" | "range" | "flag" | "hand" | "zoom";
+export const TIMELINE_TOOLS: readonly TimelineTool[] = ["pointer", "clip", "range", "flag", "hand", "zoom"];
 
 export type ToolState = {
   tool: TimelineTool;
@@ -17,6 +17,19 @@ export type ToolState = {
   /** Counts up on every Fit press; the timeline fits the view to the range when it changes. */
   fitRequests: number;
 };
+
+/**
+ * The key that picks each tool, after Final Cut (A pointer, B blade, H hand, Z zoom). M is not here:
+ * it drops a flag at the playhead while watching, so the Flag tool is F and Select range is S (R is
+ * Retry). A tool key never fires with Cmd, Ctrl or Alt held.
+ */
+export const TOOL_KEYS: Record<TimelineTool, string> = { pointer: "a", clip: "b", range: "s", flag: "f", hand: "h", zoom: "z" };
+
+export function toolForKey(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey?: boolean }): TimelineTool | null {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return null;
+  const k = e.key.toLowerCase();
+  return TIMELINE_TOOLS.find((t) => TOOL_KEYS[t] === k) ?? null;
+}
 
 const INITIAL: ToolState = { tool: "pointer", zoom: 0, fitRequests: 0 };
 let state: ToolState = INITIAL;

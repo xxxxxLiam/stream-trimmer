@@ -13,11 +13,12 @@ import {
   IconFlag,
   IconHand,
   IconPointer,
+  IconRange,
   IconScissors,
   IconZoomTool,
 } from "./BarIcons";
 import { useNextClipName } from "../hooks/useNextClipName";
-import { useToolState, type TimelineTool } from "../hooks/useToolState";
+import { TOOL_KEYS, useToolState, type TimelineTool } from "../hooks/useToolState";
 import {
   audioButtonLabel,
   makesText,
@@ -30,8 +31,9 @@ import {
 
 const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] = [
   { tool: "pointer", label: "Pointer", icon: IconPointer },
-  { tool: "clip", label: "Clip tool", icon: IconScissors },
-  { tool: "flag", label: "Flag (M)", icon: IconFlag },
+  { tool: "clip", label: "Scissors", icon: IconScissors },
+  { tool: "range", label: "Select range", icon: IconRange },
+  { tool: "flag", label: "Flag tool", icon: IconFlag },
   { tool: "hand", label: "Hand", icon: IconHand },
   { tool: "zoom", label: "Zoom tool", icon: IconZoomTool },
 ];
@@ -104,7 +106,7 @@ export default function BottomBar({
             key={t}
             type="button"
             aria-label={label}
-            title={label}
+            title={`${label} (${TOOL_KEYS[t].toUpperCase()})`}
             aria-pressed={tool === t}
             onClick={() => setTool(t)}
             className={`inline-flex h-[44px] w-[40px] shrink-0 items-center justify-center rounded-control ${

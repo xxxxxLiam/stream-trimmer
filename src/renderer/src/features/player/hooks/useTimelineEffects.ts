@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef } from "react";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
-import { setZoom, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
+import { setTool, setZoom, toolForKey, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
 import type { Range } from "../../../shared/utils/segments";
 import { fitWindow, zoomForSpan, type Win } from "../utils/timelineAxis";
 import { arrivedFromElsewhere } from "../utils/rangeOrigin";
@@ -51,6 +51,21 @@ export function useTimelineEffects(a: Args) {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.playhead]);
+
+  // A, B, S, F, H, Z pick the tool (never while typing, never with a modifier).
+  useEffect(() => {
+    if (!tabActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
+      const t = toolForKey(e);
+      if (!t) return;
+      e.preventDefault();
+      setTool(t);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tabActive]);
 
   const fitSeen = useRef(a.fitRequests);
   // Fit: frame the picked range with room either side (the whole video when nothing is picked).

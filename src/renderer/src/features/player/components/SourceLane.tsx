@@ -12,7 +12,7 @@ import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
 import LaneLabel from "./LaneLabel";
 
-export default function SourceLane({ c }: { c: TimelineController }) {
+export default function SourceLane({ c, height = 44 }: { c: TimelineController; height?: number }) {
   const covered = [...c.sections, ...c.used.filter((u) => u.end > u.start)].sort((a, b) => a.start - b.start);
   // Unused footage is dimmed: everything not under a picked range or a made clip.
   const dim: { start: number; end: number }[] = [];
@@ -26,18 +26,15 @@ export default function SourceLane({ c }: { c: TimelineController }) {
     if (at < end) dim.push({ start: at, end });
   }
   return (
-    <div className="flex h-[44px] items-center">
+    <div className="flex items-center" style={{ height }}>
       <LaneLabel>Source</LaneLabel>
       <div
-        className={`relative h-full flex-1 touch-none select-none`}
+        className={`relative h-full flex-1`}
         data-lane="source"
-        onPointerDown={c.onLanePointerDown}
-        onPointerMove={c.onLanePointerMove}
-        onPointerUp={c.onLanePointerUp}
       >
         {c.opening ? null : (
           <>
-            {c.firstClipHint ? null : <Filmstrip axis={c.axis} levels={c.storyboards} height={32} />}
+            {c.firstClipHint ? null : <Filmstrip axis={c.axis} levels={c.storyboards} height={height - 12} />}
             {dim.map((d) => {
               const x = toX(c.axis, d.start);
               return (

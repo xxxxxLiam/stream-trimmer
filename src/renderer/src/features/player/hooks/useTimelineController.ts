@@ -95,10 +95,10 @@ export function useTimelineController() {
     view,
   });
 
-  const timeAt = (e: PointerEvent<HTMLElement>): number | null => {
-    const box = e.currentTarget.getBoundingClientRect();
-    return toT(axis, e.clientX - box.left);
-  };
+  // The handlers sit on the whole timeline area (so a tool works in any part of it, including the
+  // space under the tracks); the lanes start after the label column, so x is measured from the right.
+  const laneLeft = (e: PointerEvent<HTMLElement>) => e.currentTarget.getBoundingClientRect().right - s.width;
+  const timeAt = (e: PointerEvent<HTMLElement>): number | null => toT(axis, e.clientX - laneLeft(e));
   const snap = (t: number, edge: "start" | "end") => Math.round(snapToWord(lines, t, edge));
 
   const setRange = (a: number, b: number) => {
@@ -112,9 +112,12 @@ export function useTimelineController() {
 
   /** Pointer down on the Source lane. What it does depends on the tool. */
   const onLanePointerDown = (e: PointerEvent<HTMLElement>) => {
+    // Buttons and fields inside the area (a clip label, the fold, the name box) keep their own clicks.
+    if ((e.target as HTMLElement).closest("button, input, textarea, [contenteditable='true']")) return;
+    const x = e.clientX - laneLeft(e);
+    if (x < 0 || x > s.width) return; // the label column is not the timeline
     const t = timeAt(e);
     if (t === null || !(duration > 0)) return;
-    const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     if (tools.tool === "flag") return flagsApi.addFlag(t);
     if (tools.tool === "zoom") {
@@ -123,8 +126,21 @@ export function useTimelineController() {
     }
     if (tools.tool === "hand") return s.setDrag({ kind: "pan", startX: e.clientX, startFocus: s.focus ?? playhead });
     if (tools.tool === "clip") {
-      // Scissors mark: press and drag sets a range, or click a start then click an end. They never
-      // seek. A grabbed edge of the picked range is dragged to resize it.
+      // Scissors only mark: a first click is the start, the second is the end. They never seek.
+      const step = scissorsClick(s.scissorsStart, t);
+      if (step.kind === "start") {
+        s.setScissorsStart(step.at);
+        markByHand();
+        clipper.setStartFromSeconds(snap(step.at, "start"));
+        clipper.setEndText("");
+      } else {
+        setRange(step.start, step.end);
+        s.setScissorsStart(null);
+      }
+      return;
+    }
+    if (tools.tool === "range") {
+      // Select range: press and drag sets a range; a grabbed edge of the picked range resizes it.
       if (range) {
         const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
         if (edge) {
@@ -152,8 +168,7 @@ export function useTimelineController() {
       return;
     }
     if (d.kind === "scrub") {
-      const box = e.currentTarget.getBoundingClientRect();
-      const at = toT(axis, clampX(e.clientX - box.left, box.width));
+      const at = toT(axis, clampX(e.clientX - laneLeft(e), s.width));
       if (at !== null) {
         const sec = Math.round(Math.min(Math.max(0, at), duration));
         if (sec !== lastScrub.current) {
@@ -173,27 +188,12 @@ export function useTimelineController() {
     }
   };
 
-  const onLanePointerUp = (e: PointerEvent<HTMLElement>) => {
+  const onLanePointerUp = () => {
     const d = s.drag;
     s.setDrag(null);
     lastScrub.current = null;
-    // A scissors press that did not move is a click: the first one is the start, the second the end.
-    if (d?.kind === "range" && Math.abs(e.clientX - s.dragOrigin) < DRAG_START_PX) {
-      const t = timeAt(e);
-      if (t === null) return;
-      const step = scissorsClick(s.scissorsStart, t);
-      if (step.kind === "start") {
-        s.setScissorsStart(step.at);
-        markByHand();
-        clipper.setStartFromSeconds(snap(step.at, "start"));
-        clipper.setEndText("");
-      } else {
-        setRange(step.start, step.end);
-        s.setScissorsStart(null);
-      }
-    } else if (d?.kind === "range") {
-      s.setScissorsStart(null); // a drag made the range
-    }
+    // A range drag that never moved sets nothing; one that moved already made the range.
+    if (d?.kind === "range") s.setScissorsStart(null);
   };
 
   /** Wheel and trackpad over the lane: pan sideways, Ctrl/Cmd zooms around the pointer. Returns true when used. */

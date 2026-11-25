@@ -29,8 +29,8 @@ test("alt zooms out", () => {
 });
 
 test("the first-clip hint matches the tool in hand", () => {
-  assert.equal(pickHintLead("clip"), "Drag on the timeline, or click to set the start and click again for the end");
-  assert.equal(pickHintLead("pointer"), "Choose the scissors, then drag on the timeline");
+  assert.equal(pickHintLead("clip"), "Click to set the start, click again for the end");
+  assert.equal(pickHintLead("pointer"), "Choose Select range, then drag on the timeline");
 });
 
 test("B2-8: flag, hand and zoom each get their own hint, none says Drag", () => {
@@ -39,7 +39,7 @@ test("B2-8: flag, hand and zoom each get their own hint, none says Drag", () => 
   for (const l of leads) assert.doesNotMatch(l, /^(Drag|Choose)/);
 });
 
-import { TOOL_CURSORS, clampX, placeLabels, wheelAction } from "./laneTools";
+import { TOOL_CURSORS, clampX, placeLabels, sourceLaneHeight, wheelAction } from "./laneTools";
 
 test("wheel: sideways pans, Shift+wheel pans, Ctrl/Cmd+wheel zooms, plain vertical is left alone", () => {
   const e = { deltaX: 0, deltaY: 0, shiftKey: false, ctrlKey: false, metaKey: false };
@@ -58,7 +58,7 @@ test("a scrub that leaves the lane stays on its ends", () => {
 });
 
 test("each tool has its own cursor", () => {
-  assert.equal(new Set(Object.values(TOOL_CURSORS)).size, 5);
+  assert.equal(new Set(Object.values(TOOL_CURSORS)).size, 6);
 });
 
 test("a name that does not fit its bar continues into free space, and is cut only when space runs out", () => {
@@ -74,4 +74,10 @@ test("a name that does not fit its bar continues into free space, and is cut onl
   assert.ok(p[1].outsideWidth < 72, "cut to the 26px left");
   assert.equal(p[2].inside, true);
   assert.equal(p[3].inside, true, "no room: stays inside and truncates");
+});
+
+test("the Source lane keeps 44px at the default timeline and takes all the extra height", () => {
+  assert.equal(sourceLaneHeight(200), 44);
+  assert.equal(sourceLaneHeight(150), 44);
+  assert.equal(sourceLaneHeight(380), 224);
 });
