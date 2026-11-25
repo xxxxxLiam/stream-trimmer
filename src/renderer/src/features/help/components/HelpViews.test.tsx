@@ -34,7 +34,7 @@ const top: HelpTopProps = {
 test("first view: search, the five common questions, then More", () => {
   const h = renderToStaticMarkup(<HelpTop {...top} />);
   assert.match(h, /placeholder="What do you need help with\?"/);
-  for (const a of HELP_ANSWERS) assert.match(h, new RegExp(`aria-label="${a.question.replace("?", "\\?")}"`));
+  for (const a of HELP_ANSWERS.filter((x) => !x.searchOnly)) assert.match(h, new RegExp(`aria-label="${a.question.replace("?", "\\?")}"`));
   assert.match(h, /aria-label="Replay tips for this panel"/);
   assert.match(h, /Show tips on/);
   assert.match(h, /aria-label="Keyboard shortcuts"/);

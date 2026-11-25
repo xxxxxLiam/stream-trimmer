@@ -32,7 +32,7 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
     <>
       <DrawerHeader title={`${c.count} ${c.count === 1 ? "moment" : "moments"}`} onClose={onClose} closeName="Import moments" />
       <div className={drawerBody}>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-[12px]">
           <span className="text-meta text-fg-dim">{empty ? "Paste rows from your sheet" : meta}</span>
           <button type="button" className="text-meta text-fg-dim underline hover:text-fg" onClick={() => void navigator.clipboard?.writeText(COPY_FORMAT)}>
             Copy format
@@ -42,14 +42,14 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
         {c.groups.map((g) => (
           <section key={g.videoId} aria-label={g.videoId}>
             <SectionLabel>{g.videoId === c.openVideoId ? "This video" : g.videoId}</SectionLabel>
-            <ul className="m-0 flex list-none flex-col p-0">
+            <ul className="m-[0px] flex list-none flex-col p-[0px]">
               {g.rows.map((m) => (
-                <li key={m.key} className="flex min-h-target items-center gap-3 border-b border-hairline">
-                  <span className="min-w-0 flex-1 truncate text-body">{m.name || "Unnamed"}</span>
+                <li key={m.key} className="flex min-h-target items-center gap-[12px] border-b border-hairline">
+                  <span className="min-w-[0px] flex-1 truncate text-body">{m.name || "Unnamed"}</span>
                   <span className="shrink-0 font-mono text-meta text-fg-dim">
                     {formatTimecode(m.start)} · {formatLength(m.end - m.start)}
                   </span>
-                  {typeof m.rating === "number" && <span className="w-6 shrink-0 text-right text-meta text-fg-dim">{m.rating}</span>}
+                  {typeof m.rating === "number" && <span className="w-[24px] shrink-0 text-right text-meta text-fg-dim">{m.rating}</span>}
                 </li>
               ))}
             </ul>
@@ -59,10 +59,10 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
         {c.flagged.length > 0 && (
           <section aria-label="Needs a look">
             <SectionLabel>Needs a look</SectionLabel>
-            <ul className="m-0 flex list-none flex-col p-0">
+            <ul className="m-[0px] flex list-none flex-col p-[0px]">
               {c.flagged.map((m) => (
-                <li key={m.key} className="flex min-h-target items-center gap-3 border-b border-hairline">
-                  <span className="min-w-0 flex-1">
+                <li key={m.key} className="flex min-h-target items-center gap-[12px] border-b border-hairline">
+                  <span className="min-w-[0px] flex-1">
                     <span className="block truncate text-body">{m.name || `Line ${m.key}`}</span>
                     <span className="block text-meta text-error">{m.problem?.reason}</span>
                   </span>
@@ -81,12 +81,12 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
           </section>
         )}
 
-        <div className="pt-4">
+        <div className="pt-[16px]">
           <button
             type="button"
             aria-disabled={!c.canBank}
             onClick={c.bank}
-            className={`${c.canBank ? "bg-ice text-bg" : `${outlineButton} text-disabled`} h-target w-full rounded-pill px-6 text-body font-medium`}
+            className={`${c.canBank ? "bg-ice text-bg" : `${outlineButton} text-disabled`} h-target w-full rounded-pill px-[24px] text-body font-medium`}
           >
             {c.count > 0 ? `Bank ${c.count} ${c.count === 1 ? "moment" : "moments"}` : "Nothing to bank"}
           </button>
