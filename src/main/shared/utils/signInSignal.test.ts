@@ -50,3 +50,18 @@ test("listeners hear changes only, not repeats", () => {
   s.setBrowserUsable(false);
   assert.equal(n, 1);
 });
+
+test("A2-1: the engine bundle's copy of the module and main's copy are the same signal", async () => {
+  // Two imports under different query strings are two module instances, as engine.cjs and index.cjs are.
+  type Mod = typeof import("./signInSignal");
+  const load = (query: string): Promise<Mod> => import(`./signInSignal?${query}`);
+  const main = await load("main");
+  const engine = await load("engine");
+  assert.notEqual(main, engine, "really two module instances");
+  main.signIn.setFileUsable(true);
+  assert.deepEqual(main.signIn.get(), { lowQualityWithoutSignIn: false });
+  engine.signIn.sessionEnded();
+  assert.deepEqual(main.signIn.get(), { lowQualityWithoutSignIn: true }, "the engine's rejection reaches the footer's signal");
+  engine.signIn.sessionConfirmed();
+  assert.deepEqual(main.signIn.get(), { lowQualityWithoutSignIn: false });
+});
