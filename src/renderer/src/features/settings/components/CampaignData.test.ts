@@ -30,3 +30,7 @@ test("A-7: the armed Delete times out and disarms on leaving the view or closing
   assert.match(d, /useEffect\(\(\) => setConfirming\(null\), \[viewKey, open\]\)/);
   assert.match(src("./SettingsCampaign.tsx"), /Click again to delete \$\{p\.name\}`/);
 });
+
+test("A-15d: a stale stored active campaign is rewritten at launch", () => {
+  assert.match(src("../../campaigns/hooks/CampaignContext.tsx"), /readSetting<string \| null>\(KEY_ACTIVE, null\) !== activeIdRef\.current\) writeSetting\(KEY_ACTIVE, activeIdRef\.current\)/);
+});

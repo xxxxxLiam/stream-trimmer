@@ -8,13 +8,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { TIPS } from "../utils/tipRegistry";
-import { TIPS_ON_KEY, TIPS_SEEN_KEY, forgetOpen, markSeen, nextTip, normalizeSeen, type Seen } from "../utils/tipsSeen";
+import {
+  TIPS_ON_KEY,
+  TIPS_SEEN_KEY,
+  forgetOpen,
+  markSeen,
+  nextTip,
+  normalizeSeen,
+  type Seen,
+} from "../utils/tipsSeen";
 
-const present = (selector: string) => typeof document !== "undefined" && !!document.querySelector(selector);
+const present = (selector: string) =>
+  typeof document !== "undefined" && !!document.querySelector(selector);
 
 export function useTipsController(ready: boolean) {
-  const [on, setOn] = useState<boolean>(() => readSetting<boolean>(TIPS_ON_KEY, true) !== false);
-  const [seen, setSeen] = useState<Seen>(() => normalizeSeen(readSetting<unknown>(TIPS_SEEN_KEY, {})));
+  const [on, setOn] = useState<boolean>(
+    () => readSetting<boolean>(TIPS_ON_KEY, true) !== false,
+  );
+  const [seen, setSeen] = useState<Seen>(() =>
+    normalizeSeen(readSetting<unknown>(TIPS_SEEN_KEY, {})),
+  );
   const [step, setStep] = useState(0);
   const [tick, setTick] = useState(0);
 
@@ -60,7 +73,9 @@ export function useTipsController(ready: boolean) {
           total: steps.length,
           text: steps[current].text,
           target: steps[current].target,
-          onNext: () => (current + 1 < steps.length ? setStep(current + 1) : finish()),
+          advanceOn: steps[current].advanceOn,
+          onNext: () =>
+            current + 1 < steps.length ? setStep(current + 1) : finish(),
           onBack: () => setStep(Math.max(0, current - 1)),
           onDone: finish,
           onTurnOff: turnOff,
