@@ -17,6 +17,8 @@ import HelpTop from "./HelpTop";
 import { useDrawerFocus } from "../../../shared/hooks/useDrawerFocus";
 import { useHelpController } from "../hooks/useHelpController";
 import { appVersion } from "../utils/appVersion";
+import { stepsOf, type HelpAnswer as Answer } from "../utils/helpContent";
+import type { TipStep } from "../../tips/utils/tipRegistry";
 
 export type HelpDrawerProps = {
   open: boolean;
@@ -24,8 +26,17 @@ export type HelpDrawerProps = {
   /** "signin" opens on the Sign in for 1080p page (the footer pill). */
   startAt?: "signin" | null;
   /** First-use tips: whether they are on, and replay for the open panel. */
-  tips?: { on: boolean; onReplay: () => void };
+  tips?: { on: boolean; onReplay: () => void; onShowMe: (steps: TipStep[]) => void };
 };
+
+/** An answer's steps as tip steps: only the ones that name a real control, in order. */
+export function tourOf(a: Answer): TipStep[] {
+  return stepsOf(a).flatMap((s) =>
+    s.show
+      ? [{ target: s.show.target, withText: s.show.withText, text: s.text, advanceOn: s.show.advance === "click" ? { click: "target" } : s.show.advance ? { keys: s.show.advance } : undefined }]
+      : [],
+  );
+}
 
 export default function HelpDrawer({ open, onClose, startAt = null, tips }: HelpDrawerProps) {
   const c = useHelpController({ open, onClose, startAt });
@@ -38,7 +49,7 @@ export default function HelpDrawer({ open, onClose, startAt = null, tips }: Help
 
   let body;
   if (view.kind === "answer" && c.answer) {
-    body = <HelpAnswer answer={c.answer} onBack={c.top} onClose={onClose} />;
+    body = <HelpAnswer answer={c.answer} onBack={c.top} onClose={onClose} onShowMe={() => tips?.onShowMe(tourOf(c.answer!))} />;
   } else if (view.kind === "shortcuts") {
     body = <HelpShortcuts ctrl={!isMac} onBack={c.top} onClose={onClose} />;
   } else if (view.kind === "report") {
