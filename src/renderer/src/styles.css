@@ -37,6 +37,7 @@
   --ice-tint-80: rgb(var(--ice-rgb) / 0.8);
   --frost-tint-35: rgb(var(--frost-rgb) / 0.35);
   --frost-tint-45: rgb(var(--frost-rgb) / 0.45);
+  --frost-tint-60: rgb(var(--frost-rgb) / 0.6);
   --frost-tint-80: rgb(var(--frost-rgb) / 0.8);
   --error-tint-15: rgb(var(--error-rgb) / 0.15);
   /* Old alpha names, kept pointing at the nearest named tint. */

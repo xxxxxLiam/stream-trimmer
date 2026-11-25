@@ -10,13 +10,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { BankedClip } from "../../../shared/utils/bank";
 import WaitingRow from "./WaitingRow";
 
-const clip = { id: "b1", label: "Honest Version", segments: [{ start: 4324, end: 4366 }], status: "cut" } as unknown as BankedClip;
+const clip = { id: "b1", label: "Honest Version", segments: [{ start: 4324, end: 4366 }], status: "cut", category: "Money", tier: "T1" } as unknown as BankedClip;
 const noop = () => {};
 
 test("F-14: a made row's name is the disabled token, and nothing on the row uses opacity", () => {
   const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Honest Version" suggested={false} selected={false} made onSelect={noop} onMake={noop} onRemove={noop} />);
   assert.doesNotMatch(html, /opacity-/);
   assert.match(html, /text-disabled[^>]*>Honest Version/);
+  // The whole row reads dimmed the board's way: range line, chips and dot too, none of it fg-dim.
+  assert.match(html, /text-disabled">0:|text-disabled[^>]*>1:12:04/);
+  assert.match(html, /border-hairline px-\[4px\][^>]*text-disabled/);
+  assert.match(html, /bg-frost-tint-60/);
   const waiting = renderToStaticMarkup(<WaitingRow clip={clip} name="Honest Version" suggested={false} selected={false} onSelect={noop} onMake={noop} onRemove={noop} />);
   assert.doesNotMatch(waiting, /text-disabled[^>]*>Honest Version/);
 });
