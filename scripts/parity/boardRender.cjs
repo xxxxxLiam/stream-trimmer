@@ -9,7 +9,8 @@
  */
 const path = require("node:path");
 const fs = require("node:fs");
-const { chromium } = require("playwright");
+// Loaded where a browser is launched: playwright is a dev-machine tool, not an install dependency.
+const launchChromium = () => require("playwright").chromium.launch();
 
 const SNAPSHOTS = {
   snapshot: "/mnt/project-files/design/canvas-snapshot-2026-11-24/project",
@@ -104,7 +105,7 @@ function boardFrame(file) {
 async function renderBoard(screen, opts = {}) {
   const file = screen.endsWith(".dc.html") ? screen : `${screen}.dc.html`;
   const frame = boardFrame(file);
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({
       viewport: { width: frame.width, height: frame.height },
@@ -185,7 +186,7 @@ const MEASURE = (panel) => {
 async function renderBoardPanel(screen, text) {
   const file = screen.endsWith(".dc.html") ? screen : `${screen}.dc.html`;
   const frame = boardFrame(file);
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: frame.width, height: frame.height }, deviceScaleFactor: 1 });
     await page.route("**/support.js", (r) => r.fulfill({ contentType: "text/javascript", body: SHIM }));
