@@ -10,6 +10,7 @@ import CampaignForm from "./CampaignForm";
 import { useCampaign } from "../hooks/CampaignContext";
 import { todayCount } from "../../../shared/utils/campaigns";
 import { IconGear } from "../../../shared/components/icons";
+import { Check2 } from "react-bootstrap-icons";
 
 export default function CampaignMenu({
   onClose,
@@ -54,9 +55,7 @@ export default function CampaignMenu({
                 >
                   <span className="flex w-[12px] shrink-0 justify-center">
                     {selected ? (
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--ice)" strokeWidth="1.8" aria-hidden="true">
-                        <path d="M2 6.5l2.5 2.5L10 3.5" />
-                      </svg>
+                      <Check2 width={12} height={12} className="text-ice" aria-hidden="true" focusable="false" />
                     ) : null}
                   </span>
                   <span className="min-w-0 truncate">{c.name}</span>

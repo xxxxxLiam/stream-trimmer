@@ -6,6 +6,7 @@
  */
 import { endCardKind } from "../utils/transport";
 import type { DayState } from "../../../modules/layout/hooks/PanelHostContext";
+import { Check2 } from "react-bootstrap-icons";
 
 type Props = {
   day: DayState;
@@ -30,9 +31,7 @@ export default function EndCard({ day, onNextVideo, onOpenBank, onOpenVideo }: P
     >
       {kind === "done" ? (
         <div className="flex items-center gap-[6px] text-meta text-frost">
-          <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 8.5l3 3 7-7" />
-          </svg>
+          <Check2 width={14} height={14} aria-hidden="true" focusable="false" />
           Done for today
         </div>
       ) : (

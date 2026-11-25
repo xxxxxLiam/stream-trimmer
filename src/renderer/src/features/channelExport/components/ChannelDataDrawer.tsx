@@ -7,6 +7,7 @@
  *   continues and shows as a row at the top of Videos. Owner-only: it is rendered only in the owner build.
  */
 import { useEffect } from "react";
+import { FileEarmarkText } from "react-bootstrap-icons";
 import { Drawer } from "../../../shared/components/Drawer";
 import { DrawerHeader, outlineButton } from "../../../shared/components/DrawerRows";
 import { redact } from "../../../shared/utils/diagnostics";
@@ -27,10 +28,7 @@ const stepBtn = "inline-flex size-target items-center justify-center rounded-con
 
 const FileIcon = () => (
   <span className="flex size-[30px] flex-none items-center justify-center rounded-control bg-raised text-frost">
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 1.8h5.5L12.5 5v9.2H4z" />
-      <path d="M9.5 1.8V5h3M6 8.5h4.5M6 11h4.5" />
-    </svg>
+    <FileEarmarkText width={14} height={14} aria-hidden="true" focusable="false" />
   </span>
 );
 

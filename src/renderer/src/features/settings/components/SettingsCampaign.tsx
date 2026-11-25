@@ -6,6 +6,7 @@
  *   Delete campaign. No clip id fields, no format or quality.
  */
 import { useState } from "react";
+import { ChevronDown, ChevronRight, Sliders } from "react-bootstrap-icons";
 import { MAX_RULE_SEC } from "../../../shared/utils/campaigns";
 import { formatClock } from "../../../shared/utils/clock";
 import { parseTimestamp } from "../../../shared/utils/clip";
@@ -158,7 +159,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           items={langs.map((l) => ({ key: l.code, label: l.label, checked: prefs.languages.includes(l.code), keepOpen: true, onSelect: () => p.onToggleLanguage(l.code) }))}
         >
           <span className="flex-1 truncate text-left">{langSummary}</span>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-fg-dim" aria-hidden="true"><path d="M2 3.5l3 3 3-3" /></svg>
+          <ChevronDown width={10} height={10} className="text-fg-dim" aria-hidden="true" focusable="false" />
         </PopoverMenu>
       </div>
       )}
@@ -181,17 +182,12 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
       {p.editor && <SectionLabel>Export settings</SectionLabel>}
       {p.editor && (
         <button type="button" aria-label={`${p.editor.label} settings for ${p.name}`} onClick={p.editor.onOpen} className="mt-[4px] flex min-h-[56px] items-center gap-[12px] rounded-control border border-hairlineStrong bg-raised px-[12px] py-[8px] text-left hover:bg-hover">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-fg-dim" aria-hidden="true">
-            <rect x="4" y="4" width="16" height="16" rx="3" />
-            <path d="m9 15 6-6M9 9h6v6" />
-          </svg>
+          <Sliders width={16} height={16} className="shrink-0 text-fg-dim" aria-hidden="true" focusable="false" />
           <span className="flex min-w-[0px] flex-1 flex-col gap-[2px]">
             <span className="text-body font-medium leading-[normal] text-fg">{p.editor.label}</span>
             <span className="truncate text-meta text-fg-dim">{p.editor.summary}</span>
           </span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-fg-dim" aria-hidden="true">
-            <path d="M9 6l6 6-6 6" />
-          </svg>
+          <ChevronRight width={16} height={16} className="shrink-0 text-fg-dim" aria-hidden="true" focusable="false" />
         </button>
       )}
       <button type="button" aria-label={p.confirmingDelete ? `Click again to delete ${p.name}` : `Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-[8px] h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
