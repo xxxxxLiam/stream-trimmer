@@ -5,7 +5,6 @@
  *   and the folders to put clips in on a fresh install. Electron's `app` is
  *   passed in, so none of this needs Electron running to be tested.
  */
-import fsp from "node:fs/promises";
 import path from "node:path";
 import {
   browserCheckOrder,
@@ -25,8 +24,7 @@ export function defaultBrowser(app: unknown) {
  * their first cut. With no clips folder set, useClipperController's deliverPath gate is
  * false and the whole finished file streams through the renderer into
  * ~/Downloads instead of the main process moving it — slower, and the clips
- * scatter. The folders are created here because clip:save does not create its
- * target, and they become allowed save roots once the renderer stores them
+ * scatter. The folders are only named here (clip:save makes its own target when it saves), and they become allowed save roots once the renderer stores them
  * (allowedRoots reads them back out of settings).
  *
  * This never overwrites a choice: the renderer only asks when nothing is set.
@@ -38,9 +36,9 @@ export async function defaultFolders(app: Electron.App) {
     const downloads = app.getPath("downloads");
     const clipsDir = path.join(downloads, "Clipr");
     const dataDir = path.join(downloads, "Clipr data");
-    await fsp.mkdir(clipsDir, { recursive: true });
-    // Only the Clips folder is made. The Data folder is the channel exporter's, and whatever writes into it makes it
-    // on the first write (saveFiles does mkdir), so nobody else finds an empty "Clipr data" in Downloads (A2-6).
+    // Nothing is made here. Downloads/Clipr appears when the first clip is saved (saveClip makes its folder), and the
+    // Data folder when the channel exporter first writes into it (saveFiles does mkdir), so nobody finds empty
+    // folders in Downloads before there is something to put in them (A2-6, and Start fresh in v18).
     return { clipsDir, dataDir };
   } catch {
     // A read-only or missing Downloads folder is not worth failing a launch over;
