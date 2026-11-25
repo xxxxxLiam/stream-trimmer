@@ -13,6 +13,7 @@ import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
+import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
 import { useFinalCutLook } from "../hooks/useFinalCutLook";
 import { useClipDestination } from "../../player/hooks/useClipDestination";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
@@ -27,16 +28,27 @@ export type SettingsDrawerProps = {
   startAt: string | null;
   /** Audio tracks of the open video; its dubs become the language chips. */
   tracks?: AudioTrack[];
+  /** Title of the open video, used as the sample in the layout preview. */
+  videoTitle?: string;
   /** Any campaign's Final Cut settings, and writing them. */
   editor: { settingsFor: (campaignId: string) => EditorHandoffSettings; onChange: (campaignId: string, s: EditorHandoffSettings) => void };
 };
 
-export default function SettingsDrawer({ open, onClose, startAt, tracks, editor }: SettingsDrawerProps) {
+export default function SettingsDrawer({ open, onClose, startAt, tracks, editor, videoTitle }: SettingsDrawerProps) {
   const c = useSettingsController({ open, onClose, startAt });
   const [destination] = useClipDestination();
   const viewId = c.view.kind === "campaign" ? c.view.id : null;
   const activeCampaign = c.campaigns.campaigns.find((x) => x.id === viewId);
   const look = useFinalCutLook(activeCampaign, c.campaigns);
+  const activeFcp = activeCampaign ? editor.settingsFor(activeCampaign.id) : undefined;
+  const layout = useFinalCutLayout(
+    activeCampaign,
+    {
+      layout: activeFcp?.layout ?? "export",
+      onLayout: (id) => activeCampaign && activeFcp && editor.onChange(activeCampaign.id, { ...activeFcp, layout: id }),
+    },
+    { library: activeFcp ? folderChipLabel(activeFcp.fcpLibrary ?? "", 1) : "", event: activeFcp?.mediaEvent ?? "", videoTitle },
+  );
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
   if (!open) return null;
@@ -58,8 +70,9 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
           destination === "finalcut"
             ? {
                 library: fcp.fcpLibrary ? (fcp.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
-                // The campaign name stands in until the Event is edited.
-                event: fcp.mediaEvent || campaign.name,
+                // Blank means "Export" (shown as the placeholder). Layouts video and day name their own events.
+                event: fcp.mediaEvent,
+                showEvent: fcp.layout === "export" || fcp.layout === "flat",
                 onChoose: () => {
                   void window.electronAPI?.pickFcpLibrary?.().then((p) => {
                     if (p) editor.onChange(campaign.id, { ...fcp, fcpLibrary: p });
@@ -67,6 +80,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
                 },
                 onEvent: (v) => editor.onChange(campaign.id, { ...fcp, mediaEvent: v }),
                 look,
+                layout,
               }
             : null
         }

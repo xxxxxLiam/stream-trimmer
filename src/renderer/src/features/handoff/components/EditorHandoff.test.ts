@@ -81,12 +81,12 @@ test("D-5: clips from two videos of one campaign never land in each other's even
   await H.runAfterCutting(on, { ...ctx(["POD-02"]), sourceTitle: "Podcast 214" });
   await H.runAfterCutting(on, { ...ctx(["FND-01"]), sourceTitle: "Founder story" });
   assert.deepEqual(writes.map((w) => idsIn(w.contents)), [["POD-01"], ["POD-02"], ["FND-01"]]);
-  assert.deepEqual(writes.map((w) => eventsIn(w.contents)), [["Acme"], ["Acme"], ["Acme"]], "one campaign, one event");
+  assert.deepEqual(writes.map((w) => eventsIn(w.contents)), [["Export"], ["Export"], ["Export"]], "one campaign, one event");
   assert.match(writes[2].contents, /<keyword-collection name="Founder story"\/>/);
   assert.doesNotMatch(writes[2].contents, /Podcast 214/);
 });
 
-test("D-1: the event is the campaign's Event, falling back to the campaign name", async () => {
+test("D-1: the event is the campaign's Event, falling back to Export", async () => {
   const H = await import("./EditorHandoff");
   const { DEFAULT_EDITOR_SETTINGS } = await import("../../../shared/utils/fcpxml");
   H.resetSessionHandoff();
@@ -94,7 +94,7 @@ test("D-1: the event is the campaign's Event, falling back to the campaign name"
   const on = { ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const };
   await H.runAfterCutting({ ...on, mediaEvent: "Acme exports" }, { ...ctx(["A-01"]), sourceTitle: "Podcast 214" });
   await H.runAfterCutting(on, { ...ctx(["A-02"]), sourceTitle: "Podcast 214" });
-  assert.deepEqual(writes.map((w) => eventsIn(w.contents)), [["Acme exports"], ["Acme"]]);
+  assert.deepEqual(writes.map((w) => eventsIn(w.contents)), [["Acme exports"], ["Export"]]);
 });
 
 test("D-3: a rejected handoff is published with the engine's reason and the clip it was for", async () => {
