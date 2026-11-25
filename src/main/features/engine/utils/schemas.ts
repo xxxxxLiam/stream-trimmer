@@ -4,16 +4,20 @@
  * Description: Request body schemas for the engine's routes.
  */
 import { z } from "zod";
-import { isYouTubeUrl, isYouTubeVideoUrl } from "./youtubeUrl";
+import { isYouTubeUrl } from "./youtubeUrl";
+import { isSupportedVideoUrl } from "./videoUrl";
 
 export const urlSchema = z
   .string()
   .url()
   .refine(isYouTubeUrl, "URL must be a YouTube link");
 
-// One video, not a channel or a playlist page that yt-dlp would go and list. (The channel exporter
+// One video (YouTube, Twitch or Kick), not a channel or a playlist page that yt-dlp would go and list. (The channel exporter
 // takes any YouTube link, so it keeps urlSchema.)
-export const videoUrlSchema = urlSchema.refine(isYouTubeVideoUrl, "URL must be a link to one YouTube video");
+export const videoUrlSchema = z
+  .string()
+  .url()
+  .refine(isSupportedVideoUrl, "URL must be a link to one YouTube, Twitch or Kick video");
 
 // Browsers yt-dlp can read a logged-in YouTube session from. Only the browser
 // name ever crosses the API; cookie contents never touch this process.

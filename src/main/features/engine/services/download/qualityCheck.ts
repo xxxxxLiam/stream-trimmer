@@ -33,11 +33,9 @@ export async function checkDelivery(
     // for one more download on a different client set before giving up.
     const requestedHeight: number | "best" =
       quality === "best" ? BEST_HEIGHT_CAP : Number(quality);
-    let degraded = isDegradedDelivery(
-      delivered.height,
-      requestedHeight,
-      ctx.availableHeights,
-    );
+    // Other player clients and a sign-in only exist for YouTube.
+    let degraded =
+      ctx.isYouTube && isDegradedDelivery(delivered.height, requestedHeight, ctx.availableHeights);
     if (degraded) {
       console.warn(
         `[server] /api/download degraded job=${jobId} requested=${quality} delivered=${delivered.height ?? "?"} available=${ctx.availableHeights.join(",") || "unknown"} — rebuilding on ${PLAYER_CLIENTS_FALLBACK}`,
@@ -98,7 +96,7 @@ export async function checkDelivery(
     // failure, not a quality choice. The clip is still delivered (it is real
     // work), but it never passes silently: the cause and the one fix travel
     // with it.
-    const lowQuality = lowQualityWithoutSession({
+    const lowQuality = ctx.isYouTube && lowQualityWithoutSession({
       deliveredHeight: delivered.height,
       requested: requestedHeight,
       sessionValid: ctx.sessionConfirmed,

@@ -6,6 +6,7 @@
 import { type Request, type Response } from "express";
 import { resolveSegments, segmentsTotal, type Segment } from "../segments";
 import { binariesOk } from "../binaries";
+import { isYouTubeLink } from "../../utils/videoUrl";
 import { cookieModeFor, resolveCookieOptions } from "../cookies";
 import { MAX_CLIP_SECONDS } from "../../utils/engineConfig";
 import { binaryError } from "../../utils/errors";
@@ -18,6 +19,8 @@ export interface DownloadRequest {
   audioLanguage: DownloadInput["audioLanguage"];
   deliver: DownloadInput["deliver"];
   cookiesFromBrowser: DownloadInput["cookiesFromBrowser"];
+  /** False for Twitch and Kick: no sign-in, player clients or YouTube headers. */
+  isYouTube: boolean;
   segs: Segment[];
   segCount: number;
   multi: boolean;
@@ -54,8 +57,10 @@ export function parseDownloadRequest(req: Request, res: Response): DownloadReque
   const totalSec = segmentsTotal(segs);
   const lastEnd = Math.max(...segs.map((s) => s.end));
 
-  const cookieOptions: Record<string, unknown> = resolveCookieOptions(cookiesFromBrowser);
-  const cookieMode = cookieModeFor(cookiesFromBrowser);
+  // Sign-in, player clients and the YouTube Referer belong to YouTube links only; Twitch and Kick run bare.
+  const isYouTube = isYouTubeLink(url);
+  const cookieOptions: Record<string, unknown> = isYouTube ? resolveCookieOptions(cookiesFromBrowser) : {};
+  const cookieMode = isYouTube ? cookieModeFor(cookiesFromBrowser) : "none";
   console.log(
     `[server] /api/download auth mode=${cookieMode} segments=${segCount}`,
   );
@@ -73,5 +78,6 @@ export function parseDownloadRequest(req: Request, res: Response): DownloadReque
     lastEnd,
     cookieOptions,
     cookieMode,
+    isYouTube,
   };
 }
