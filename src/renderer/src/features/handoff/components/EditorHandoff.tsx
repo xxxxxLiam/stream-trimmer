@@ -313,10 +313,11 @@ async function runAfterCuttingInner(
   // The name typed before this cut belongs to the clip just saved, once. It is
   // remembered by clip id so a later "Send all" still uses it.
   const typed = takeNextProjectName();
-  const justSaved = ctx.clips[ctx.clips.length - 1];
+  // A clip and its language copies arrive together: the editor opens with the clip itself, not a dub.
+  const justSaved = ctx.clips.find((c) => !c.parentId) ?? ctx.clips[ctx.clips.length - 1];
   if (typed && justSaved) typedProjectNames.set(justSaved.id, typed);
   if (settings.afterCutting === "reveal") {
-    const last = ctx.clips[ctx.clips.length - 1];
+    const last = ctx.clips.find((c) => !c.parentId) ?? ctx.clips[ctx.clips.length - 1];
     if (api && last) {
       const r = await api.reveal(last.path);
       outcome = { ok: r.ok, message: r.ok ? "Revealed the clip." : r.error ?? "Could not reveal the clip." };
