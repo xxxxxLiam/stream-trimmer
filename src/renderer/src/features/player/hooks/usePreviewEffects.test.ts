@@ -16,3 +16,9 @@ test("the key listener reads the latest handlers through a ref", () => {
   assert.doesNotMatch(src, /[^.]\ba\.setIn\(\)/);
   assert.doesNotMatch(src, /[^.]\ba\.setOut\(\)/);
 });
+
+test("a held J or L shuttle also stops when the window loses focus or is hidden, not only on keyup", () => {
+  assert.match(src, /window\.addEventListener\("blur", stopShuttle\)/);
+  assert.match(src, /document\.addEventListener\("visibilitychange"/);
+  assert.match(src, /window\.removeEventListener\("blur", stopShuttle\)/);
+});

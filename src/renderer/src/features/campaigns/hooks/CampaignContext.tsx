@@ -41,7 +41,7 @@ import {
   type UsedRange,
 } from "../../../shared/utils/campaigns";
 import { bankStore } from "../../../shared/utils/bank";
-import { KEY_LOOK_MIGRATED, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
+import { KEY_LOOK_MIGRATED, loadLastLookId, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 
 export type { Campaign, UsedRange } from "../../../shared/utils/campaigns";
@@ -130,7 +130,7 @@ function idOrUndefined(v: unknown): string | undefined {
 function loadCampaigns(): Campaign[] {
   const list = normalizeCampaigns(readSetting<unknown>(KEY_CAMPAIGNS, []));
   if (readSetting<boolean>(KEY_LOOK_MIGRATED, false)) return list;
-  const legacy = readSetting<{ applyLook?: boolean; lookXml?: string }>(KEY_EDITOR, {});
+  const legacy = readSetting<unknown>(KEY_EDITOR, {});
   const moved = migratePastedLook(list, loadSavedLooks(), legacy);
   if (moved.migrated) {
     saveSavedLooks(moved.looks);
@@ -192,6 +192,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       const clipsDir = input.clipsDir ?? d.clipsDir;
       const { campaigns: next, campaign } = createCampaign(campaignsRef.current, {
         ...input,
+        fcpLookId: input.fcpLookId ?? loadLastLookId(),
         clipsDir,
         dataDir: input.dataDir ?? (d.dataDir || undefined),
       });

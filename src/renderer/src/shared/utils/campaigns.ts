@@ -171,8 +171,8 @@ export function createCampaign(
     clipsDir,
     dataDir: input.dataDir ?? (clipsDir ? defaultDataDir(clipsDir) : ""),
     usedRanges: {},
-    // A new campaign starts with the last look used, so a second client is one pick, not a second upload.
-    ...((input.fcpLookId ?? lastLookIdUsed(list)) ? { fcpLookId: input.fcpLookId ?? lastLookIdUsed(list) } : {}),
+    // The caller passes the last look picked, so a second client is one pick, not a second upload.
+    ...(input.fcpLookId ? { fcpLookId: input.fcpLookId } : {}),
   });
   return { campaigns: [...list, campaign], campaign };
 }
@@ -455,10 +455,4 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
     );
   }
   return out;
-}
-
-/** The look the newest campaign that has one is using (for "a new campaign starts with the last look used"). */
-export function lastLookIdUsed(list: readonly Campaign[]): string | undefined {
-  for (let i = list.length - 1; i >= 0; i--) if (list[i].fcpLookId) return list[i].fcpLookId;
-  return undefined;
 }
