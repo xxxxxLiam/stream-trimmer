@@ -7,11 +7,13 @@
  *   polled readings to believe while a seek is outstanding.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   SEEK_SETTLE_SEC,
   SEEK_TIMEOUT_MS,
   acceptPolledTime,
+  shouldStayPaused,
   type PendingSeek,
 } from "./useYouTubePlayerController";
 
@@ -66,4 +68,15 @@ test("the embed keeps YouTube's normal controls: nothing turns them off, so they
   assert.doesNotMatch(vars, /controls:\s*0/);
   assert.doesNotMatch(vars, /disablekb/);
   assert.match(vars, /modestbranding: 1/);
+});
+
+test("seeking keeps the play state: paused, cued and ended stay paused, playing keeps playing", () => {
+  for (const state of [-1, 0, 2, 5]) assert.equal(shouldStayPaused(state, false), true, `state ${state}`);
+  for (const state of [1, 3]) assert.equal(shouldStayPaused(state, false), false, `state ${state}`);
+  assert.equal(shouldStayPaused(5, true), false, "a seek that asks to play plays");
+});
+
+test("seekTo puts the pause back through shouldStayPaused", () => {
+  const src = readFileSync(new URL("./useYouTubePlayerController.ts", import.meta.url), "utf8");
+  assert.match(src, /const stayPaused = shouldStayPaused\(playerRef\.current\?\.getPlayerState\(\)/);
 });

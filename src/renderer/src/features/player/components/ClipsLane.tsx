@@ -130,11 +130,16 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     if (!stacked(key)) return null;
     const { row, from, to } = slotOf(key);
     const w = labelWidth(label);
-    const right = Math.max(0, c.width - to - 4);
-    const onRight = right >= Math.min(w, 48) || from < w;
+    // Room is the gap to the next bar on either side (any row), so a name never runs over another clip's bar or name.
+    const nextLeft = Math.min(c.width, ...bars.filter((b) => b.left >= to - 1 && b.left > from).map((b) => b.left));
+    const prevRight = Math.max(0, ...bars.filter((b) => b.left + b.width <= from + 1 && b.left < from).map((b) => b.left + b.width));
+    const right = Math.max(0, nextLeft - to - 8);
+    const left = Math.max(0, from - prevRight - 8);
+    const onRight = right >= Math.min(w, 48) || (from < w && left < Math.min(w, 48));
+    if (onRight ? right < 24 : left < 24) return null;
     const style = onRight
       ? { left: to + 4, width: Math.min(w, right), top: 5 + row * ROW_H }
-      : { left: Math.max(0, from - 4 - w), width: w, top: 5 + row * ROW_H, textAlign: "right" as const };
+      : { left: from - 4 - Math.min(w, left), width: Math.min(w, left), top: 5 + row * ROW_H, textAlign: "right" as const };
     return (
       <span
         key={`${key}-stack-label`}
