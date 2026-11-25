@@ -133,7 +133,12 @@ test("BrandMark is the two-blade mark in Frost over Ice; the lockup adds the nam
   assert.ok(h.indexOf("var(--frost)") < h.indexOf("var(--ice)"));
   assert.doesNotMatch(h, /drop-shadow/);
   assert.match(html(<BrandMark glow />), /drop-shadow\(var\(--glow-mark\)\)/);
-  assert.match(html(<BrandLockup />), />Clipr</);
+  const lock = html(<BrandLockup size={56} />);
+  assert.match(lock, /aria-label="Clipr"/);
+  assert.match(lock, /<path id="r-cut" fill="var\(--ice\)"/, "the Ice piece of the r is its own path in the brand colour");
+  assert.match(lock, /<path id="r-stem" fill="var\(--c-fg\)"/);
+  assert.doesNotMatch(html(<BrandLockup size={24} />), /r-cut/, "below 32px the mark stands alone");
+  assert.match(html(<BrandLockup size={56} glow />), /<g style="filter:drop-shadow\(var\(--glow-mark\)\)"/);
 });
 
 test("no shared component holds a raw hex or rgba value", () => {
@@ -141,7 +146,7 @@ test("no shared component holds a raw hex or rgba value", () => {
   const mine = ["Button", "SplitButton", "IconButton", "Chip", "Menu", "Tooltip", "Toggle", "SearchPill", "Drawer", "Row", "UndoRing", "BrandMark"];
   for (const name of mine) {
     const file = readdirSync(dir).find((f) => f === `${name}.tsx`)!;
-    const src = readFileSync(join(dir, file), "utf8").replace(/\bd="[^"]*"/g, "").replace(/const (UPPER|LOWER) = "[^"]*"/g, "");
+    const src = readFileSync(join(dir, file), "utf8").replace(/\bd="[^"]*"/g, "").replace(/const (UPPER|LOWER|LOCKUP_[A-Z_]+) = "[^"]*"/g, "");
     assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b|rgba?\(/, `${name} has a raw colour`);
   }
 });

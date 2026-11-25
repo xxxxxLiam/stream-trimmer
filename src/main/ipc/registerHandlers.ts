@@ -12,6 +12,7 @@ import { registerEditorHandlers } from "./editorHandlers";
 import { registerExportHandlers } from "./exportHandlers";
 import { registerFilesHandlers } from "./filesHandlers";
 import { registerOwnerHandlers } from "./ownerHandlers";
+import { registerReportHandlers } from "./reportHandlers";
 import { registerSettingsHandlers } from "./settingsHandlers";
 import { registerSystemHandlers } from "./systemHandlers";
 import { registerUpdaterHandlers } from "./updaterHandlers";
@@ -29,4 +30,5 @@ export function registerHandlers() {
   registerClipNamesHandlers();
   registerDiagnosticsHandlers();
   registerSystemHandlers();
+  registerReportHandlers();
 }

@@ -8,7 +8,7 @@ import { createElement, useEffect, useLayoutEffect, useRef, useState, type CSSPr
 import PanelGroup from "./PanelGroup";
 import PanelResizeHandle from "./PanelResizeHandle";
 import { usePanelLayoutState } from "../hooks/usePanelLayoutState";
-import { DEFAULT_SIZES, SIZE_LIMITS, CENTRE_MIN_W } from "../utils/panelLayout";
+import { DEFAULT_SIZES, SIZE_LIMITS, CENTRE_MIN_W, fitSides } from "../utils/panelLayout";
 import { getPanel } from "../utils/panelRegistry";
 import { panelBodyDomId } from "./PanelTabStrip";
 import "../utils/panelRegistrations";
@@ -36,8 +36,10 @@ export default function PanelWorkspace() {
 
   const { left, right, centre } = layout.groups;
   const containerWidth = width || Infinity;
+  // Saved widths can come from a bigger screen or a zoomed window; fit them so Preview keeps its minimum.
+  const fitted = fitSides(layout.sizes, containerWidth, { left: left.tabs.length > 0, right: right.tabs.length > 0 });
   const sideMax = (key: "left" | "right") =>
-    Math.max(SIZE_LIMITS[key].min, Math.min(SIZE_LIMITS[key].max, containerWidth - layout.sizes[key === "left" ? "right" : "left"] - CENTRE_MIN_W));
+    Math.max(SIZE_LIMITS[key].min, Math.min(SIZE_LIMITS[key].max, containerWidth - fitted[key === "left" ? "right" : "left"] - CENTRE_MIN_W));
 
   const centrePanels = centre.tabs.flatMap((id) => getPanel(id) ?? []);
   // The timeline runs the full width under all three groups; the other centre panels share the
@@ -50,14 +52,14 @@ export default function PanelWorkspace() {
       <div className="flex min-h-0 min-w-0 flex-1 px-[8px] pt-[8px]">
         {left.tabs.length ? (
           <>
-            <div id="ui-panels-left" className="flex min-h-0 shrink-0" style={{ width: layout.sizes.left } as CSSProperties}>
+            <div id="ui-panels-left" className="flex min-h-0 shrink-0" style={{ width: fitted.left } as CSSProperties}>
               <PanelGroup group="left" />
             </div>
             <PanelResizeHandle
               orientation="vertical"
               label="Resize left panels"
-              value={layout.sizes.left}
-              min={SIZE_LIMITS.left.min}
+              value={fitted.left}
+              min={Math.min(SIZE_LIMITS.left.min, fitted.left)}
               max={sideMax("left")}
               grows="with-pointer"
               onChange={(px, persist) => resize("left", px, containerWidth, persist)}
@@ -82,14 +84,14 @@ export default function PanelWorkspace() {
             <PanelResizeHandle
               orientation="vertical"
               label="Resize right panels"
-              value={layout.sizes.right}
-              min={SIZE_LIMITS.right.min}
+              value={fitted.right}
+              min={Math.min(SIZE_LIMITS.right.min, fitted.right)}
               max={sideMax("right")}
               grows="against-pointer"
               onChange={(px, persist) => resize("right", px, containerWidth, persist)}
               onReset={() => resize("right", DEFAULT_SIZES.right, containerWidth)}
             />
-            <div className="flex min-h-0 shrink-0" style={{ width: layout.sizes.right } as CSSProperties}>
+            <div className="flex min-h-0 shrink-0" style={{ width: fitted.right } as CSSProperties}>
               <PanelGroup group="right" />
             </div>
           </>

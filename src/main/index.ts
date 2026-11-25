@@ -9,6 +9,7 @@
 import electron from "electron";
 import * as logger from "./modules/logger/logger";
 import { registerHandlers } from "./ipc/registerHandlers";
+import { flushPendingReports } from "./features/reports/services/reportService";
 import { loadSettings } from "./features/settings/services/settingsService";
 import { migrateLegacyUserData } from "./modules/userData/migrateLegacyUserData";
 import { startBackend, stopBackend } from "./modules/engineHost/engineHost";
@@ -54,6 +55,7 @@ app.whenReady().then(async () => {
     sweepStaleClips();
     startCookieChecks();
     startToolChecks();
+    flushPendingReports();
     void startSignInSignal();
     setupAutoUpdater();
   } catch (err: unknown) {

@@ -77,8 +77,11 @@ live state only, from the named set (`glow-cut`, `glow-range`, `glow-row`,
 names too (`ice-tint-12` and so on). Ice appears at most twice per screen.
 
 The product's logo is `src/renderer/src/shared/components/BrandMark.tsx`: the
-scissor-blade mark, with the "Clipr" wordmark beside it in the app (lockup A,
-Inter 500). The app, installer and tray icons are mark-only.
+scissor-blade mark, with the "Clipr" wordmark beside it in the app (lockup C:
+the mark with "Clipr" in Inter 500, its r cut by a diagonal slit with the top
+piece in Ice; the paths come from `design/clipr-lockup-c.svg`, never rebuilt by
+hand; below 32px the mark stands alone). The app, installer and tray icons are
+mark-only.
 
 ## Who this is for
 

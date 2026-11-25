@@ -4,12 +4,12 @@
  * Description: The content of the small always-on-top Symbols and phrases window (about 396px,
  *   opened from the Transcript Copy menu). Tabs Symbols, Honorifics and Phrases; click an entry
  *   to copy it, and it reads "Copied" for 2 s. The window has no title bar, so the header is
- *   its drag area. Esc closes it from the main process.
+ *   its drag area. Esc and the close button at the right of the header close it.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SYMBOL_GROUPS, matchesQuery, type SymbolEntry, type SymbolGroupId } from "../../handoff/utils/symbols";
 import { writeClipboard } from "../../../shared/utils/handoff";
-import { IconSearch } from "../../../shared/components/PanelIcons";
+import { IconClose, IconSearch } from "../../../shared/components/PanelIcons";
 
 const COPIED_MS = 2000;
 
@@ -34,6 +34,15 @@ export default function SymbolsWindow() {
     },
     [],
   );
+
+  // Esc closes the window from here too, so it works wherever focus sits (main also catches it).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") window.close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const entries = useMemo(() => {
     const groups = TABS.find((t) => t.id === tab)!.groups;
@@ -80,6 +89,16 @@ export default function SymbolsWindow() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-label="Close"
+          title="Close (Esc)"
+          onClick={() => window.close()}
+          className="ml-auto inline-flex h-[32px] w-[32px] items-center justify-center rounded-control text-fg-dim hover:text-fg"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
+          <IconClose />
+        </button>
       </div>
 
       <label className="mx-[10px] mb-[6px] mt-[10px] flex h-target flex-none items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-fg-dim">

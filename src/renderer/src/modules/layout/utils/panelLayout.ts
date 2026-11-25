@@ -112,6 +112,51 @@ export function moveTab(layout: PanelLayout, id: PanelId, by: -1 | 1): PanelLayo
   return withGroup(layout, g, { ...layout.groups[g], tabs });
 }
 
+/**
+ * Move a panel into another side group (left or right), at `index` or at the end, and show it
+ * there. The group it left shows its neighbour. Centre panels stay where they are.
+ */
+export function movePanelToGroup(layout: PanelLayout, id: PanelId, to: "left" | "right", index?: number): PanelLayout {
+  const from = groupOf(layout, id);
+  if (!from || from === "centre") return layout;
+  if (from === to) {
+    if (index === undefined) return layout;
+    const tabs = layout.groups[to].tabs.filter((t) => t !== id);
+    const at = Math.min(Math.max(0, index), tabs.length);
+    tabs.splice(at, 0, id);
+    return withGroup(layout, to, { tabs, active: id });
+  }
+  const left = closePanel(layout, id);
+  const tabs = [...left.groups[to].tabs];
+  const at = index === undefined ? tabs.length : Math.min(Math.max(0, index), tabs.length);
+  tabs.splice(at, 0, id);
+  return withGroup(left, to, { tabs, active: id });
+}
+
+/** A side group never fits narrower than this, however small the window or large the zoom. */
+export const SIDE_FLOOR = 120;
+
+/**
+ * The side widths to draw at this container width. The stored sizes stay as the user set them, so a
+ * wider window brings them back; here they shrink together, in proportion, so the centre keeps at
+ * least CENTRE_MIN_W (and a side group never goes under SIDE_FLOOR). A group with no tabs takes no room.
+ */
+export function fitSides(
+  sizes: Pick<PanelSizes, "left" | "right">,
+  containerWidth: number,
+  has: { left: boolean; right: boolean } = { left: true, right: true },
+): { left: number; right: number } {
+  const l = has.left ? sizes.left : 0;
+  const r = has.right ? sizes.right : 0;
+  if (!Number.isFinite(containerWidth) || containerWidth <= 0) return { left: l, right: r };
+  const room = Math.max(containerWidth - CENTRE_MIN_W, (has.left ? SIDE_FLOOR : 0) + (has.right ? SIDE_FLOOR : 0));
+  if (l + r <= room) return { left: l, right: r };
+  if (!has.left) return { left: 0, right: Math.max(SIDE_FLOOR, room) };
+  if (!has.right) return { left: Math.max(SIDE_FLOOR, room), right: 0 };
+  const left = Math.min(room - SIDE_FLOOR, Math.max(SIDE_FLOOR, Math.floor((l * room) / (l + r))));
+  return { left, right: room - left };
+}
+
 /** Set one size, clamped to its limit and, for the sides, to what leaves the centre its minimum. */
 export function resizeGroup(
   layout: PanelLayout,
@@ -159,6 +204,15 @@ export function normalizeLayout(raw: unknown, defs: PanelDefinition[]): PanelLay
     if (placed.has(d.id) || known.has(d.id)) continue; // closed on purpose, or already placed
     groups[d.group].tabs.push(d.id);
     groups[d.group].active ??= d.id;
+  }
+  // The preview and the timeline can't be closed; a damaged saved layout never leaves them out.
+  for (const d of defs) {
+    if (d.group !== "centre" || groups.centre.tabs.includes(d.id)) continue;
+    for (const g of GROUPS) groups[g] = { ...groups[g], tabs: groups[g].tabs.filter((t) => t !== d.id) };
+    groups.centre.tabs.push(d.id);
+  }
+  for (const g of GROUPS) {
+    if (!groups[g].active || !groups[g].tabs.includes(groups[g].active as PanelId)) groups[g].active = groups[g].tabs[0] ?? null;
   }
   const sizes = { ...DEFAULT_SIZES };
   for (const k of Object.keys(sizes) as (keyof PanelSizes)[]) {

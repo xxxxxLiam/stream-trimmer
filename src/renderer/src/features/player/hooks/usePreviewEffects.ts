@@ -36,6 +36,12 @@ function typing(e: KeyboardEvent): boolean {
   return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
 }
 
+/** Space presses a focused button, switch, link or menu item; only on anything else does it play or pause. */
+export function onControl(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLElement | null;
+  return !!el?.closest?.('button, a[href], summary, [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"], [role="option"], [role="tab"], [role="radio"]');
+}
+
 export function usePreviewEffects(a: Args) {
   const { player, videoId, tabActive, duration, seekRequest, loop, sections, fullScreen } = a;
   const playerRef = useRef(player);
@@ -98,6 +104,7 @@ export function usePreviewEffects(a: Args) {
     };
     const onDown = (e: KeyboardEvent) => {
       if (e.altKey || typing(e)) return;
+      if (e.key === " " && onControl(e)) return;
       if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.key === "N") {
         e.preventDefault();
         argsRef.current.onNextVideo();

@@ -31,6 +31,7 @@ export const IPC = {
   fileStartDrag: "file:startDrag",
   fileUndoClip: "file:undoClip",
   ownerCheck: "owner:check",
+  reportSend: "report:send",
   settingsAll: "settings:all",
   settingsRestoredAt: "settings:restoredAt",
   settingsSet: "settings:set",

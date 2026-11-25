@@ -16,6 +16,8 @@ const base: ColdStartProps = {
   value: "",
   onChange: noop,
   onPasteButton: noop,
+  onPasteText: noop,
+  onSubmit: noop,
   offer: null,
   onUseOffer: noop,
   toolsStatus: "ready",
@@ -31,8 +33,8 @@ const html = (p: Partial<ColdStartProps> = {}) => renderToStaticMarkup(<ColdStar
 
 test("empty: logo, name, promise, glowing box, Paste with its key, both chips and the folder chip", () => {
   const h = html();
-  assert.match(h, /aria-label="Clipr logo"/);
-  assert.match(h, />Clipr</);
+  assert.match(h, /aria-label="Clipr"/);
+  assert.match(h, /id="r-cut"/, "lockup C: the r is cut, its top piece its own path");
   assert.match(h, /Only the seconds you need/);
   assert.match(h, /placeholder="Paste a YouTube link"/);
   assert.match(h, /shadow-box/);
@@ -111,4 +113,17 @@ test("B-4: a link that has not opened is not saved as a video", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync(new URL("../../workspace/hooks/WorkspaceContext.tsx", import.meta.url), "utf8");
   assert.match(src, /if \(url && !opened\) return;/);
+});
+
+test("A-9: pasted or submitted text that is not a video gets a sentence; a stale engine error never shows for it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const ctl = readFileSync(new URL("../hooks/useStartController.ts", import.meta.url), "utf8");
+  assert.match(ctl, /submitted === url\.trim\(\) \? NOT_A_VIDEO/);
+  assert.match(ctl, /extractVideoId\(url\) \? \(error \? plainOpenError\(error\)/);
+  assert.match(ctl, /onSubmit: \(\) => \{/);
+  const box = readFileSync(new URL("./ColdStart.tsx", import.meta.url), "utf8");
+  assert.match(box, /onPaste=\{p\.onPasteText\}/);
+  assert.match(box, /e\.key === "Enter"/);
+  const { NOT_A_VIDEO } = await import("../utils/startUtils");
+  assert.match(html({ value: "meeting notes", problem: NOT_A_VIDEO }), /That is not a link to one video\./);
 });

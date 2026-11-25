@@ -60,3 +60,42 @@ test("every refusal carries one message and one fix sentence", () => {
   const res = checkCookiesFile(row(".google.com", "SID", "x"), NOW);
   assert.ok(!res.ok && res.message.endsWith(".") && res.fix.endsWith("."));
 });
+
+// ---- A-13: the picker path and the refusal that names the real site -----------------------------
+
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { MAX_COOKIE_BYTES, readCookieFile } from "./cookieFile";
+
+test("a wrong-site refusal names the file's real site, not google.com", () => {
+  const facebook = checkCookiesFile([row(".facebook.com", "c_user", "1"), row(".facebook.com", "xs", "2"), row(".example.org", "a", "b")].join("\n"), NOW);
+  assert.equal(facebook.ok, false);
+  assert.equal(facebook.ok === false && facebook.reason, "wrong-site");
+  assert.equal(facebook.ok === false && facebook.message, "That file was made on facebook.com, not youtube.com.");
+  const lookalike = checkCookiesFile(row(".notyoutube.com", "SID", "x"), NOW);
+  assert.equal(lookalike.ok === false && lookalike.message, "That file was made on notyoutube.com, not youtube.com.");
+  const strange = checkCookiesFile(row("<script>x</script>", "SID", "x"), NOW);
+  assert.equal(strange.ok === false && strange.message, "That file was made on another site, not youtube.com.");
+});
+
+test("the picker path: a folder, a missing file and a file over the cap each get a plain sentence, with no system text", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ck-"));
+  const logged: string[] = [];
+  const refusal = async (p: unknown) => {
+    const r = await readCookieFile(p, (m) => logged.push(m));
+    assert.equal(r.ok, false);
+    return r.ok ? "" : r.refusal.message;
+  };
+  assert.equal(await refusal(dir), "That is a folder, not a cookies file.");
+  assert.equal(await refusal(path.join(dir, "gone.txt")), "That file is gone.");
+  assert.equal(await refusal(undefined), "No file was chosen.");
+  const big = path.join(dir, "big.txt");
+  fs.writeFileSync(big, Buffer.alloc(MAX_COOKIE_BYTES + 1, 97));
+  assert.equal(await refusal(big), "That file is too big to be a cookies file.");
+  for (const m of [await refusal(dir), await refusal(path.join(dir, "gone.txt"))]) assert.doesNotMatch(m, /ENOENT|EISDIR|\/tmp|illegal operation/);
+  assert.ok(logged.some((l) => /ENOENT/.test(l)), "the system's own error is in the log");
+  const fine = path.join(dir, "ok.txt");
+  fs.writeFileSync(fine, "hello");
+  assert.deepEqual(await readCookieFile(fine), { ok: true, text: "hello" });
+});

@@ -22,7 +22,7 @@ export function useExportController() {
   const handoff = useHandoffNotice(queries.campaignId);
   const makingByClipButton = useMakingName();
   useRetryKey(Boolean(state.failed), actions.retry);
-  const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote, cancelDownload } = useClipperContext();
+  const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
   const finishedEntry = state.finished ? downloads.find((d) => d.id === state.finished?.entryId) : undefined;
 
@@ -41,7 +41,7 @@ export function useExportController() {
     made,
     ...actions,
     ...handoff,
-    cancel: cancelDownload,
+    cancel: actions.stop,
     selectedId: state.selectedId,
     notice: state.notice,
     making: downloading
