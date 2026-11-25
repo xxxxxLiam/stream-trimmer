@@ -4,7 +4,7 @@
   "description": "Cut short vertical clips out of long podcasts and interviews.",
   "author": "IDK Solutions (Pty) Ltd",
   "license": "SEE LICENSE IN LICENSE",
-  "version": "14.0.0",
+  "version": "15.0.0",
   "type": "module",
   "main": "out/main/index.cjs",
   "scripts": {
@@ -77,7 +77,7 @@
   "build": {
     "appId": "app.youtubeclipper.local",
     "productName": "Clipr",
-    "copyright": "Copyright \u00a9 2025\u20132026 IDK Solutions (Pty) Ltd",
+    "copyright": "Copyright © 2025–2026 IDK Solutions (Pty) Ltd",
     "artifactName": "Clipr-${version}-${os}-${arch}.${ext}",
     "publish": {
       "provider": "github",

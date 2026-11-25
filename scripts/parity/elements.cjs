@@ -9,7 +9,8 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { chromium } = require("playwright");
+// Loaded where a browser is launched: playwright is a dev-machine tool, not an install dependency.
+const launchChromium = () => require("playwright").chromium.launch();
 const { SHIM, boardDir } = require("./boardRender.cjs");
 
 const REPO = path.resolve(__dirname, "..", "..");
@@ -66,7 +67,7 @@ function parseArgs() {
 
 async function boardData(o) {
   const file = `${o.screen}.dc.html`;
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: 1500, height: 1000 }, deviceScaleFactor: 1 });
     await page.route("**/support.js", (r) => r.fulfill({ contentType: "text/javascript", body: SHIM }));
