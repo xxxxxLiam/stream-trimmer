@@ -67,6 +67,13 @@ export function useTimelineEffects(a: Args) {
     return () => window.removeEventListener("keydown", onKey);
   }, [tabActive]);
 
+  // Zooming back out clears the centre. Declared before Fit's effect on purpose: Fit resets the zoom to 0
+  // and re-centres in the same commit, so its setFocus must run last and win.
+  useEffect(() => {
+    if (a.zoom === 0) a.setFocus(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.zoom]);
+
   const fitSeen = useRef(a.fitRequests);
   // Fit: frame the picked range with room either side (the whole video when nothing is picked).
   useEffect(() => {
@@ -91,12 +98,6 @@ export function useTimelineEffects(a: Args) {
     if (a.playhead < r.start || a.playhead > r.end) a.seek(r.start);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.duration, a.framed?.start, a.framed?.end]);
-
-  // Zooming back out clears the centre.
-  useEffect(() => {
-    if (a.zoom === 0) a.setFocus(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.zoom]);
 
   // Zoomed in, the window follows the playhead once it runs off the edge. Only when the playhead
   // moves: zooming or panning to look somewhere else must not snap the view back to it.

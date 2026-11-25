@@ -11,6 +11,8 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
 import { useToolState } from "../../../modules/layout/hooks/useToolState";
+import { useAudioLanguageState } from "../../../modules/layout/hooks/useAudioLanguageState";
+import { audioLanesOf } from "../../../shared/utils/audioLanguages";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
@@ -32,6 +34,8 @@ export function useTimelineController() {
   const tools = useToolState();
   const { active } = useCampaign();
   const range = usePickedRange();
+  const [audioSel] = useAudioLanguageState(active?.id ?? null);
+  const audioLanes = useMemo(() => audioLanesOf(clipper.info?.audioTracks, audioSel), [clipper.info?.audioTracks, audioSel]);
   const flagsApi = useFlagsState(clipper.videoId);
   const s = useTimelineState();
   const { duration, videoId } = clipper;
@@ -226,6 +230,7 @@ export function useTimelineController() {
     playhead,
     range,
     sections,
+    audioLanes,
     suggestedName,
     joined,
     total,
@@ -243,6 +248,7 @@ export function useTimelineController() {
     setWidth: s.setWidth,
     storyboards: clipper.info?.storyboards,
     lines,
+    transcriptLoading: clipper.loadingTranscript,
     flags: flagsApi.flags,
     used,
     waiting,
@@ -254,6 +260,8 @@ export function useTimelineController() {
     inText: range ? clockTime(range.start) : startPicked ? clockTime(clipper.start) : dash,
     outText: range ? clockTime(range.end) : dash,
     lengthText: total > 0 ? lengthLabel(total) : dash,
+    /** The whole joined clip in seconds, for the campaign's length rule. */
+    totalSeconds: total,
     onLanePointerDown,
     onLanePointerMove,
     onLanePointerUp,

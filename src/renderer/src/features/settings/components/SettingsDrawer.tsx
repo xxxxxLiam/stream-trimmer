@@ -5,10 +5,11 @@
  *   panel while open and blocks nothing else. Rows with a chevron open a second view, switches flip in
  *   place, Back shows the parent's name, X and Escape close.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Drawer } from "../../../shared/components/Drawer";
 import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
+import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
 import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
@@ -16,15 +17,20 @@ import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
 import { useFinalCutLook } from "../hooks/useFinalCutLook";
 import { useClipDestination } from "../../player/hooks/useClipDestination";
-import { campaignClipsDir, campaignNameProblems } from "../../../shared/utils/campaigns";
+import { campaignClipsDir, campaignNameProblems, type Campaign } from "../../../shared/utils/campaigns";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
+import { lookForCampaign, loadSavedLooks } from "../../../shared/utils/fcpLooks";
+import { destinationLabel } from "../../player/utils/clipDestination";
+import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import { DEFAULT_DAILY_QUOTA, dropCampaignPrefs, toggleLanguage } from "../utils/settingsPrefs";
 import type { AudioTrack } from "../../../shared/utils/clip";
 import type { EditorHandoffSettings } from "../../../shared/utils/fcpxml";
 
 /** How long "Click again to delete" stays armed. */
 export const DELETE_ARM_MS = 5000;
+/** A second click this soon after the first is the same double-click, not a decision. */
+export const DELETE_GUARD_MS = 400;
 
 export type SettingsDrawerProps = {
   open: boolean;
@@ -42,10 +48,12 @@ export type SettingsDrawerProps = {
 export default function SettingsDrawer({ open, onClose, startAt, tracks, editor, videoTitle }: SettingsDrawerProps) {
   const c = useSettingsController({ open, onClose, startAt });
   const [destination] = useClipDestination();
-  const viewId = c.view.kind === "campaign" ? c.view.id : null;
+  const viewId = c.view.kind === "campaign" || c.view.kind === "editor" ? c.view.id : null;
   const activeCampaign = c.campaigns.campaigns.find((x) => x.id === viewId);
-  const look = useFinalCutLook(activeCampaign, c.campaigns);
   const activeFcp = activeCampaign ? editor.settingsFor(activeCampaign.id) : undefined;
+  const look = useFinalCutLook(activeCampaign, c.campaigns, () => {
+    if (activeCampaign && activeFcp) editor.onChange(activeCampaign.id, { ...activeFcp, timelineFormat: { ...activeFcp.timelineFormat, kind: "look" } });
+  });
   const layout = useFinalCutLayout(
     activeCampaign,
     {
@@ -56,8 +64,9 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   );
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
+  const armedAt = useRef(0);
   // A-7: the first click on Delete arms it for a few seconds only; leaving the view or closing the drawer disarms it.
-  const viewKey = c.view.kind === "campaign" ? c.view.id : c.view.kind;
+  const viewKey = c.view.kind === "campaign" ? c.view.id : c.view.kind === "editor" ? `editor:${c.view.id}` : c.view.kind;
   useEffect(() => {
     if (!confirming) return;
     const t = window.setTimeout(() => setConfirming(null), DELETE_ARM_MS);
@@ -66,10 +75,42 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   useEffect(() => setConfirming(null), [viewKey, open]);
   if (!open) return null;
   const { view } = c;
-  const campaign = view.kind === "campaign" ? c.campaigns.campaigns.find((x) => x.id === view.id) : undefined;
+  const campaign = view.kind === "campaign" || view.kind === "editor" ? c.campaigns.campaigns.find((x) => x.id === view.id) : undefined;
+
+  const lookFormat = (campaign: Campaign) => lookForCampaign(campaign, loadSavedLooks())?.format ?? null;
+  const fcpFields = (campaign: Campaign, fcp: EditorHandoffSettings): FinalCutFields => ({
+    library: fcp.fcpLibrary ? (fcp.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
+    // Blank means "Export" (shown as the placeholder). Layouts video and day name their own events.
+    event: fcp.mediaEvent,
+    showEvent: fcp.layout === "export" || fcp.layout === "flat",
+    onChoose: () => {
+      void window.electronAPI?.pickFcpLibrary?.().then((p) => {
+        if (p) editor.onChange(campaign.id, { ...fcp, fcpLibrary: p });
+      });
+    },
+    onEvent: (v) => editor.onChange(campaign.id, { ...fcp, mediaEvent: v }),
+    look,
+    layout,
+    timeline: {
+      kind: fcp.timelineFormat.kind,
+      lookName: look?.saved.find((l) => l.id === look.currentId)?.name ?? "",
+      lookFormat: lookFormat(campaign),
+      onPick: (kind) => editor.onChange(campaign.id, { ...fcp, timelineFormat: { ...fcp.timelineFormat, kind } }),
+    },
+  });
 
   let body;
-  if (view.kind === "campaign" && campaign) {
+  if (view.kind === "editor" && campaign && hasEditorPage(destination)) {
+    body = (
+      <SettingsEditor
+        campaignName={campaign.name}
+        label={destinationLabel(destination)}
+        finalCut={destination === "finalcut" ? fcpFields(campaign, editor.settingsFor(campaign.id)) : null}
+        onBack={c.back}
+        onClose={onClose}
+      />
+    );
+  } else if (view.kind === "campaign" && campaign) {
     const fcp = editor.settingsFor(campaign.id);
     body = (
       <SettingsCampaign
@@ -79,24 +120,26 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         quota={campaign.dailyQuota ?? DEFAULT_DAILY_QUOTA}
         onQuota={(n) => c.campaigns.update(campaign.id, { dailyQuota: n })}
         folderLabel={folderChipLabel(campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir), 3)}
-        finalCut={
-          destination === "finalcut"
+        editor={
+          hasEditorPage(destination)
             ? {
-                library: fcp.fcpLibrary ? (fcp.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
-                // Blank means "Export" (shown as the placeholder). Layouts video and day name their own events.
-                event: fcp.mediaEvent,
-                showEvent: fcp.layout === "export" || fcp.layout === "flat",
-                onChoose: () => {
-                  void window.electronAPI?.pickFcpLibrary?.().then((p) => {
-                    if (p) editor.onChange(campaign.id, { ...fcp, fcpLibrary: p });
-                  });
-                },
-                onEvent: (v) => editor.onChange(campaign.id, { ...fcp, mediaEvent: v }),
-                look,
-                layout,
+                label: destinationLabel(destination),
+                summary: editorSummary(
+                  destination,
+                  destinationLabel(destination),
+                  finalCutSummary({
+                    library: fcp.fcpLibrary ? folderChipLabel(fcp.fcpLibrary, 1) : "",
+                    event: fcp.mediaEvent,
+                    layout: fcp.layout ?? "export",
+                    look: look?.saved.find((l) => l.id === look.currentId)?.name ?? "",
+                  }),
+                ),
+                onOpen: () => c.setView({ kind: "editor", id: campaign.id }),
               }
             : null
         }
+        lengthRule={{ min: campaign.lengthMinSec, max: campaign.lengthMaxSec }}
+        onLengthRule={(patch) => c.campaigns.update(campaign.id, patch)}
         onPatch={(patch) => c.patchCampaign(campaign.id, patch)}
         onToggleLanguage={(code) => c.patchCampaign(campaign.id, { languages: toggleLanguage(c.prefsFor(campaign.id).languages, code) })}
         onOpenFolder={() => {
@@ -115,10 +158,14 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         confirmingDelete={confirming === campaign.id}
         onDelete={() => {
           if (confirming === campaign.id) {
+            if (Date.now() - armedAt.current < DELETE_GUARD_MS) return;
             setConfirming(null);
             c.campaigns.remove(campaign.id);
             dropCampaignPrefs(campaign.id, (k) => readSetting<Record<string, unknown>>(k, {}), writeSetting);
-          } else setConfirming(campaign.id);
+          } else {
+            armedAt.current = Date.now();
+            setConfirming(campaign.id);
+          }
         }}
         onBack={c.back}
         onClose={onClose}

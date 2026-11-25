@@ -544,6 +544,8 @@ export default function EditorHandoff({
       ? "Vertical 1080 x 1920"
       : settings.timelineFormat.kind === "source"
         ? "Match source"
+        : settings.timelineFormat.kind === "look"
+          ? "From your look"
         : `${settings.timelineFormat.width} x ${settings.timelineFormat.height}`
   } \u00B7 ${settings.timelineFormat.fps === "source" ? "source fps" : `${settings.timelineFormat.fps} fps`}`;
   const showStatus = !busy && !!status && (!!status.message || (status.skipped?.length ?? 0) > 0);
@@ -761,12 +763,13 @@ export default function EditorHandoff({
                     value={settings.timelineFormat.kind}
                     onChange={(e) => {
                       const kind = e.target.value as TimelineKind;
-                      const fps = kind !== "source" && settings.timelineFormat.fps === "source" ? "30" : settings.timelineFormat.fps;
-                      set({ timelineFormat: { ...settings.timelineFormat, kind, fps } });
+                      // The frame rate is left as it is: vertical follows the video by default, so a kind change must not write 30.
+                      set({ timelineFormat: { ...settings.timelineFormat, kind } });
                     }}
                   >
                     <option value="vertical">Vertical 1080 x 1920</option>
                     <option value="source">Match source</option>
+                    <option value="look">From your look</option>
                     <option value="custom">Custom size</option>
                   </select>
                 </label>

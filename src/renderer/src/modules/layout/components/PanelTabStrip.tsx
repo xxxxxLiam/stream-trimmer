@@ -183,7 +183,7 @@ export default function PanelTabStrip({
         >
           <IconPlus />
         </PopoverMenu>
-        <PopoverMenu label={`${label} menu`} items={menuItems} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
+        <PopoverMenu label={`${label} menu`} items={menuItems} menuWidth={212} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
           <IconMore />
         </PopoverMenu>
       </div>

@@ -116,6 +116,16 @@ test("report: note, privacy line, Send report and Copy details; kept state says 
   assert.doesNotMatch(k, /aria-label="Send report"/);
 });
 
+test("report sent: the page itself says Sent, what went with it, Back to Help and Copy details, and promises nothing", () => {
+  const h = renderToStaticMarkup(<HelpReport {...report} state="sent" />);
+  assert.match(h, /role="status"[\s\S]*text-frost[\s\S]*Sent\. Thank you\./);
+  assert.match(h, /It went with the error, the version numbers and a cleaned log\. There&#x27;s nothing else to do\./);
+  assert.match(h, />Back to Help</);
+  assert.match(h, /aria-label="Copy details"/);
+  assert.doesNotMatch(h, /aria-label="Send report"|reference|reply/i);
+  assert.doesNotMatch(renderToStaticMarkup(<HelpReport {...report} state="kept" />), />Back to Help<|cleaned log/);
+});
+
 test("shortcuts read Ctrl on Windows", () => {
   assert.match(renderToStaticMarkup(<HelpShortcuts ctrl onBack={noop} onClose={noop} />), />Ctrl Enter</);
   assert.match(renderToStaticMarkup(<HelpShortcuts ctrl={false} onBack={noop} onClose={noop} />), />⌘ Enter</);

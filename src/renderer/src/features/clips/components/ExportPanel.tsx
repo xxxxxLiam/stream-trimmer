@@ -13,6 +13,8 @@ import { getClipDestination } from "../../player/hooks/useClipDestination";
 import FailedRow from "./FailedRow";
 import HandoffRow from "./HandoffRow";
 import MakingRow from "./MakingRow";
+import OfflineRow from "./OfflineRow";
+import CrashNoteHost from "../../help/components/CrashNoteHost";
 import WaitingRow from "./WaitingRow";
 
 const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
@@ -23,14 +25,19 @@ export default function ExportPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
+      <CrashNoteHost />
       {c.making && <MakingRow kind="making" {...c.making} onCancel={c.cancel} />}
+      {c.offline && <OfflineRow name={c.offline.name} percent={c.offline.percent} />}
       {c.failed && (
         <FailedRow
           failed={c.failed}
           failure={c.failure}
+          campaignName={c.campaignName}
+          signedIn={c.signedIn}
           onAction={(a) => {
             if (a === "retry") c.retry();
             else if (a === "changeFolder") void c.changeFolder();
+            else if (a === "showFolder") c.showFolder();
             else if (a === "showInBrowser") c.showInBrowser();
             else if (a === "signIn") c.signIn();
             else c.saveForLater();

@@ -471,9 +471,10 @@ test("timeline choices: vertical, match source, custom, each with an explicit ra
   assert.deepEqual(resolveTimeline({ kind: "source", width: 1, height: 1, fps: "source" }, NTSC), { width: 1920, height: 1080, fps: { num: 30000, den: 1001 } });
   assert.deepEqual(resolveTimeline({ kind: "source", width: 1, height: 1, fps: "25" }, NTSC), { width: 1920, height: 1080, fps: { num: 25, den: 1 } });
   assert.deepEqual(resolveTimeline({ kind: "custom", width: 1080, height: 1080, fps: "24" }, NTSC), { width: 1080, height: 1080, fps: { num: 24, den: 1 } });
-  // bad stored values fall back to vertical 1080x1920 at 30, never to the source
-  assert.deepEqual(normalizeTimeline({ kind: "nope", fps: "banana", width: -4 }), { kind: "vertical", width: 1080, height: 1920, fps: "30" });
-  assert.equal(normalizeTimeline({ kind: "vertical", fps: "source" }).fps, "30");
+  // bad stored values fall back to vertical 1080x1920 that follows the video's own rate
+  assert.deepEqual(normalizeTimeline({ kind: "nope", fps: "banana", width: -4 }), { kind: "vertical", width: 1080, height: 1920, fps: "source" });
+  assert.equal(normalizeTimeline({ kind: "vertical", fps: "source" }).fps, "source", "vertical may follow the video");
+  assert.equal(normalizeTimeline({ kind: "vertical", fps: "25" }).fps, "25", "an explicit rate is kept");
   assert.equal(DEFAULT_EDITOR_SETTINGS.timelineFormat.kind, "vertical");
   assert.equal(DEFAULT_EDITOR_SETTINGS.createProject, false);
 });
@@ -898,4 +899,37 @@ test("D2-1: layouts A and C name the smart collection like the keyword collectio
 test("D2-2: a blank Event on the flat layout writes Export, not Clips", () => {
   assert.match(layoutXml("flat"), /<event name="Export">/);
   assert.ok(!layoutXml("flat").includes('<event name="Clips">'));
+});
+
+// ---- timeline: from the look, and vertical following the video ----------------------------------
+
+const PAL: MediaInfo = { ...NTSC, fps: { num: 25, den: 1 }, durationSec: 10 };
+
+test("vertical follows the video's frame rate by default, and an explicit rate still wins (C)", () => {
+  assert.deepEqual(DEFAULT_EDITOR_SETTINGS.timelineFormat.fps, "source");
+  const v = DEFAULT_EDITOR_SETTINGS.timelineFormat;
+  assert.deepEqual(resolveTimeline(v, PAL), { width: 1080, height: 1920, fps: { num: 25, den: 1 } });
+  assert.deepEqual(resolveTimeline(v, NTSC), { width: 1080, height: 1920, fps: { num: 30000, den: 1001 } });
+  assert.deepEqual(resolveTimeline({ ...v, fps: "30" }, PAL), { width: 1080, height: 1920, fps: { num: 30, den: 1 } });
+});
+
+test("kind look makes the project in the look's size and rate; no format in the look gives vertical (b)", () => {
+  const fmt = { kind: "look" as const, width: 1080, height: 1920, fps: "source" };
+  assert.deepEqual(resolveTimeline(fmt, NTSC, { width: 3840, height: 2160, fps: "25" }), { width: 3840, height: 2160, fps: { num: 25, den: 1 } });
+  assert.deepEqual(resolveTimeline(fmt, PAL, { width: 1080, height: 1350, fps: "29.97" }), { width: 1080, height: 1350, fps: { num: 30000, den: 1001 } });
+  assert.deepEqual(resolveTimeline(fmt, PAL), { width: 1080, height: 1920, fps: { num: 25, den: 1 } });
+  assert.deepEqual(resolveTimeline({ ...fmt, kind: "vertical" }, PAL, { width: 3840, height: 2160, fps: "25" }), { width: 1080, height: 1920, fps: { num: 25, den: 1 } }, "other kinds ignore the look");
+});
+
+test("a project in kind look carries the look's size and rate and validates against the DTD (b)", { skip: !hasXmllint }, () => {
+  const look = parseLook(sampleExport({ version: "1.10" }));
+  const xml = buildFcpxml({
+    eventName: "Raw",
+    clips: [clip()],
+    project: { ...PROJECT, look, timeline: { kind: "look", width: 1080, height: 1920, fps: "source" } },
+  });
+  assert.equal(validate(xml), "");
+  assert.ok(Object.values(tree(xml).formats).includes("1920x1080@1001/30000s"), "a 1920x1080 29.97 format is written for the project");
+  const vertical = buildFcpxml({ eventName: "Raw", clips: [clip()], project: { ...PROJECT, look } });
+  assert.ok(Object.values(tree(vertical).formats).includes("1080x1920@1/30s"), "kind vertical is unchanged");
 });

@@ -33,6 +33,8 @@ export interface DownloadFailureInfo {
   attempt: FailureAttempt;
   /** The engine's own words for the clip's Export row, when it sent them. */
   row?: ClipRowState;
+  /** Set when the clip was refused before it started because the folder is clearly short of room. */
+  room?: { neededMb: number; freeMb: number };
 }
 
 export type DownloadOptions = {

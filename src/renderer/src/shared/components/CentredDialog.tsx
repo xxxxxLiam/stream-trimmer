@@ -60,7 +60,8 @@ export default function CentredDialog({
   }, [open, onClose]);
 
   useEffect(() => {
-    if (open) panelRef.current?.focus();
+    // A field that asked for focus (autoFocus) keeps it; the panel takes it only when nothing inside does.
+    if (open && !panelRef.current?.contains(document.activeElement)) panelRef.current?.focus();
   }, [open]);
 
   if (!open) return null;

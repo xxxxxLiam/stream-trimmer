@@ -9,6 +9,7 @@ import { clearAfterCuttingOutcome } from "../../handoff/components/EditorHandoff
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
+import type { Segment } from "../../../shared/utils/segments";
 import { bankStore, type BankedClip } from "../../../shared/utils/bank";
 import { getDownloads } from "../../../shared/utils/downloads";
 import { playFrom } from "../../../shared/utils/playFrom";
@@ -96,18 +97,29 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     if (!res.ok) s.setNotice(res.error ?? "The clip could not be undone.");
   }, [s, forgetUse, removeDownload]);
 
+  const rerun = useCallback(
+    (f: { name: string; segments: Segment[]; bankId?: string }) => {
+      const clip = f.bankId ? q.clips.find((c) => c.id === f.bankId) : undefined;
+      if (clip) {
+        void make(clip);
+        return;
+      }
+      s.setFailed(null);
+      s.attempt.current = { name: f.name, segments: f.segments };
+      cutAgain(f.segments, f.name);
+    },
+    [s, q.clips, make, cutAgain],
+  );
   const retry = useCallback(() => {
-    const f = s.failed;
-    if (!f) return;
-    const clip = f.bankId ? q.clips.find((c) => c.id === f.bankId) : undefined;
-    if (clip) {
-      void make(clip);
-      return;
-    }
-    s.setFailed(null);
-    s.attempt.current = { name: f.name, segments: f.segments };
-    cutAgain(f.segments, f.name);
-  }, [s, q.clips, make, cutAgain]);
+    if (s.failed) rerun(s.failed);
+  }, [s.failed, rerun]);
+  // The connection is back: the same cut again, from where it stopped (the engine keeps what it fetched).
+  const resume = useCallback(() => {
+    const o = s.offline;
+    if (!o) return;
+    s.setOffline(null);
+    rerun(o);
+  }, [s, rerun]);
 
   // The new folder lands in state after the picker closes, so retry through refs that always hold
   // the latest render, and only when the folder really changed.
@@ -124,6 +136,11 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     for (let i = 0; i < 10 && latest.current.where === before; i++) await new Promise((r) => window.setTimeout(r, 50));
     if (latest.current.where !== before) latest.current.retry();
   }, [pickSaveDir, pickClipsDir, campaignId]);
+
+  const showFolder = useCallback(() => {
+    const dir = latest.current.where;
+    if (dir) void window.electronAPI?.editor?.reveal?.(dir);
+  }, []);
 
   const { openSignIn } = usePanelHost();
   const signIn = useCallback(() => openSignIn(), [openSignIn]);
@@ -146,5 +163,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid],
   );
 
-  return { select, make, stop, undo, remove, retry, changeFolder, showInBrowser, saveForLater, signIn };
+  return { select, make, stop, undo, remove, retry, resume, changeFolder, showFolder, folder: where, showInBrowser, saveForLater, signIn };
 }

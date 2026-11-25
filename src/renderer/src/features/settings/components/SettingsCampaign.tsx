@@ -2,23 +2,14 @@
  * File: SettingsCampaign.tsx
  * Path: src/renderer/src/features/settings/components/SettingsCampaign.tsx
  * Description: One campaign (Settings.dc.html view 3): Name, Clips a day, Extra seconds at both ends,
- *   Languages, Folder with Change and Open, the Final Cut library and event while Final Cut Pro is ticked, and
+ *   Languages, Folder with Change and Open, one button for the ticked editor (opens its own page), and
  *   Delete campaign. No clip id fields, no format or quality.
  */
 import { useState } from "react";
+import { formatClock } from "../../../shared/utils/clock";
+import { parseTimestamp } from "../../../shared/utils/clip";
 import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
-import FinalCutLayout, { type FinalCutLayoutProps } from "./FinalCutLayout";
-import FinalCutLook, { type FinalCutLookProps } from "./FinalCutLook";
 import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
-
-export type FinalCutFields = { library: string; event: string;
-  /** False for the layouts that name their own events (per video, per day): the Event field would do nothing. */
-  showEvent?: boolean; onChoose: () => void; onEvent: (v: string) => void;
-  /** The "Your look" row; shown when the look files can be read (needs the Engine look reader). */
-  look?: FinalCutLookProps;
-  /** The "Layout" row (how clips are laid out in Final Cut, with a preview). */
-  layout?: FinalCutLayoutProps;
-};
 
 export type SettingsCampaignProps = {
   name: string;
@@ -27,10 +18,13 @@ export type SettingsCampaignProps = {
   quota: number;
   onQuota: (n: number) => void;
   folderLabel: string;
+  /** The optional clip length rule in seconds (either end may be unset), and writing it. Never blocks Clip. */
+  lengthRule: { min?: number; max?: number };
+  onLengthRule: (patch: { lengthMinSec?: number; lengthMaxSec?: number }) => void;
   /** Dub tracks of the open video. The Languages block shows only when there are some. */
   dubs: { code: string; label: string }[];
-  /** Present only while Final Cut Pro is ticked in the Clip menu for this campaign. */
-  finalCut: FinalCutFields | null;
+  /** The button for the editor ticked in the Clip menu; null for Save to folder and CapCut, which have nothing to set. */
+  editor: { label: string; summary: string; onOpen: () => void } | null;
   onPatch: (p: Partial<CampaignPrefs>) => void;
   onToggleLanguage: (code: string) => void;
   onOpenFolder: () => void;
@@ -53,6 +47,33 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [nameProblem, setNameProblem] = useState("");
   const [folderProblem, setFolderProblem] = useState("");
+  const [lengthDraft, setLengthDraft] = useState<{ min?: string; max?: string }>({});
+  const [lengthProblem, setLengthProblem] = useState("");
+  const commitLength = (end: "min" | "max") => {
+    const text = lengthDraft[end];
+    if (text === undefined) return;
+    const next = text.trim() === "" ? undefined : parseTimestamp(text);
+    const other = end === "min" ? p.lengthRule.max : p.lengthRule.min;
+    const bad = next === null || (next !== undefined && next < 1) ? "Use minutes and seconds, like 0:30."
+      : next !== undefined && other !== undefined && (end === "min" ? next > other : next < other) ? "The first time must not be longer than the second." : "";
+    setLengthProblem(bad);
+    setLengthDraft((d) => ({ ...d, [end]: undefined }));
+    if (!bad) p.onLengthRule(end === "min" ? { lengthMinSec: next ?? undefined } : { lengthMaxSec: next ?? undefined });
+  };
+  const lengthField = (end: "min" | "max", label: string) => (
+    <input
+      type="text"
+      inputMode="numeric"
+      aria-label={label}
+      aria-invalid={lengthProblem ? true : undefined}
+      placeholder={end === "min" ? "0:30" : "1:00"}
+      value={lengthDraft[end] ?? (p.lengthRule[end] ? formatClock(p.lengthRule[end] ?? 0) : "")}
+      onChange={(e) => { setLengthDraft((d) => ({ ...d, [end]: e.target.value })); setLengthProblem(""); }}
+      onBlur={() => commitLength(end)}
+      onKeyDown={(e) => { if (e.key === "Enter") commitLength(end); }}
+      className={`${fieldInput} w-[72px] text-center [font-variant-numeric:tabular-nums] ${lengthProblem ? "border-error" : ""}`}
+    />
+  );
   const commitName = () => {
     if (draft === null) return;
     if (draft.trim() === p.name) {
@@ -114,6 +135,15 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           })}
         </div>
       </div>
+      <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
+        <div role="group" aria-label="Clip length" className="flex items-center gap-[8px]">
+          <span className="flex-1 text-body leading-[normal]">Clip length</span>
+          {lengthField("min", "Shortest clip length")}
+          <span className="text-body text-fg-dim">to</span>
+          {lengthField("max", "Longest clip length")}
+        </div>
+        {lengthProblem ? <span role="alert" className="text-meta text-error">{lengthProblem}</span> : <span className="text-meta text-fg-dim">Leave empty if {p.name} has no length rule.</span>}
+      </div>
       {p.dubs.length > 0 && (
       <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
         <div className="flex flex-col gap-[2px]">
@@ -159,32 +189,20 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
       </div>
       {folderProblem && <span role="alert" className="text-meta text-error">{folderProblem}</span>}
       </div>
-      {p.finalCut && (
-        <div role="group" aria-label="Final Cut Pro" className="flex flex-col gap-[8px] rounded-control border border-hairlineStrong bg-raised p-[12px]">
-          <span className="flex items-center gap-[8px] text-body leading-[normal] font-medium">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="text-fg-dim" aria-hidden="true">
-              <rect x="4" y="4" width="16" height="16" rx="3" />
-              <path d="m9 15 6-6M9 9h6v6" />
-            </svg>
-            Final Cut Pro
+      {p.editor && (
+        <button type="button" aria-label={`${p.editor.label} settings for ${p.name}`} onClick={p.editor.onOpen} className="mt-[4px] flex min-h-[56px] items-center gap-[12px] rounded-control border border-hairlineStrong bg-raised px-[12px] py-[8px] text-left hover:bg-hover">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-fg-dim" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+            <path d="m9 15 6-6M9 9h6v6" />
+          </svg>
+          <span className="flex min-w-[0px] flex-1 flex-col gap-[2px]">
+            <span className="text-body font-medium leading-[normal] text-fg">{p.editor.label}</span>
+            <span className="truncate text-meta text-fg-dim">{p.editor.summary}</span>
           </span>
-          <label htmlFor="fcp-lib" className="text-meta text-fg-dim">Library</label>
-          <div className="flex gap-[8px]">
-            <input id="fcp-lib" type="text" readOnly value={p.finalCut.library} className={`${fieldInput} flex-1`} />
-            <button type="button" aria-label={`Choose the Final Cut library for ${p.name}`} onClick={p.finalCut.onChoose} className="h-target rounded-control border border-hairlineStrong bg-hover px-[16px] text-body leading-[normal] text-fg">
-              Choose
-            </button>
-          </div>
-          {p.finalCut.showEvent !== false && (
-            <>
-              <label htmlFor="fcp-event" className="text-meta text-fg-dim">Event</label>
-              <input id="fcp-event" type="text" value={p.finalCut.event} placeholder="Export" onChange={(e) => p.finalCut?.onEvent(e.target.value)} className={fieldInput} />
-            </>
-          )}
-          {p.finalCut.layout && <FinalCutLayout {...p.finalCut.layout} />}
-          {p.finalCut.look && <FinalCutLook {...p.finalCut.look} />}
-          <p className="m-[0px] text-meta text-fg-dim">Shown only while Final Cut Pro is ticked in the Clip menu.</p>
-        </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-fg-dim" aria-hidden="true">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
       )}
       <button type="button" aria-label={p.confirmingDelete ? `Click again to delete ${p.name}` : `Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-[8px] h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
         {p.confirmingDelete ? `Click again to delete ${p.name}` : "Delete campaign"}

@@ -44,7 +44,11 @@ try {
     // ISO time of the copy this launch restored the settings from, or null.
     // "unreadable" (the file could not be read and there was no copy), "missing" (no file, no copy) or null.
     settingsLost: () => ipcRenderer.invoke(IPC.settingsLost),
+    // The one-time "Clipr has changed a lot" prompt: pending is true on the first launch after updating; answer is "fresh" or "keep".
+    startFreshPending: () => ipcRenderer.invoke(IPC.startFreshPending),
+    startFreshAnswer: (choice: unknown) => ipcRenderer.invoke(IPC.startFreshAnswer, choice),
     settingsRestoredAt: () => ipcRenderer.invoke(IPC.settingsRestoredAt),
+    saveTextFile: (payload: unknown) => ipcRenderer.invoke(IPC.dialogSaveText, payload),
     pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.
@@ -60,6 +64,8 @@ try {
     showInFolder: (targetPath: unknown) =>
       ipcRenderer.invoke(IPC.fileShowInFolder, targetPath),
     undoClip: (targetPath: unknown) => ipcRenderer.invoke(IPC.fileUndoClip, targetPath),
+    checkFreeSpace: (payload: unknown) => ipcRenderer.invoke(IPC.fileFreeSpace, payload),
+    checkFolder: (payload: unknown) => ipcRenderer.invoke(IPC.fileCheckFolder, payload),
     fileExists: (targetPath: unknown) => ipcRenderer.invoke(IPC.fileExists, targetPath),
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.

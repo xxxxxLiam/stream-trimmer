@@ -369,6 +369,7 @@ export type FailureCode =
   | "network_dropped"
   | "out_point_past_end"
   | "save_folder_gone"
+  | "folder_not_writable"
   | "disk_full"
   | "engine_behind"
   | "join_failed"
@@ -494,7 +495,7 @@ const PATTERNS = {
   rateLimited: /HTTP Error 429|Too Many Requests/i,
   formatGone: /requested format is not available/i,
   noFfmpeg: /ffprobe and ffmpeg not found|ffmpeg not found|ffmpeg is not installed/i,
-  permission: /EACCES|EPERM|permission denied/i,
+  permission: /EACCES|EPERM|EROFS|permission denied|read-only file system/i,
   disk: /ENOSPC|no space left on device|not enough space|disk full/i,
   folder: /ENOTDIR|\bENOENT\b|no such file or directory|Errno 2\b/i,
   spawnMissing: /spawn [^\n]*ENOENT/i,
@@ -576,7 +577,7 @@ export function classifyFailure(
   }
   if (!PATTERNS.disk.test(text) && PATTERNS.permission.test(text)) {
     return failure(
-      "save_folder_gone",
+      "folder_not_writable",
       500,
       "Clipr can't write to that folder",
       { id: "choose_folder", label: "Choose a folder" },

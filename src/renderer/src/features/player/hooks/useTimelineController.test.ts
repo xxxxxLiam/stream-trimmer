@@ -62,7 +62,7 @@ test("zooming does not snap the view back to the playhead: only the playhead mov
 
 test("tool keys are wired, and the tool buttons show them in their tooltips", () => {
   assert.match(effects, /toolForKey\(e\)[\s\S]*setTool\(t\)/);
-  const bar = readFileSync(new URL("../../../modules/layout/components/BottomBar.tsx", import.meta.url), "utf8");
+  const bar = readFileSync(new URL("../components/TimelineTools.tsx", import.meta.url), "utf8");
   assert.match(bar, /title=\{`\$\{label\} \(\$\{TOOL_KEYS\[t\]\.toUpperCase\(\)\}\)`\}/);
 });
 
@@ -73,4 +73,10 @@ test("a short timeline scrolls its tracks vertically under a ruler that stays pu
   assert.match(tracks, /tabIndex=\{0\}/, "focusable, so the arrow keys and Page Up/Down scroll it");
   assert.match(tracks, /<SourceLane[\s\S]*<ClipsLane/);
   assert.ok(lane.indexOf("<TimelineRuler") < lane.lastIndexOf("<div", i), "the ruler sits above the scrolling part");
+});
+
+test("Fit's re-centre runs after the zoom-reset effect, so Fit (zoom to 0 and a new centre in one commit) is not cleared", () => {
+  const clear = effects.indexOf("if (a.zoom === 0) a.setFocus(null)");
+  const fit = effects.indexOf("fitWindow(a.range, a.duration)");
+  assert.ok(clear > 0 && fit > 0 && clear < fit);
 });

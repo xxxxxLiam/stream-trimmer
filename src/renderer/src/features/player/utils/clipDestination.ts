@@ -18,6 +18,8 @@ export const DESTINATIONS: readonly { id: ClipDestination; label: string }[] = [
   { id: "capcut", label: "CapCut" },
 ];
 
+export const destinationLabel = (id: ClipDestination): string => DESTINATIONS.find((d) => d.id === id)?.label ?? "";
+
 /** The editors this system offers (Final Cut is not offered on Windows); undefined = all. */
 export function availableDestinations(offered: readonly string[] | undefined) {
   return DESTINATIONS.filter((d) => d.id === "folder" || !offered || offered.includes(d.id));

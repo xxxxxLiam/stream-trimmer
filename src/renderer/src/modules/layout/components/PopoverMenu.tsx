@@ -18,6 +18,8 @@ export type MenuItem =
       /** A tick shows when set (true or false keeps the room so labels line up). */
       checked?: boolean;
       disabled?: boolean;
+      /** A small icon before the label. */
+      icon?: ReactNode;
       /** Dim text at the right edge of the row. */
       detail?: string;
       /** Keep the menu open after picking, for a list of ticks. */
@@ -184,6 +186,7 @@ export default function PopoverMenu({
                   </span>
                   )
                 )}
+                {item.icon ? <span aria-hidden className="flex-none">{item.icon}</span> : null}
                 <span>{item.label}</span>
                 {item.detail ? <span className="ml-auto text-meta text-fg-dim">{item.detail}</span> : null}
               </button>

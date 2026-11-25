@@ -21,6 +21,27 @@ test("C-1: a cut clears ITS tab's store, never the module-level active one", () 
 test("F-1: one top bar and one tips host, for the open video only", () => {
   assert.match(app, /useTipsController\(!!info && active &&/);
   assert.match(app, /\{active && \(\s*<TopBar/);
-  assert.match(app, /\{active && \(\s*<BottomBar/);
+  assert.match(app, /\{active && \(\s*<ExportBar/);
+  assert.ok(!/BottomBar/.test(app), "the floating bottom bar is gone");
   assert.equal((app.match(/<TopBar/g) ?? []).length, 1);
+});
+
+test("R2: one timeline controller feeds the Timeline panel and the fixed export bar", () => {
+  assert.match(app, /<TimelineControllerProvider>[\s\S]*<PanelWorkspace \/>[\s\S]*<ExportBar[\s\S]*<\/TimelineControllerProvider>/);
+  const timeline = readFileSync(new URL("../features/player/components/Timeline.tsx", import.meta.url), "utf8");
+  const bar = readFileSync(new URL("../features/player/components/ExportBar.tsx", import.meta.url), "utf8");
+  assert.match(timeline, /useTimelineView\(\)/);
+  assert.ok(!/useTimelineController\(\)/.test(timeline), "a second controller would double the key handlers");
+  assert.match(timeline, /<TimelineTools \/>/);
+  assert.match(bar, /h-\[60px\][^"]*border-t border-hairlineStrong bg-panel/);
+  assert.ok(!/\b(m[xtblr]?-\[|rounded-)/.test(bar.match(/id="ui-export-bar" className="([^"]*)"/)![1]), "full bleed: no margin, no radius");
+});
+
+test("R2: the timeline is an inset rounded card above the fixed export bar", () => {
+  const timeline = readFileSync(new URL("../features/player/components/Timeline.tsx", import.meta.url), "utf8");
+  const cls = timeline.match(/id="ui-timeline"[^>]*className=\{?[`"]([^`"]*)[`"]/)![1];
+  assert.match(cls, /\bmx-\[8px\]/);
+  assert.match(cls, /\bmb-\[8px\]/);
+  assert.match(cls, /\brounded-panel\b/);
+  assert.ok(!/border-y/.test(cls));
 });
