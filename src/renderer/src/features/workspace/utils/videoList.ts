@@ -13,7 +13,7 @@ import { clipsFor, type BankData } from "../../../shared/utils/bank";
  * the top of the Done group (the fold shows the latest first, as on board 03.2.6).
  */
 export function setDone(tabs: WorkspaceTab[], id: string, done: boolean): WorkspaceTab[] {
-  const next = tabs.map((t) => {
+  const next: WorkspaceTab[] = tabs.map((t) => {
     if (t.id !== id) return t;
     const { done: _drop, ...rest } = t;
     return done ? { ...rest, done: true } : rest;
