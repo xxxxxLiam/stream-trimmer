@@ -1,23 +1,23 @@
 /**
  * File: Timeline.tsx
  * Path: src/renderer/src/features/player/components/Timeline.tsx
- * Description: The timeline panel: header, ruler and the three lanes (Transcript, Source, Clips),
+ * Description: The timeline panel: tools row, ruler and the three lanes (Transcript, Source, Clips),
  *   full width under the preview. The tools and zoom come from the bottom bar's shared state.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useTimelineController } from "../hooks/useTimelineController";
+import { useTimelineView } from "../hooks/TimelineControllerContext";
 import { TOOL_CURSORS, sourceLaneHeight } from "../utils/laneTools";
 import { useTranscriptLane } from "../hooks/useTranscriptLane";
 import ClipsLane from "./ClipsLane";
 import SourceLane from "./SourceLane";
-import TimelineHeader from "./TimelineHeader";
+import TimelineTools from "./TimelineTools";
 import TimelineRuler from "./TimelineRuler";
 import TranscriptLane from "./TranscriptLane";
 
 const LABEL_WIDTH = 96;
 
 export default function Timeline() {
-  const c = useTimelineController();
+  const c = useTimelineView();
   const laneBox = useRef<HTMLDivElement>(null);
   const transcriptLane = useTranscriptLane();
   const { setWidth } = c;
@@ -52,7 +52,7 @@ export default function Timeline() {
 
   return (
     <div id="ui-timeline" ref={laneBox} className={`relative flex min-w-[0px] flex-1 flex-col border-y border-hairline bg-panel pb-[10px]`}>
-      <TimelineHeader c={c} />
+      <TimelineTools />
       {/* The tools act on this whole area, down to the empty space under the tracks. */}
       <div
         data-timeline-area

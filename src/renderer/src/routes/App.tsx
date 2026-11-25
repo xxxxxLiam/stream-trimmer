@@ -58,7 +58,8 @@ import {
 } from "../shared/utils/youtubeConnection";
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
-import BottomBar from "../modules/layout/components/BottomBar";
+import ExportBar from "../features/player/components/ExportBar";
+import { TimelineControllerProvider } from "../features/player/hooks/TimelineControllerContext";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import SettingsRestoredNote from "../features/settings/components/SettingsRestoredNote";
 import TipCard from "../features/tips/components/TipCard";
@@ -632,6 +633,7 @@ function Layout({ active }: { active: boolean }) {
         />
         )}
         <PanelHostProvider value={panelHost}>
+        <TimelineControllerProvider>
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
             <PanelWorkspace />
             {active && (
@@ -644,9 +646,8 @@ function Layout({ active }: { active: boolean }) {
               </>
             )}
           </div>
-        </PanelHostProvider>
         {active && (
-        <BottomBar
+        <ExportBar
           clipCount={languagePlans.length}
           tracks={info?.audioTracks}
           selectedLanguages={audioSel}
@@ -659,6 +660,8 @@ function Layout({ active }: { active: boolean }) {
           onSignIn={openSignIn}
         />
         )}
+        </TimelineControllerProvider>
+        </PanelHostProvider>
         </>
         )}
       </main>
