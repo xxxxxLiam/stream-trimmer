@@ -41,8 +41,9 @@ export default function FullScreenBar({ c, flags }: Props) {
         onSeek={(t) => player.seekTo(t)}
       />
       <div className="relative mt-[10px] flex h-target items-center">
-        <span className="text-body tabular-nums">
-          {clockTime(player.currentTime)} <span className="text-fg-dim">/ {clockTime(c.duration)}</span>
+        <span className="flex gap-[14px] text-body leading-[16px] tabular-nums">
+          <span>{clockTime(player.currentTime)}</span>
+          <span className="text-fg-dim">/ {clockTime(c.duration)}</span>
         </span>
         <span className="absolute left-1/2 flex -translate-x-1/2 items-center gap-[8px]">
           <TransportButton labelBelow={false} label={hoverLabel("loop", mac)} name="Loop" active={c.loop} pressed={c.loop} onClick={c.toggleLoop}>

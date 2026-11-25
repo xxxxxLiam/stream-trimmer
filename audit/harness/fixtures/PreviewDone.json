@@ -1,0 +1,60 @@
+{
+ "_doc": "Done for today (the end card of Main05EndOfVideo, Done variant): Acme has made its 3 clips and no open video has moments waiting.",
+ "extends": "PreviewEnd",
+ "seed": {
+  "clipper.campaigns": [
+   {
+    "id": "acme",
+    "name": "Acme",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "ACM",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/home/liam/Downloads/Clipr/Acme",
+    "dataDir": "/tmp/Data/Acme",
+    "usedRanges": {
+     "podcast214": [
+      {
+       "start": 482,
+       "end": 515,
+       "clipId": "ACM-podcast214-01",
+       "at": "$NOW"
+      },
+      {
+       "start": 900,
+       "end": 940,
+       "clipId": "ACM-podcast214-02",
+       "at": "$NOW"
+      },
+      {
+       "start": 1200,
+       "end": 1240,
+       "clipId": "ACM-podcast214-03",
+       "at": "$NOW"
+      }
+     ]
+    },
+    "dailyQuota": 3
+   },
+   {
+    "id": "nova",
+    "name": "Nova",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "NOV",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/tmp/Clips/Nova",
+    "dataDir": "/tmp/Data/Nova",
+    "usedRanges": {},
+    "dailyQuota": 2
+   }
+  ],
+  "clipper.bank": {}
+ }
+}

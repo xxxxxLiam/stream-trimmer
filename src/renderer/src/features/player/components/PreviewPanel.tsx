@@ -89,7 +89,11 @@ export default function PreviewPanel() {
             </div>
           )}
           {caption ? (
-            <span className="pointer-events-none absolute bottom-[11px] left-1/2 max-w-[calc(100%-24px)] -translate-x-1/2 rounded-chip bg-overlay-75 px-[10px] py-[5px] text-center text-body leading-[16px]">
+            <span
+              className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-24px)] -translate-x-1/2 rounded-chip bg-overlay-75 text-center ${
+                c.fullScreen ? "bottom-[130px] px-[18px] py-[6px] text-drawer-title font-normal leading-[22px]" : "bottom-[11px] px-[10px] py-[5px] text-body leading-[16px]"
+              }`}
+            >
               {caption}
             </span>
           ) : null}
