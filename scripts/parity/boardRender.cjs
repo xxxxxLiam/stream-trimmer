@@ -146,4 +146,4 @@ async function renderBoard(screen, opts = {}) {
   }
 }
 
-module.exports = { renderBoard, boardFrame, get SNAPSHOT() { return snapshotDir(); } };
+module.exports = { renderBoard, boardFrame, SHIM, snapshotDir, get SNAPSHOT() { return snapshotDir(); } };
