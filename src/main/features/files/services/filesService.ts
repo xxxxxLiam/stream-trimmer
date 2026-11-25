@@ -5,6 +5,7 @@
  *   confined to the folders the user chose (see saveRoots.ts); payload shapes are
  *   validated by the IPC handlers before they reach these functions.
  */
+import { plainSaveError } from "./saveError";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -59,7 +60,7 @@ export async function saveClip(payload: any) {
     return { ok: true, path: target };
   } catch (err: unknown) {
     logger.log("clip", `save failed: ${logger.describe(err)}`);
-    return { ok: false, error: logger.describe(err) };
+    return { ok: false, error: plainSaveError(err) };
   }
 }
 
@@ -80,10 +81,8 @@ export async function saveFile(payload: any) {
     const target = await writeWithoutOverwrite(dest.target, buf);
     return { ok: true, path: target };
   } catch (err: any) {
-    return {
-      ok: false,
-      error: err && err.message ? err.message : "Save failed",
-    };
+    logger.log("file", `save failed: ${logger.describe(err)}`);
+    return { ok: false, error: plainSaveError(err) };
   }
 }
 
@@ -118,10 +117,8 @@ export async function saveFiles(payload: any) {
     }
     return { ok: true, path: target };
   } catch (err: any) {
-    return {
-      ok: false,
-      error: err && err.message ? err.message : "Save failed",
-    };
+    logger.log("file", `export save failed: ${logger.describe(err)}`);
+    return { ok: false, error: plainSaveError(err) };
   }
 }
 

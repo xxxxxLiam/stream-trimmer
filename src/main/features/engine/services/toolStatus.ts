@@ -67,22 +67,76 @@ function denoPath(): string | null {
 
 const probes: { ytdlp?: Probe; ffmpeg?: Probe; deno?: Probe } = {};
 let started = false;
+/** When each tool was last probed, to space re-probes of a broken or missing result. */
+const probedAt: { ytdlp: number; ffmpeg: number; deno: number } = { ytdlp: 0, ffmpeg: 0, deno: 0 };
+/** A broken result is looked at again no sooner than this after the last look. */
+export const REPROBE_BACKOFF_MS = 3_000;
+const inFlight = new Set<string>();
+let probeFn: (binary: string | null, arg: string) => Promise<Probe> = (b, a) => probeBinary(b, a);
 
-/** Starts the one background probe (idempotent); never blocks. */
+/** Test seam: replace what a probe runs. */
+export function setProbeForTest(fn: typeof probeFn | null): void {
+  probeFn = fn ?? ((b, a) => probeBinary(b, a));
+}
+
+type Name = "ytdlp" | "ffmpeg" | "deno";
+const targets: Record<Name, () => { binary: string | null; arg: string }> = {
+  ytdlp: () => ({ binary: yt?.binary ?? null, arg: "--version" }),
+  ffmpeg: () => ({ binary: resolvedFfmpeg ?? null, arg: "-version" }),
+  deno: () => ({ binary: denoPath(), arg: "--version" }),
+};
+
+function probe(name: Name, now: number): void {
+  if (inFlight.has(name)) return;
+  inFlight.add(name);
+  probedAt[name] = now;
+  const t = targets[name]();
+  void probeFn(t.binary, t.arg).then((p) => {
+    probes[name] = p;
+    inFlight.delete(name);
+  });
+}
+
+/** Starts the background probe (idempotent); never blocks. */
 export function startToolProbe(): void {
   if (started) return;
   started = true;
-  void probeBinary(yt?.binary ?? null, "--version").then((p) => (probes.ytdlp = p));
-  void probeBinary(resolvedFfmpeg ?? null, "-version").then((p) => (probes.ffmpeg = p));
-  void probeBinary(denoPath(), "--version").then((p) => (probes.deno = p));
+  const now = Date.now();
+  (["ytdlp", "ffmpeg", "deno"] as Name[]).forEach((n) => probe(n, now));
 }
 
 /** After yt-dlp was replaced: read its version again. The old answer stays until the new one lands. */
 export function refreshToolProbe(): void {
-  void probeBinary(yt?.binary ?? null, "--version").then((p) => (probes.ytdlp = p));
+  probe("ytdlp", Date.now());
 }
 
-export function currentToolStatus(): ToolsStatus {
+/**
+ * A video opened, so yt-dlp and ffmpeg ran: whatever an earlier slow or failed probe said, the tools work.
+ * Only a result that is already bad is replaced, and only with what the working run proves.
+ */
+export function markToolsReady(): void {
+  for (const n of ["ytdlp", "ffmpeg"] as const) {
+    const p = probes[n];
+    if (!p || p.path === null || ("ok" in p && p.ok)) continue;
+    probes[n] = { path: p.path, ok: true, version: "" };
+  }
+}
+
+/** A broken or missing result is probed again when asked, once the backoff has passed. */
+export function currentToolStatus(now: number = Date.now()): ToolsStatus {
   startToolProbe();
+  for (const n of ["ytdlp", "ffmpeg", "deno"] as Name[]) {
+    const p = probes[n];
+    const bad = p && (p.path === null || !("ok" in p) || !p.ok);
+    if (bad && now - probedAt[n] >= REPROBE_BACKOFF_MS) probe(n, now);
+  }
   return summarize(probes);
+}
+
+/** Test seam: forget every probe so the next call starts fresh. */
+export function resetToolProbesForTest(): void {
+  for (const k of Object.keys(probes)) delete (probes as Record<string, unknown>)[k];
+  started = false;
+  inFlight.clear();
+  probedAt.ytdlp = probedAt.ffmpeg = probedAt.deno = 0;
 }
