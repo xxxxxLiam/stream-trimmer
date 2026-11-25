@@ -145,3 +145,24 @@ test("languages: the original and its dubs go out as ONE document and ONE send t
   assert.equal(sends.length, 1, "Final Cut is sent to once");
   assert.equal(idsIn(writes[0].contents).length, 2, "both languages are in it");
 });
+
+test("Resolve: Clip writes one timeline file with the clip and its languages, opens Resolve with it, and says how to import", async () => {
+  const H = await import("./EditorHandoff");
+  const { DEFAULT_EDITOR_SETTINGS } = await import("../../../shared/utils/fcpxml");
+  H.resetSessionHandoff();
+  writes.length = 0;
+  const opened: any[] = [];
+  const w = (globalThis as any).window.electronAPI.editor;
+  const open = w.openWith;
+  w.openWith = async (a: unknown) => (opened.push(a), { ok: true, shown: true });
+  const settings = { ...DEFAULT_EDITOR_SETTINGS, openIn: "resolve" as const };
+  const c = { ...ctx([]), clips: [mk("Hook"), { ...mk("Hook ES"), parentId: "Hook" }] };
+  const out = await H.runAfterCutting(settings, c as any);
+  w.openWith = open;
+  assert.equal(writes.length, 1, "one timeline file");
+  assert.equal((writes[0].contents.match(/<project /g) ?? []).length, 1, "one timeline for the clip, its language inside");
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].app, "resolve");
+  assert.match(opened[0].file, /\.fcpxml$/, "Resolve is given the timeline file, not the mp4");
+  assert.match(out!.message, /File > Import > Timeline/);
+});
