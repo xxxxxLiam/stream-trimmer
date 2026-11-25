@@ -161,6 +161,11 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   const defaultsRef = useRef(defaults);
   defaultsRef.current = defaults;
 
+  // A-15d: a stored active id that points at a deleted campaign is rewritten once at launch, not just resolved each time.
+  useEffect(() => {
+    if (readSetting<string | null>(KEY_ACTIVE, null) !== activeIdRef.current) writeSetting(KEY_ACTIVE, activeIdRef.current);
+  }, []);
+
   const commit = useCallback((next: Campaign[]) => {
     campaignsRef.current = next;
     setCampaigns(next);
