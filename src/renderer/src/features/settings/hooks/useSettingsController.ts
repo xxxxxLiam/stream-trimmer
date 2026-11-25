@@ -62,7 +62,7 @@ export function useSettingsController({
     () =>
       campaigns.campaigns.map((c) => {
         const p = prefs.prefsFor(c.id);
-        return { id: c.id, name: c.name, summary: campaignSummary(c.dailyQuota ?? DEFAULT_DAILY_QUOTA, p), languages: languagesLine(p) };
+        return { id: c.id, name: c.name, summary: campaignSummary(c.dailyQuota ?? DEFAULT_DAILY_QUOTA), languages: languagesLine(p) };
       }),
     [campaigns.campaigns, prefs],
   );

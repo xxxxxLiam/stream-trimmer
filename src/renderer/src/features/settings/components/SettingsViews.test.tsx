@@ -34,7 +34,7 @@ test("top list: Your work rows, two switches, nothing about editor, quality or c
 
 test("campaigns list: summary lines, Edit per campaign, Add campaign", () => {
   const h = renderToStaticMarkup(
-    <SettingsCampaigns rows={[{ id: "a", name: "Acme", summary: "3 clips a day · 1s extra at both ends", languages: "Languages: Original, Spanish" }, { id: "n", name: "Nova", summary: "2 clips a day · 1s extra at both ends", languages: null }]} onEdit={noop} onAdd={noop} onBack={noop} onClose={noop} />,
+    <SettingsCampaigns rows={[{ id: "a", name: "Acme", summary: "3 clips a day", languages: "Languages: Original, Spanish" }, { id: "n", name: "Nova", summary: "2 clips a day", languages: null }]} onEdit={noop} onAdd={noop} onBack={noop} onClose={noop} />,
   );
   assert.match(h, /Languages: Original, Spanish/);
   assert.match(h, /aria-label="Edit Nova"/);
@@ -44,7 +44,7 @@ test("campaigns list: summary lines, Edit per campaign, Add campaign", () => {
 
 const campaign: SettingsCampaignProps = {
   name: "Acme",
-  prefs: { extraSeconds: 1, languages: ["original", "es"] },
+  prefs: { languages: ["original", "es"] },
   dubs: [{ code: "es", label: "Spanish" }, { code: "pt", label: "Portuguese" }],
   quota: 3,
   onQuota: noop,
@@ -63,11 +63,12 @@ const campaign: SettingsCampaignProps = {
   onClose: noop,
 };
 
-test("one campaign: quota, extra seconds, languages, folder; no id pattern, format or quality", () => {
+test("one campaign: quota, languages, folder; no id pattern, format or quality", () => {
   const h = renderToStaticMarkup(<SettingsCampaign {...campaign} />);
   assert.match(h, /Clips a day/);
   assert.match(h, /aria-label="One more clip a day"/);
-  assert.match(h, /aria-checked="true"[^>]*aria-label="1 seconds"/);
+  // Liam, 25 Nov: the padding is a fixed 5 seconds, so there is no choice to show.
+  assert.doesNotMatch(h, /Extra seconds|aria-label="\d seconds"/);
   assert.match(h, /aria-label="Spanish audio, ticked"/);
   assert.match(h, /aria-label="Portuguese audio, not ticked"/);
   assert.match(h, /aria-label="Open the Acme folder"/);

@@ -41,7 +41,7 @@ import { createSerialQueue } from "../features/clips/utils/serialQueue";
 import { pickedRangeOf } from "../features/player/utils/pickedRange";
 import { clipSections } from "../features/player/utils/clipDestination";
 import { matchingMoment } from "../features/clips/utils/finishBankedCut";
-import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
+import { CLIP_PADDING_SEC, padSections } from "../features/clips/utils/padSections";
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
@@ -395,7 +395,7 @@ function Layout({ active }: { active: boolean }) {
   );
 
   // Cut: the clip's name (typed on the lane, else suggested) is the file's name, the row's name and
-  // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
+  // the editor project's name. Marked sections get 5 seconds at both ends; the
   // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
     async (segments: Segment[], retryName?: string) => {
@@ -407,7 +407,7 @@ function Layout({ active }: { active: boolean }) {
       const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
       // Recorded before anything starts: the marks are already cleared, so Retry and Save for later read this.
       setCutAttempt({ name, segments });
-      const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
+      const toCut = padSections(segments, CLIP_PADDING_SEC, duration || undefined);
       setMakingName(name);
       // A range that is a waiting moment is that moment: its id is what the use, the cut mark and Undo all key on.
       const moment = cutCampaignId ? matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments) : undefined;

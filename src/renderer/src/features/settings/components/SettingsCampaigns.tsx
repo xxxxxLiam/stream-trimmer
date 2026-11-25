@@ -1,7 +1,7 @@
 /**
  * File: SettingsCampaigns.tsx
  * Path: src/renderer/src/features/settings/components/SettingsCampaigns.tsx
- * Description: Campaigns list (Settings.dc.html view 2): each campaign with its quota, extra seconds
+ * Description: Campaigns list (Settings.dc.html view 2): each campaign with its quota
  *   and languages, an Edit button, and Add campaign.
  */
 import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
@@ -34,7 +34,7 @@ export default function SettingsCampaigns(p: {
       <button type="button" aria-label="Add campaign" onClick={p.onAdd} className="mt-[12px] h-target rounded-control bg-ice text-body leading-[normal] font-medium text-bg">
         Add campaign
       </button>
-      <p className="m-[0px] mt-[12px] text-meta text-fg-dim">Each campaign shows its quota, extra seconds and languages. Edit opens that campaign.</p>
+      <p className="m-[0px] mt-[12px] text-meta text-fg-dim">Each campaign shows its quota and languages. Edit opens that campaign.</p>
       </div>
     </>
   );

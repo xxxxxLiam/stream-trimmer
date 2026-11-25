@@ -16,16 +16,15 @@ import {
 
 test("nothing stored gives the drawn defaults", () => {
   assert.deepEqual(normalizeAppPrefs(undefined), { notifyQueueDone: true });
-  assert.deepEqual(normalizeCampaignPrefs(null), { extraSeconds: 1, languages: ["original"] });
+  assert.deepEqual(normalizeCampaignPrefs(null), { languages: ["original"] });
 });
 
 test("bad stored values are repaired, good ones kept", () => {
   assert.equal(normalizeAppPrefs({ notifyQueueDone: false }).notifyQueueDone, false);
   assert.equal(normalizeAppPrefs({ notifyQueueDone: "no" }).notifyQueueDone, true);
-  const p = normalizeCampaignPrefs({ extraSeconds: 7, languages: ["es", "es", 4] });
-  assert.equal(p.extraSeconds, 1);
+  const p = normalizeCampaignPrefs({ languages: ["es", "es", 4] });
   assert.deepEqual(p.languages, ["original", "es"]);
-  assert.equal(normalizeCampaignPrefs({ extraSeconds: 2 }).extraSeconds, 2);
+  assert.equal("extraSeconds" in normalizeCampaignPrefs({ extraSeconds: 2 }), false, "an old stored value is dropped");
 });
 
 test("clips a day never goes below 1 or above 99", () => {
@@ -41,9 +40,9 @@ test("a dub can be ticked and unticked, the original cannot be unticked", () => 
 });
 
 test("summary lines match the Campaigns list", () => {
-  const acme = { extraSeconds: 1 as const, languages: ["original", "es"] };
-  assert.equal(campaignSummary(3, acme), "3 clips a day · 1s extra at both ends");
-  assert.equal(campaignSummary(1, acme), "1 clip a day · 1s extra at both ends");
+  const acme = { languages: ["original", "es"] };
+  assert.equal(campaignSummary(3), "3 clips a day");
+  assert.equal(campaignSummary(1), "1 clip a day");
   assert.equal(languagesLine(acme), "Languages: Original, Spanish");
   assert.equal(languagesLine({ ...acme, languages: ["original"] }), null);
 });

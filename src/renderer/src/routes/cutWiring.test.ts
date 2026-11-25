@@ -9,8 +9,9 @@ test("C-1: the Clip button names the file from the lane's name, never from the c
   assert.doesNotMatch(app, /nextClipId\(/);
 });
 
-test("C-3: marked sections are padded by the campaign's extra seconds, and the recorded ranges are the marked ones", () => {
-  assert.match(app, /padSections\(segments, extraSecondsFor\(cutCampaignId\)/);
+test("C-3: marked sections are padded by the fixed 5 seconds, and the recorded ranges are the marked ones", () => {
+  assert.match(app, /padSections\(segments, CLIP_PADDING_SEC, duration/);
+  assert.doesNotMatch(app, /extraSecondsFor/);
   assert.match(app, /download\(\{ segments: toCut,/);
   assert.match(app, /recordUse\(videoId, segments, groupId, cutCampaignId\)/);
 });
