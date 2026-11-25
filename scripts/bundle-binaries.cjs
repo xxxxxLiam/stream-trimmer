@@ -248,6 +248,9 @@ function reportYtDlpVersion(binPath, channel) {
   const version = res.status === 0 ? (res.stdout || "").trim() : "";
   if (version) {
     console.log(`[bundle-binaries] yt-dlp version ${version} (${channel})`);
+    // Shipped beside the binary so the app knows which version it has without running it at start-up (a Mac's first
+    // run of an unsigned yt-dlp is slow, and the window waits for the main process).
+    fs.writeFileSync(path.join(path.dirname(binPath), "yt-dlp.version"), `${version}\n`);
   } else {
     // Not fatal: the binary is downloaded and verified, we just can't name it
     // (a build host with no python3 can't run the zipapp). Losing the audit
