@@ -11,9 +11,11 @@ import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { DEFAULT_DAILY_QUOTA, campaignSummary, languagesLine } from "../utils/settingsPrefs";
 import { useSettingsState } from "./useSettingsState";
 
-export type SettingsView = { kind: "top" } | { kind: "campaigns" } | { kind: "campaign"; id: string } | { kind: "folder" };
+export type SettingsView = { kind: "top" } | { kind: "campaigns" } | { kind: "campaign"; id: string } | { kind: "editor"; id: string } | { kind: "folder" };
 
 export function parentOf(v: SettingsView): { label: string; view: SettingsView } | null {
+  // The label is the campaign's own name, which only the caller knows; the empty label is replaced there.
+  if (v.kind === "editor") return { label: "", view: { kind: "campaign", id: v.id } };
   if (v.kind === "campaign") return { label: "Campaigns", view: { kind: "campaigns" } };
   if (v.kind === "campaigns" || v.kind === "folder") return { label: "Settings", view: { kind: "top" } };
   return null;
@@ -51,7 +53,7 @@ export function useSettingsController({
   }, [open, onClose, adding]);
 
   // A campaign that was deleted while its view is open sends you back to the list.
-  const gone = view.kind === "campaign" && !campaigns.campaigns.some((c) => c.id === view.id);
+  const gone = (view.kind === "campaign" || view.kind === "editor") && !campaigns.campaigns.some((c) => c.id === view.id);
   useEffect(() => {
     if (gone) setView({ kind: "campaigns" });
   }, [gone]);

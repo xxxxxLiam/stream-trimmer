@@ -60,7 +60,7 @@ test("wiring: the picker writes the settings the generator reads; a campaign wit
   const drawer = readFileSync(`${dir}settings/components/SettingsDrawer.tsx`, "utf8");
   assert.match(drawer, /\{ \.\.\.activeFcp, layout: id \}/);
   assert.match(drawer, /showEvent: fcp\.layout === "export" \|\| fcp\.layout === "flat"/);
-  assert.match(readFileSync(`${dir}settings/components/SettingsCampaign.tsx`, "utf8"), /showEvent !== false/);
+  assert.match(readFileSync(`${dir}settings/components/SettingsEditor.tsx`, "utf8"), /showEvent !== false/);
 });
 
 test("D2-10: the preview says Sep, names the clip from the video, and the list takes arrows and Esc", () => {

@@ -10,6 +10,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import SettingsCampaign, { type SettingsCampaignProps } from "./SettingsCampaign";
+import SettingsEditor from "./SettingsEditor";
+import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
@@ -47,7 +49,7 @@ const campaign: SettingsCampaignProps = {
   quota: 3,
   onQuota: noop,
   folderLabel: "Clipr/Acme",
-  finalCut: null,
+  editor: null,
   onPatch: noop,
   onToggleLanguage: noop,
   onOpenFolder: noop,
@@ -76,11 +78,40 @@ test("Languages show only when the open video has dubs", () => {
   assert.doesNotMatch(renderToStaticMarkup(<SettingsCampaign {...campaign} dubs={[]} />), /Languages/);
 });
 
-test("Final Cut library and event appear only when Final Cut is ticked", () => {
-  const h = renderToStaticMarkup(<SettingsCampaign {...campaign} finalCut={{ library: "Acme.fcpbundle", event: "Acme", onChoose: noop, onEvent: noop }} />);
-  assert.match(h, /role="group" aria-label="Final Cut Pro"/);
+test("the campaign form ends with one button for the ticked editor, and no editor fields", () => {
+  const h = renderToStaticMarkup(<SettingsCampaign {...campaign} editor={{ label: "Final Cut Pro", summary: "Acme.fcpbundle · Export · One Export event · Acme grade", onOpen: noop }} />);
+  assert.match(h, /aria-label="Final Cut Pro settings for Acme"/);
+  assert.match(h, />Final Cut Pro</);
+  assert.match(h, /Acme\.fcpbundle · Export · One Export event · Acme grade/);
+  assert.doesNotMatch(h, /fcp-lib|fcp-event/);
+  assert.doesNotMatch(renderToStaticMarkup(<SettingsCampaign {...campaign} />), /settings for Acme/);
+});
+
+test("the editor page: Final Cut holds Library, Event, Layout and Your look under \u2039 Acme", () => {
+  const h = renderToStaticMarkup(
+    <SettingsEditor campaignName="Acme" label="Final Cut Pro" finalCut={{ library: "Acme.fcpbundle", event: "Acme", onChoose: noop, onEvent: noop }} onBack={noop} onClose={noop} />,
+  );
+  assert.match(h, /aria-label="Back to Acme"/);
+  assert.match(h, />Final Cut Pro</);
   assert.match(h, /value="Acme\.fcpbundle"/);
   assert.match(h, /aria-label="Choose the Final Cut library for Acme"/);
+  const other = renderToStaticMarkup(<SettingsEditor campaignName="Acme" label="DaVinci Resolve" finalCut={null} onBack={noop} onClose={noop} />);
+  assert.match(other, /Nothing to set for DaVinci Resolve yet/);
+  assert.doesNotMatch(other, /fcp-lib/);
+});
+
+test("which editors get a button, and the summary line", () => {
+  assert.deepEqual(["folder", "premiere", "finalcut", "resolve", "capcut"].map(hasEditorPage), [false, true, true, true, false]);
+  assert.equal(finalCutSummary({ library: "Acme.fcpbundle", event: "", layout: "export", look: "Acme grade" }), "Acme.fcpbundle · Export · One Export event · Acme grade");
+  assert.equal(finalCutSummary({ library: "", event: "x", layout: "video", look: "" }), "Event per video");
+  assert.equal(editorSummary("finalcut", "Final Cut Pro", ""), "Not set up yet");
+});
+
+test("the editor view goes back to its campaign, and the drawer wires the button to it", () => {
+  assert.deepEqual(parentOf({ kind: "editor", id: "a" })?.view, { kind: "campaign", id: "a" });
+  const drawer = read("features/settings/components/SettingsDrawer.tsx");
+  assert.match(drawer, /onOpen: \(\) => c\.setView\(\{ kind: "editor", id: campaign\.id \}\)/);
+  assert.match(drawer, /view\.kind === "editor" && campaign && hasEditorPage\(destination\)/);
 });
 
 test("delete takes two clicks", () => {
