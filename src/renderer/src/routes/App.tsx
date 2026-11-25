@@ -18,7 +18,6 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
-import { loadLastLayout } from "../shared/utils/lastLayout";
 import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
@@ -88,10 +87,9 @@ function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings
 const EDITOR_KEY = "clipper.editorHandoff";
 
 /** "After cutting" settings, kept per campaign beside the other campaign fields. */
-/** A campaign with no Final Cut settings yet starts with the layout picked last, the way a new campaign gets the last look. */
+/** A campaign with no Final Cut settings yet has the default layout (A) until it chooses: it never follows the layout another campaign picked. */
 function editorSettingsOf(raw: unknown): EditorHandoffSettings {
-  const settings = normalizeEditorSettings(raw);
-  return raw === undefined ? { ...settings, layout: loadLastLayout() ?? settings.layout } : settings;
+  return normalizeEditorSettings(raw);
 }
 
 function useEditorSettings(campaignId: string | null) {
