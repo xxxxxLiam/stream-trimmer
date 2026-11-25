@@ -63,6 +63,9 @@ test("the controller asks once, reloads after fresh, closes after keep, keeps th
     "utf8",
   );
   assert.match(src, /startFreshPending\?\.\(\)/);
+  // V18-F-1: an answered question is remembered for the session, so the reload (or a Keep) never asks or backs up again.
+  assert.match(src, /if \(answeredThisSession\(\)\) return;/);
+  assert.match(src, /sessionStorage\.setItem\(ANSWERED_KEY, "1"\)/);
   assert.match(src, /if \(!r\.ok\) \{\s*setError/);
   assert.match(
     src,
