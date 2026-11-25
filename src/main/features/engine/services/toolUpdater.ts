@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import { execFile } from "node:child_process";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { reloadYtDlp, yt, ytDlpVersion } from "./binaries";
+import { reloadYtDlp, versionOfResolved, yt } from "./binaries";
 import { refreshToolProbe } from "./toolStatus";
 import { LATEST_TAG_URL, singleFlight, ytDlpSumsUrl, updateYtDlp, versionOfToolFile, type ToolUpdateResult } from "./toolUpdate";
 
@@ -72,7 +72,7 @@ const flight = singleFlight(async (): Promise<ToolUpdateResult> => {
   try {
     return await updateYtDlp({
       platform: process.platform,
-      currentVersion: () => (yt ? ytDlpVersion(yt.binary) : null),
+      currentVersion: () => versionOfResolved(yt),
       fetchLatestTag,
       fetchChecksums,
       checksumOf,
