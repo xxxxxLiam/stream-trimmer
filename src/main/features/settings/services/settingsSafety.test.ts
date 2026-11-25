@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createSettingsStore } from "./settingsStore";
-import { APPROVED_ROOTS_KEY, MAX_VALUE_BYTES, PAGE_KEYS, RESTORED_KEY, pageMayWrite } from "./settingsKeys";
+import { APPROVED_ROOTS_KEY, MAX_VALUE_BYTES, PAGE_KEYS, pageMayWrite } from "./settingsKeys";
 import { allowedRoots } from "../../../shared/utils/pathSafety";
 
 const GOOD = { "clipper.bank": [{ id: "a" }], "clipper.clipsDir": "/x/clips" };
@@ -40,7 +40,7 @@ for (const [name, bytes] of [
     s.load();
     assert.deepEqual(s.all()["clipper.bank"], [{ id: "a" }]);
     assert.equal(s.all()["clipper.clipsDir"], "/x/clips");
-    assert.equal(typeof s.all()[RESTORED_KEY], "number");
+    assert.equal(typeof s.restoredAt(), "number");
     assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8"))["clipper.bank"], [{ id: "a" }]);
   });
 }
@@ -50,7 +50,7 @@ test("with no good copy an unreadable file is still kept aside and nothing is cl
   fs.writeFileSync(f, "{not json");
   const s = createSettingsStore(f);
   s.load();
-  assert.equal(s.all()[RESTORED_KEY], undefined);
+  assert.equal(s.restoredAt(), null);
   assert.ok(fs.readdirSync(dir).some((n) => n.includes(".corrupt-")));
 });
 
@@ -63,14 +63,12 @@ test("every write keeps the file it replaces as settings.json.bak, and no half-w
   assert.ok(dir);
 });
 
-test("a page may write known keys only, small values only, and only clear the restored notice", () => {
+test("a page may write known keys only and small values only, and never the approved folders", () => {
   assert.equal(pageMayWrite("clipper.bank", [1]), true);
   assert.equal(pageMayWrite("evil.key", 1), false);
   assert.equal(pageMayWrite("__proto__", { a: 1 }), false);
   assert.equal(pageMayWrite("clipper.bank", "x".repeat(MAX_VALUE_BYTES + 1)), false);
   assert.equal(pageMayWrite(APPROVED_ROOTS_KEY, ["/"]), false);
-  assert.equal(pageMayWrite(RESTORED_KEY, 5), false);
-  assert.equal(pageMayWrite(RESTORED_KEY, null), true);
   assert.equal(pageMayWrite(42, 1), false);
 });
 

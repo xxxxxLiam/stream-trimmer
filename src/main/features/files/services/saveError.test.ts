@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { plainSaveError } from "./saveError";
+import { describeSaveError, plainSaveError } from "./saveError";
 
 const err = (code: string, message: string) => Object.assign(new Error(message), { code });
 
@@ -23,4 +23,16 @@ test("each kind of failed save gets its own plain sentence and leaks nothing", (
     assert.match(s, re);
     assert.doesNotMatch(s, /\/|node:|at async|E[A-Z]{3,}/);
   }
+});
+
+test("each failed save carries a code the Export row can act on (Change folder), with the plain sentence", () => {
+  const code = (e: unknown) => describeSaveError(e).code;
+  assert.equal(code(err("ENOSPC", "no space left on device")), "DISK_FULL");
+  assert.equal(code(err("EDQUOT", "quota")), "DISK_FULL");
+  assert.equal(code(err("EACCES", "permission denied")), "FOLDER_NOT_WRITABLE");
+  assert.equal(code(err("EROFS", "read-only file system")), "FOLDER_NOT_WRITABLE");
+  assert.equal(code(err("ENOENT", "no such file or directory")), "FOLDER_GONE");
+  assert.equal(code(err("ENOTDIR", "not a directory")), "FOLDER_GONE");
+  assert.equal(code(new Error("weird")), "SAVE_FAILED");
+  assert.match(describeSaveError(err("ENOSPC", "x")).error, /folder is full/);
 });

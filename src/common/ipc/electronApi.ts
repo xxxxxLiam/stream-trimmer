@@ -23,6 +23,9 @@ export type UpdateStatusPayload =
   | { state: "ready"; version?: string }
   | { state: "error"; message: string; url?: string };
 
+/** Why a save failed: the disk is full, the folder can't be written, the folder is gone, or something else. */
+export type SaveFailureCode = "DISK_FULL" | "FOLDER_NOT_WRITABLE" | "FOLDER_GONE" | "SAVE_FAILED";
+
 export interface ElectronAPI {
   isElectron: true;
   settingsSnapshot?: Record<string, unknown>;
@@ -34,7 +37,7 @@ export interface ElectronAPI {
     dirPath: string;
     filename: string;
     data: ArrayBuffer | Uint8Array;
-  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
   /**
    * Moves a finished clip from the engine's temp directory to `dirPath`.
    * Only the path crosses the bridge, never the media.
@@ -43,7 +46,7 @@ export interface ElectronAPI {
     tempPath: string;
     dirPath: string;
     filename: string;
-  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
   saveFiles: (payload: {
     dirPath: string;
     folder: string;

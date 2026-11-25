@@ -122,13 +122,16 @@ export function markToolsReady(): void {
   }
 }
 
-/** A broken or missing result is probed again when asked, once the backoff has passed. */
-export function currentToolStatus(now: number = Date.now()): ToolsStatus {
+/**
+ * A broken or missing result is probed again when asked, once the backoff has passed. `force` (the
+ * screen's Try again) looks again at once. A bad result stays as it is until the new look lands.
+ */
+export function currentToolStatus(now: number = Date.now(), force = false): ToolsStatus {
   startToolProbe();
   for (const n of ["ytdlp", "ffmpeg", "deno"] as Name[]) {
     const p = probes[n];
     const bad = p && (p.path === null || !("ok" in p) || !p.ok);
-    if (bad && now - probedAt[n] >= REPROBE_BACKOFF_MS) probe(n, now);
+    if (bad && (force || now - probedAt[n] >= REPROBE_BACKOFF_MS)) probe(n, now);
   }
   return summarize(probes);
 }

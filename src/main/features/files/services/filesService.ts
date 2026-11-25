@@ -5,7 +5,7 @@
  *   confined to the folders the user chose (see saveRoots.ts); payload shapes are
  *   validated by the IPC handlers before they reach these functions.
  */
-import { plainSaveError } from "./saveError";
+import { describeSaveError } from "./saveError";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -60,7 +60,7 @@ export async function saveClip(payload: any) {
     return { ok: true, path: target };
   } catch (err: unknown) {
     logger.log("clip", `save failed: ${logger.describe(err)}`);
-    return { ok: false, error: plainSaveError(err) };
+    return { ok: false, ...describeSaveError(err) };
   }
 }
 
@@ -82,7 +82,7 @@ export async function saveFile(payload: any) {
     return { ok: true, path: target };
   } catch (err: any) {
     logger.log("file", `save failed: ${logger.describe(err)}`);
-    return { ok: false, error: plainSaveError(err) };
+    return { ok: false, ...describeSaveError(err) };
   }
 }
 
@@ -118,7 +118,7 @@ export async function saveFiles(payload: any) {
     return { ok: true, path: target };
   } catch (err: any) {
     logger.log("file", `export save failed: ${logger.describe(err)}`);
-    return { ok: false, error: plainSaveError(err) };
+    return { ok: false, ...describeSaveError(err) };
   }
 }
 

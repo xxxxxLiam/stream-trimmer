@@ -13,7 +13,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { siblingDir as siblingDataDir } from "../../../../common/utils/siblingDir";
 import { allowedRoots } from "../../../shared/utils/pathSafety";
-import { APPROVED_ROOTS_KEY, RESTORED_KEY } from "./settingsKeys";
+import { APPROVED_ROOTS_KEY } from "./settingsKeys";
 
 
 /**
@@ -82,6 +82,8 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
   // into the file on disk without a store that never loaded silently wiping
   // everything already saved there.
   const removed = new Set<string>();
+  // When this run restored the settings from the last good copy (ms of that copy), for the one line the app shows.
+  let restoredAt: number | null = null;
 
   /**
    * Keeps a copy of a file we cannot read BEFORE anything replaces it, next to
@@ -153,9 +155,8 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     const checked = readFileChecked();
     const raw = checked.data;
     cache = migrateSettings(raw, { dataFolderName });
+    restoredAt = checked.restoredAt ? Math.round(checked.restoredAt) : null;
     if (checked.restoredAt) {
-      // Tell the person once: the renderer shows it and clears the key.
-      cache[RESTORED_KEY] = Math.round(checked.restoredAt);
       if (log) log("settings.json was unreadable; restored from the last good copy");
     }
     removed.clear();
@@ -239,7 +240,7 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     return saved;
   }
 
-  return { load, all, set, persist, onChange, path: filePath };
+  return { load, all, set, persist, onChange, restoredAt: () => restoredAt, path: filePath };
 }
 
 export {

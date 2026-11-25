@@ -92,3 +92,21 @@ test("a video that opens marks a broken tool check ready", async () => {
     resetToolProbesForTest();
   }
 });
+
+test("Try again (force) looks again at once, without waiting out the backoff", async () => {
+  resetToolProbesForTest();
+  let ytCalls = 0;
+  setProbeForTest(async (_b, arg) => (arg === "--version" && ytCalls++ === 0 ? { path: "/x", ok: false } : { path: "/x", ok: true, version: "1" }));
+  try {
+    const t0 = Date.now();
+    currentToolStatus(t0);
+    await settle();
+    assert.equal(currentToolStatus(t0 + 1).overall, "broken"); // inside the backoff: not looked at again
+    currentToolStatus(t0 + 2, true); // Try again
+    await settle();
+    assert.equal(currentToolStatus(t0 + 3).overall, "ready");
+  } finally {
+    setProbeForTest(null);
+    resetToolProbesForTest();
+  }
+});
