@@ -942,3 +942,40 @@ test("a project in kind look carries the look's size and rate and validates agai
   const vertical = buildFcpxml({ eventName: "Raw", clips: [clip()], project: { ...PROJECT, look } });
   assert.ok(Object.values(tree(vertical).formats).includes("1080x1920@1/30s"), "kind vertical is unchanged");
 });
+
+test("language copies: one project per clip, the dubs inside it as switched-off lanes", { skip: !hasXmllint }, () => {
+  const clips = [
+    clip({ id: "Hook", label: "", path: "/c/hook.mp4" }),
+    clip({ id: "Hook ES", label: "", path: "/c/hook-es.mp4", parentId: "Hook" }),
+    clip({ id: "Hook PT", label: "", path: "/c/hook-pt.mp4", parentId: "Hook" }),
+  ];
+  const xml = buildFcpxml({ eventName: "Raw", clips, project: PROJECT });
+  assert.equal(validate(xml), "");
+  assert.equal((xml.match(/<project /g) ?? []).length, 1, "one project, not one per language");
+  assert.equal((xml.match(/<asset /g) ?? []).length, 3, "every language is still imported");
+  assert.equal((xml.match(/enabled="0"/g) ?? []).length, 2, "the dubs sit in the project, switched off");
+  assert.match(xml, /lane="-2"/);
+  assert.match(xml, /lane="-3"/);
+});
+
+test("without a parent every file is its own project (the old behaviour this replaces)", () => {
+  const clips = [clip({ id: "Hook", path: "/c/hook.mp4" }), clip({ id: "Hook ES", path: "/c/hook-es.mp4" })];
+  const xml = buildFcpxml({ eventName: "Raw", clips, project: PROJECT });
+  assert.equal((xml.match(/<project /g) ?? []).length, 2);
+});
+
+test("session build with language copies: counted and named as one clip", async () => {
+  const probe = async () => ({ ok: true as const, kind: "ffprobe" as const, json: { streams: [{ codec_type: "video", width: 1080, height: 1920, avg_frame_rate: "30/1" }], format: { duration: "5" } } });
+  const r = await buildSessionFcpxml(
+    [
+      { id: "Hook", path: "/c/hook.mp4", segments: [{ start: 0, end: 5 }] },
+      { id: "Hook ES", path: "/c/hook-es.mp4", segments: [{ start: 0, end: 5 }], parentId: "Hook" },
+    ],
+    "Raw",
+    probe as any,
+    { project: PROJECT },
+  );
+  assert.equal(r.included, 1);
+  assert.deepEqual(r.projectNames, ["Hook"]);
+  assert.match(r.filename, /Hook/);
+});

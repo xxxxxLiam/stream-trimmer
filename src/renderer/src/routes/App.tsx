@@ -353,8 +353,8 @@ function Layout({ active }: { active: boolean }) {
   // "After cutting" choice. Never blocks or fails the cut itself.
   // `settings` are the ones in force when the cut STARTED: a switch while it runs must not apply
   // the new campaign's "After cutting" choice to this campaign's clip.
-  const afterSaved = useCallback(
-    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string, groupId?: string) => {
+  const recordSaved = useCallback(
+    (clipId: string, label: string | undefined, segments: Segment[], projectName?: string, groupId?: string, parentId?: string): SessionClip | null => {
       const newest = getDownloads().find((d) => d.kind === "clip");
       if (newest) {
         annotateDownload(newest.id, {
@@ -371,7 +371,7 @@ function Layout({ active }: { active: boolean }) {
         });
       }
       const saved = getDownloads().find((d) => d.kind === "clip" && d.path);
-      if (!saved) return; // browser download: no file path to hand on
+      if (!saved) return null; // browser download: no file path to hand on
       const clip: SessionClip = {
         id: clipId,
         label,
@@ -381,18 +381,27 @@ function Layout({ active }: { active: boolean }) {
         sourceUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : sourceUrl || undefined,
         sourceTitle: info?.title || undefined,
         cutAt: Date.now(),
+        ...(parentId ? { parentId } : {}),
       };
-      const cutFor = campaign?.id ?? null;
-      setSessionByCampaign((prev) => addSessionClip(prev, cutFor, clip));
+      setSessionByCampaign((prev) => addSessionClip(prev, campaign?.id ?? null, clip));
+      return clip;
+    },
+    [videoId, sourceUrl, campaign?.id, campaign?.name, info?.title],
+  );
+
+  // One hand-off per clip: the original and every language copy go to the editor together, as one export.
+  const handOff = useCallback(
+    (clips: SessionClip[], settings: EditorHandoffSettings) => {
+      if (clips.length === 0) return;
       void runAfterCutting(settings, {
-        campaignId: cutFor,
+        campaignId: campaign?.id ?? null,
         campaignName: campaign?.name,
         sourceTitle: info?.title,
         clipsDir: folders.clipsDir || saveDir || undefined,
-        clips: [clip],
+        clips,
       }).catch(() => {});
     },
-    [videoId, sourceUrl, campaign?.id, campaign?.name, info?.title, folders.clipsDir, saveDir],
+    [campaign?.id, campaign?.name, info?.title, folders.clipsDir, saveDir],
   );
 
   // Cut: the clip's name (typed on the lane, else suggested) is the file's name, the row's name and
@@ -419,6 +428,7 @@ function Layout({ active }: { active: boolean }) {
       if (cutCampaignId && !moment) saveInFlightCut({ campaignId: cutCampaignId, videoId, name, segments });
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
       let madeAny = false;
+      const made: SessionClip[] = [];
       try {
         for (const plan of languagePlansRef.current) {
           const fileName = nameForLanguage(name, plan);
@@ -429,15 +439,17 @@ function Layout({ active }: { active: boolean }) {
             if (moment) bankStore.markCut(cutCampaignId, videoId, moment.id);
           }
           madeAny = true;
-          afterSaved(fileName, undefined, segments, startSettings, undefined, groupId);
+          const saved = recordSaved(fileName, undefined, segments, undefined, groupId, made[0]?.id);
+          if (saved) made.push(saved);
         }
       } finally {
+        handOff(made, startSettings);
         clearInFlightCut();
         setMakingName(null);
         setMakingClipId(null);
       }
     },
-    [videoId, campaign, info?.title, downloads, duration, download, recordUse, afterSaved],
+    [videoId, campaign, info?.title, downloads, duration, download, recordUse, recordSaved, handOff],
   );
   // Clips are made one after another. Pressing Clip hands the marked sections over and clears them at
   // once, so the next clip can be marked while this one is making (a failed clip has its own Retry).
@@ -462,6 +474,7 @@ function Layout({ active }: { active: boolean }) {
       const startSettings = withDestination(editorRef.current);
       const baseId = projectName?.trim() || clip.id;
       let madeAny = false;
+      const made: SessionClip[] = [];
       // The Making row names the clip in hand, and it is out of Waiting only while this runs (a stop puts it back).
       setMakingName(baseId);
       setMakingClipId(clip.id);
@@ -471,15 +484,17 @@ function Layout({ active }: { active: boolean }) {
           if (!ok) break;
           madeAny = true;
           // The Final Cut clip carries the clip's name, the file's, not the bank id.
-          afterSaved(nameForLanguage(baseId, plan), undefined, clip.segments, startSettings, projectName, clip.id);
+          const saved = recordSaved(nameForLanguage(baseId, plan), undefined, clip.segments, projectName, clip.id, made[0]?.id);
+          if (saved) made.push(saved);
         }
       } finally {
+        handOff(made, startSettings);
         setMakingName(null);
         setMakingClipId(null);
       }
       return madeAny;
     },
-    [download, afterSaved],
+    [download, recordSaved, handOff],
   );
   // The same line as Clip: a banked moment made while a clip is making waits its turn.
   const cutBanked = (clip: BankedClip, projectName?: string) => cutQueue.current.enqueue(() => cutBankedNow(clip, projectName));

@@ -10,3 +10,9 @@ test("C-6: the engine's save codes and the Node error text both become a folder 
   assert.equal(saveFailure({ error: "ENOTDIR: not a directory, mkdir '/f/x'" }).code, "save_folder_gone");
   assert.deepEqual(saveFailure({ code: "SAVE_FAILED", error: "The clip could not be saved." }), {}, "anything else stays an ordinary failure");
 });
+
+test("a finished download's delayed reset is skipped once a newer download has started", async () => {
+  const { shouldResetProgress } = await import("./downloadErrors");
+  assert.equal(shouldResetProgress(1, 1), true);
+  assert.equal(shouldResetProgress(1, 2), false);
+});
