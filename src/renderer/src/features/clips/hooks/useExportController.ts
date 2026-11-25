@@ -11,12 +11,14 @@ import { useExportEffects, useRetryKey } from "./useExportEffects";
 import { useExportMutations } from "./useExportMutations";
 import { useExportQueries } from "./useExportQueries";
 import { useExportState } from "./useExportState";
+import { useHandoffNotice } from "./useHandoffNotice";
 
 export function useExportController() {
   const queries = useExportQueries();
   const state = useExportState();
   useExportEffects(queries, state);
   const actions = useExportMutations(queries, state);
+  const handoff = useHandoffNotice(queries.campaignId);
   useRetryKey(Boolean(state.failed), actions.retry);
   const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
@@ -36,6 +38,7 @@ export function useExportController() {
     waiting,
     made,
     ...actions,
+    ...handoff,
     selectedId: state.selectedId,
     notice: state.notice,
     making: downloading

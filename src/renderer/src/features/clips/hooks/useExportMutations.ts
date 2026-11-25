@@ -5,6 +5,7 @@
  *   it, undo the clip just made, remove a moment.
  */
 import { useCallback, useRef } from "react";
+import { clearAfterCuttingOutcome } from "../../handoff/components/EditorHandoff";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
@@ -46,6 +47,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
       s.attempt.current = { name: name || clip.id, segments: clip.segments, bankId: clip.id };
       s.setNotice("");
       s.setFinished(null);
+      clearAfterCuttingOutcome(); // the last clip's handoff answer is old news once the next one starts
       try {
         const ok = await cutBanked(clip, name);
         if (ok) finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
