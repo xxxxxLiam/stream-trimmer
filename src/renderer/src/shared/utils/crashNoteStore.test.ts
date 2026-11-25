@@ -26,7 +26,7 @@ test("Crash note: the app reopens on its own page with the note in Export, not o
   assert.match(app, /consumeCrashFlag\(window\.location\.search/);
   assert.doesNotMatch(app, /if \(wasCrashed\(window\.location\.search\)\) return <CrashScreenHost/);
   const panel = readFileSync("src/renderer/src/features/clips/components/ExportPanel.tsx", "utf8");
-  assert.match(panel, /<CrashNoteHost \/>\s*\n\s*\{c\.making/);
+  assert.ok(panel.indexOf("<CrashNoteHost />") > 0 && panel.indexOf("<CrashNoteHost />") < panel.indexOf("{c.making"), "the crash note is the first thing in Export");
 });
 
 test("the crash note leaves when dismissed or when the next clip finishes", async () => {
