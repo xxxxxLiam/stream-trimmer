@@ -47,6 +47,100 @@
       "tier": "T3",
       "rating": 7.0
      }
+    ],
+    "founder2": [
+     {
+      "id": "c1",
+      "label": "",
+      "segments": [
+       {
+        "start": 100,
+        "end": 140
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c2",
+      "label": "",
+      "segments": [
+       {
+        "start": 200,
+        "end": 240
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c3",
+      "label": "",
+      "segments": [
+       {
+        "start": 300,
+        "end": 340
+       }
+      ],
+      "status": "banked"
+     }
+    ]
+   },
+   "nova": {
+    "townhall": [
+     {
+      "id": "c1",
+      "label": "",
+      "segments": [
+       {
+        "start": 100,
+        "end": 140
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c2",
+      "label": "",
+      "segments": [
+       {
+        "start": 200,
+        "end": 240
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c3",
+      "label": "",
+      "segments": [
+       {
+        "start": 300,
+        "end": 340
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c4",
+      "label": "",
+      "segments": [
+       {
+        "start": 400,
+        "end": 440
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c5",
+      "label": "",
+      "segments": [
+       {
+        "start": 500,
+        "end": 540
+       }
+      ],
+      "status": "banked"
+     }
     ]
    }
   }

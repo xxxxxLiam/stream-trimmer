@@ -11,6 +11,7 @@ import { extractVideoId } from "../../../shared/utils/clip";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
+import { useMakingClipId } from "../../../shared/utils/clipNameStore";
 import { linkKind, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
 
 /** How long "Moved … to Done · Undo" stays. */
@@ -31,6 +32,7 @@ export function useVideosController() {
   /** The open video is still being read: its row says "Opening…" until the title arrives. */
   const opening = loadingInfo && !info;
   const { campaigns } = useCampaign();
+  const makingId = useMakingClipId();
   const bank = useSyncExternalStore(bankStore.subscribe, bankStore.get, bankStore.get);
   const [pills, setPills] = useState<string[]>([]);
   const [text, setText] = useState("");
@@ -54,12 +56,12 @@ export function useVideosController() {
         id: t.id,
         title: ws.labelFor(t.id),
         campaign: campaign?.name ?? "",
-        waiting: waitingIn(bank, t.campaignId, t.url ? extractVideoId(t.url) : null),
+        waiting: waitingIn(bank, t.campaignId, t.url ? extractVideoId(t.url) : null, makingId),
         isOpen: t.id === ws.activeId,
         done: !!t.done,
       };
     },
-    [campaigns, bank, ws],
+    [campaigns, bank, ws, makingId],
   );
 
   const terms = useMemo(() => [...pills, text].filter((x) => x.trim()).join(" "), [pills, text]);
