@@ -19,7 +19,8 @@ test("each row says the approved words", () => {
     reason: "This video is private, so it can’t be downloaded.",
     detail: "Your range is kept.",
   });
-  assert.equal(failureCopy("stopped", 1).detail, "Clipr is updating its download tools and will try once more.");
+  assert.equal(failureCopy("stopped", 1).detail, "", "no retry is promised unless the engine says it is retrying");
+  assert.equal(failureCopy("stopped", 1, undefined, true).detail, "Clipr is updating its download tools and will try once more.");
   assert.equal(failureCopy("stopped", 2).detail, "", "after the retry also failed the row says only the reason");
 });
 
@@ -41,7 +42,7 @@ test("R retries; Cmd R and typing do not", () => {
 
 test("the engine's row state decides the kind and whether the retry was spent", () => {
   assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: false }), { kind: "stopped", attempts: 1 });
-  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: true }), { kind: "stopped", attempts: 1 });
+  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: true }), { kind: "stopped", attempts: 1, retrying: true });
   assert.deepEqual(rowFailure({ state: "failed-final", reason: "x" }), { kind: "stopped", attempts: 2 });
   assert.deepEqual(rowFailure({ state: "no-space", reason: "x" }), { kind: "disk", attempts: 1 });
   assert.deepEqual(rowFailure({ state: "cannot-download", kind: "private", reason: "x" }), { kind: "private", attempts: 1 });
@@ -82,4 +83,27 @@ test("B2-2: the engine's cap error says the real reason and offers no Retry", ()
   assert.doesNotMatch(failureCopy(kind, 1).detail, /try once more/i);
   assert.deepEqual(failureActions(kind, 1), []);
   assert.deepEqual(failureActions(kind, 2), []);
+});
+
+test("C-8 / C2-5: each engine code says its own sentence and offers its own way on", () => {
+  assert.equal(classifyClipFailure("network_dropped"), "offline");
+  assert.equal(classifyClipFailure("sign_in_needed"), "signin");
+  assert.equal(classifyClipFailure("video_unavailable"), "removed");
+  assert.equal(classifyClipFailure("unknown", "YouTube refused the media request for this video"), "refused");
+  assert.equal(failureCopy("offline", 1).reason, "No internet connection.");
+  assert.match(failureCopy("signin", 1).reason, /signed in/);
+  assert.match(failureCopy("removed", 1).reason, /removed or isn’t available/);
+  assert.match(failureCopy("refused", 1).reason, /refused/);
+  for (const k of ["offline", "signin", "removed", "refused", "stopped"] as const) {
+    assert.doesNotMatch(failureCopy(k, 1).detail, /try once more|download tools/, `${k} promises no retry`);
+  }
+  assert.deepEqual(failureActions("signin", 1), ["signIn", "retry"]);
+  assert.deepEqual(failureActions("removed", 1), ["showInBrowser", "saveForLater"]);
+});
+
+test("C-8: Copy details joins after the second failed Retry for every kind that has Retry", () => {
+  for (const k of ["offline", "refused", "stopped", "signin"] as const) {
+    assert.ok(!failureActions(k, 1).includes("copyDetails"), `${k} first failure`);
+    assert.ok(failureActions(k, 2).includes("copyDetails"), `${k} second failure`);
+  }
 });

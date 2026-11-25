@@ -21,6 +21,7 @@ const LABEL: Record<Exclude<FailureAction, "copyDetails">, string> = {
   changeFolder: "Change folder",
   showInBrowser: "Show video in browser",
   saveForLater: "Save for later",
+  signIn: "Sign in",
 };
 
 export type FailedRowProps = {
@@ -30,7 +31,7 @@ export type FailedRowProps = {
 };
 
 export default function FailedRow({ failed, failure, onAction }: FailedRowProps) {
-  const copy = failureCopy(failed.kind, failed.attempts, failed.reason);
+  const copy = failureCopy(failed.kind, failed.attempts, failed.reason, failed.retrying);
   const actions = failureActions(failed.kind, failed.attempts);
   return (
     <div
@@ -57,7 +58,7 @@ export default function FailedRow({ failed, failure, onAction }: FailedRowProps)
               />
             ) : null;
           }
-          const label = a === "showInBrowser" || a === "saveForLater" ? LABEL[a] : `${LABEL[a]} ${failed.name}`;
+          const label = a === "showInBrowser" || a === "saveForLater" || a === "signIn" ? LABEL[a] : `${LABEL[a]} ${failed.name}`;
           return (
             <button key={a} type="button" aria-label={label} className={HIT} onClick={() => onAction(a)}>
               <span className={i === 0 ? PRIMARY : QUIET}>{LABEL[a]}</span>

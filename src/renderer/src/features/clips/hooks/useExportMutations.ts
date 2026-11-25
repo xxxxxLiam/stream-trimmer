@@ -20,13 +20,13 @@ import { UNDO_SECONDS } from "../utils/exportRows";
 import { clipNameFor } from "../utils/cutNaming";
 import { createSerialQueue } from "../utils/serialQueue";
 import { setCutAttempt } from "../../../shared/utils/cutAttempt";
-import type { ExportState } from "./useExportState";
+import { withFinished, type ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
 export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
   const { cutBanked, cutAgain } = usePanelHost();
-  const { recordUse, forgetUse } = useCampaign();
+  const { recordUse, forgetUse, folders, pickClipsDir } = useCampaign();
   const { removeDownload, pickSaveDir, saveDir, info, cancelDownload } = useClipperContext();
   const stopped = useRef(false);
   const { campaignId, vid } = q;
@@ -51,13 +51,10 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
         // video's title. A name already saved for this video gets " 2".
         const taken = getDownloads().map((d) => d.label.replace(/\.[^.]+$/, ""));
         const name = clipNameFor({ candidates: [clip.label, suggestProjectName(clip)], videoTitle: info?.title, taken });
-        s.setMakingName(name);
         s.setFailed(null);
-        s.setMakingId(clip.id);
         s.attempt.current = { name, segments: clip.segments, bankId: clip.id };
         setCutAttempt({ name, segments: clip.segments, bankId: clip.id });
         s.setNotice("");
-        s.setFinished(null);
         stopped.current = false;
         clearAfterCuttingOutcome(); // the last clip's handoff answer is old news once the next one starts
         try {
@@ -67,8 +64,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
             // Its own Undo, even when the next queued clip starts at once.
             const newest = getDownloads().find((d) => d.kind === "clip");
             if (newest) {
-              s.setFinished({ entryId: newest.id, name, endsAt: Date.now() + UNDO_SECONDS * 1000 });
-              s.setSecondsLeft(UNDO_SECONDS);
+              s.setFinished((list) => withFinished(list, { entryId: newest.id, name, endsAt: Date.now() + UNDO_SECONDS * 1000 }));
             }
           } else if (!stopped.current) s.setNotice(`${name} was not made. It is still waiting.`);
         } catch {
@@ -86,9 +82,9 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     cancelDownload();
   }, [cancelDownload]);
 
-  const undo = useCallback(async () => {
-    const entry = getDownloads().find((d) => d.id === s.finished?.entryId);
-    s.setFinished(null);
+  const undo = useCallback(async (entryId: string) => {
+    const entry = getDownloads().find((d) => d.id === entryId);
+    s.setFinished((list) => list.filter((f) => f.entryId !== entryId));
     if (!entry) return;
     const res = await undoClip({
       entries: clipGroup(entry, getDownloads()),
@@ -115,14 +111,22 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
 
   // The new folder lands in state after the picker closes, so retry through refs that always hold
   // the latest render, and only when the folder really changed.
-  const latest = useRef({ retry, saveDir });
-  latest.current = { retry, saveDir };
+  // The folder the cut used is the campaign's own when it has one (it overrides the global one), so
+  // that is the one changed; the global picker is only for a campaign-less cut.
+  const where = folders.clipsDir || saveDir;
+  const latest = useRef({ retry, where });
+  latest.current = { retry, where };
   const changeFolder = useCallback(async () => {
-    const before = latest.current.saveDir;
-    await pickSaveDir();
-    await new Promise((r) => window.setTimeout(r, 50));
-    if (latest.current.saveDir !== before) latest.current.retry();
-  }, [pickSaveDir]);
+    const before = latest.current.where;
+    if (campaignId) await pickClipsDir(campaignId);
+    else await pickSaveDir();
+    // The new folder reaches this hook a render later; wait for it (up to half a second), then cut again.
+    for (let i = 0; i < 10 && latest.current.where === before; i++) await new Promise((r) => window.setTimeout(r, 50));
+    if (latest.current.where !== before) latest.current.retry();
+  }, [pickSaveDir, pickClipsDir, campaignId]);
+
+  const { openSignIn } = usePanelHost();
+  const signIn = useCallback(() => openSignIn(), [openSignIn]);
 
   const showInBrowser = useCallback(() => {
     if (vid) window.open(`https://www.youtube.com/watch?v=${vid}`, "_blank", "noopener");
@@ -142,5 +146,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid],
   );
 
-  return { select, make, stop, undo, remove, retry, changeFolder, showInBrowser, saveForLater };
+  return { select, make, stop, undo, remove, retry, changeFolder, showInBrowser, saveForLater, signIn };
 }

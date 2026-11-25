@@ -20,7 +20,6 @@ const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platfor
 export default function ExportPanel() {
   const c = useExportController();
   const actions = useEntryActions();
-  const finishedEntry = c.finishedEntry;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
@@ -33,21 +32,23 @@ export default function ExportPanel() {
             if (a === "retry") c.retry();
             else if (a === "changeFolder") void c.changeFolder();
             else if (a === "showInBrowser") c.showInBrowser();
+            else if (a === "signIn") c.signIn();
             else c.saveForLater();
           }}
         />
       )}
-      {c.finished && (
+      {c.finished.map((f) => (
         <MakingRow
+          key={f.entryId}
           kind="finished"
-          name={c.finished.name}
-          secondsLeft={c.finished.secondsLeft}
-          canShow={c.canShowFinished}
-          onUndo={c.undo}
-          onShow={() => finishedEntry && actions.show(finishedEntry)}
-          onInEditor={() => finishedEntry && actions.inEditor(finishedEntry)}
+          name={f.name}
+          secondsLeft={f.secondsLeft}
+          canShow={f.canShow}
+          onUndo={() => void c.undo(f.entryId)}
+          onShow={() => f.entry && actions.show(f.entry)}
+          onInEditor={() => f.entry && actions.inEditor(f.entry)}
         />
-      )}
+      ))}
 
       {c.handoffNotice && (
         <HandoffRow

@@ -11,7 +11,7 @@ import { normalizeTier, parseBankImport } from "../../../shared/utils/bankImport
 import { parseTimecode } from "../../../shared/utils/segments";
 import { checkNames } from "../../clips/utils/clipName";
 
-export type RowProblem = { reason: string; fix: "swap" | "skip" };
+export type RowProblem = { reason: string; fix: "swap" | "skip"; /** The name is what is wrong, so the row can be renamed. */ name?: true };
 
 export type MomentRow = {
   /** Stable within one paste: the 1-based line. */
@@ -215,5 +215,21 @@ export function flagNames(rows: readonly MomentRow[], existing: ReadonlyArray<{ 
       existing,
     ).map((p) => [String(p.line), p.reason]),
   );
-  return rows.map((r) => (problems.has(r.key) ? { ...r, problem: { reason: problems.get(r.key)!, fix: "skip" as const } } : r));
+  return rows.map((r) => (problems.has(r.key) ? { ...r, problem: { reason: problems.get(r.key)!, fix: "skip" as const, name: true as const } } : r));
+}
+
+/**
+ * The name check as the person works through the list: a rename takes effect, and a skipped row no
+ * longer counts as the other holder of a name, so its twin is not left flagged against a line that
+ * will never be banked. A skipped row keeps its own flag (it is skipped either way).
+ */
+export function checkImportNames(
+  parsed: readonly MomentRow[],
+  existing: ReadonlyArray<{ id: string; name: string }>,
+  skipped: ReadonlySet<string>,
+  renamed: ReadonlyMap<string, string>,
+): MomentRow[] {
+  const applied = parsed.map((r) => (renamed.has(r.key) ? { ...r, name: renamed.get(r.key)! } : r));
+  const checked = new Map(flagNames(applied.filter((r) => !skipped.has(r.key)), existing).map((r) => [r.key, r]));
+  return applied.map((r) => checked.get(r.key) ?? r);
 }

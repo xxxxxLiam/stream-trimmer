@@ -41,3 +41,10 @@ test("C-4: a bare video link still opens the video, and ordinary text is left al
   assert.equal(classifyPaste("remember to buy milk"), "none");
   assert.equal(classifyPaste(`${SHEET_HEADER}\nnot a link\tnot a time`), "none");
 });
+
+test("C2-11: a sheet with no video column opens Import for the open video, and is left alone with no video open", () => {
+  const sheet = "start\tend\tname\n0:20:00\t0:20:40\tSheet One\n0:30:00\t0:30:40\tSheet Two";
+  assert.equal(classifyPaste(sheet, { openVideoId: "podcast214" }), "moments");
+  assert.equal(classifyPaste(sheet, { openVideoId: null }), "none");
+  assert.equal(classifyPaste(sheet), "none");
+});
