@@ -54,6 +54,7 @@ const COLUMNS: Record<string, string> = {
   tier: "tier",
   campaign: "campaign", client: "campaign",
 };
+const HINT_ORDER = ["name", "start", "end", "rating", "category", "tier", "campaign"];
 const ORDER = ["video", "start", "end", "name", "rating", "category", "tier", "campaign"];
 
 function splitCells(line: string): string[] {
@@ -137,6 +138,9 @@ export function parseMoments(text: string, ctx: ParseContext): MomentRow[] {
     const line = i + 1;
     if (map) {
       rows.push(rowFromCells((k) => (k in map! ? (cells[map![k]] ?? "") : ""), line, ctx));
+    } else if (cells.length >= 3 && !extractVideoId(cells[0]) && parseTimecode(cells[1]) !== null && parseTimecode(cells[2]) !== null) {
+      // The hint's own order, no header and no link: "Honest Version, 1:12:04, 1:12:46" (comma or tab) for the open video.
+      rows.push(rowFromCells((k) => cells[HINT_ORDER.indexOf(k)] ?? "", line, ctx));
     } else if (tabbed && cells.length >= 3) {
       // A sheet paste without its header row: the order "Copy format" asks for.
       rows.push(rowFromCells((k) => cells[ORDER.indexOf(k)] ?? "", line, ctx));
@@ -152,6 +156,7 @@ export function parseMoments(text: string, ctx: ParseContext): MomentRow[] {
           name: c.label,
           start: seg.start,
           end: seg.end,
+          ...(c.ranPastEnd !== undefined ? { ranPastEnd: c.ranPastEnd } : {}),
           ...(c.category ? { category: c.category } : {}),
           ...(c.tier ? { tier: c.tier } : {}),
           ...(ctx.openVideoId ? {} : { problem: { reason: "no video link", fix: "skip" as const } }),

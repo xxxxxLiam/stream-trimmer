@@ -24,7 +24,7 @@ const { ipcMain } = electron;
 
 export function registerFilesHandlers() {
   // Before a clip starts: room for it where it will land? `ok` is false only when clearly short; null freeMb means unknown.
-  // Can Clipr write into this folder? { ok: true } or { ok: false, problem: "gone" | "refused" }. Only chosen folders are looked at; a malformed request is ok.
+  // Can Clipr write into this folder? { ok: true } or { ok: false, problem: "gone" | "refused" | "blocked" }. Only chosen folders are looked at; a malformed request is ok.
   ipcMain.handle(IPC.fileCheckFolder, (_e: unknown, payload: unknown) => checkSaveFolder(payload));
   ipcMain.handle(IPC.fileFreeSpace, (_e: unknown, payload: unknown) => checkFreeSpace(payload) ?? { ok: true, neededMb: 0, freeMb: null });
   ipcMain.handle(IPC.clipSave, async (_e: unknown, payload: any) => {

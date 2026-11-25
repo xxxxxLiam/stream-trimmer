@@ -85,3 +85,21 @@ test("the folder check runs before the free-space check and the request, and Cli
   const folder = src.indexOf("checkFolder");
   assert.ok(folder > 0 && folder < src.indexOf("checkFreeSpace") && folder < src.indexOf("new EventSource("));
 });
+
+test("C4-1: the pre-check answers stop the clip before the engine, outside the progress-channel guard that would swallow them", async () => {
+  const fs = await import("node:fs");
+  const src = fs.readFileSync(new URL("../modules/clipper/hooks/useClipDownloadMutations.ts", import.meta.url), "utf8");
+  const guard = src.indexOf("let es: EventSource | null = null;");
+  assert.ok(src.indexOf("window.electronAPI.checkFolder") < guard && src.indexOf("window.electronAPI.checkFreeSpace") < guard, "the checks run before the guarded block");
+  const swallow = src.indexOf("EventSource unavailable");
+  const rethrow = src.indexOf("if (refusal) throw refusal; // the pre-check");
+  assert.ok(swallow > 0 && rethrow > swallow, "the refusal is thrown after the guard, into the catch that fills the clip's row");
+  assert.ok(src.indexOf("fetch(\n        apiUrl(`/api/download?") > rethrow, "and before the engine is asked");
+});
+
+test("C4-3: a failed Clip-button cut kept in Waiting keeps its name", async () => {
+  const fs = await import("node:fs");
+  const eff = fs.readFileSync(new URL("../features/clips/hooks/useExportEffects.ts", import.meta.url), "utf8");
+  assert.match(eff, /clipNameFor\(\{ candidates: \[f\.name\]/);
+  assert.match(eff, /importClips\(q\.campaignId, q\.vid, \[\{ line: 1, id: null, label, segments: f\.segments \}\]\)/);
+});
