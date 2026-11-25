@@ -25,14 +25,15 @@ test("a fresh timeline starts on the pointer, which only moves the playhead", ()
   assert.equal(getToolStateForTest().tool, "pointer");
 });
 
-test("tool keys: A pointer, B scissors, S select range, F flag, H hand, Z zoom; M and modified keys are not tools", () => {
+test("tool keys: A pointer, B scissors, D select range, F flag, H hand, Z zoom; M and modified keys are not tools", () => {
   const k = (key: string, mods: Partial<{ metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }> = {}) =>
     toolForKey({ key, metaKey: false, ctrlKey: false, altKey: false, ...mods });
-  assert.deepEqual(["a", "b", "s", "f", "h", "z"].map((x) => k(x)), ["pointer", "clip", "range", "flag", "hand", "zoom"]);
+  assert.deepEqual(["a", "b", "d", "f", "h", "z"].map((x) => k(x)), ["pointer", "clip", "range", "flag", "hand", "zoom"]);
   assert.equal(k("A"), "pointer");
   assert.equal(k("m"), null, "M drops a flag at the playhead, it does not pick the Flag tool");
   assert.equal(k("r"), null, "R is Retry");
-  assert.equal(k("s", { metaKey: true }), null);
+  assert.equal(k("d", { metaKey: true }), null);
+  assert.equal(k("s"), null, "S is the review flow's skip key, not a tool");
   assert.equal(k("z", { ctrlKey: true }), null);
   assert.equal(new Set(TIMELINE_TOOLS.map((t) => TOOL_KEYS[t])).size, TIMELINE_TOOLS.length, "no two tools share a key");
 });
