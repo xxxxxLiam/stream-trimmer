@@ -8,9 +8,9 @@
 import type { ReactNode } from "react";
 import { cx } from "../utils/cx";
 
-export function KeyHint({ children }: { children: ReactNode }) {
+export function KeyHint({ children, large = false }: { children: ReactNode; large?: boolean }) {
   return (
-    <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-chip border border-hairlineStrong bg-raised px-[5px] text-meta font-semibold text-fg">
+    <span className={`inline-flex items-center justify-center rounded-chip ${large ? "h-[22px] min-w-[32px] px-[5px]" : "h-[20px] min-w-[20px] px-[5px]"} border border-hairlineStrong bg-raised text-meta font-semibold text-fg`}>
       {children}
     </span>
   );
@@ -35,7 +35,7 @@ export default function Tooltip({ id, children, keyHint, className }: TooltipPro
       )}
     >
       {children}
-      {keyHint ? <KeyHint>{keyHint}</KeyHint> : null}
+      {keyHint ? <KeyHint large>{keyHint}</KeyHint> : null}
     </span>
   );
 }
