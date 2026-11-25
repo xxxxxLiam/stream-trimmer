@@ -5,7 +5,7 @@
  *   follows the playhead when it leaves, the preview scrubber is told the zoomed part, and the
  *   fold and the scissors reset when they no longer apply.
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { setZoom, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
 import type { Range } from "../../../shared/utils/segments";
@@ -52,9 +52,13 @@ export function useTimelineEffects(a: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.playhead]);
 
+  const fitSeen = useRef(a.fitRequests);
   // Fit: frame the picked range with room either side (the whole video when nothing is picked).
   useEffect(() => {
-    if (a.fitRequests === 0) return;
+    // Only a press that happens while this is mounted: a remount sees the old count and must not refit.
+    if (a.fitRequests === fitSeen.current) return;
+    fitSeen.current = a.fitRequests;
+    if (!tabActive) return; // every open tab has a timeline; only the one on screen answers
     const w = fitWindow(a.range, a.duration);
     setZoom(zoomForSpan(a.duration, w.end - w.start));
     a.setFocus((w.start + w.end) / 2);
@@ -65,13 +69,13 @@ export function useTimelineEffects(a: Args) {
   // timeline on itself, with the playhead inside it. A range marked by hand never moves the ruler.
   useEffect(() => {
     const r = a.framed;
-    if (!r || !(a.duration > 0) || !arrivedFromElsewhere()) return;
+    if (!tabActive || !r || !(a.duration > 0) || !arrivedFromElsewhere()) return;
     const w = fitWindow(r, a.duration);
     setZoom(zoomForSpan(a.duration, w.end - w.start));
     a.setFocus((w.start + w.end) / 2);
     if (a.playhead < r.start || a.playhead > r.end) a.seek(r.start);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.videoId, a.duration, a.framed?.start, a.framed?.end]);
+  }, [tabActive, a.videoId, a.duration, a.framed?.start, a.framed?.end]);
 
   // Zoomed in, the window follows the playhead once it runs off the edge.
   useEffect(() => {

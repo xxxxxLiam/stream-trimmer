@@ -63,7 +63,9 @@
   --c-hairline: rgba(255, 255, 255, 0.08);
   --c-hairline-strong: rgba(255, 255, 255, 0.14);
   /* bg overlay alphas (scrims over video and under dialogs). */
+  --bg-overlay-50: rgb(10 13 15 / 0.5);
   --bg-overlay-60: rgb(10 13 15 / 0.6);
+  --bg-overlay-75: rgb(10 13 15 / 0.75);
   --bg-overlay-80: rgb(10 13 15 / 0.8);
   --bg-overlay-92: rgb(10 13 15 / 0.92);
 

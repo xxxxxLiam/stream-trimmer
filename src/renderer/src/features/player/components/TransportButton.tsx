@@ -60,7 +60,7 @@ export default function TransportButton({
         {children}
       </button>
       <Tooltip
-        className={`pointer-events-none absolute left-1/2 z-20 hidden -translate-x-1/2 group-focus-within:inline-flex group-hover:inline-flex ${labelBelow ? "top-full mt-1" : "bottom-full mb-1"}`}
+        className={`pointer-events-none absolute left-1/2 z-20 hidden -translate-x-1/2 group-focus-within:inline-flex group-hover:inline-flex ${labelBelow ? "top-full mt-[4px]" : "bottom-full mb-[4px]"}`}
         keyHint={key}
       >
         {text}

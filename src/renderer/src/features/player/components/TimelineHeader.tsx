@@ -22,20 +22,20 @@ export default function TimelineHeader({ c }: { c: TimelineController }) {
   const chips = c.segments;
   const overlap = c.range ? findOverlaps(c.range, c.used).length > 0 : false;
   return (
-    <div className="flex h-[60px] items-center gap-4 px-4">
+    <div className="flex h-[60px] items-center gap-[16px] px-[16px]">
       {chips.length === 0 ? (
         <>
-          <span id="ui-mark-in" className="text-section tabular-nums" aria-label="In">
+          <span id="ui-mark-in" className="text-section font-normal tabular-nums" aria-label="In">
             {c.inText}
           </span>
-          <span id="ui-mark-out" className="text-section tabular-nums" aria-label="Out">
+          <span id="ui-mark-out" className="text-section font-normal tabular-nums" aria-label="Out">
             {c.outText}
           </span>
         </>
       ) : null}
-      <span id="ui-stitched-total" className="inline-flex items-baseline gap-2">
+      <span id="ui-stitched-total" className="inline-flex items-baseline gap-[8px]">
         <span className="text-cliplength tabular-nums text-ice">{c.lengthText}</span>
-        <span className="text-meta text-fg-dim">clip length</span>
+        <span className="text-meta leading-[15px] text-fg-dim">clip length</span>
       </span>
       {overlap ? (
         <span id="ui-overlap-warning" role="status" className="text-meta text-fg-dim">
@@ -50,7 +50,7 @@ export default function TimelineHeader({ c }: { c: TimelineController }) {
       {chips.map((s, i) => (
         <span
           key={`${s.start}-${s.end}`}
-          className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-ice-tint-50 pl-3 pr-1 text-body"
+          className="inline-flex h-[30px] items-center gap-[6px] rounded-full border border-ice-tint-50 pl-[12px] pr-[4px] text-body"
         >
           <span className="text-fg-dim">{i + 1}</span>
           <span className="tabular-nums">{lengthLabel(s.end - s.start)}</span>
@@ -59,19 +59,19 @@ export default function TimelineHeader({ c }: { c: TimelineController }) {
             aria-label={`Remove section ${i + 1}`}
             disabled={c.locked}
             onClick={() => c.removeSection(i)}
-            className="inline-flex size-7 items-center justify-center text-fg-dim hover:text-fg"
+            className="inline-flex size-[28px] items-center justify-center text-fg-dim hover:text-fg"
           >
             <CrossIcon />
           </button>
         </span>
       ))}
-      <span className="ml-auto flex items-center gap-2">
+      <span className="ml-auto flex items-center gap-[8px]">
         <button
           type="button"
           disabled={!c.range || c.locked}
           onClick={c.addSection}
           id="ui-add-segment"
-          className="h-target rounded-full border border-hairline-strong bg-raised px-4 text-body text-fg disabled:text-disabled"
+          className="h-target rounded-full border border-hairlineStrong bg-raised px-[16px] text-body text-fg disabled:text-disabled"
         >
           + section
         </button>

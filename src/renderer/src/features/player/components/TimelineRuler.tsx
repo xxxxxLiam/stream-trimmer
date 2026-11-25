@@ -14,11 +14,11 @@ export function foldLabel(seconds: number): string {
 
 export default function TimelineRuler({ c }: { c: TimelineController }) {
   return (
-    <div className="flex h-[18px] items-center">
+    <div className="flex h-[18px] items-start">
       <LaneLabel />
       <div className="relative h-full flex-1">
         {c.opening ? null : c.ticks.map((t) => (
-          <span key={`${t.t}-${t.x}`} className="absolute text-meta tabular-nums text-fg-dim" style={{ left: t.x }}>
+          <span key={`${t.t}-${t.x}`} className="absolute text-meta leading-[15px] tabular-nums text-fg-dim" style={{ left: t.x }}>
             {t.label}
           </span>
         ))}

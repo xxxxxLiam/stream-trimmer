@@ -7,6 +7,7 @@
  */
 import { motion } from "framer-motion";
 import { BoxArrowUpRight, CameraVideo, ExclamationTriangle } from "react-bootstrap-icons";
+import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
 import { useTimelineView } from "../hooks/useTimelineView";
@@ -33,35 +34,39 @@ export default function PreviewPanel() {
   const opening = !!videoId && !info && c.loadingInfo;
   const blocked = player.blocked;
   const showEnd = !!videoId && !blocked && player.ended;
+  // The words being said now, over the picture. Only a line that is playing, never a stale one.
+  const { transcript } = useClipperContext();
+  const now = player.currentTime;
+  const caption = !showEnd && !opening ? transcript?.find((l) => l.start <= now && now < l.end)?.text : undefined;
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.16, ease: "easeOut" }}
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-visible rounded-panel border border-hairline bg-panel"
+      className="relative flex min-h-[0px] min-w-[0px] flex-1 flex-col overflow-visible rounded-panel border border-hairline bg-panel"
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2.5">
-        <div className="flex flex-none justify-between text-body tabular-nums">
+      <div className="flex min-h-[0px] flex-1 flex-col gap-[8px] px-[12px] py-[10px]">
+        <div className="flex h-[16px] flex-none items-center justify-between text-body leading-[16px] tabular-nums">
           <span>{clockTime(showEnd ? c.duration : player.currentTime)}</span>
           <span className="text-fg-dim">{clockTime(c.duration)}</span>
         </div>
 
-        <div ref={c.frameRef} className="relative min-h-0 flex-1 overflow-hidden rounded-control bg-raised">
-          {videoId && !blocked && <div ref={player.containerRef} className="absolute inset-0" />}
+        <div ref={c.frameRef} className="relative min-h-[0px] flex-1 overflow-hidden rounded-control bg-raised">
+          {videoId && !blocked && <div ref={player.containerRef} className="absolute inset-[0px]" />}
           {videoId && blocked && (
-            <div className="absolute inset-0">
+            <div className="absolute inset-[0px]">
               <img
                 src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
                 alt={info?.title ? `Thumbnail for ${info.title}` : "Source thumbnail"}
                 className="h-full w-full object-cover opacity-40"
                 loading="lazy"
               />
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+              <div className="absolute inset-[0px] flex flex-col items-center justify-center gap-[8px] px-[24px] text-center">
                 <ExclamationTriangle size={22} className="text-fg" />
                 <span className="text-body text-fg">The owner blocks playback here</span>
                 <span className="max-w-sm text-meta text-fg-dim">Cutting and downloading still work.</span>
-                <button type="button" onClick={() => openExternal(videoId)} className="btn mt-1">
+                <button type="button" onClick={() => openExternal(videoId)} className="btn mt-[4px]">
                   <BoxArrowUpRight size={12} />
                   <span>Watch on YouTube</span>
                 </button>
@@ -69,16 +74,21 @@ export default function PreviewPanel() {
             </div>
           )}
           {opening && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-6 text-center">
+            <div className="absolute inset-[0px] flex flex-col items-center justify-center gap-[6px] px-[24px] text-center">
               <span className="text-body text-fg-dim">Opening the video… the transcript follows.</span>
             </div>
           )}
           {!videoId && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg-dim">
+            <div className="absolute inset-[0px] flex flex-col items-center justify-center gap-[8px] text-fg-dim">
               <CameraVideo size={22} />
               <span className="text-meta">Paste a link to preview it</span>
             </div>
           )}
+          {caption ? (
+            <span className="pointer-events-none absolute bottom-[11px] left-1/2 max-w-[calc(100%-24px)] -translate-x-1/2 rounded-chip bg-overlay-75 px-[10px] py-[5px] text-center text-body leading-[16px]">
+              {caption}
+            </span>
+          ) : null}
           {showEnd ? (
             <EndCard day={host.day} onNextVideo={host.onNextVideo} onOpenBank={host.onOpenBank} onOpenVideo={host.onOpenVideo} />
           ) : null}

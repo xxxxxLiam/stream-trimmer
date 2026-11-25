@@ -74,7 +74,9 @@ export default {
           "tint-15": "var(--error-tint-15)",
         },
         "bg-overlay": {
+          50: "var(--bg-overlay-50)",
           60: "var(--bg-overlay-60)",
+          75: "var(--bg-overlay-75)",
           80: "var(--bg-overlay-80)",
           92: "var(--bg-overlay-92)",
         },

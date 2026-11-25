@@ -17,7 +17,7 @@ type Props = {
 const PRIMARY =
   "mt-3 inline-flex h-target items-center rounded-full bg-ice px-[22px] text-body font-medium text-bg";
 const SECONDARY =
-  "mt-3 inline-flex h-target items-center rounded-full border border-hairline-strong bg-raised px-[22px] text-body font-medium text-fg";
+  "mt-3 inline-flex h-target items-center rounded-full border border-hairlineStrong bg-raised px-[22px] text-body font-medium text-fg";
 
 export default function EndCard({ day, onNextVideo, onOpenBank, onOpenVideo }: Props) {
   const kind = endCardKind({ next: day.next, made: day.made, quota: day.quota });
@@ -26,10 +26,10 @@ export default function EndCard({ day, onNextVideo, onOpenBank, onOpenVideo }: P
   return (
     <div
       role="status"
-      className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-bg-overlay-80 px-6 text-center"
+      className="absolute inset-[0px] flex flex-col items-center justify-center gap-[6px] bg-bg-overlay-80 px-[24px] text-center"
     >
       {kind === "done" ? (
-        <div className="flex items-center gap-1.5 text-meta text-frost">
+        <div className="flex items-center gap-[6px] text-meta text-frost">
           <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M3 8.5l3 3 7-7" />
           </svg>

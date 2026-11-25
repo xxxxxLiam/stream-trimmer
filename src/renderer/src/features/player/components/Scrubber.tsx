@@ -46,17 +46,17 @@ export default function Scrubber({ duration, playhead, range, flags, view, onSee
       aria-valuetext={clockTime(playhead)}
       onClick={seekFromPointer}
       onKeyDown={onKey}
-      className={`relative flex-none cursor-pointer ${large ? "h-1 rounded-chip bg-hover" : "h-[5px] rounded-[3px] bg-raised"}`}
+      className={`relative flex-none cursor-pointer ${large ? "h-[4px] rounded-chip bg-hover" : "h-[5px] rounded-[3px] bg-raised"}`}
     >
       {view ? (
         <span
-          className="absolute inset-y-0 rounded-[3px] bg-hover"
+          className="absolute inset-y-[0px] rounded-[3px] bg-hover"
           style={{ left: `${pct(view.start, duration)}%`, width: `${pct(view.end - view.start, duration)}%` }}
         />
       ) : null}
       {range ? (
         <span
-          className="absolute inset-y-0 rounded-[2px] bg-ice"
+          className="absolute inset-y-[0px] rounded-[2px] bg-ice"
           style={{ left: `${pct(range.start, duration)}%`, width: `${pct(range.end - range.start, duration)}%` }}
         />
       ) : null}
@@ -64,13 +64,13 @@ export default function Scrubber({ duration, playhead, range, flags, view, onSee
         <span
           key={f}
           aria-hidden="true"
-          className="absolute -top-[5px] h-[14px] w-0.5 bg-fg-dim"
+          className="absolute -top-[5px] h-[14px] w-[2px] bg-fg-dim"
           style={{ left: `${pct(f, duration)}%` }}
         />
       ))}
       <span
         aria-hidden="true"
-        className={`absolute w-0.5 bg-frost shadow-playhead ${large ? "-top-[7px] h-[18px]" : "-top-[4px] h-[13px]"}`}
+        className={`absolute w-[2px] bg-frost shadow-playhead ${large ? "-top-[7px] h-[18px]" : "-top-[4px] h-[13px]"}`}
         style={{ left: `${pct(playhead, duration)}%` }}
       />
     </div>

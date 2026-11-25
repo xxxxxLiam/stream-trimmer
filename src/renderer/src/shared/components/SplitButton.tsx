@@ -53,7 +53,7 @@ export default function SplitButton({
         aria-expanded={menuExpanded}
         aria-disabled={disabled || undefined}
         onClick={disabled ? undefined : onOpenMenu}
-        className={cx("inline-flex h-target w-[34px] items-center justify-center rounded-r-pill", half)}
+        className={cx("inline-flex h-target w-[36px] items-center justify-center rounded-r-pill", half)}
       >
         {menuIcon}
       </button>

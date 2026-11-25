@@ -1,0 +1,91 @@
+{
+ "_doc": "Workspace with the fake YouTube player (so the transport row shows) and the 1:12:04 to 1:12:46 range picked by hand with I and O, then Fit, playhead at 1:12:31. Boards: Main01Layout, Main02a, Main02d, FirstClip variants build on it.",
+ "extends": "Workspace",
+ "initScript": "fakeYT.js",
+ "initGlobals": {
+  "__fakeYT": {
+   "start": 4324
+  }
+ },
+ "seed": {
+  "clipper.workspaces": {
+   "activeId": "ws_a",
+   "tabs": [
+    {
+     "id": "ws_a",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=podcast214",
+     "campaignId": "acme"
+    },
+    {
+     "id": "ws_b",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=founder2",
+     "campaignId": "acme"
+    },
+    {
+     "id": "ws_c",
+     "name": "",
+     "url": "https://www.youtube.com/watch?v=townhall",
+     "campaignId": "nova"
+    }
+   ]
+  }
+ },
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4324"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "i"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4366"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "o"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "click": "button[aria-label='Loop']"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4351; window.__fakeYTPlayer.pauseVideo()"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "click": "button:text-is('Fit')"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "document.activeElement && document.activeElement.blur()"
+  },
+  {
+   "wait": 300
+  }
+ ],
+ "stub": {
+  "vttFile": "podcast214-timeline.vtt"
+ }
+}

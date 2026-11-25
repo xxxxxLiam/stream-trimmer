@@ -24,6 +24,7 @@ function args() {
     else if (a[i] === "--board-only") out.boardOnly = true;
     else if (a[i] === "--window") out.window = /^\d+$/.test(a[i + 1] || "") ? Number(a[++i]) : 0;
     else if (a[i] === "--el") out.el = Number(a[++i]);
+    else if (a[i] === "--dump") out.dump = true;
     else if (a[i] === "--snapshot") process.env.PARITY_SNAPSHOT = a[++i];
     else if (!out.screen) out.screen = a[i];
   }
@@ -40,7 +41,12 @@ function loadFixture(name) {
   const f = path.join(REPO, "audit", "harness", "fixtures", `${name}.json`);
   if (!fs.existsSync(f)) return { seed: {}, steps: [] };
   // "$NOW" in a fixture becomes the current time in ms, so "made today" counts stay today.
-  return JSON.parse(fs.readFileSync(f, "utf8").replace(/"\$NOW"/g, String(Date.now())));
+  const fx = JSON.parse(fs.readFileSync(f, "utf8").replace(/"\$NOW"/g, String(Date.now())));
+  // "extends": another fixture's name. Its keys apply first; seed and stub merge one level down, and
+  // every other key here replaces the base's.
+  if (!fx.extends) return fx;
+  const base = loadFixture(fx.extends);
+  return { ...base, ...fx, seed: { ...base.seed, ...fx.seed }, stub: base.stub ? { ...base.stub, ...fx.stub } : fx.stub };
 }
 
 async function runSteps(win, steps) {
@@ -51,6 +57,8 @@ async function runSteps(win, steps) {
     else if (s.waitFor) await win.waitForSelector(s.waitFor);
     else if (s.wait) await win.waitForTimeout(s.wait);
     else if (s.eval) await win.evaluate(s.eval);
+    else if (s.log) console.log("log:", JSON.stringify(await win.evaluate(s.log)));
+    else if (s.shot) await win.screenshot({ path: s.shot });
   }
 }
 
@@ -85,7 +93,7 @@ async function appRegion(win, frame, fx, useWindow) {
   return frame.clip;
 }
 
-async function screenshotApp(screen, frame, fx, useWindow) {
+async function screenshotApp(screen, frame, fx, useWindow, dump) {
   const win0 = fx.window || (useWindow ? { width: frame.width, height: frame.height } : { width: 1360, height: 760 });
   const { launchApp } = require("../../audit/harness/app.cjs");
   // The packaged-shape app looks for binaries in <electron>/dist/resources/bin, not under cwd, so a
@@ -113,10 +121,23 @@ async function screenshotApp(screen, frame, fx, useWindow) {
     if (inner[0] !== win0.width || inner[1] !== win0.height) {
       console.warn(`window content is ${inner.join("x")}, wanted ${win0.width}x${win0.height}`);
     }
+    if (fx.initScript) {
+      // A script that must exist before the app's own code runs (the fake YouTube player), then a reload.
+      const src = fs.readFileSync(path.join(REPO, "audit", "harness", "fixtures", fx.initScript), "utf8");
+      const pre = fx.initGlobals ? `Object.assign(window, ${JSON.stringify(fx.initGlobals)});` : "";
+      await a.win.context().addInitScript(pre + src);
+      await a.win.reload();
+    }
     await a.win.waitForSelector(fx.waitFor || "#root *");
     await runSteps(a.win, fx.steps);
     await a.win.waitForTimeout(400);
-    return await a.win.screenshot({ clip: await appRegion(a.win, frame, fx, useWindow) });
+    const clip = await appRegion(a.win, frame, fx, useWindow);
+    if (dump) {
+      const f = require("./dumpLayout.cjs").DUMP_SRC;
+      const d = await a.win.evaluate(new Function("p", "return (" + f + ")(p[0], p[1])"), [0, 0]).catch(() => null);
+      globalThis.__appDump = d;
+    }
+    return await a.win.screenshot({ clip });
   } finally {
     await a.close();
     if (link) fs.rmSync(link, { recursive: true, force: true });
@@ -127,13 +148,15 @@ async function screenshotApp(screen, frame, fx, useWindow) {
   const o = args();
   const outDir = path.join(REPO, "audit", "out", "parity", o.screen + (o.window !== undefined ? `-window${o.window}` : o.el !== undefined ? `-el${o.el}` : ""));
   fs.mkdirSync(outDir, { recursive: true });
-  const { png: boardPng, frame } = await renderBoard(o.screen, { window: o.window, el: o.el });
+  const { png: boardPng, frame, dump: boardDump } = await renderBoard(o.screen, { window: o.window, el: o.el, dump: o.dump });
+  if (boardDump) fs.writeFileSync(path.join(outDir, "board.json"), JSON.stringify(boardDump, null, 1));
   fs.writeFileSync(path.join(outDir, "board.png"), boardPng);
   console.log(`board: ${frame.title} (${frame.width}x${frame.height})`);
   if (o.boardOnly) return;
 
   const fixture = loadFixture(o.fixture);
-  const appPng = await screenshotApp(o.screen, frame, fixture, o.window !== undefined);
+  const appPng = await screenshotApp(o.screen, frame, fixture, o.window !== undefined, o.dump);
+  if (o.dump && globalThis.__appDump) fs.writeFileSync(path.join(outDir, "app.json"), JSON.stringify(globalThis.__appDump, null, 1));
   fs.writeFileSync(path.join(outDir, "app.png"), appPng);
   let b = PNG.sync.read(boardPng);
   let p = PNG.sync.read(appPng);

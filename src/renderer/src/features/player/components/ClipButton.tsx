@@ -30,7 +30,7 @@ export default function ClipButton({ openUp = false, listenForKey = false }: { o
       {c.reason ? (
         <Tooltip
           id={tipId}
-          className={`pointer-events-none absolute right-0 z-20 hidden group-focus-within:inline-flex group-hover:inline-flex ${openUp ? "bottom-full mb-1" : "top-full mt-1"}`}
+          className={`pointer-events-none absolute right-[0px] z-20 hidden group-focus-within:inline-flex group-hover:inline-flex ${openUp ? "bottom-full mb-[4px]" : "top-full mt-[4px]"}`}
         >
           {c.reason}
         </Tooltip>
@@ -41,7 +41,7 @@ export default function ClipButton({ openUp = false, listenForKey = false }: { o
           onKeyDown={(e) => {
             if (e.key === "Escape") c.closeMenu();
           }}
-          className={`absolute right-0 z-30 ${openUp ? "bottom-full mb-2" : "top-full mt-2"}`}
+          className={`absolute right-[0px] z-30 ${openUp ? "bottom-full mb-[8px]" : "top-full mt-[8px]"}`}
         >
           <MenuLabel>Where clips go</MenuLabel>
           {c.destinations.map((d) => (

@@ -14,7 +14,7 @@ import { toX } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import LaneLabel from "./LaneLabel";
 
-const BAR = "absolute top-[5px] h-6 overflow-hidden text-ellipsis whitespace-nowrap px-2 text-meta leading-[22px]";
+const BAR = "absolute top-[5px] h-[24px] overflow-hidden text-ellipsis whitespace-nowrap px-[8px] text-meta leading-[22px]";
 
 /** No suggested name yet (no suggestion yet): a time-based one. */
 export function timeName(start: number): string {
@@ -27,6 +27,9 @@ export function skippedLabel(seconds: number): string {
 }
 
 export default function ClipsLane({ c }: { c: TimelineController }) {
+  const first = c.axis.pieces[0]?.t0 ?? 0;
+  const last = c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? 0;
+  const shown = (start: number, end: number) => end > start && end >= first && start <= last;
   const span = (start: number, end: number) => {
     const x = toX(c.axis, start);
     return { left: x, width: Math.max(6, toX(c.axis, end) - x) };
@@ -41,13 +44,13 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
   return (
     <div className="flex h-[34px] items-center">
       <LaneLabel>Clips</LaneLabel>
-      <div className="relative h-full flex-1">
+      <div className="relative h-full flex-1 overflow-hidden">
         {c.opening
           ? null
           : (
             <>
               {c.used.map((u, i) =>
-                u.end > u.start ? (
+                shown(u.start, u.end) ? (
                   <button
                     key={`used-${i}-${u.start}`}
                     type="button"
@@ -61,7 +64,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 ) : null,
               )}
               {c.waiting.map((b, i) =>
-                b.end > b.start ? (
+                shown(b.start, b.end) && !(sections.length === 1 && b.start === sections[0].start && b.end === sections[0].end) ? (
                   <button
                     key={`wait-${i}-${b.start}`}
                     type="button"
@@ -69,8 +72,8 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                     onClick={() => playFrom(b.start)}
                     className={`${BAR} rounded-chip border text-center ${
                       c.range && b.start === c.range.start && b.end === c.range.end
-                        ? "border-fg text-fg"
-                        : "border-hairline-strong text-fg-dim"
+                        ? "border-frost text-fg"
+                        : "border-hairlineStrong text-fg-dim"
                     }`}
                     style={span(b.start, b.end)}
                   >
