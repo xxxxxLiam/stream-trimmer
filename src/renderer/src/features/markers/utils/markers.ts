@@ -74,3 +74,8 @@ export function trimWindow(at: number, duration: number | null): FlagRange {
   }
   return { start, end };
 }
+
+/** Delete and Backspace remove the focused flag row (B-9). */
+export function isRemoveKey(key: string): boolean {
+  return key === "Delete" || key === "Backspace";
+}

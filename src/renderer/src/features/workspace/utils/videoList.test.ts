@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { matchesVideoQuery, nextOpenId, nextWaitingId, setDone, splitVideos, waitingIn, looksLikeLink } from "./videoList";
+import { matchesVideoQuery, nextOpenId, nextWaitingId, setDone, splitVideos, waitingIn, looksLikeLink, linkKind } from "./videoList";
 import type { WorkspaceTab } from "../hooks/WorkspaceContext";
 import type { BankData } from "../../../shared/utils/bank";
 
@@ -59,4 +59,19 @@ test("nextWaitingId skips Done videos and ones with nothing waiting, and wraps",
   assert.equal(nextWaitingId(tabs, "a", waiting), "d");
   assert.equal(nextWaitingId(tabs, "d", waiting), "a");
   assert.equal(nextWaitingId(tabs, "a", () => 0), null);
+});
+
+test("B-5: a YouTube link without https:// is a link, not a search word", () => {
+  assert.equal(linkKind("m.youtube.com/watch?v=abc123"), "video");
+  assert.equal(linkKind("music.youtube.com/watch?v=abc123"), "video");
+  assert.equal(linkKind("youtu.be/abc123"), "video");
+  assert.equal(linkKind("https://www.youtube.com/watch?v=abc123"), "video");
+  assert.equal(linkKind("founder story"), "none");
+  assert.equal(linkKind("youtube tips"), "none");
+});
+
+test("B-6: a link that is not a YouTube video is flagged, not opened", () => {
+  assert.equal(linkKind("https://example.com/video"), "bad");
+  assert.equal(linkKind("https://www.youtube.com/@somechannel"), "bad");
+  assert.equal(linkKind("www.vimeo.com/123"), "bad");
 });
