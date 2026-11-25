@@ -39,6 +39,7 @@ test("B2-8: flag, hand and zoom each get their own hint, none says Drag", () => 
   for (const l of leads) assert.doesNotMatch(l, /^(Drag|Choose)/);
 });
 
+import { DEFAULT_SIZES } from "../../../modules/layout/utils/panelLayout";
 import { TOOL_CURSORS, clampX, placeLabels, sourceLaneHeight, wheelAction } from "./laneTools";
 
 test("wheel: sideways pans, Shift+wheel pans, Ctrl/Cmd+wheel zooms, plain vertical is left alone", () => {
@@ -77,7 +78,12 @@ test("a name that does not fit its bar continues into free space, and is cut onl
 });
 
 test("the Source lane keeps 44px at the default timeline and takes all the extra height", () => {
-  assert.equal(sourceLaneHeight(200), 44);
+  assert.equal(sourceLaneHeight(DEFAULT_SIZES.timeline), 44);
   assert.equal(sourceLaneHeight(150), 44);
-  assert.equal(sourceLaneHeight(380), 224);
+  assert.equal(sourceLaneHeight(DEFAULT_SIZES.timeline + 180), 224);
+});
+
+test("the default timeline is tall enough for the board's five lanes under the tools row and ruler", () => {
+  // Transcript 32 + Source 44 + two Audio 32 + Clips 34, the ruler 18, the tools row 44 (+ its 10px below).
+  assert.ok(DEFAULT_SIZES.timeline >= 32 + 44 + 32 + 32 + 34 + 18 + 44 + 10);
 });

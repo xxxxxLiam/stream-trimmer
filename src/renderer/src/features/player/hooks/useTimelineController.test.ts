@@ -74,3 +74,9 @@ test("a short timeline scrolls its tracks vertically under a ruler that stays pu
   assert.match(tracks, /<SourceLane[\s\S]*<ClipsLane/);
   assert.ok(lane.indexOf("<TimelineRuler") < lane.lastIndexOf("<div", i), "the ruler sits above the scrolling part");
 });
+
+test("Fit's re-centre runs after the zoom-reset effect, so Fit (zoom to 0 and a new centre in one commit) is not cleared", () => {
+  const clear = effects.indexOf("if (a.zoom === 0) a.setFocus(null)");
+  const fit = effects.indexOf("fitWindow(a.range, a.duration)");
+  assert.ok(clear > 0 && fit > 0 && clear < fit);
+});

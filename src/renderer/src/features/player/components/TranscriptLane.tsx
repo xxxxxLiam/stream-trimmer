@@ -2,7 +2,7 @@
  * File: TranscriptLane.tsx
  * Path: src/renderer/src/features/player/components/TranscriptLane.tsx
  * Description: One line of the words said, above Source. Lines inside the picked range are tinted
- *   Ice. Shown or hidden from the Panels menu.
+ *   Ice. While the transcript is on its way it says so in a dim line (no spinner). Shown or hidden from the Panels menu.
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { toX } from "../utils/timelineAxis";
@@ -20,6 +20,11 @@ export default function TranscriptLane({ c }: { c: TimelineController }) {
     <div className="flex h-[32px] items-center">
       <LaneLabel>Transcript</LaneLabel>
       <div className="relative h-full flex-1 overflow-hidden">
+        {c.transcriptLoading ? (
+          <span role="status" className="absolute inset-y-[0px] left-[0px] flex items-center px-[6px] text-meta text-fg-dim">
+            Getting the transcript…
+          </span>
+        ) : null}
         {shown.map((l) => {
           const x = toX(c.axis, l.start);
           const w = toX(c.axis, l.end) - x;

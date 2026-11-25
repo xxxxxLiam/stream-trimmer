@@ -248,6 +248,7 @@ export function useTimelineController() {
     setWidth: s.setWidth,
     storyboards: clipper.info?.storyboards,
     lines,
+    transcriptLoading: clipper.loadingTranscript,
     flags: flagsApi.flags,
     used,
     waiting,
