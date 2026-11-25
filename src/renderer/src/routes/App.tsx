@@ -445,6 +445,7 @@ function Layout({ active }: { active: boolean }) {
       open={settingsOpen}
       onClose={closeSettings}
       startAt={settingsStartAt}
+      videoTitle={info?.title}
       tracks={info?.audioTracks}
       editor={{ settingsFor: editorSettingsFor, onChange: setEditorSettingsFor }}
     />

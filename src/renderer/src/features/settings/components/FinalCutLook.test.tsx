@@ -74,11 +74,11 @@ test("wiring: the row is fed by the saved-looks hook; the old paste editor is go
   assert.match(hook, /deleteSavedLook/);
 });
 
-test("D-1, D-8, D-15: Event defaults to the campaign name, every campaign shows its Final Cut fields, a cancelled pick clears the error", async () => {
+test("D-1, D-8, D-15: Event defaults to Export, every campaign shows its Final Cut fields, a cancelled pick clears the error", async () => {
   const { readFileSync } = await import("node:fs");
   const dir = new URL(".", import.meta.url).pathname;
   const drawer = readFileSync(`${dir}SettingsDrawer.tsx`, "utf8");
-  assert.match(drawer, /fcp\.mediaEvent \|\| campaign\.name/);
+  assert.match(drawer, /fcp\.mediaEvent \|\| "Export"/);
   assert.match(drawer, /destination === "finalcut"\s*\?/);
   assert.doesNotMatch(drawer, /isActive/);
   assert.match(readFileSync(`${dir}../hooks/useFinalCutLook.ts`, "utf8"), /setProblem\(added\.cancelled \? "" : added\.reason\)/);

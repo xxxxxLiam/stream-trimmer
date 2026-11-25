@@ -41,6 +41,7 @@ import {
   type UsedRange,
 } from "../../../shared/utils/campaigns";
 import { bankStore } from "../../../shared/utils/bank";
+import { loadLastLayout } from "../../../shared/utils/lastLayout";
 import { KEY_LOOK_MIGRATED, loadLastLookId, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 
@@ -193,6 +194,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       const { campaigns: next, campaign } = createCampaign(campaignsRef.current, {
         ...input,
         fcpLookId: input.fcpLookId ?? loadLastLookId(),
+        fcpLayout: input.fcpLayout ?? loadLastLayout(),
         clipsDir,
         dataDir: input.dataDir ?? (d.dataDir || undefined),
       });
