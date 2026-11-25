@@ -10,9 +10,10 @@ import type { AfterCutting, EditorHandoffSettings } from "../../../shared/utils/
 
 export type ClipDestination = "folder" | "premiere" | "finalcut" | "resolve" | "capcut";
 
-export const DESTINATIONS: readonly { id: ClipDestination; label: string }[] = [
+/** `soon`: shown in the menu but disabled, "Coming soon" (Premiere Pro, Liam 25 Nov). It can never be the chosen destination. */
+export const DESTINATIONS: readonly { id: ClipDestination; label: string; soon?: boolean }[] = [
   { id: "folder", label: "Save to folder" },
-  { id: "premiere", label: "Premiere Pro" },
+  { id: "premiere", label: "Premiere Pro", soon: true },
   { id: "finalcut", label: "Final Cut Pro" },
   { id: "resolve", label: "DaVinci Resolve" },
   { id: "capcut", label: "CapCut" },
@@ -26,7 +27,8 @@ export function availableDestinations(offered: readonly string[] | undefined) {
 }
 
 export function normalizeDestination(raw: unknown, offered?: readonly string[]): ClipDestination {
-  const hit = availableDestinations(offered).find((d) => d.id === raw);
+  // A choice remembered from before an editor became "coming soon" falls back to Save to folder.
+  const hit = availableDestinations(offered).find((d) => d.id === raw && !d.soon);
   return hit ? hit.id : "folder";
 }
 

@@ -84,6 +84,10 @@ export default function ClipButton({ openUp = false, listenForKey = false }: { o
               leading={
                 <Check2 width={14} height={14} aria-hidden="true" focusable="false" />
               }
+              disabled={d.soon}
+              aria-disabled={d.soon || undefined}
+              trailing={d.soon ? "Coming soon" : undefined}
+              className={d.soon ? "text-disabled hover:bg-transparent" : undefined}
               onClick={() => c.setDestination(d.id)}
             >
               {d.label}

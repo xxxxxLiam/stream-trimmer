@@ -70,3 +70,20 @@ test("A4-4: with no campaign the Clip button says to make one", () => {
   assert.match(clipReason({ hasRange: true, segments: 0, noCampaign: true }) ?? "", /Make a campaign first/);
   assert.equal(clipReason({ hasRange: true, segments: 0 }), null);
 });
+
+import { readFileSync } from "node:fs";
+
+test("Premiere Pro is listed but coming soon: it can never be the chosen destination, even from an old saved choice", () => {
+  assert.equal(DESTINATIONS.find((d) => d.id === "premiere")?.soon, true);
+  assert.equal(DESTINATIONS.filter((d) => d.soon).length, 1, "only Premiere is marked");
+  assert.equal(normalizeDestination("premiere"), "folder");
+  assert.equal(normalizeDestination("premiere", ["premiere", "resolve", "capcut"]), "folder");
+  assert.equal(normalizeDestination("resolve", ["premiere", "resolve", "capcut"]), "resolve", "the others are untouched");
+});
+
+test("the Clip arrow menu shows Premiere Pro disabled with 'Coming soon', and picking it does nothing", () => {
+  const menu = readFileSync(new URL("../components/ClipButton.tsx", import.meta.url), "utf8");
+  assert.match(menu, /disabled=\{d\.soon\}[\s\S]*trailing=\{d\.soon \? "Coming soon" : undefined\}/);
+  const ctl = readFileSync(new URL("../hooks/useClipController.ts", import.meta.url), "utf8");
+  assert.match(ctl, /\?\.soon\) return; \/\/ coming soon: not selectable, opens no setup/);
+});
