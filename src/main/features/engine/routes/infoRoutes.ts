@@ -13,6 +13,8 @@ import { audioTracksOf } from "../utils/audioTracks";
 import { computeBitrates } from "../utils/bitrates";
 import { storyboardsOf } from "../utils/storyboards";
 import { binaryError, fullErrMessage, logYtError } from "../utils/errors";
+import { describeInfoFailure } from "../utils/infoFailure";
+import { markToolsReady } from "../services/toolStatus";
 import { infoSchema } from "../utils/schemas";
 import { parseVttTranscript } from "../utils/vtt";
 
@@ -47,6 +49,7 @@ export function registerInfoRoutes(app: Express): void {
           } as any);
         },
       );
+      markToolsReady();
       res.json({
         id: info.id,
         title: info.title,
@@ -58,7 +61,8 @@ export function registerInfoRoutes(app: Express): void {
       });
     } catch (e) {
       logYtError("/api/info", parsed.data.url, options, e);
-      res.status(400).json({ error: fullErrMessage(e) });
+      // The raw text is in the log above; the person gets one plain sentence and a kind.
+      res.status(400).json(describeInfoFailure(fullErrMessage(e)));
     }
   });
 

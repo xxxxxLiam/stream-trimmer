@@ -8,6 +8,8 @@ import path from "node:path";
 import electron from "electron";
 import { isDev } from "../../shared/utils/env";
 import { rememberUiPort } from "./symbolsWindow";
+import { isAppUrl, isSafeExternalUrl } from "./navigationGuard";
+import { createCrashRecovery, crashedUrl } from "./crashRecovery";
 
 const { BrowserWindow, shell } = electron;
 
@@ -103,17 +105,39 @@ export async function createWindow(port: number) {
     });
   }
 
-  // Open external links in the user's browser, not inside the app.
+  const appUrl = isDev ? "http://localhost:8080/" : `http://127.0.0.1:${port}/`;
+  const appOrigins = [new URL(appUrl).origin];
+
+  // Open external links in the user's browser, not inside the app, and only ones that are safe to hand over.
+  const toBrowser = (url: string) => {
+    if (isSafeExternalUrl(url)) void shell.openExternal(url);
+  };
   mainWindow.webContents.setWindowOpenHandler(({ url }: Electron.HandlerDetails) => {
-    shell.openExternal(url);
+    toBrowser(url);
     return { action: "deny" };
+  });
+  // The window only ever shows the app. A link, a dropped file or a redirect that would take it
+  // elsewhere is stopped (a page that kept the preload bridge could otherwise reach the person's files).
+  const stayInApp = (event: Electron.Event, url: string) => {
+    if (isAppUrl(url, appOrigins)) return;
+    event.preventDefault();
+    toBrowser(url);
+  };
+  mainWindow.webContents.on("will-navigate", stayInApp);
+  mainWindow.webContents.on("will-redirect", stayInApp);
+
+  // If the page process dies, reload it once with the crashed flag so the app can say so (and offer Send report).
+  const recovery = createCrashRecovery();
+  mainWindow.webContents.on("render-process-gone", (_e: unknown, details: Electron.RenderProcessGoneDetails) => {
+    if (recovery.onGone(details?.reason ?? "crashed") !== "reload") return;
+    if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(crashedUrl(appUrl)).catch(() => undefined);
   });
 
   if (isDev) {
-    await mainWindow.loadURL("http://localhost:8080");
+    await mainWindow.loadURL(appUrl);
   } else {
     try {
-      await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
+      await mainWindow.loadURL(appUrl);
     } catch (err: unknown) {
       // Emergency fallback — the app still works, minus the video preview.
       console.error("[electron] http load failed, falling back to file://", err);

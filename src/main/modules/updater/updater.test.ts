@@ -83,6 +83,8 @@ test("a version becomes the tag the release workflow creates", () => {
   assert.equal(releaseTag(""), null);
   assert.equal(releaseTag(undefined), null);
   assert.equal(releaseTag("latest"), null);
+  // E-11: nothing after the version may smuggle a path or a query into the download link.
+  for (const bad of ["1.2.3/../../x", "1.2.3?x=1", "1.2.3 evil", "1.2.3/"]) assert.equal(releaseTag(bad), null, bad);
 });
 
 test("each platform gets a direct link to its own installer", () => {

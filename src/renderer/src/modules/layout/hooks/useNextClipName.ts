@@ -17,7 +17,7 @@ export function setNextClipName(name: string | null) {
   listeners.forEach((l) => l());
 }
 
-/** The name the next Clip will give its clip right now (the typed name, else the suggestion), or null. */
+/** What the name is right now, for code that is not a component (the cut reads it when Clip is pressed). */
 export function getNextClipName(): string | null {
   return current;
 }

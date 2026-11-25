@@ -46,3 +46,67 @@ test("probing: no file is missing, a failing run is broken, output is the versio
   assert.deepEqual(await probeBinary(process.execPath, "--version", run("", true)), { path: process.execPath, ok: false });
   assert.deepEqual(await probeBinary(process.execPath, "--version", run("2026.11.23\n")), { path: process.execPath, ok: true, version: "2026.11.23" });
 });
+
+// ---- E-1: a failed first probe is looked at again ----------------------------------------------
+
+import { currentToolStatus, markToolsReady, REPROBE_BACKOFF_MS, resetToolProbesForTest, setProbeForTest } from "./toolStatus";
+
+const settle = () => new Promise((r) => setTimeout(r, 5));
+
+test("a failed first probe is probed again on a later ask, once the backoff has passed", async () => {
+  resetToolProbesForTest();
+  let ytCalls = 0;
+  setProbeForTest(async (binary, arg) => {
+    if (arg === "--version" && ytCalls++ === 0) return { path: "/x", ok: false }; // first yt-dlp look is slow/failed
+    return { path: "/x", ok: true, version: "1" };
+  });
+  try {
+    const t0 = Date.now();
+    currentToolStatus(t0);
+    await settle();
+    assert.equal(currentToolStatus(t0 + 1).overall, "broken");
+    // Inside the backoff nothing is re-probed.
+    await settle();
+    assert.equal(currentToolStatus(t0 + 2).overall, "broken");
+    // After it, the ask starts a new probe and the answer turns ready.
+    currentToolStatus(t0 + REPROBE_BACKOFF_MS + 10);
+    await settle();
+    assert.equal(currentToolStatus(t0 + REPROBE_BACKOFF_MS + 20).overall, "ready");
+  } finally {
+    setProbeForTest(null);
+    resetToolProbesForTest();
+  }
+});
+
+test("a video that opens marks a broken tool check ready", async () => {
+  resetToolProbesForTest();
+  setProbeForTest(async () => ({ path: "/x", ok: false }));
+  try {
+    currentToolStatus(Date.now());
+    await settle();
+    assert.equal(currentToolStatus(Date.now()).overall, "broken");
+    markToolsReady();
+    assert.equal(currentToolStatus(Date.now()).overall, "ready");
+  } finally {
+    setProbeForTest(null);
+    resetToolProbesForTest();
+  }
+});
+
+test("Try again (force) looks again at once, without waiting out the backoff", async () => {
+  resetToolProbesForTest();
+  let ytCalls = 0;
+  setProbeForTest(async (_b, arg) => (arg === "--version" && ytCalls++ === 0 ? { path: "/x", ok: false } : { path: "/x", ok: true, version: "1" }));
+  try {
+    const t0 = Date.now();
+    currentToolStatus(t0);
+    await settle();
+    assert.equal(currentToolStatus(t0 + 1).overall, "broken"); // inside the backoff: not looked at again
+    currentToolStatus(t0 + 2, true); // Try again
+    await settle();
+    assert.equal(currentToolStatus(t0 + 3).overall, "ready");
+  } finally {
+    setProbeForTest(null);
+    resetToolProbesForTest();
+  }
+});

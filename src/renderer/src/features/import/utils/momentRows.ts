@@ -9,6 +9,7 @@
 import { extractVideoId } from "../../../shared/utils/clip";
 import { normalizeTier, parseBankImport } from "../../../shared/utils/bankImport";
 import { parseTimecode } from "../../../shared/utils/segments";
+import { checkNames } from "../../clips/utils/clipName";
 
 export type RowProblem = { reason: string; fix: "swap" | "skip" };
 
@@ -199,4 +200,20 @@ export function planBank(good: readonly MomentRow[]): BankBucket[] {
     else out.push({ campaignName: name, videoId: r.videoId, rows: [r] });
   }
   return out;
+}
+
+/**
+ * Run the clip-name rule on a paste: a row whose name is not two plain words, repeats another row's
+ * name, or is already in the bank is flagged "Skip" with the reason, so import never files a name the
+ * rule forbids. A row with no name is fine (it is named from its words when it is made).
+ */
+export function flagNames(rows: readonly MomentRow[], existing: ReadonlyArray<{ id: string; name: string }> = []): MomentRow[] {
+  const named = rows.filter((r) => !r.problem && r.name.trim());
+  const problems = new Map(
+    checkNames(
+      named.map((r) => ({ line: Number(r.key), id: null, label: r.name })),
+      existing,
+    ).map((p) => [String(p.line), p.reason]),
+  );
+  return rows.map((r) => (problems.has(r.key) ? { ...r, problem: { reason: problems.get(r.key)!, fix: "skip" as const } } : r));
 }

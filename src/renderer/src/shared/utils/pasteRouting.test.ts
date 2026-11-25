@@ -26,3 +26,18 @@ test("ordinary text and empty pastes are left alone", () => {
   assert.equal(classifyPaste("hello there"), "none");
   assert.equal(classifyPaste("   "), "none");
 });
+
+const SHEET_HEADER = "video\tstart\tend\tname\trating\ttopic\ttier\tcampaign";
+const SHEET_ROW = "https://www.youtube.com/watch?v=podcast214\t0:20:00\t0:20:40\tSheet One\t8\tMoney\tT1\tAcme";
+
+test("C-4: the sheet 'Copy format' asks for opens Import, with or without its header row", () => {
+  assert.equal(classifyPaste(`${SHEET_HEADER}\n${SHEET_ROW}`), "moments");
+  assert.equal(classifyPaste(`${SHEET_ROW}\n${SHEET_ROW.replace("0:20:00", "0:30:00")}`), "moments");
+  assert.equal(classifyPaste(SHEET_ROW), "moments", "one tab-separated row is a sheet row, not a video link");
+});
+
+test("C-4: a bare video link still opens the video, and ordinary text is left alone", () => {
+  assert.equal(classifyPaste("https://www.youtube.com/watch?v=podcast214"), "video");
+  assert.equal(classifyPaste("remember to buy milk"), "none");
+  assert.equal(classifyPaste(`${SHEET_HEADER}\nnot a link\tnot a time`), "none");
+});

@@ -4,7 +4,8 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { crashDetails } from "./crashDetails";
+import { readFileSync } from "node:fs";
+import { crashDetails, reopenUrl, wasCrashed } from "./crashDetails";
 import { makeReport } from "./reports";
 
 test("the error, its first stack lines and the diagnostics all go into the details", () => {
@@ -20,4 +21,13 @@ test("a path with a user name is cleaned by the report maker", () => {
   const e = new Error("ENOENT /Users/liam/Clips/a.mp4");
   const r = makeReport("", crashDetails(e, ""), new Date(0), "c-1");
   assert.doesNotMatch(r.details, /liam/);
+});
+
+test("E-2: a window reloaded at ?crashed=1 shows the crash screen, and Reopen drops the flag", () => {
+  assert.equal(wasCrashed("?crashed=1"), true);
+  assert.equal(wasCrashed(""), false);
+  assert.equal(wasCrashed("?window=symbols"), false);
+  assert.equal(reopenUrl("file:///app/index.html?crashed=1&x=2#/a"), "file:///app/index.html?x=2#/a");
+  const app = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /if \(wasCrashed\(window\.location\.search\)\) return <CrashScreenHost/);
 });

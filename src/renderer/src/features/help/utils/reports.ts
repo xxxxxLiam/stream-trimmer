@@ -9,8 +9,21 @@ import { redact } from "../../../shared/utils/diagnostics";
 
 export type PendingReport = { id: string; at: string; note: string; details: string };
 
-/** The small relay Liam owns. Empty until it is built: then every report is kept and retried later. */
-export const REPORT_RELAY_URL = "";
+/** The relay address as built in: an https address, or "" for none. Anything else is ignored. */
+export function relayUrlFrom(raw: unknown): string {
+  const text = typeof raw === "string" ? raw.trim() : "";
+  try {
+    return new URL(text).protocol === "https:" ? text : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The small relay Liam owns, set when the app is built (VITE_REPORT_RELAY_URL, see .env.example) so it
+ * can be filled in later without a code change. Empty until then: every report is kept and retried later.
+ */
+export const REPORT_RELAY_URL = relayUrlFrom(typeof __REPORT_RELAY_URL__ === "string" ? __REPORT_RELAY_URL__ : "");
 export const PENDING_REPORTS_KEY = "clipper.pendingReports";
 const MAX_PENDING = 20;
 const MAX_NOTE = 2000;

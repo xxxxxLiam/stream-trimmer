@@ -100,6 +100,7 @@ test("the engine's own sentences win over the fallback", () => {
 
 test("the footer pill opens Help on its sign-in page", () => {
   const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
-  assert.match(app, /onSignIn=\{\(\) => \{\s*setHelpStartAt\("signin"\)/);
+  assert.match(app, /const openSignIn = \(\) => \{\s*setHelpStartAt\("signin"\)/);
+  assert.match(app, /onSignIn=\{openSignIn\}/);
   assert.match(app, /<HelpDrawer open=\{helpOpen\} onClose=\{closeHelp\} startAt=\{helpStartAt\}/);
 });

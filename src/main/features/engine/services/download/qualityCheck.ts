@@ -5,7 +5,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { isDegradedDelivery } from "../../utils/quality";
+import { BEST_HEIGHT_CAP, isDegradedDelivery } from "../../utils/quality";
 import { lowQualityWithoutSession, staleSessionFailure } from "../segments";
 import { probeDelivered, resolvedFfmpeg } from "../binaries";
 import { CancelledError } from "../downloadJobs";
@@ -32,7 +32,7 @@ export async function checkDelivery(
     // a player client that handed back nothing usable, so it is worth paying
     // for one more download on a different client set before giving up.
     const requestedHeight: number | "best" =
-      quality === "best" ? "best" : Number(quality);
+      quality === "best" ? BEST_HEIGHT_CAP : Number(quality);
     let degraded = isDegradedDelivery(
       delivered.height,
       requestedHeight,

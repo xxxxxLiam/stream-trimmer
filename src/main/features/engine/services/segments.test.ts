@@ -660,3 +660,25 @@ test("clearing the clip cache never removes a cookie copy a download is using", 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ---- E-9: real yt-dlp strings that used to fall into "unknown / Try again" ----------------------
+
+test("real yt-dlp errors each get their own row, and a 403 is the refused row, not a dropped connection", () => {
+  const code = (m: string) => classifyFailure(m, { percent: 0 });
+  assert.equal(code("ERROR: [youtube] a: Sign in to confirm you're not a bot.").code, "sign_in_needed");
+  assert.equal(code("ERROR: [youtube] a: Sign in to confirm you’re not a bot.").code, "sign_in_needed");
+  assert.equal(code("ERROR: [youtube] a: Sign in to confirm your age.").code, "sign_in_needed");
+  assert.equal(code("ERROR: [youtube] a: Video unavailable. This video is not available").code, "video_unavailable");
+  assert.equal(code("ERROR: [youtube] a: The uploader has not made this video available in your country").code, "video_unavailable");
+  assert.equal(code("ERROR: [youtube] a: This live event will begin in 2 hours.").code, "video_unavailable");
+  const f403 = code("ERROR: unable to download video data: HTTP Error 403: Forbidden");
+  assert.notEqual(f403.code, "network_dropped");
+  assert.match(f403.error, /refused/);
+  assert.match(code("WARNING: [youtube] HTTP Error 429: Too Many Requests").error, /refused/);
+  assert.match(code("ERROR: Postprocessing: ffprobe and ffmpeg not found.").error, /video tools are incomplete/);
+  const perm = code("ERROR: unable to open for writing: [Errno 13] Permission denied: '/Users/x/Clips/a.mp4'");
+  assert.equal(perm.code, "save_folder_gone");
+  assert.match(perm.error, /can't write to that folder/);
+  // Members-only and private still go to the private row.
+  assert.equal(code("Private video. Sign in if you've been granted access").code, "private_video");
+});

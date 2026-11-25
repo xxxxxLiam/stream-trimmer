@@ -8,9 +8,9 @@
 import { useMemo, useState } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
-import { bankStore } from "../../../shared/utils/bank";
+import { bankStore, clipsFor } from "../../../shared/utils/bank";
 import type { ParsedClip } from "../../../shared/utils/bankImport";
-import { parseMoments, planBank, resolveRows, type MomentRow } from "../utils/momentRows";
+import { flagNames, parseMoments, planBank, resolveRows, type MomentRow } from "../utils/momentRows";
 
 export function toParsed(r: MomentRow): ParsedClip {
   return {
@@ -30,10 +30,12 @@ export function useImportController(text: string, onClose: () => void) {
   const [swapped, setSwapped] = useState<ReadonlySet<string>>(new Set());
   const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
 
-  const rows = useMemo(
-    () => parseMoments(text, { openVideoId: videoId ?? null, openDuration: duration || undefined }),
-    [text, videoId, duration],
-  );
+  const rows = useMemo(() => {
+    // Names already in the active campaign's bank, for this video and every other.
+    const data = bankStore.get();
+    const existing = active ? Object.keys(data[active.id] ?? {}).flatMap((v) => clipsFor(data, active.id, v).map((c) => ({ id: c.id, name: c.label }))) : [];
+    return flagNames(parseMoments(text, { openVideoId: videoId ?? null, openDuration: duration || undefined }), existing);
+  }, [text, videoId, duration, active]);
   const r = useMemo(() => resolveRows(rows, swapped, skipped), [rows, swapped, skipped]);
 
   const known = (name: string) => campaigns.find((c) => c.name.trim().toLowerCase() === name.trim().toLowerCase());

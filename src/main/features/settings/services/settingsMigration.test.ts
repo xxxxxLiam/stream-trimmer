@@ -56,7 +56,8 @@ test("never overwrites folders the user already chose", () => {
     "clipper.dataDir": "/new/data",
     "clipper.dataDirConfirmed": true,
   };
-  assert.deepEqual(migrateSettings(input), input);
+  // The folders already chosen are also carried into main's approved list, once.
+  assert.deepEqual(migrateSettings(input), { ...input, "clipper.approvedRoots": ["/old", "/new/clips", "/new/data"] });
 });
 
 test("a fresh install gets nothing invented", () => {

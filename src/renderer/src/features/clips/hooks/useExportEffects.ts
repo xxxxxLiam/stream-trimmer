@@ -10,6 +10,7 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { clipTitle, getDownloads } from "../../../shared/utils/downloads";
 import { UNDO_SECONDS } from "../utils/exportRows";
+import { clipGroup } from "../utils/undoClip";
 import { classifyClipFailure, isRetryKey, rowFailure } from "../utils/clipFailure";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
@@ -44,7 +45,10 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
       if (downloadPhase === "done") {
         const newest = getDownloads().find((d) => d.kind === "clip");
         if (newest) {
-          setFinished({ entryId: newest.id, name: clipTitle(newest.label), endsAt: Date.now() + UNDO_SECONDS * 1000 });
+          // The clip's name is its first file's (the original), not the newest language copy's.
+          const files = clipGroup(newest, getDownloads());
+          const first = files[files.length - 1] ?? newest;
+          setFinished({ entryId: newest.id, name: clipTitle(first.label), endsAt: Date.now() + UNDO_SECONDS * 1000 });
           setSecondsLeft(UNDO_SECONDS);
         }
         s.setFailed(null);
@@ -57,11 +61,14 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         const key = JSON.stringify(a.segments);
         s.failCount.current = { key, count: s.failCount.current.key === key ? s.failCount.current.count + 1 : 1 };
         const fromRow = failure?.row ? rowFailure(failure.row) : null;
+        const classified = classifyClipFailure(failure?.code, failure?.message ?? error);
         s.setFailed({
           ...a,
-          kind: fromRow?.kind ?? classifyClipFailure(failure?.code),
+          // The engine's row decides, except that a network cause is named as such (no YouTube error).
+          kind: classified === "offline" ? "offline" : (fromRow?.kind ?? classified),
           attempts: fromRow?.attempts ?? s.failCount.current.count,
-          reason: fromRow?.reason,
+          // A full or unwritable folder says so in the engine's own sentence.
+          reason: fromRow?.reason ?? (failure?.code === "disk_full" || failure?.code === "save_folder_gone" ? failure.message : undefined),
           message: error,
           code: failure?.code,
         });

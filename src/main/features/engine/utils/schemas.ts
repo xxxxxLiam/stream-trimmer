@@ -4,12 +4,16 @@
  * Description: Request body schemas for the engine's routes.
  */
 import { z } from "zod";
-import { isYouTubeUrl } from "./youtubeUrl";
+import { isYouTubeUrl, isYouTubeVideoUrl } from "./youtubeUrl";
 
 export const urlSchema = z
   .string()
   .url()
   .refine(isYouTubeUrl, "URL must be a YouTube link");
+
+// One video, not a channel or a playlist page that yt-dlp would go and list. (The channel exporter
+// takes any YouTube link, so it keeps urlSchema.)
+export const videoUrlSchema = urlSchema.refine(isYouTubeVideoUrl, "URL must be a link to one YouTube video");
 
 // Browsers yt-dlp can read a logged-in YouTube session from. Only the browser
 // name ever crosses the API; cookie contents never touch this process.
@@ -32,12 +36,15 @@ export const authSourceSchema = z.union([z.literal("app"), cookieBrowserSchema])
 // you're not a bot" for a signed-out IP, which read in the UI as the app
 // having lost a sign-in it was actually still holding.
 export const infoSchema = z.object({
-  url: urlSchema,
+  url: videoUrlSchema,
   cookiesFromBrowser: authSourceSchema.optional(),
 });
 
+/** The shortest range worth cutting (seconds). A 1 ms range is a mistake, not a clip. */
+export const MIN_RANGE_SECONDS = 0.5;
+
 export const downloadSchema = z.object({
-  url: urlSchema,
+  url: videoUrlSchema,
   // A clip is a list of ranges, joined in order into one file. The older
   // single `start`/`end` pair is still accepted and means one segment.
   segments: z
@@ -57,7 +64,8 @@ export const downloadSchema = z.object({
     .optional(),
   // Liam's card (2026-11-24): clips are MP4 at 1080p, or the highest the video has below that, with
   // no quality choice on screen. A request that names no quality gets that; the ladder steps down.
-  quality: z.string().optional(),
+  // "best", or a height or bitrate as digits: the only values the app sends (a free string would be pasted into the format selector).
+  quality: z.string().regex(/^(?:best|\d{2,4})$/, "quality must be best or a number").optional(),
   // How the finished clip is handed back. "stream" sends the media as the
   // response body. "path" returns only its location on disk, for the
   // desktop app, whose main process can move the file itself — the media
@@ -67,7 +75,12 @@ export const downloadSchema = z.object({
   // inside the app; a browser name lets yt-dlp read that browser's session.
   // Cookie contents never cross the API — only the source label.
   cookiesFromBrowser: authSourceSchema.optional(),
-});
+}).refine(
+  (d) =>
+    (d.segments ?? []).every((g) => g.end - g.start >= MIN_RANGE_SECONDS) &&
+    (d.segments || d.start === undefined || d.end === undefined || d.end - d.start >= MIN_RANGE_SECONDS),
+  "A range must be at least half a second long",
+);
 
 /** MP3 keeps its bitrate meaning; video defaults to the 1080p ladder. */
 export const DEFAULT_VIDEO_QUALITY = "1080";

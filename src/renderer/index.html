@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
+    <!-- The page may load itself, the YouTube player and thumbnails, and talk to the local engine. Nothing else. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://img.youtube.com https://*.ytimg.com https://*.ggpht.com https://*.googleusercontent.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' http://127.0.0.1:* http://localhost:*; media-src 'self' blob: http://127.0.0.1:*; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Clipr</title>
   </head>

@@ -8,12 +8,17 @@
 import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
 
-export type ClipFailureKind = "stopped" | "disk" | "private";
+export type ClipFailureKind = "stopped" | "disk" | "private" | "offline";
 export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater";
 
-export function classifyClipFailure(code: string | undefined): ClipFailureKind {
+/** What a plain "the network is down" failure looks like in the engine's message (no YouTube error involved). */
+const OFFLINE = /no internet|offline|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENETUNREACH|getaddrinfo|network is unreachable|name resolution|unable to connect|timed out|connection (?:reset|refused|timed out)/i;
+
+export function classifyClipFailure(code: string | undefined, message?: string): ClipFailureKind {
   if (code === "disk_full" || code === "save_folder_gone") return "disk";
   if (code === "private_video") return "private";
+  // Only a failure with no code of its own and a network cause in its words is "offline".
+  if (!code && message && OFFLINE.test(message)) return "offline";
   return "stopped";
 }
 
@@ -37,7 +42,10 @@ export function failureCopy(
   reasonOverride?: string,
 ): { reason: string; detail: string } {
   if (kind === "disk") {
-    return { reason: "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
+    return { reason: reasonOverride ?? "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
+  }
+  if (kind === "offline") {
+    return { reason: "No internet connection.", detail: attempts < 2 ? "Check your connection, then Retry." : "" };
   }
   if (kind === "private") {
     return { reason: reasonOverride ?? "This video is private, so it can’t be downloaded.", detail: "Your range is kept." };
@@ -52,6 +60,7 @@ export function failureCopy(
 export function failureActions(kind: ClipFailureKind, attempts: number): FailureAction[] {
   if (kind === "disk") return ["changeFolder"];
   if (kind === "private") return ["showInBrowser", "saveForLater"];
+  // Offline gets Retry too (no engine retry is promised), with Copy details once it failed again.
   return attempts >= 2 ? ["retry", "copyDetails"] : ["retry"];
 }
 

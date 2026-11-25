@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addPending, flushPending, makeReport, normalizePending, reportText, sendToRelay } from "./reports";
+import { addPending, flushPending, makeReport, normalizePending, relayUrlFrom, reportText, sendToRelay } from "./reports";
 
 const now = new Date("2026-11-24T19:00:00Z");
 
@@ -42,4 +42,10 @@ test("flushing drops only the reports that were accepted, and a throw keeps the 
     return r.id === "ok";
   });
   assert.deepEqual(left.map((r) => r.id), ["no", "boom"]);
+});
+
+test("the relay address is a build-time setting: only an https address counts, and none means reports are kept", () => {
+  assert.equal(relayUrlFrom("https://relay.example.com/report"), "https://relay.example.com/report");
+  assert.equal(relayUrlFrom("  https://relay.example.com/r  "), "https://relay.example.com/r");
+  for (const bad of ["", "http://relay.example.com", "javascript:1", "relay.example.com", undefined, 5, null]) assert.equal(relayUrlFrom(bad), "");
 });

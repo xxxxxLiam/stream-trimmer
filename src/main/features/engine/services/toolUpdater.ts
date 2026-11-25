@@ -7,12 +7,13 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 import { execFile } from "node:child_process";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { reloadYtDlp, yt, ytDlpVersion } from "./binaries";
 import { refreshToolProbe } from "./toolStatus";
-import { LATEST_TAG_URL, singleFlight, updateYtDlp, versionOfToolFile, type ToolUpdateResult } from "./toolUpdate";
+import { LATEST_TAG_URL, singleFlight, ytDlpSumsUrl, updateYtDlp, versionOfToolFile, type ToolUpdateResult } from "./toolUpdate";
 
 function toolsDir(): string | null {
   return process.env.YT_CLIPPER_TOOLS_DIR || null;
@@ -29,6 +30,18 @@ async function download(url: string, dest: string): Promise<void> {
   const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(120_000) });
   if (!res.ok || !res.body) throw new Error(`download answered ${res.status}`);
   await pipeline(Readable.fromWeb(res.body as never), fs.createWriteStream(dest, { mode: 0o755 }));
+}
+
+async function fetchChecksums(tag: string): Promise<string> {
+  const res = await fetch(ytDlpSumsUrl(tag), { redirect: "follow", signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`checksum list answered ${res.status}`);
+  return res.text();
+}
+
+async function checksumOf(file: string): Promise<string> {
+  const hash = crypto.createHash("sha256");
+  await pipeline(fs.createReadStream(file), hash);
+  return hash.digest("hex");
 }
 
 function verify(file: string): Promise<string | null> {
@@ -61,6 +74,8 @@ const flight = singleFlight(async (): Promise<ToolUpdateResult> => {
       platform: process.platform,
       currentVersion: () => (yt ? ytDlpVersion(yt.binary) : null),
       fetchLatestTag,
+      fetchChecksums,
+      checksumOf,
       download,
       verify,
       tmpPathFor: (n) => path.join(dir, n),

@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  campaignClipsDir,
   addUsedRanges,
   clipNumber,
   clipsMadeToday,
@@ -175,12 +176,16 @@ test("normalizeCampaigns drops junk, dedupes ids and repairs fields", () => {
     { id: "a", name: "A", targetMinSec: 90, targetMaxSec: 10, usedRanges: { v: [{ start: 1, end: 2, clipId: "x" }, { bad: 1 }] } },
     { id: "a", name: "dupe" },
     { name: "no id" },
-    { id: "b", name: "B", format: "weird" },
+    { id: "b", name: "B", format: "mp3", quality: "360" },
   ]);
   assert.deepEqual(out.map((c) => c.id), ["a", "b"]);
   assert.equal(out[0].targetMaxSec, 90);
   assert.deepEqual(out[0].usedRanges.v, [{ start: 1, end: 2, clipId: "x" }]);
-  assert.equal(out[1].format, "mp4");
+  // A-1: format and quality are not stored per campaign; old values are ignored.
+  assert.equal("format" in out[1], false);
+  assert.equal("quality" in out[1], false);
+  // A-2: every campaign has a daily quota; an older one without gets the default 3.
+  assert.equal(out[1].dailyQuota, 3);
 });
 
 test("a new campaign's id is not a function of its name, so a reused name never reuses an id", () => {
@@ -271,7 +276,7 @@ test("today count: a joined clip counts once, yesterday and unstamped clips do n
   c = addUsedRanges(c, "vid", [{ start: 80, end: 90 }], "AC-0", yesterday);
   c.usedRanges["other"] = [{ start: 1, end: 2, clipId: "AC-OLD" }];
   assert.equal(clipsMadeToday(c, noon), 2);
-  assert.equal(todayCount(c, noon), null, "no quota set, no count");
+  assert.equal(todayCount(c, noon), "2 of 3 today", "every campaign has a quota, default 3");
   assert.equal(todayCount({ ...c, dailyQuota: 3 }, noon), "2 of 3 today");
   assert.equal(todayCount(null, noon), null);
 });
@@ -283,5 +288,18 @@ test("daily quota and the time a clip was made survive a reload", () => {
   const back = normalizeCampaigns(JSON.parse(JSON.stringify([c])))[0];
   assert.equal(back.dailyQuota, 4);
   assert.equal(back.usedRanges.vid[0].at, noon);
-  assert.equal(normalizeCampaigns([{ ...c, dailyQuota: -2 }])[0].dailyQuota, undefined);
+  assert.equal(normalizeCampaigns([{ ...c, dailyQuota: -2 }])[0].dailyQuota, 3, "a bad quota falls back to the default");
+});
+
+test("A-2: a new campaign has Clips a day (default 3, or the form's value)", () => {
+  assert.equal(createCampaign([], { name: "Acme" }).campaign.dailyQuota, 3);
+  assert.equal(createCampaign([], { name: "Acme", dailyQuota: 5 }).campaign.dailyQuota, 5);
+});
+
+test("A-3: a campaign's folder is a folder named after it inside the Clips folder, unless it chose its own", () => {
+  assert.equal(campaignClipsDir({ name: "Acme", clipsDir: "" }, "/Users/me/Downloads/Clipr"), "/Users/me/Downloads/Clipr/Acme");
+  assert.equal(campaignClipsDir({ name: "Acme", clipsDir: "/x/own" }, "/Users/me/Downloads/Clipr"), "/x/own");
+  assert.equal(campaignClipsDir({ name: "A/B: C", clipsDir: "" }, "C:\\Clips\\"), "C:\\Clips\\A-B- C");
+  assert.equal(campaignClipsDir({ name: "Acme", clipsDir: "" }, ""), "");
+  assert.equal(createCampaign([], { name: "Acme" }).campaign.clipsDir, "", "a new campaign has no folder of its own until it chooses one");
 });
