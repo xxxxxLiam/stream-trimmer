@@ -611,8 +611,9 @@ function Layout({ active }: { active: boolean }) {
 
   return (
     <>
-      <SettingsRestoredNote />
-      <StartFreshPrompt />
+      {/* E3-1: every workspace tab mounts this layout, so the window-wide notes belong to the visible one only. */}
+      {active && <SettingsRestoredNote />}
+      {active && <StartFreshPrompt />}
       
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">

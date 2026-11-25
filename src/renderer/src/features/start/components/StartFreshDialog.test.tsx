@@ -81,3 +81,9 @@ test("App mounts it", () => {
   );
   assert.match(app, /<StartFreshPrompt \/>/);
 });
+
+test("E3-1: only the visible workspace tab mounts the start-fresh dialog and the restored note", () => {
+  const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
+  assert.match(app, /\{active && <StartFreshPrompt \/>\}/);
+  assert.match(app, /\{active && <SettingsRestoredNote \/>\}/);
+});
