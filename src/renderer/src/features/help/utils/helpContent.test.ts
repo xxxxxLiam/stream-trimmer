@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { HELP_ANSWERS } from "./helpContent";
+import { HELP_ANSWERS, SHORTCUTS } from "./helpContent";
 import { searchHelp } from "./helpSearch";
 
 const ROOT = join(process.cwd(), "src/renderer/src");
@@ -83,4 +83,46 @@ test("no match gives nothing, and the More rows are searchable", () => {
   assert.equal(none.answers.length + none.more.length, 0);
   assert.ok(searchHelp("bug").more.includes("report"));
   assert.ok(searchHelp("hotkeys").more.includes("shortcuts"));
+});
+
+test("F-5: cookies, sign in, 1080p, undo and key names all find something", () => {
+  const found = (q: string) => searchHelp(q);
+  for (const q of ["cookies", "sign in", "1080p", "360p", "login"]) assert.equal(found(q).answers[0]?.id, "sign-in", q);
+  for (const q of ["undo", "oops", "take back"]) assert.equal(found(q).answers[0]?.id, "undo-clip", q);
+  for (const q of ["enter", "space", "ctrl", "cmd"]) assert.ok(found(q).more.includes("shortcuts"), q);
+  assert.ok(searchHelp("").answers.every((a) => a.id !== "sign-in" && a.id !== "undo-clip"), "searchOnly answers stay off the default list");
+});
+
+test("F-6: every shortcut listed is handled, and every handled shortcut is listed", () => {
+  const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
+  const code = [
+    "routes/App.tsx",
+    "features/player/hooks/usePreviewEffects.ts",
+    "features/player/hooks/useTimelineEffects.ts",
+    "features/player/hooks/useClipController.ts",
+    "features/player/utils/transport.ts",
+    "features/clips/utils/clipFailure.ts",
+  ].map(read).join("\n");
+  const handled: Record<string, RegExp> = {
+    "Space": /e\.key === " "/,
+    "J  K  L": /k === "j"/,
+    "I": /e\.key === "i"/,
+    "O": /e\.key === "o"/,
+    "M": /e\.key !== "m"/,
+    "Shift N": /e\.shiftKey && !e\.metaKey && !e\.ctrlKey && e\.key === "N"/,
+    "⌘ Enter": /\(e\.metaKey \|\| e\.ctrlKey\) && e\.key === "Enter"/,
+    "R": /toLowerCase\(\) !== "r"/,
+    "⌘ R": /k === "r" && !e\.shiftKey/,
+    "⌘ L": /modifier\) return k === "l"/,
+    "⌘ ,": /k === "," && !e\.shiftKey/,
+    "⌘ ;": /k === ";" && !e\.shiftKey/,
+    "⌘ /": /k === "\/" && !e\.shiftKey/,
+  };
+  for (const s of SHORTCUTS) {
+    if (s.keys === "Esc") continue;
+    assert.ok(handled[s.keys], `${s.keys} has a handler check`);
+    assert.match(code, handled[s.keys], `${s.keys} (${s.does}) is not handled by any key handler`);
+  }
+  for (const k of Object.keys(handled)) assert.ok(SHORTCUTS.some((s) => s.keys === k), `${k} is handled but not listed`);
+  assert.ok(!SHORTCUTS.some((s) => s.keys === "⌘ B"), "nothing handles Ctrl/⌘ B");
 });
