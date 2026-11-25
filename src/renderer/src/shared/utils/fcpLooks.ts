@@ -21,6 +21,8 @@ export type SavedLook = {
 
 export const KEY_LOOKS = "clipper.fcpLooks";
 export const KEY_LOOK_MIGRATED = "clipper.fcpLookMigrated";
+/** Campaigns (or "*" for the flat old shape) whose switched-on old pasted look could not be read; the look row says so. */
+export const KEY_LOOK_UNREAD = "clipper.fcpLookUnread";
 /** The look picked or uploaded last, which a new campaign starts with. */
 export const KEY_LAST_LOOK = "clipper.fcpLastLookId";
 /** What the old single pasted look is called once it is in the list. */
@@ -48,10 +50,16 @@ export function normalizeSavedLooks(raw: unknown): SavedLook[] {
   return out;
 }
 
-/** "Acme grade.fcpxmld" -> "Acme grade"; a file with no name of its own is "My look". */
+/**
+ * "Acme grade.fcpxmld" -> "Acme grade"; "TextEdit copy.rtf" -> "My look" (the extension, the " copy" the Mac adds
+ * and a bare app or document name say nothing about the look); a file with no name of its own is "My look".
+ */
 export function lookNameFromFile(fileName: string): string {
-  const name = fileName.replace(/\.(fcpxmld|fcpxml|txt|xml)$/i, "").trim();
-  return name || "My look";
+  const name = fileName
+    .replace(/\.(fcpxmld|fcpxml|txt|xml|rtf)$/i, "")
+    .replace(/\s+copy(\s+\d+)?$/i, "")
+    .trim();
+  return !name || /^(textedit|untitled|document|new document)$/i.test(name) ? "My look" : name;
 }
 
 function uniqueLookName(list: readonly SavedLook[], name: string): string {
@@ -131,8 +139,8 @@ export function legacyLookEntries(raw: unknown): { campaignId: string | null; ap
  * One time: the old pasted looks become saved looks. Identical texts are stored once, as "My look";
  * different ones follow as "My look 2" and so on. Every campaign that had "Apply my look" on points at
  * its look (the flat shape points every campaign without one). A switched-off look is still kept in the
- * list. A text that no longer parses leaves everything where it is and nothing is marked migrated, so it
- * is not lost either.
+ * list. A text that no longer parses is skipped (it stays in the old settings, untouched) and never stops
+ * the move; when it was switched on, its campaign is named in `unread` so the look row can say so once.
  */
 export function migratePastedLook(
   campaigns: readonly Campaign[],
@@ -140,15 +148,16 @@ export function migratePastedLook(
   legacy: unknown,
   now: number = Date.now(),
   makeId: () => string = newLookId,
-): { campaigns: Campaign[]; looks: SavedLook[]; migrated: boolean } {
+): { campaigns: Campaign[]; looks: SavedLook[]; migrated: boolean; unread: string[] } {
   const entries = legacyLookEntries(legacy);
-  if (entries.length === 0) return { campaigns: [...campaigns], looks: [...looks], migrated: true };
+  if (entries.length === 0) return { campaigns: [...campaigns], looks: [...looks], migrated: true, unread: [] };
   const parsed: { campaignId: string | null; apply: boolean; text: string; look: Look }[] = [];
+  const unread: string[] = [];
   for (const e of entries) {
     try {
       parsed.push({ ...e, look: parseLook(e.text) });
     } catch {
-      return { campaigns: [...campaigns], looks: [...looks], migrated: false };
+      if (e.apply) unread.push(e.campaignId ?? "*");
     }
   }
   let list = [...looks];
@@ -164,7 +173,7 @@ export function migratePastedLook(
     const mine = parsed.find((e) => e.apply && e.campaignId === c.id) ?? parsed.find((e) => e.apply && e.campaignId === null);
     return mine ? { ...c, fcpLookId: idByText.get(mine.text) } : c;
   });
-  return { campaigns: next, looks: list, migrated: true };
+  return { campaigns: next, looks: list, migrated: true, unread };
 }
 
 // ---- persistence ------------------------------------------------------------------------
