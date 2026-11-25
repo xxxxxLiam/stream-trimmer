@@ -11,6 +11,8 @@ import { readLogScrubbed } from "../../diagnostics/services/diagnosticsService";
 import { buildReport, validInput } from "./reportBuild";
 import { createReportQueue, type RelayReport } from "./reportQueue";
 import { createReportSender } from "./reportSender";
+import { getSettings } from "../../settings/services/settingsService";
+import { LEGACY_REPORTS_KEY, migrateLegacyReports } from "./reportMigration";
 import { RELAY_CLIENT_HEADER, RELAY_CLIENT_VALUE, RELAY_URL } from "./relayConfig";
 
 const { app } = electron;
@@ -47,7 +49,24 @@ export async function sendReport(raw: unknown): Promise<{ ok: boolean; status?: 
   return { ok: true, status: await getSender().send(report) };
 }
 
+/** Reports an older build kept in settings go into the queue once (E2-7). */
+function carryOldReports(): void {
+  const settings = getSettings();
+  if (!settings) return;
+  try {
+    migrateLegacyReports({
+      read: () => settings.all()[LEGACY_REPORTS_KEY],
+      clear: () => settings.set(LEGACY_REPORTS_KEY, null),
+      queue: createReportQueue(path.join(app.getPath("userData"), "pending-reports.json")),
+      ctx: { appVersion: app.getVersion(), os: `${process.platform} ${os.release()}`, homeDir: os.homedir() },
+    });
+  } catch {
+    /* a failed carry-over must never stop the app starting; the old list stays for the next launch */
+  }
+}
+
 /** At launch: tries the reports kept from earlier. */
 export function flushPendingReports(): void {
+  carryOldReports();
   void getSender().flush();
 }
