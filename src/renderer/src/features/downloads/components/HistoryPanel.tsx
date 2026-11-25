@@ -40,7 +40,7 @@ export default function HistoryPanel() {
                 >
                   <span className="h-[26px] w-[40px] flex-none rounded-chip bg-hover" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <div className={`truncate text-body font-medium ${h.missing[e.id] ? "text-disabled" : ""}`}>{clipTitle(e.label)}</div>
+                    <div className={`truncate text-body font-medium leading-[normal] ${h.missing[e.id] ? "text-disabled" : ""}`}>{clipTitle(e.label)}</div>
                     <div className="mt-[2px] truncate text-meta leading-[normal] text-fg-dim">
                       {h.missing[e.id] ? "File missing. It was moved or deleted." : rowMeta(e)}
                     </div>
