@@ -57,7 +57,7 @@ export function clipReason(s: {
     if (s.endSet) return "Set a start first: click the timeline or press I";
     return "Set an end first: click the timeline or press O";
   }
-  return s.noCampaign ? "Make a campaign first: Settings, Campaigns, Add campaign" : null;
+  return s.noCampaign ? "Make a campaign first: Settings, Add campaign" : null;
 }
 
 type Section = { start: number; end: number };

@@ -9,6 +9,8 @@ import { useState } from "react";
 import { MAX_RULE_SEC } from "../../../shared/utils/campaigns";
 import { formatClock } from "../../../shared/utils/clock";
 import { parseTimestamp } from "../../../shared/utils/clip";
+import PopoverMenu from "../../../modules/layout/components/PopoverMenu";
+import { languageTag } from "../../../shared/utils/audioLanguages";
 import { DrawerHeader, SectionLabel, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 import { stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
@@ -45,6 +47,9 @@ const stepButton = "h-target w-target rounded-control border border-hairlineStro
 const fieldInput = "h-target min-w-0 rounded-control border border-hairlineStrong bg-panel px-[12px] text-body leading-[normal] text-fg outline-none focus:border-ice-tint-50";
 
 export default function SettingsCampaign(p: SettingsCampaignProps) {
+  // Languages is one dropdown, many ticks: Original first, always on; the closed state names what is picked ("Original + ES").
+  const langs = [{ code: "original", label: "Original" }, ...p.dubs];
+  const langSummary = langs.filter((l) => p.prefs.languages.includes(l.code)).map((l) => (l.code === "original" ? "Original" : languageTag(l.code))).join(" + ") || "Original";
   const { prefs } = p;
   const [draft, setDraft] = useState<string | null>(null);
   const [nameProblem, setNameProblem] = useState("");
@@ -101,7 +106,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
   };
   return (
     <>
-      <DrawerHeader closeName="Settings" title={p.name} back="Campaigns" onBack={p.onBack} onClose={p.onClose} />
+      <DrawerHeader closeName="Settings" title={p.name} back="Settings" onBack={p.onBack} onClose={p.onClose} />
       <div className={drawerBody}>
       <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
         <label htmlFor="campaign-name" className="text-body leading-[normal]">Name</label>
@@ -143,28 +148,18 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           <span className="text-body leading-[normal]">Languages</span>
           <span className="text-meta text-fg-dim">Shown only when the video has dubs</span>
         </div>
-        <div className="flex flex-wrap gap-[8px]">
-          {[{ code: "original", label: "Original" }, ...p.dubs].map((l) => {
-            const on = prefs.languages.includes(l.code);
-            return (
-              <button
-                key={l.code}
-                type="button"
-                aria-pressed={on}
-                aria-label={`${l.label} audio, ${on ? "ticked" : "not ticked"}`}
-                onClick={() => p.onToggleLanguage(l.code)}
-                className={`inline-flex h-target items-center gap-[6px] rounded-[22px] px-[16px] text-body leading-[normal] ${on ? "bg-ice text-bg" : "border border-hairlineStrong bg-raised text-fg"}`}
-              >
-                {on && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M5 12.5l4.5 4.5L19 7.5" />
-                  </svg>
-                )}
-                {l.label}
-              </button>
-            );
-          })}
-        </div>
+        <PopoverMenu
+          label={`Languages: ${langSummary}`}
+          align="start"
+          boxes
+          menuWidth={260}
+          pressedWhenOpen={false}
+          triggerClassName="inline-flex h-target w-full items-center gap-[8px] rounded-control border border-hairlineStrong bg-raised px-[12px] text-body leading-[normal] text-fg hover:bg-hover"
+          items={langs.map((l) => ({ key: l.code, label: l.label, checked: prefs.languages.includes(l.code), keepOpen: true, onSelect: () => p.onToggleLanguage(l.code) }))}
+        >
+          <span className="flex-1 truncate text-left">{langSummary}</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-fg-dim" aria-hidden="true"><path d="M2 3.5l3 3 3-3" /></svg>
+        </PopoverMenu>
       </div>
       )}
       <div className="flex flex-col gap-[4px] py-[12px]">

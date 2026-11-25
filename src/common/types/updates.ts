@@ -2,13 +2,13 @@
  * File: updates.ts
  * Path: src/common/types/updates.ts
  * Description: Shapes the main process sends the renderer for app updates. The top bar's
- *   "Restart to update" pill reads UpdateReady and calls restart-to-update; nothing here
+ *   "Restart app to update" pill reads UpdateReady and calls restart-to-update; nothing here
  *   ever opens a dialog.
  */
 
 /**
  * Pushed once when a new version is ready. On Windows and Linux it has downloaded and the pill
- * reads "Restart to update" (mode "restart"). On the unsigned Mac build nothing installs in
+ * reads "Restart app to update" (mode "restart"). On the unsigned Mac build nothing installs in
  * place, so the pill reads "Get version <x>" and opens `url` (mode "download").
  */
 export type UpdateReady =
