@@ -55,3 +55,9 @@ test("changing the kind never rewrites the frame rate (vertical follows the vide
   assert.doesNotMatch(handoff, /=== "source" \? "30"/);
   assert.match(handoff, /timelineFormat: \{ \.\.\.settings\.timelineFormat, kind \}/);
 });
+
+test("V18-F-5: an older custom size is shown as it is, with no choice ticked", () => {
+  const h = html({ kind: "custom", custom: { width: 1280, height: 720, fps: "24" } });
+  assert.doesNotMatch(h, /aria-checked="true"/);
+  assert.match(h, /1280 × 720 at 24 fps, set in an older version\. Pick one above to change it\./);
+});

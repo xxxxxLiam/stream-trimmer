@@ -121,6 +121,9 @@ test("report sent: the page itself says Sent, what went with it, Back to Help an
   assert.match(h, /role="status"[\s\S]*text-frost[\s\S]*Sent\. Thank you\./);
   assert.match(h, /It went with the error, the version numbers and a cleaned log\. There&#x27;s nothing else to do\./);
   assert.match(h, />Back to Help</);
+  // V18-F-7: the header arrow keeps "Back to Help"; the body button has its own name, so the two are told apart.
+  assert.equal((h.match(/aria-label="Back to Help"/g) ?? []).length, 1);
+  assert.match(h, /aria-label="Back to Help questions"/);
   assert.match(h, /aria-label="Copy details"/);
   assert.doesNotMatch(h, /aria-label="Send report"|reference|reply/i);
   assert.doesNotMatch(renderToStaticMarkup(<HelpReport {...report} state="kept" />), />Back to Help<|cleaned log/);

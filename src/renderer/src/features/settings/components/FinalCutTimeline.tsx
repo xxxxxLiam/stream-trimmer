@@ -13,6 +13,8 @@ export type FinalCutTimelineProps = {
   lookName: string;
   /** The look's own size and rate once read, else null. */
   lookFormat: { width: number; height: number; fps: string } | null;
+  /** A custom size from an older version, which this switch cannot set; shown as it is, with no choice ticked. */
+  custom?: { width: number; height: number; fps: string };
   onPick: (kind: "vertical" | "source" | "look") => void;
 };
 
@@ -23,7 +25,11 @@ const CHOICES: { id: "vertical" | "source" | "look"; label: string }[] = [
 ];
 
 /** What the timeline is, in plain words, for the line under the switch. */
-export function timelineLine(p: Pick<FinalCutTimelineProps, "kind" | "lookName" | "lookFormat">): string {
+export function timelineLine(p: Pick<FinalCutTimelineProps, "kind" | "lookName" | "lookFormat" | "custom">): string {
+  if (p.kind === "custom" && p.custom) {
+    const fps = p.custom.fps === "source" ? "the video's frame rate" : `${p.custom.fps} fps`;
+    return `${p.custom.width} × ${p.custom.height} at ${fps}, set in an older version. Pick one above to change it.`;
+  }
   const on = p.kind === "look" && p.lookName ? "look" : p.kind === "source" ? "source" : "vertical";
   if (on === "look") {
     const f = p.lookFormat;
@@ -35,7 +41,7 @@ export function timelineLine(p: Pick<FinalCutTimelineProps, "kind" | "lookName" 
 
 export default function FinalCutTimeline(p: FinalCutTimelineProps) {
   // A look-based choice with no look left falls back to vertical, as the project does.
-  const shown = p.kind === "look" && !p.lookName ? "vertical" : p.kind === "custom" ? "vertical" : p.kind;
+  const shown = p.kind === "look" && !p.lookName ? "vertical" : p.kind;
   return (
     <div className="flex flex-col gap-[8px]">
       <span id="fcp-timeline-label" className="text-meta text-fg-dim">Timeline</span>
@@ -60,7 +66,7 @@ export default function FinalCutTimeline(p: FinalCutTimelineProps) {
           );
         })}
       </div>
-      <p className="m-[0px] text-meta text-fg-dim">{timelineLine({ kind: shown, lookName: p.lookName, lookFormat: p.lookFormat })}</p>
+      <p className="m-[0px] text-meta text-fg-dim">{timelineLine({ kind: shown, lookName: p.lookName, lookFormat: p.lookFormat, custom: p.custom })}</p>
       <p className="m-[0px] text-meta text-fg-dim">Clipr never crops: a wide video sits in the middle of a vertical timeline, and your look's zoom fills it.</p>
     </div>
   );

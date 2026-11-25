@@ -39,7 +39,7 @@ export default function HelpReport(p: HelpReportProps) {
             {kept && <p className="m-[0px] text-meta text-fg-dim">The report is kept on this computer and sent on a later launch. Copy details still works if you want to pass it on yourself.</p>}
             {sent && <p className="m-[0px] text-meta text-fg-dim">It went with the error, the version numbers and a cleaned log. There&apos;s nothing else to do.</p>}
             <div className="flex gap-[8px]">
-              {sent && <button type="button" onClick={p.onBack} className={outlineButton}>Back to Help</button>}
+              {sent && <button type="button" aria-label="Back to Help questions" onClick={p.onBack} className={outlineButton}>Back to Help</button>}
               <button type="button" aria-label="Copy details" onClick={p.onCopy} className={outlineButton}>{p.copied ? "Copied" : "Copy details"}</button>
             </div>
           </>
