@@ -186,7 +186,8 @@ function comments(id) {
   for (let i = 0; i < COMMENTS_PER_VIDEO; i++) {
     out.push({
       id: `${id}-c${i}`,
-      parent: i % 3 === 2 ? `${id}-c${i - 1}` : "root",
+      // Replies only when asked: the exporter keeps top-level comments, so row counts stay predictable.
+      parent: process.env.FAKE_REPLIES && i % 3 === 2 ? `${id}-c${i - 1}` : "root",
       author: `Commenter ${i}`,
       author_id: `UC${id}${i}`,
       // A newline inside a field is the other thing a CSV writer must survive.

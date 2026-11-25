@@ -10,8 +10,8 @@ export const LIMIT_STEPS = [10, 25, 50, 100, 200, 500, 1000] as const;
 
 export const DEFAULT_LIMIT = 100;
 
-/** Seconds per video: the details pass (it supplies the view counts) plus the transcript pass. */
-const SECONDS_PER_VIDEO = 4 + 3;
+/** Seconds per video: the details pass (it supplies the view counts), the comments pass and the transcript pass. */
+const SECONDS_PER_VIDEO = 4 + 8 + 3;
 
 /** The next step up or down from a typed count; a count between steps snaps to the next one in that direction. */
 export function stepLimit(n: number, dir: 1 | -1): number {
