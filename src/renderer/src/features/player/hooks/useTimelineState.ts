@@ -10,6 +10,7 @@ export type Drag =
   | { kind: "range"; anchor: number }
   | { kind: "edge"; edge: "start" | "end"; fixed: number }
   | { kind: "scrub" }
+  | { kind: "move"; grab: number; len: number; pressedAt: number; moved: boolean }
   | { kind: "pan"; startX: number; startFocus: number }
   | null;
 

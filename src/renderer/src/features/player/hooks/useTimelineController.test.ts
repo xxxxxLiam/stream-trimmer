@@ -50,10 +50,6 @@ test("the cursor follows the tool over the whole timeline, not only the Source l
   assert.match(lane, /cursorFor\(c\.tool, alt\)/);
 });
 
-test("the Source outline wraps the filmstrip instead of sitting on it", () => {
-  assert.match(sourceLane, /left: x - 3/);
-});
-
 test("zooming does not snap the view back to the playhead: only the playhead moving does", () => {
   const follow = effects.slice(effects.indexOf("the window follows the playhead"));
   const deps = follow.slice(0, follow.indexOf("publishTimelineView")).match(/\}, \[([^\]]*)\]\)/g) ?? [];
@@ -225,4 +221,35 @@ test("the lane works out the over-cap line live from the range's length, and gro
   assert.match(clipsLane, /unsaved && c\.totalSeconds > MAX_CLIP_SECONDS \? overCapMessage\(c\.totalSeconds\) : ""/);
   assert.match(clipsLane, /\(overCap \? OVER_LINE_H : 0\)/);
   assert.match(clipsLane, /over=\{overCap\}/);
+});
+
+test("the selection outline sits exactly on the picture strip's top and bottom lines, no padding", () => {
+  const inset = Number(/export const STRIP_INSET = (\d+);/.exec(sourceLane)?.[1]);
+  assert.ok(inset > 0);
+  assert.match(filmstrip, new RegExp(`top: ${inset}, bottom: ${inset}`), "the strip is inset by the same amount");
+  assert.match(sourceLane, /top: STRIP_INSET, bottom: STRIP_INSET/);
+  assert.doesNotMatch(sourceLane, /top: c\.joined \? 12 : 3/);
+  assert.doesNotMatch(sourceLane, /left: x - 3/);
+});
+
+test("pointer tool: pressing a selected range's body on the Source lane moves it (length kept); a grabbed edge resizes; no move means a click seek", () => {
+  assert.match(down, /target\.closest\('\[data-lane="source"\]'\)/);
+  assert.match(down, /kind: "move", grab: t - hit\.r\.start, len: hit\.r\.end - hit\.r\.start/);
+  assert.match(down, /pickSection\(/);
+  assert.match(src, /const r = movedRange\(d\.len, d\.grab, t, duration\);\s*clipper\.setRangeFromSeconds\(r\.start, r\.end\)/);
+  assert.match(src, /if \(!d\.moved\) \{[\s\S]*?clipper\.requestSeek\(Math\.round\(d\.pressedAt\)\)/);
+});
+
+test("a locked section is movable too: it is promoted to the selected range, the old one locks, Esc puts all back", () => {
+  assert.match(down, /if \(range\) store\.add\(range, /);
+  assert.match(down, /store\.remove\(hit\.id\)/);
+  assert.match(src, /store\.load\(before\.segments\)/);
+});
+
+test("a moved range touching another section reads as one and joins only on release; Esc and edge scroll cover the move", () => {
+  assert.match(src, /touching\(range, store\.segments, TOUCH_PX \* /);
+  assert.match(src, /else if \(mergeHint\) \{[\s\S]*store\.remove\(i\)[\s\S]*clipper\.setRangeFromSeconds\(mergeHint\.union\.start, mergeHint\.union\.end\)/);
+  assert.match(src, /dragKind !== "move"\) return;/);
+  assert.match(src, /dragKind === "move"/);
+  assert.match(sourceLane, /Joins when you let go/);
 });
