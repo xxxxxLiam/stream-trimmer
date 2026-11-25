@@ -20,6 +20,8 @@ import TopBarLinkField from "../../../features/workspace/components/TopBarLinkFi
 import PanelsMenu from "./PanelsMenu";
 import type { MenuItem } from "./PopoverMenu";
 import { IconSettingsGear } from "./BarIcons";
+import ChannelButton from "../../../features/channelExport/components/ChannelButton";
+import { CHANNEL_DATA_BUILT } from "../../../shared/utils/ownerGate";
 import { useWindowChrome } from "../hooks/useWindowChrome";
 import { barIsTitleBar, lightsShowing, topBarPaddingLeft, topBarPaddingRight } from "../utils/topBarInset";
 
@@ -32,9 +34,11 @@ export type TopBarProps = {
   campaignMenu?: ReactNode;
   /** Owner build: the Channel data row of the Panels menu. Empty in the public build. */
   panelsMenuExtras?: MenuItem[];
+  /** Owner build only: the Channel data icon next to Panels, and what a channel link typed into the link field does. */
+  channel?: { open: boolean; onToggle: () => void; isChannelUrl: (text: string) => boolean; onLink: (url: string) => void };
 };
 
-export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleSettings, campaignMenu, panelsMenuExtras }: TopBarProps) {
+export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleSettings, campaignMenu, panelsMenuExtras, channel }: TopBarProps) {
   const { info } = useClipperContext();
   const { active } = useCampaign();
   const now = useToday();
@@ -53,9 +57,10 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
           {today}
         </span>
       ) : null}
-      <TopBarLinkField />
+      <TopBarLinkField channel={channel} />
       <div className="relative ml-auto flex items-center gap-[2px]">
         <UpdatePill />
+        {CHANNEL_DATA_BUILT && channel ? <ChannelButton open={channel.open} onToggle={channel.onToggle} /> : null}
         <PanelsMenu extraItems={panelsMenuExtras} />
         <HelpButton open={helpOpen} onToggle={onToggleHelp} />
         <button
