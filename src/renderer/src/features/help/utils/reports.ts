@@ -2,37 +2,33 @@
  * File: reports.ts
  * Path: src/renderer/src/features/help/utils/reports.ts
  * Description: "Report a problem": a report is the person's note plus the error, versions and a
- *   cleaned log. It is sent through the report relay; while the relay is unreachable or not built yet
- *   it is kept on this computer and tried again on a later launch. Pure helpers plus a small store.
+ *   cleaned log. The main process sends it through the report relay and keeps it for a later launch
+ *   when the relay can't be reached; this file only builds the text and asks main to send.
  */
 import { redact } from "../../../shared/utils/diagnostics";
 
 export type PendingReport = { id: string; at: string; note: string; details: string };
 
-/** The relay address as built in: an https address, or "" for none. Anything else is ignored. */
-export function relayUrlFrom(raw: unknown): string {
-  const text = typeof raw === "string" ? raw.trim() : "";
-  try {
-    return new URL(text).protocol === "https:" ? text : "";
-  } catch {
-    return "";
-  }
-}
-
-/**
- * The small relay Liam owns, set when the app is built (VITE_REPORT_RELAY_URL, see .env.example) so it
- * can be filled in later without a code change. Empty until then: every report is kept and retried later.
- */
-export const REPORT_RELAY_URL = relayUrlFrom(typeof __REPORT_RELAY_URL__ === "string" ? __REPORT_RELAY_URL__ : "");
-export const PENDING_REPORTS_KEY = "clipper.pendingReports";
-const MAX_PENDING = 20;
 const MAX_NOTE = 2000;
+
+/** Cuts to `max` whole characters, so an emoji (a surrogate pair, or a joined sequence) is never split in half. */
+export function cutNote(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const Seg = (Intl as { Segmenter?: new (l?: string, o?: { granularity: "grapheme" }) => { segment(s: string): Iterable<{ segment: string }> } }).Segmenter;
+  const parts = Seg ? Array.from(new Seg(undefined, { granularity: "grapheme" }).segment(text), (x) => x.segment) : Array.from(text);
+  let out = "";
+  for (const g of parts) {
+    if (out.length + g.length > max) break;
+    out += g;
+  }
+  return out;
+}
 
 export function makeReport(note: string, details: string, now: Date, id: string): PendingReport {
   return {
     id,
     at: now.toISOString(),
-    note: redact(note).slice(0, MAX_NOTE),
+    note: cutNote(redact(note), MAX_NOTE),
     details: redact(details),
   };
 }
@@ -42,42 +38,21 @@ export function reportText(r: Pick<PendingReport, "note" | "details">): string {
   return [r.note.trim() ? `What happened: ${r.note.trim()}` : "", r.details.trim()].filter(Boolean).join("\n\n");
 }
 
-export function normalizePending(raw: unknown): PendingReport[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((r): r is PendingReport => !!r && typeof r === "object" && typeof (r as PendingReport).id === "string" && typeof (r as PendingReport).note === "string" && typeof (r as PendingReport).details === "string" && typeof (r as PendingReport).at === "string")
-    .slice(-MAX_PENDING);
-}
+/** What a send came to: "sent" went out now, "kept" is queued by the main process for a later launch. */
+export type SendOutcome = "sent" | "kept";
 
-export function addPending(list: readonly PendingReport[], r: PendingReport): PendingReport[] {
-  return [...list.filter((x) => x.id !== r.id), r].slice(-MAX_PENDING);
-}
-
-/** Tries each kept report once; the ones that went are dropped from the list. */
-export async function flushPending(
-  list: readonly PendingReport[],
-  send: (r: PendingReport) => Promise<boolean>,
-): Promise<PendingReport[]> {
-  const left: PendingReport[] = [];
-  for (const r of list) {
-    let ok = false;
-    try {
-      ok = await send(r);
-    } catch {
-      ok = false;
-    }
-    if (!ok) left.push(r);
+/**
+ * Sends through the main process (IPC `sendReport`): it adds the app and system version and the cleaned log,
+ * queues the report when the relay can't be reached, and retries on a later launch. Outside the desktop app there
+ * is no relay, so the report stays only on this screen's Copy details and is called kept.
+ */
+export async function sendReport(kind: "crash" | "problem", note: string, error: string): Promise<SendOutcome> {
+  const api = typeof window !== "undefined" ? window.electronAPI : undefined;
+  if (!api?.sendReport) return "kept";
+  try {
+    const r = await api.sendReport({ kind, note: kind === "problem" ? cutNote(redact(note), MAX_NOTE) : undefined, error: redact(error).trim() || "No error text" });
+    return r.ok && r.status === "sent" ? "sent" : "kept";
+  } catch {
+    return "kept";
   }
-  return left;
-}
-
-/** POSTs the report to the relay. False when there is no relay or it did not accept it. */
-export async function sendToRelay(r: PendingReport, url: string = REPORT_RELAY_URL): Promise<boolean> {
-  if (!url) return false;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ note: r.note, details: r.details, at: r.at }),
-  });
-  return res.ok;
 }

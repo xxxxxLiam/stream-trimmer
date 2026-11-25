@@ -18,7 +18,7 @@ export type SearchPillProps = {
 
 export default function SearchPill({ label, value, onChange, placeholder, icon, clearIcon }: SearchPillProps) {
   return (
-    <label className="flex h-target items-center gap-2 rounded-pill border border-hairline bg-raised pl-3.5 pr-1.5 text-fg-dim focus-within:border-hairlineStrong">
+    <label className="flex h-target items-center gap-2 rounded-pill border border-hairline bg-raised pl-3.5 pr-1.5 text-fg-dim focus-within:border-hairlineStrong has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-frost">
       <span aria-hidden="true" className="inline-flex">{icon}</span>
       <input
         type="search"

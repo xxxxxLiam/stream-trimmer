@@ -67,7 +67,7 @@ export default function HelpTop(p: HelpTopProps) {
             placeholder="What do you need help with?"
             onChange={(e) => p.onQuery(e.target.value)}
             data-help-item
-            className="box-border h-target w-full rounded-[22px] border border-hairlineStrong bg-raised pl-[40px] pr-[16px] text-body leading-[normal] text-fg outline-none"
+            className="box-border h-target w-full rounded-[22px] border border-hairlineStrong bg-raised pl-[40px] pr-[16px] text-body leading-[normal] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost"
           />
         </div>
         {!hasAny && (

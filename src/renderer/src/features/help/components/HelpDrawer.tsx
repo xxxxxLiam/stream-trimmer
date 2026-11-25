@@ -6,6 +6,7 @@
  *   Keyboard shortcuts, Report a problem (with its kept-for-later state), About, and the "Sign in for
  *   1080p" page the footer pill opens. Focus starts in the search field; Esc closes Help.
  */
+import { useRef } from "react";
 import { Drawer } from "../../../shared/components/Drawer";
 import HelpAbout from "./HelpAbout";
 import HelpAnswer from "./HelpAnswer";
@@ -13,6 +14,7 @@ import HelpReport from "./HelpReport";
 import HelpShortcuts from "./HelpShortcuts";
 import HelpSignIn from "./HelpSignIn";
 import HelpTop from "./HelpTop";
+import { useDrawerFocus } from "../../../shared/hooks/useDrawerFocus";
 import { useHelpController } from "../hooks/useHelpController";
 import { appVersion } from "../utils/appVersion";
 
@@ -27,6 +29,9 @@ export type HelpDrawerProps = {
 
 export default function HelpDrawer({ open, onClose, startAt = null, tips }: HelpDrawerProps) {
   const c = useHelpController({ open, onClose, startAt });
+  const root = useRef<HTMLDivElement>(null);
+  // F-4 and F-12: focus stays in the drawer while it is open, returns to the opener on close, and lands on the new view's heading.
+  const onKeyDown = useDrawerFocus(root, open, c.view.kind === "answer" ? `answer:${c.view.id}` : c.view.kind, "#ui-help-button");
   if (!open) return null;
   const { view } = c;
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
@@ -43,7 +48,7 @@ export default function HelpDrawer({ open, onClose, startAt = null, tips }: Help
         onNote={c.setNote}
         state={c.report.state}
         copied={c.report.copied}
-        onSend={() => void c.report.send(c.note)}
+        onSend={() => void c.sendReport()}
         onCopy={() => void c.report.copyDetails(c.note)}
         onBack={c.top}
         onClose={onClose}
@@ -79,7 +84,7 @@ export default function HelpDrawer({ open, onClose, startAt = null, tips }: Help
   }
 
   return (
-    <div id="ui-help-drawer" className="absolute inset-y-0 right-0 z-30 max-w-full overflow-y-auto">
+    <div id="ui-help-drawer" ref={root} onKeyDown={onKeyDown} className="absolute inset-y-0 right-0 z-30 max-w-full overflow-y-auto">
       <Drawer label="Help">{body}</Drawer>
     </div>
   );

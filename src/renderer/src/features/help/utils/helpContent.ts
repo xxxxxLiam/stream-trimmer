@@ -27,7 +27,7 @@ export const HELP_ANSWERS: HelpAnswer[] = [
       "Only that part downloads, into your campaign’s folder.",
     ],
     labels: ["Clip"],
-    synonyms: ["download", "export", "save", "cut", "start", "begin", "new"],
+    synonyms: ["download", "export", "save", "cut", "start", "begin", "new", "mark", "range"],
   },
   {
     id: "clip-greyed",
@@ -83,6 +83,28 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     labels: ["Settings", "Your look"],
     synonyms: ["look", "template", "preset", "colour grade", "color grade", "lut", "zoom", "volume", "final cut", "xml", "style"],
   },
+  {
+    id: "sign-in",
+    question: "How do I sign in for 1080p?",
+    searchOnly: true,
+    paras: [
+      "Clipr asks YouTube for 1080p when you’re signed in, and gets 360p when you’re not. Signing in to YouTube in Chrome, Edge, Firefox or Brave is usually enough: Clipr looks for it when it opens.",
+      "If it can’t find one, press Sign in for 1080p at the bottom of the window. Export your cookies.txt as the page says, then drop it there or choose the file.",
+    ],
+    labels: ["Sign in for 1080p"],
+    synonyms: ["cookies", "cookie", "cookies.txt", "login", "log in", "account", "youtube", "360p", "1080p", "quality", "resolution", "age", "restricted", "members", "bot"],
+  },
+  {
+    id: "undo-clip",
+    question: "How do I undo a clip?",
+    searchOnly: true,
+    paras: [
+      "Right after a clip is made its row says Undo, with a ring counting down 5 seconds. Press the ring and the clip is taken back.",
+      "After that, the file is in your campaign’s folder like any other.",
+    ],
+    labels: ["Undo"],
+    synonyms: ["undo", "oops", "mistake", "delete", "remove", "take back", "cancel", "wrong", "by mistake"],
+  },
 ];
 
 /** The rows under "More" that the search also covers. */
@@ -104,12 +126,13 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "I", does: "Mark the start of a part" },
   { keys: "O", does: "Mark the end of a part" },
   { keys: "M", does: "Drop a flag" },
-  { keys: "N", does: "Trim to the next flag" },
+  { keys: "Shift N", does: "Go to the next video" },
   { keys: "⌘ Enter", does: "Clip" },
-  { keys: "⌘ B", does: "Save the part for later" },
-  { keys: "R", does: "Retry the selected failed clip" },
+  { keys: "R", does: "Retry the failed clip" },
+  { keys: "⌘ R", does: "Show the last saved clip in Finder (File Explorer on Windows)" },
   { keys: "⌘ L", does: "Loop the marked part" },
   { keys: "⌘ ,", does: "Settings" },
+  { keys: "⌘ ;", does: "Symbols" },
   { keys: "⌘ /", does: "Help" },
   { keys: "Esc", does: "Close a drawer or leave full screen" },
 ];
