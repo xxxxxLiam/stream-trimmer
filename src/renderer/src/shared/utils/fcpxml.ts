@@ -991,13 +991,18 @@ export function buildFcpxml(input: FcpxmlInput): string {
 
 /** A filename for the document: event name made safe, with the extension. */
 export function fcpxmlFilename(eventName: string, clipId?: string): string {
-  const safe = noEmDash(clipId ? `${eventName} ${clipId}` : eventName)
-    .replace(/[\\/:*?"<>|\u0000-\u001F]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^\.+/, "")
-    .slice(0, 80)
-    .trim();
+  const clean = (t: string) =>
+    noEmDash(t)
+      .replace(/[\\/:*?"<>|\u0000-\u001F]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "");
+  const MAX = 80;
+  const clip = clipId ? clean(clipId).slice(0, MAX) : "";
+  // The clip's name is the part that tells two documents apart, so it is what survives the cut: the Event name
+  // gives way, never the clip (a long Event name used to push every clip's name off the end).
+  const event = clean(eventName).slice(0, clip ? Math.max(0, MAX - clip.length - 1) : MAX).trim();
+  const safe = [event, clip].filter(Boolean).join(" ").trim();
   return `${safe || "Clips"}.fcpxml`;
 }
 

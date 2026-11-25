@@ -324,6 +324,13 @@ test("filename is safe and ends in .fcpxml", () => {
   assert.equal(fcpxmlFilename(`a/b:c*d?"e`), "a b c d e.fcpxml");
   assert.equal(fcpxmlFilename("  "), "Clips.fcpxml");
   assert.equal(fcpxmlFilename("..hidden"), "hidden.fcpxml");
+  // D4-1: a long Event name gives way, never the clip's name, so two clips never share a file name.
+  const long = "Q".repeat(120);
+  const a = fcpxmlFilename(long, "Hot Take");
+  const b = fcpxmlFilename(long, "Big Deal");
+  assert.notEqual(a, b);
+  assert.match(a, / Hot Take\.fcpxml$/);
+  assert.ok(a.length <= 80 + ".fcpxml".length);
 });
 
 // ---- DTD -------------------------------------------------------------------
