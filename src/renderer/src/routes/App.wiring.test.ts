@@ -55,3 +55,16 @@ test("R2: screens without a top bar still drag the window by a strip along the t
   assert.match(strip, /barIsTitleBar\(chrome\)/);
   assert.match(strip, /topbar-drag/);
 });
+
+test("F4-2: Ctrl+, and Ctrl+/ swap the right drawers like the buttons, one at a time", () => {
+  const src = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+  assert.match(src, /k === "\/"[\s\S]{0,200}setSettingsOpen\(false\);\s*setHelpOpen\(\(v\) => !v\)/);
+  assert.match(src, /k === ","[\s\S]{0,200}setHelpOpen\(false\);\s*setSettingsOpen\(\(v\) => !v\)/);
+});
+
+test("F4-1: a failed update download clears the percent; F4-4: Done with this video meets the 44px target", () => {
+  const hook = readFileSync(new URL("../features/updates/hooks/useUpdateStatusEffects.ts", import.meta.url), "utf8");
+  assert.match(hook, /s\.state === "error"\) setDownloading\(null\)/);
+  const panel = readFileSync(new URL("../features/workspace/components/VideosPanel.tsx", import.meta.url), "utf8");
+  assert.match(panel, /aria-label="Done with this video"[\s\S]{0,200}h-\[44px\] w-\[44px\]/);
+});

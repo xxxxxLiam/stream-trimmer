@@ -38,7 +38,7 @@ test("F-16: the download shows a quiet pill with its percent, fed by the status 
   assert.match(pill, /!pill && downloading !== null/);
 });
 
-test("F3-4: no percent never reads NaN, and checking or error mid-download keep the last good state", async () => {
+test("F3-4: no percent never reads NaN, and checking keeps the last good state and an error ends it (F4-1)", async () => {
   const { readFileSync } = await import("node:fs");
   const { downloadingLabel } = await import("./updatePill");
   assert.equal(downloadingLabel(Number.NaN), "Downloading update");
@@ -46,5 +46,6 @@ test("F3-4: no percent never reads NaN, and checking or error mid-download keep 
   const hook = readFileSync(new URL("../hooks/useUpdateStatusEffects.ts", import.meta.url), "utf8");
   assert.match(hook, /Number\.isFinite\(s\.percent\)/);
   assert.match(hook, /else if \(s\.state === "ready" \|\| s\.state === "none"/);
-  assert.doesNotMatch(hook, /s\.state === "error"|s\.state === "checking"/, "those two leave it alone");
+  assert.doesNotMatch(hook, /s\.state === "checking"/, "checking leaves it alone");
+  assert.match(hook, /s\.state === "error"\) setDownloading\(null\)/, "F4-1: a failed download clears the percent");
 });
