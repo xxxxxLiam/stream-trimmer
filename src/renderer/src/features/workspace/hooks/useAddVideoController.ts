@@ -8,9 +8,10 @@ import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace } from "./WorkspaceContext";
+import type { ChannelLink } from "../components/TopBarLinkField";
 import { linkKind, linkInText, resolveLink } from "../utils/videoList";
 
-export function useAddVideoController() {
+export function useAddVideoController(channel?: ChannelLink) {
   const ws = useWorkspace();
   const { info } = useClipperContext();
   const { active } = useCampaign();
@@ -43,6 +44,11 @@ export function useAddVideoController() {
   const submit = () => {
     if (ws.opening) return; // one link at a time: the panel already says it is opening
     if (isTitle || action.kind === "empty") return leave();
+    // Owner build: a channel link goes to Channel data instead of being refused as "not a video".
+    if (channel?.isChannelUrl(text.trim())) {
+      channel.onLink(text.trim());
+      return leave();
+    }
     if (action.kind === "error") return setProblem(action.message);
     if (action.existingId) {
       if (action.reopen) ws.setTabDone(action.existingId, false);

@@ -83,7 +83,20 @@ test("Premiere Pro is listed but coming soon: it can never be the chosen destina
 
 test("the Clip arrow menu shows Premiere Pro disabled with 'Coming soon', and picking it does nothing", () => {
   const menu = readFileSync(new URL("../components/ClipButton.tsx", import.meta.url), "utf8");
-  assert.match(menu, /disabled=\{d\.soon\}[\s\S]*trailing=\{d\.soon \? "Coming soon" : undefined\}/);
+  assert.match(menu, /disabled=\{d\.soon\}[\s\S]*trailing=\{d\.soon \? "Coming soon" :/);
   const ctl = readFileSync(new URL("../hooks/useClipController.ts", import.meta.url), "utf8");
   assert.match(ctl, /\?\.soon\) return; \/\/ coming soon: not selectable, opens no setup/);
+});
+
+test("the footer's middle sentence and its two pickers are gone; the Clip arrow carries Where clips go and Audio as pages", () => {
+  const bar = readFileSync(new URL("../components/ExportBar.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(bar, /makesText\(|ui-footer-clips|Audio languages/);
+  assert.match(bar, /Sign in for 1080p/);
+  assert.match(bar, /<ClipButton listenForKey openUp options=\{\{/);
+  const menu = readFileSync(new URL("../components/ClipButton.tsx", import.meta.url), "utf8");
+  assert.match(menu, /setPage\("where"\)/);
+  assert.match(menu, /setPage\("audio"\)/);
+  assert.match(menu, /setPage\("root"\)/);
+  assert.match(menu, /\{hasDubs \? \(/, "the Audio row is absent when the video has no dubs");
+  assert.match(menu, /"Folder on this computer"/);
 });

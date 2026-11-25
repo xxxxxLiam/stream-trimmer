@@ -701,6 +701,19 @@ function Layout({ active }: { active: boolean }) {
             setSettingsOpen((v) => !v);
           }}
           panelsMenuExtras={overlayItems}
+          channel={
+            CHANNEL_DATA_BUILT && channelAvailable
+              ? {
+                  open: channelOpen,
+                  onToggle: () => setChannelOpen((v) => !v),
+                  isChannelUrl: isLikelyChannelUrl,
+                  onLink: (url) => {
+                    channel.setChannelUrl(url);
+                    setChannelOpen(true);
+                  },
+                }
+              : undefined
+          }
           campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
         />
         )}
@@ -720,7 +733,6 @@ function Layout({ active }: { active: boolean }) {
           </div>
         {active && (
         <ExportBar
-          clipCount={languagePlans.length}
           tracks={info?.audioTracks}
           selectedLanguages={audioSel}
           onSelectLanguages={setAudioSel}
