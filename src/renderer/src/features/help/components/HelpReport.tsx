@@ -6,6 +6,7 @@
  *   Back to Help and Copy details (no reference number, no promise of a reply). After Send, when the report service is down, "Saved. Clipr will send it
  *   when it can." and Copy details still works.
  */
+import { useEffect, useRef } from "react";
 import { DrawerHeader, drawerBodyRoomy, outlineButton } from "../../../shared/components/DrawerRows";
 import { MAX_NOTE } from "../utils/reports";
 import type { ReportState } from "../hooks/useReportMutations";
@@ -24,13 +25,18 @@ export type HelpReportProps = {
 export default function HelpReport(p: HelpReportProps) {
   const kept = p.state === "kept";
   const sent = p.state === "sent";
+  const done = useRef<HTMLDivElement | null>(null);
+  // F3-2: pressing Send removes the button, so focus goes to the result instead of the page body.
+  useEffect(() => {
+    if (kept || sent) done.current?.focus();
+  }, [kept, sent]);
   return (
     <>
       <DrawerHeader title="Report a problem" back="Help" onBack={p.onBack} closeName="Help" onClose={p.onClose} />
       <div className={drawerBodyRoomy}>
         {kept || sent ? (
           <>
-            <div role="status" className="flex items-center gap-[8px] box-content min-h-[44px] rounded-control border border-hairlineStrong bg-raised px-[12px] text-body">
+            <div ref={done} tabIndex={-1} role="status" className="flex items-center gap-[8px] outline-none box-content min-h-[44px] rounded-control border border-hairlineStrong bg-raised px-[12px] text-body">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-frost">
                 <path d="M5 12.5l4.5 4.5L19 7.5" />
               </svg>

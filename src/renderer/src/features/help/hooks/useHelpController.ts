@@ -5,7 +5,7 @@
  *   report, sign in, about), the search text and the report note; opens on the sign-in page when the
  *   footer pill asks; closes on Escape; and hands focus back to the Help button on close.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { searchHelp } from "../utils/helpSearch";
 import { HELP_ANSWERS, type HelpMoreId } from "../utils/helpContent";
 import { useReportMutations } from "./useReportMutations";
@@ -19,12 +19,20 @@ export function useHelpController({ open, onClose, startAt }: { open: boolean; o
   const [note, setNote] = useState("");
   const report = useReportMutations();
   const cookies = useCookieDropMutations();
+  const reportRef = useRef(report);
+  reportRef.current = report;
 
   useEffect(() => {
     if (!open) return;
-    setView(startAt === "signin" ? { kind: "signin" } : { kind: "top" });
+    // A report that finished while Help was closed is shown first, so its result is never lost.
+    setView(startAt === "signin" ? { kind: "signin" } : reportRef.current.unseen && reportRef.current.state !== "writing" ? { kind: "report" } : { kind: "top" });
     setQuery("");
   }, [open, startAt]);
+
+  // Looking at the result is seeing it.
+  useEffect(() => {
+    if (open && view.kind === "report" && report.state !== "writing") report.markSeen();
+  }, [open, view.kind, report.state]);
 
   // Escape closes Help (the drawer blocks nothing, so this is the keyboard way out).
   useEffect(() => {
@@ -45,8 +53,11 @@ export function useHelpController({ open, onClose, startAt }: { open: boolean; o
   const openMore = (id: HelpMoreId) => {
     if (id === "shortcuts") setView({ kind: "shortcuts" });
     else if (id === "report") {
-      report.reset();
-      setNote("");
+      // A note that has not been sent yet stays; only a finished report starts the page empty again.
+      if (report.state !== "writing") {
+        report.reset();
+        setNote("");
+      }
       setView({ kind: "report" });
     } else if (id === "about") setView({ kind: "about" });
   };

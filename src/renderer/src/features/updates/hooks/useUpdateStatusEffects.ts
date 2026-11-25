@@ -19,7 +19,10 @@ export function useUpdateStatusEffects(): { ready: UpdateReady | null; downloadi
     const off = api.onUpdateReady(setReady);
     // F-16: the download's progress arrives on its own channel; without this nothing shows while it runs.
     const offStatus = api.onUpdateStatus?.((s) => {
-      setDownloading(s.state === "downloading" ? Math.max(0, Math.min(100, Math.round(s.percent))) : null);
+      // F3-4: only a downloading status moves it, and only to a real number; "checking" or "error" mid-download keep the
+      // last good state, and a download with no percent yet is NaN-free (-1 reads as "no percent").
+      if (s.state === "downloading") setDownloading(Number.isFinite(s.percent) ? Math.max(0, Math.min(100, Math.round(s.percent))) : (prev) => prev ?? -1);
+      else if (s.state === "ready" || s.state === "none" || s.state === "manual" || s.state === "available") setDownloading(null);
     });
     return () => {
       live = false;

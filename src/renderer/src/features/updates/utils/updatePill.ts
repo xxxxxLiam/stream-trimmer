@@ -27,5 +27,6 @@ export function restartRefusal(result: RestartToUpdateResult): string | null {
 
 /** The quiet pill while the new version downloads (no click: nothing to do yet). */
 export function downloadingLabel(percent: number): string {
+  if (!Number.isFinite(percent) || percent < 0) return "Downloading update";
   return `Downloading update ${Math.max(0, Math.min(100, Math.round(percent)))}%`;
 }
