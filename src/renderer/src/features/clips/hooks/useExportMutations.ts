@@ -20,7 +20,7 @@ import { UNDO_SECONDS } from "../utils/exportRows";
 import { clipNameFor } from "../utils/cutNaming";
 import { createSerialQueue } from "../utils/serialQueue";
 import { setCutAttempt } from "../../../shared/utils/cutAttempt";
-import type { ExportState } from "./useExportState";
+import { withFinished, type ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
 export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: ExportState) {
@@ -51,13 +51,10 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
         // video's title. A name already saved for this video gets " 2".
         const taken = getDownloads().map((d) => d.label.replace(/\.[^.]+$/, ""));
         const name = clipNameFor({ candidates: [clip.label, suggestProjectName(clip)], videoTitle: info?.title, taken });
-        s.setMakingName(name);
         s.setFailed(null);
-        s.setMakingId(clip.id);
         s.attempt.current = { name, segments: clip.segments, bankId: clip.id };
         setCutAttempt({ name, segments: clip.segments, bankId: clip.id });
         s.setNotice("");
-        s.setFinished(null);
         stopped.current = false;
         clearAfterCuttingOutcome(); // the last clip's handoff answer is old news once the next one starts
         try {
@@ -67,8 +64,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
             // Its own Undo, even when the next queued clip starts at once.
             const newest = getDownloads().find((d) => d.kind === "clip");
             if (newest) {
-              s.setFinished({ entryId: newest.id, name, endsAt: Date.now() + UNDO_SECONDS * 1000 });
-              s.setSecondsLeft(UNDO_SECONDS);
+              s.setFinished((list) => withFinished(list, { entryId: newest.id, name, endsAt: Date.now() + UNDO_SECONDS * 1000 }));
             }
           } else if (!stopped.current) s.setNotice(`${name} was not made. It is still waiting.`);
         } catch {
@@ -86,9 +82,9 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     cancelDownload();
   }, [cancelDownload]);
 
-  const undo = useCallback(async () => {
-    const entry = getDownloads().find((d) => d.id === s.finished?.entryId);
-    s.setFinished(null);
+  const undo = useCallback(async (entryId: string) => {
+    const entry = getDownloads().find((d) => d.id === entryId);
+    s.setFinished((list) => list.filter((f) => f.entryId !== entryId));
     if (!entry) return;
     const res = await undoClip({
       entries: clipGroup(entry, getDownloads()),

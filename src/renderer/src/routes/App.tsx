@@ -37,12 +37,14 @@ import { readSetting, writeSetting } from "../shared/utils/persist";
 import { bankStore, clipsFor, type BankedClip } from "../shared/utils/bank";
 import { clipNameFor } from "../features/clips/utils/cutNaming";
 import { createSerialQueue } from "../features/clips/utils/serialQueue";
+import { pickedRangeOf } from "../features/player/utils/pickedRange";
+import { clipSections } from "../features/player/utils/clipDestination";
 import { matchingMoment } from "../features/clips/utils/finishBankedCut";
 import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
-import { setMakingName } from "../shared/utils/clipNameStore";
+import { setMakingClipId, setMakingName } from "../shared/utils/clipNameStore";
 import { setCutAttempt } from "../shared/utils/cutAttempt";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
@@ -253,6 +255,11 @@ function Layout({ active }: { active: boolean }) {
     duration,
     setStartText,
     setEndText,
+    startText,
+    endText,
+    start: rangeStart,
+    end: rangeEnd,
+    validationError,
     setUrl,
     flushAutoLoad,
     transcript,
@@ -391,6 +398,10 @@ function Layout({ active }: { active: boolean }) {
       setCutAttempt({ name, segments });
       const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
       setMakingName(name);
+      // A range that is a waiting moment is that moment: its id is what the use, the cut mark and Undo all key on.
+      const moment = cutCampaignId ? matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments) : undefined;
+      const groupId = moment?.id ?? name;
+      setMakingClipId(moment?.id ?? null);
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
       let madeAny = false;
       try {
@@ -399,15 +410,15 @@ function Layout({ active }: { active: boolean }) {
           const ok = await download({ segments: toCut, clipId: fileName, audioLanguage: plan.language });
           if (!ok) break;
           if (!madeAny && cutCampaignId) {
-            recordUse(videoId, segments, name, cutCampaignId);
-            const moment = matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments);
+            recordUse(videoId, segments, groupId, cutCampaignId);
             if (moment) bankStore.markCut(cutCampaignId, videoId, moment.id);
           }
           madeAny = true;
-          afterSaved(fileName, undefined, segments, startSettings, undefined, name);
+          afterSaved(fileName, undefined, segments, startSettings, undefined, groupId);
         }
       } finally {
         setMakingName(null);
+        setMakingClipId(null);
       }
     },
     [videoId, campaign, info?.title, downloads, duration, download, recordUse, afterSaved],
@@ -430,12 +441,20 @@ function Layout({ active }: { active: boolean }) {
       const startSettings = withDestination(editorRef.current);
       const baseId = projectName?.trim() || clip.id;
       let madeAny = false;
-      for (const plan of languagePlansRef.current) {
-        const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
-        if (!ok) break;
-        madeAny = true;
-        // The Final Cut clip carries the clip's name, the file's, not the bank id.
-        afterSaved(nameForLanguage(baseId, plan), undefined, clip.segments, startSettings, projectName, clip.id);
+      // The Making row names the clip in hand, and it is out of Waiting only while this runs (a stop puts it back).
+      setMakingName(baseId);
+      setMakingClipId(clip.id);
+      try {
+        for (const plan of languagePlansRef.current) {
+          const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
+          if (!ok) break;
+          madeAny = true;
+          // The Final Cut clip carries the clip's name, the file's, not the bank id.
+          afterSaved(nameForLanguage(baseId, plan), undefined, clip.segments, startSettings, projectName, clip.id);
+        }
+      } finally {
+        setMakingName(null);
+        setMakingClipId(null);
       }
       return madeAny;
     },
@@ -461,6 +480,9 @@ function Layout({ active }: { active: boolean }) {
       } else if (k === "," && !e.shiftKey) {
         e.preventDefault();
         setSettingsOpen((v) => !v);
+      } else if (k === "b" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        addMomentRef.current();
       } else if (k === "r" && !e.shiftKey) {
         e.preventDefault();
         revealRef.current();
@@ -487,6 +509,22 @@ function Layout({ active }: { active: boolean }) {
     openPanelById(id);
     window.setTimeout(() => document.getElementById(tabDomId(id))?.focus(), 0);
   };
+  // Add a moment / Ctrl B: bank what is marked now (a just-marked In and Out, else the committed
+  // sections), waiting, under the lane's name or a suggested one. The marks stay, so Clip still works.
+  const addMoment = () => {
+    if (!campaign?.id || !videoId) return;
+    const range = pickedRangeOf({ startText, endText, start: rangeStart, end: rangeEnd, validationError });
+    const sections = clipSections(tabSegments, range);
+    if (sections.length === 0) return;
+    const taken = [
+      ...downloads.map((d) => d.label.replace(/\.[^.]+$/, "")),
+      ...clipsFor(bankStore.get(), campaign.id, videoId).map((c) => c.label),
+    ];
+    const label = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+    bankStore.importClips(campaign.id, videoId, [{ line: 1, id: null, label, segments: sections }]);
+  };
+  const addMomentRef = useRef(addMoment);
+  addMomentRef.current = addMoment;
   const panelHost: PanelHost = {
     playhead,
     cutSegments: cutMarked,
@@ -494,10 +532,7 @@ function Layout({ active }: { active: boolean }) {
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
-    addMoment: () => {
-      if (!campaign?.id || !videoId || tabSegments.length === 0) return;
-      bankStore.importClips(campaign.id, videoId, [{ line: 1, id: null, label: "", segments: tabSegments.map((x) => ({ start: x.start, end: x.end })) }]);
-    },
+    addMoment,
     openChannel: (url) => {
       if (url) channel.setChannelUrl(url);
       setChannelOpen(true);

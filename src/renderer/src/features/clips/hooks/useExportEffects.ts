@@ -13,13 +13,13 @@ import { UNDO_SECONDS } from "../utils/exportRows";
 import { clipGroup } from "../utils/undoClip";
 import { classifyClipFailure, isRetryKey, rowFailure } from "../utils/clipFailure";
 import { getCutAttempt, setCutAttempt } from "../../../shared/utils/cutAttempt";
-import type { ExportState } from "./useExportState";
+import { withFinished, type ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
 export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
   const { downloading, downloadPhase, error, failure } = useClipperContext();
-  const { setSelectedId, setNotice, setFinished, setSecondsLeft } = s;
+  const { setSelectedId, setNotice, setFinished, setNow } = s;
 
   // New video or campaign: the selection and notices do not carry over.
   useEffect(() => {
@@ -49,15 +49,12 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
           // The clip's name is its first file's (the original), not the newest language copy's.
           const files = clipGroup(newest, getDownloads());
           const first = files[files.length - 1] ?? newest;
-          setFinished({ entryId: newest.id, name: clipTitle(first.label), endsAt: Date.now() + UNDO_SECONDS * 1000 });
-          setSecondsLeft(UNDO_SECONDS);
+          setFinished((list) => withFinished(list, { entryId: newest.id, name: clipTitle(first.label), endsAt: Date.now() + UNDO_SECONDS * 1000 }));
         }
         s.setFailed(null);
         s.failCount.current = { key: "", count: 0 };
         s.attempt.current = null;
         setCutAttempt(null);
-        // The next clip is "New clip" until a waiting moment names it.
-        s.setMakingName("New clip");
       } else if (downloadPhase === "error" && error) {
         // The cut that ran last: the marks were cleared when Clip was pressed, so its range is kept here.
         const a = getCutAttempt() ?? s.attempt.current ?? { name: "New clip", segments: seg.segments.map((x) => ({ start: x.start, end: x.end })) };
@@ -81,19 +78,20 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [downloading, downloadPhase]);
 
-  // The Undo drains until its end time; the row keeps its size when it ends.
-  const endsAt = s.finished?.endsAt ?? null;
+  // The Undo windows drain until their own end times; a window that has run out leaves the list.
+  const nextEnd = s.finished.reduce<number | null>((m, f) => (m === null ? f.endsAt : Math.min(m, f.endsAt)), null);
+  const anyLeft = s.finished.length > 0;
   useEffect(() => {
-    if (endsAt === null) return;
+    if (!anyLeft) return;
     const tick = () => {
-      const left = (endsAt - Date.now()) / 1000;
-      if (left <= 0) setFinished(null);
-      else setSecondsLeft(left);
+      const t = Date.now();
+      setNow(t);
+      setFinished((list) => (list.some((f) => f.endsAt <= t) ? list.filter((f) => f.endsAt > t) : list));
     };
     tick();
     const id = window.setInterval(tick, 250);
     return () => window.clearInterval(id);
-  }, [endsAt, setFinished, setSecondsLeft]);
+  }, [anyLeft, nextEnd, setFinished, setNow]);
 }
 
 /** R retries the failed clip on its row. Not while typing, and not with a modifier. */
