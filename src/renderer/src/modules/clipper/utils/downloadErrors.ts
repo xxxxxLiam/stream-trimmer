@@ -74,3 +74,24 @@ export async function requestEngineCancel(
     /* the abort alone still frees the renderer */
   }
 }
+
+/**
+ * A failed save of the finished clip, as the Export row needs it. The engine answers with a code
+ * (DISK_FULL, FOLDER_NOT_WRITABLE, FOLDER_GONE, SAVE_FAILED) and a plain sentence; until it does, the
+ * Node error text names the cause. Only the folder problems get a code (they offer Change folder);
+ * anything else stays an ordinary failure. `reason` is the sentence to show.
+ */
+export function saveFailure(result: { error?: string; code?: string }): { code?: "disk_full" | "save_folder_gone"; reason?: string } {
+  const text = result.error ?? "";
+  if (result.code === "DISK_FULL" || /ENOSPC|no space left|disk full/i.test(text)) {
+    return { code: "disk_full", reason: result.code ? text || "The Clips folder is full." : "The Clips folder is full." };
+  }
+  if (
+    result.code === "FOLDER_NOT_WRITABLE" ||
+    result.code === "FOLDER_GONE" ||
+    /ENOTDIR|ENOENT|EACCES|EPERM|EROFS|read-only file system|permission denied|not a directory/i.test(text)
+  ) {
+    return { code: "save_folder_gone", reason: result.code ? text || "Clipr can’t write to that folder." : "Clipr can’t write to that folder." };
+  }
+  return {};
+}

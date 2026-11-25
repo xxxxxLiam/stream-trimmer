@@ -61,11 +61,14 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         const key = JSON.stringify(a.segments);
         s.failCount.current = { key, count: s.failCount.current.key === key ? s.failCount.current.count + 1 : 1 };
         const fromRow = failure?.row ? rowFailure(failure.row) : null;
+        const classified = classifyClipFailure(failure?.code, failure?.message ?? error);
         s.setFailed({
           ...a,
-          kind: fromRow?.kind ?? classifyClipFailure(failure?.code),
+          // The engine's row decides, except that a network cause is named as such (no YouTube error).
+          kind: classified === "offline" ? "offline" : (fromRow?.kind ?? classified),
           attempts: fromRow?.attempts ?? s.failCount.current.count,
-          reason: fromRow?.reason,
+          // A full or unwritable folder says so in the engine's own sentence.
+          reason: fromRow?.reason ?? (failure?.code === "disk_full" || failure?.code === "save_folder_gone" ? failure.message : undefined),
           message: error,
           code: failure?.code,
         });

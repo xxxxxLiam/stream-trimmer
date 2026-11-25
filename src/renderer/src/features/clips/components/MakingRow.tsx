@@ -16,7 +16,7 @@ import { makingText, undoText } from "../utils/exportRows";
 import UndoRing from "./UndoRing";
 
 export type MakingRowProps =
-  | { kind: "making"; name: string; percent: number; phase: string; retrying?: boolean }
+  | { kind: "making"; name: string; percent: number; phase: string; retrying?: boolean; onCancel?: () => void }
   | {
       kind: "finished";
       name: string;
@@ -40,6 +40,17 @@ export default function MakingRow(props: MakingRowProps) {
         className="relative mx-[10px] mb-[6px] mt-[10px] overflow-hidden rounded-control bg-raised px-[10px] py-[9px]"
       >
         <div className={NAME}>{props.name}</div>
+        {props.onCancel && (
+          // Stops a clip that stalls. A 44px target on the row's right edge; the row keeps its size.
+          <button
+            type="button"
+            aria-label={`Cancel ${props.name}`}
+            onClick={props.onCancel}
+            className="absolute right-[2px] top-[3px] h-[44px] rounded-control px-[8px] text-meta leading-[normal] text-fg-dim hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost"
+          >
+            Cancel
+          </button>
+        )}
         {props.retrying ? (
           <div className="mt-[3px] text-meta leading-[1.45]">
             <span className="text-error">{failureCopy("stopped", 1).reason}</span>{" "}

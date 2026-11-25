@@ -38,6 +38,8 @@ import { clipNameFor } from "../features/clips/utils/cutNaming";
 import { matchingMoment } from "../features/clips/utils/finishBankedCut";
 import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
+import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
+import { tabDomId } from "../modules/layout/components/PanelTabStrip";
 import { setMakingName } from "../shared/utils/clipNameStore";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
@@ -466,6 +468,12 @@ function Layout({ active }: { active: boolean }) {
     />
   );
   const dayHost = useDayHost();
+  // The end card's buttons: show the panel (open and brought forward) and put the keyboard on its tab.
+  const { open: openPanelById } = usePanelLayoutState();
+  const focusPanel = (id: "export" | "videos") => {
+    openPanelById(id);
+    window.setTimeout(() => document.getElementById(tabDomId(id))?.focus(), 0);
+  };
   const panelHost: PanelHost = {
     playhead,
     cutSegments: (segs) => void cutClip(segs),
@@ -489,8 +497,8 @@ function Layout({ active }: { active: boolean }) {
     // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".
     day: dayHost.day,
     onNextVideo: dayHost.onNextVideo,
-    onOpenBank: () => {},
-    onOpenVideo: () => {},
+    onOpenBank: () => focusPanel("export"),
+    onOpenVideo: () => focusPanel("videos"),
   };
 
   // Overlays that are not panels. They stay one key (and one Panels menu row) away.
