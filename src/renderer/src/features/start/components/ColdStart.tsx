@@ -57,7 +57,8 @@ function Notice({ text, action, onAction }: { text: string; action: string; onAc
 export default function ColdStart(p: ColdStartProps) {
   const checking = p.toolsStatus === "checking";
   const broken = p.toolsStatus === "broken";
-  const waiting = !checking && !broken && !p.offer;
+  // The box is ready for a link from the first frame, glow included, while the tools update: the link opens when they are.
+  const waiting = !broken && !p.offer;
   return (
     <main
       id="ui-cold-start"
@@ -85,7 +86,7 @@ export default function ColdStart(p: ColdStartProps) {
                   waiting ? "border-ice-tint-50 shadow-box" : "border-hairlineStrong"
                 }`}
               >
-                <span aria-hidden="true" className={`h-[22px] w-[2px] rounded-[1px] bg-ice ${checking ? "opacity-0" : ""}`} />
+                <span aria-hidden="true" className="h-[22px] w-[2px] rounded-[1px] bg-ice" />
                 <label className="sr-only" htmlFor="ui-cold-start-link">Video link</label>
                 <input
                   id="ui-cold-start-link"

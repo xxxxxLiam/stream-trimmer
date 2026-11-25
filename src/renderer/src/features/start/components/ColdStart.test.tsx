@@ -57,10 +57,13 @@ test("link already copied: the box offers it and has no input; nothing opens by 
   assert.doesNotMatch(h, /<input/);
 });
 
-test("checking tools: box loses its glow and the line says why the link waits", () => {
+test("checking tools: the box keeps its glow and caret from the first frame, and the line says why the link waits", () => {
   const h = html({ toolsStatus: "checking" });
   assert.match(h, /Updating download tools, about 20 s\. Your link will open when they are ready\./);
-  assert.doesNotMatch(h, /shadow-box/);
+  assert.match(h, /border-ice-tint-50 shadow-box/, "focused look while the tools update (Liam, 25 Nov)");
+  assert.doesNotMatch(h, /opacity-0/, "the caret shows too");
+  assert.match(h, /<input[^>]*id="ui-cold-start-link"/);
+  assert.doesNotMatch(h, /<input[^>]*disabled/, "a link can be pasted during the update");
 });
 
 test("tool cannot be fixed: one sentence and one button in the error colour", () => {
