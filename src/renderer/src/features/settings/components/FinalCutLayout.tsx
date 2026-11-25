@@ -5,6 +5,7 @@
  *   list (name and one line each), and previews the result as a small tree built from the campaign's real
  *   names. Logic-free. Built with the shared parts until Design's drawing lands.
  */
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { FcpLayout } from "../../../shared/utils/fcpxml";
 import type { LayoutOption, TreeLine } from "../utils/importLayouts";
 
@@ -20,10 +21,38 @@ export type FinalCutLayoutProps = {
 
 export default function FinalCutLayout(p: FinalCutLayoutProps) {
   const current = p.options.find((o) => o.id === p.current);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const wasOpen = useRef(false);
+
+  // Opening puts focus on the chosen layout; closing gives it back to the row's button.
+  useEffect(() => {
+    if (p.open) list.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+    else if (wasOpen.current) trigger.current?.focus();
+    wasOpen.current = p.open;
+  }, [p.open]);
+
+  // Arrows, Home and End move through the list; Esc closes only the list, never the Settings drawer under it.
+  const onListKey = (e: KeyboardEvent<HTMLUListElement>) => {
+    const items = Array.from(list.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      p.onToggleOpen();
+      return;
+    }
+    const to = e.key === "ArrowDown" ? (at + 1) % items.length : e.key === "ArrowUp" ? (at - 1 + items.length) % items.length : e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : -1;
+    if (to >= 0) {
+      e.preventDefault();
+      items[to]?.focus();
+    }
+  };
   return (
     <div className="flex flex-col gap-[8px]">
       <span className="text-meta text-fg-dim">Layout</span>
       <button
+        ref={trigger}
         type="button"
         aria-haspopup="listbox"
         aria-expanded={p.open}
@@ -34,13 +63,14 @@ export default function FinalCutLayout(p: FinalCutLayoutProps) {
         <span aria-hidden="true" className="text-fg-dim">▾</span>
       </button>
       {p.open && (
-        <ul role="listbox" aria-label="Layouts" className="m-[0px] flex list-none flex-col rounded-control border border-hairlineStrong bg-panel p-[4px]">
+        <ul ref={list} onKeyDown={onListKey} role="listbox" aria-label="Layouts" className="m-[0px] flex list-none flex-col rounded-control border border-hairlineStrong bg-panel p-[4px]">
           {p.options.map((o) => (
             <li key={o.id}>
               <button
                 type="button"
                 role="option"
                 aria-selected={o.id === p.current}
+                tabIndex={o.id === p.current ? 0 : -1}
                 onClick={() => p.onPick(o.id)}
                 className="flex min-h-target w-full items-start gap-[8px] rounded-control px-[8px] py-[8px] text-left hover:bg-hover"
               >
