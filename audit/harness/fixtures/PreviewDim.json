@@ -1,0 +1,57 @@
+{
+ "_doc": "I pressed at 1:12:04 and no O yet: the Clip button dimmed, its reason showing.",
+ "extends": "Preview",
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4324"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "i"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4351; window.__fakeYTPlayer.pauseVideo()"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "click": "button[aria-label='Zoom in']"
+  },
+  {
+   "hover": "#ui-cut"
+  },
+  {
+   "wait": 300
+  }
+ ]
+}

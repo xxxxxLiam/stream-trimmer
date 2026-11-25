@@ -30,6 +30,230 @@
      "campaignId": "nova"
     }
    ]
+  },
+  "clipper.bank": {
+   "acme": {
+    "podcast214": [
+     {
+      "id": "b1",
+      "label": "Honest Version",
+      "segments": [
+       {
+        "start": 4324,
+        "end": 4366
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T1",
+      "rating": 9.1
+     },
+     {
+      "id": "b2",
+      "label": "Big Deal",
+      "segments": [
+       {
+        "start": 2470,
+        "end": 2511
+       }
+      ],
+      "status": "banked",
+      "category": "Hustle",
+      "tier": "T2",
+      "rating": 8.4
+     },
+     {
+      "id": "b3",
+      "label": "Hot Take",
+      "segments": [
+       {
+        "start": 482,
+        "end": 515
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T3",
+      "rating": 7.0
+     }
+    ],
+    "founder2": [
+     {
+      "id": "f0",
+      "label": "Moment 1",
+      "segments": [
+       {
+        "start": 100,
+        "end": 130
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 8.0
+     },
+     {
+      "id": "f1",
+      "label": "Moment 2",
+      "segments": [
+       {
+        "start": 160,
+        "end": 190
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.9
+     },
+     {
+      "id": "f2",
+      "label": "Moment 3",
+      "segments": [
+       {
+        "start": 220,
+        "end": 250
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.8
+     }
+    ],
+    "pricing": [
+     {
+      "id": "p0",
+      "label": "Moment 1",
+      "segments": [
+       {
+        "start": 100,
+        "end": 130
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 8.0
+     },
+     {
+      "id": "p1",
+      "label": "Moment 2",
+      "segments": [
+       {
+        "start": 160,
+        "end": 190
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.9
+     },
+     {
+      "id": "p2",
+      "label": "Moment 3",
+      "segments": [
+       {
+        "start": 220,
+        "end": 250
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.8
+     },
+     {
+      "id": "p3",
+      "label": "Moment 4",
+      "segments": [
+       {
+        "start": 280,
+        "end": 310
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.7
+     }
+    ]
+   },
+   "nova": {
+    "townhall": [
+     {
+      "id": "t0",
+      "label": "Moment 1",
+      "segments": [
+       {
+        "start": 100,
+        "end": 130
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 8.0
+     },
+     {
+      "id": "t1",
+      "label": "Moment 2",
+      "segments": [
+       {
+        "start": 160,
+        "end": 190
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.9
+     },
+     {
+      "id": "t2",
+      "label": "Moment 3",
+      "segments": [
+       {
+        "start": 220,
+        "end": 250
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.8
+     },
+     {
+      "id": "t3",
+      "label": "Moment 4",
+      "segments": [
+       {
+        "start": 280,
+        "end": 310
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.7
+     },
+     {
+      "id": "t4",
+      "label": "Moment 5",
+      "segments": [
+       {
+        "start": 340,
+        "end": 370
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T2",
+      "rating": 7.6
+     }
+    ]
+   }
   }
  },
  "steps": [
@@ -86,6 +310,20 @@
   }
  ],
  "stub": {
-  "vttFile": "podcast214-timeline.vtt"
+  "vttFile": "podcast214-timeline.vtt",
+  "infos": {
+   "founder2": {
+    "title": "Founder story, part 2",
+    "duration": 3000
+   },
+   "townhall": {
+    "title": "Q3 town hall",
+    "duration": 5400
+   },
+   "pricing": {
+    "title": "Pricing AMA",
+    "duration": 2400
+   }
+  }
  }
 }

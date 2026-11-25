@@ -12,7 +12,8 @@ import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
 import { useTimelineView } from "../hooks/useTimelineView";
 import { usePreviewController } from "../hooks/usePreviewController";
-import { clockTime } from "../utils/transport";
+import { formatLength } from "../../../shared/utils/segments";
+import { clipPosition, clockTime } from "../utils/transport";
 import EndCard from "./EndCard";
 import FullScreenBar from "./FullScreenBar";
 import PreparingLine from "./PreparingLine";
@@ -33,6 +34,8 @@ export default function PreviewPanel() {
   const view = useTimelineView();
   const opening = !!videoId && !info && c.loadingInfo;
   const blocked = player.blocked;
+  // A joined clip is counted in clip time (0:09 of 0:34); anything else in video time.
+  const clipPos = c.sections.length >= 2 ? clipPosition(c.sections, player.currentTime) : null;
   const showEnd = !!videoId && !blocked && player.ended;
   // The words being said now, over the picture. Only a line that is playing, never a stale one.
   const { transcript } = useClipperContext();
@@ -44,12 +47,13 @@ export default function PreviewPanel() {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.16, ease: "easeOut" }}
+      data-panel="preview"
       className="relative flex min-h-[0px] min-w-[0px] flex-1 flex-col overflow-visible rounded-panel border border-hairline bg-panel"
     >
       <div className="flex min-h-[0px] flex-1 flex-col gap-[8px] px-[12px] py-[10px]">
         <div className="flex h-[16px] flex-none items-center justify-between text-body leading-[16px] tabular-nums">
-          <span>{clockTime(showEnd ? c.duration : player.currentTime)}</span>
-          <span className="text-fg-dim">{clockTime(c.duration)}</span>
+          <span>{clipPos ? formatLength(clipPos.at) : clockTime(showEnd ? c.duration : player.currentTime)}</span>
+          <span className="text-fg-dim">{clipPos ? formatLength(clipPos.total) : clockTime(c.duration)}</span>
         </div>
 
         <div ref={c.frameRef} className="relative min-h-[0px] flex-1 overflow-hidden rounded-control bg-raised">
@@ -106,6 +110,7 @@ export default function PreviewPanel() {
               range={c.range}
               flags={flags}
               view={view}
+              joined={c.sections}
               onSeek={(t) => player.seekTo(t)}
             />
             <PlayerControls c={c} />

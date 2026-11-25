@@ -45,7 +45,7 @@ export default function TransportButton({
         ? "border-ice-tint-50 text-ice"
         : look === "tile"
           ? "border-transparent text-fg-dim hover:text-fg"
-          : "text-fg-dim hover:text-fg";
+          : "text-fg-dim hover:bg-hover hover:text-fg";
   const [text, key] = label.split("  ");
   return (
     <span className="group relative inline-flex">
@@ -60,7 +60,7 @@ export default function TransportButton({
         {children}
       </button>
       <Tooltip
-        className={`pointer-events-none absolute left-1/2 z-20 hidden -translate-x-1/2 group-focus-within:inline-flex group-hover:inline-flex ${labelBelow ? "top-full mt-[4px]" : "bottom-full mb-[4px]"}`}
+        className={`pointer-events-none absolute left-1/2 z-20 hidden -translate-x-1/2 group-focus-within:inline-flex group-hover:inline-flex ${labelBelow ? "top-full mt-[8px]" : "bottom-full mb-[8px]"}`}
         keyHint={key}
       >
         {text}

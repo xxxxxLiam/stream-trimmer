@@ -6,10 +6,9 @@
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
 import test from "node:test";
 
-const src = fs.readFileSync(path.join(__dirname, "usePreviewEffects.ts"), "utf8");
+const src = fs.readFileSync(new URL("./usePreviewEffects.ts", import.meta.url), "utf8");
 
 test("the key listener reads the latest handlers through a ref", () => {
   assert.match(src, /argsRef\.current\.setIn\(\)/);

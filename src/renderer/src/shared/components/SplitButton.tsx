@@ -33,7 +33,7 @@ export default function SplitButton({
   describedBy,
 }: SplitButtonProps) {
   const half = disabled
-    ? "cursor-not-allowed bg-raised text-disabled"
+    ? "cursor-not-allowed border border-hairlineStrong bg-raised text-disabled"
     : cx("bg-ice text-bg hover:shadow-clip-hover", glowing && "shadow-cut");
   return (
     <span className="inline-flex gap-0.5">

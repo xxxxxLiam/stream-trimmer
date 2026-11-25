@@ -25,16 +25,16 @@ export default function TimelineHeader({ c }: { c: TimelineController }) {
     <div className="flex h-[60px] items-center gap-[16px] px-[16px]">
       {chips.length === 0 ? (
         <>
-          <span id="ui-mark-in" className="text-section font-normal tabular-nums" aria-label="In">
+          <span id="ui-mark-in" className={`text-section font-normal tabular-nums ${c.inText === "—" ? "text-fg-dim" : ""}`} aria-label={c.inText === "—" ? "No start" : "In"}>
             {c.inText}
           </span>
-          <span id="ui-mark-out" className="text-section font-normal tabular-nums" aria-label="Out">
+          <span id="ui-mark-out" className={`text-section font-normal tabular-nums ${c.outText === "—" ? "text-fg-dim" : ""}`} aria-label={c.outText === "—" ? "No end" : "Out"}>
             {c.outText}
           </span>
         </>
       ) : null}
       <span id="ui-stitched-total" className="inline-flex items-baseline gap-[8px]">
-        <span className="text-cliplength tabular-nums text-ice">{c.lengthText}</span>
+        <span className={`text-cliplength tabular-nums ${c.lengthText === "—" ? "text-fg-dim" : "text-ice"}`}>{c.lengthText}</span>
         <span className="text-meta leading-[15px] text-fg-dim">clip length</span>
       </span>
       {overlap ? (
@@ -50,7 +50,7 @@ export default function TimelineHeader({ c }: { c: TimelineController }) {
       {chips.map((s, i) => (
         <span
           key={`${s.start}-${s.end}`}
-          className="inline-flex h-[30px] items-center gap-[6px] rounded-full border border-ice-tint-50 pl-[12px] pr-[4px] text-body"
+          className="inline-flex h-[32px] items-center gap-[6px] rounded-[15px] border border-ice-tint-50 pl-[12px] pr-[4px] text-body"
         >
           <span className="text-fg-dim">{i + 1}</span>
           <span className="tabular-nums">{lengthLabel(s.end - s.start)}</span>
@@ -75,7 +75,7 @@ export default function TimelineHeader({ c }: { c: TimelineController }) {
         >
           + section
         </button>
-        <ClipButton listenForKey />
+        <ClipButton listenForKey openUp />
       </span>
     </div>
   );

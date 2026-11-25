@@ -1,0 +1,25 @@
+{
+ "_doc": "The video has ended: the end card over the picture (Main05EndOfVideo), preview panel only.",
+ "extends": "Preview",
+ "initGlobals": {
+  "__fakeYT": {
+   "start": 8073,
+   "ended": true
+  }
+ },
+ "mask": [],
+ "region": {
+  "selector": "[data-panel='preview']"
+ },
+ "steps": [
+  {
+   "wait": 2000
+  },
+  {
+   "eval": "document.activeElement && document.activeElement.blur()"
+  },
+  {
+   "wait": 300
+  }
+ ]
+}

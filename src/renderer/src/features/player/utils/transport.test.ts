@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SPEEDS,
+  clipPosition,
+  clipToVideo,
   clockTime,
   endCardKind,
   hoverLabel,
@@ -87,4 +89,23 @@ test("end card: next video, done for today, or nothing waiting", () => {
   assert.equal(endCardKind({ next: null, made: 3, quota: 3 }), "done");
   assert.equal(endCardKind({ next: null, made: 2, quota: 3 }), "nothing");
   assert.equal(endCardKind({ next: null, made: 0, quota: null }), "nothing");
+});
+
+test("a joined clip counts the playhead in clip time, skipped parts left out", () => {
+  const two = [{ start: 72, end: 90 }, { start: 604, end: 620 }];
+  assert.deepEqual(clipPosition(two, 81), { at: 9, total: 34 });
+  assert.deepEqual(clipPosition(two, 610), { at: 24, total: 34 });
+  // In the skipped part it reads the end of the section before; before the first it reads 0; after all, the total.
+  assert.equal(clipPosition(two, 300).at, 18);
+  assert.equal(clipPosition(two, 10).at, 0);
+  assert.equal(clipPosition(two, 700).at, 34);
+  assert.deepEqual(clipPosition([], 5), { at: 0, total: 0 });
+});
+
+test("clipToVideo is the way back from clip time", () => {
+  const two = [{ start: 72, end: 90 }, { start: 604, end: 620 }];
+  assert.equal(clipToVideo(two, 9), 81);
+  assert.equal(clipToVideo(two, 24), 610);
+  assert.equal(clipToVideo(two, 99), 620);
+  for (const t of [72, 85, 604, 619]) assert.equal(clipToVideo(two, clipPosition(two, t).at), t);
 });

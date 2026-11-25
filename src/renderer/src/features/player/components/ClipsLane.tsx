@@ -27,9 +27,7 @@ export function skippedLabel(seconds: number): string {
 }
 
 export default function ClipsLane({ c }: { c: TimelineController }) {
-  const first = c.axis.pieces[0]?.t0 ?? 0;
-  const last = c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? 0;
-  const shown = (start: number, end: number) => end > start && end >= first && start <= last;
+  const shown = (start: number, end: number) => end > start && c.axis.pieces.some((p) => !p.folded && end >= p.t0 && start <= p.t1);
   const span = (start: number, end: number) => {
     const x = toX(c.axis, start);
     return { left: x, width: Math.max(6, toX(c.axis, end) - x) };

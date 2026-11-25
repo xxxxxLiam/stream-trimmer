@@ -53,6 +53,7 @@ async function runSteps(win, steps) {
   for (const s of steps || []) {
     if (s.click) await win.click(s.click);
     else if (s.fill) await win.fill(s.fill[0], s.fill[1]);
+    else if (s.hover) await win.hover(s.hover);
     else if (s.press) await win.keyboard.press(s.press);
     else if (s.waitFor) await win.waitForSelector(s.waitFor);
     else if (s.wait) await win.waitForTimeout(s.wait);

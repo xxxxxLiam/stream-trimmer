@@ -99,3 +99,32 @@ export function endCardKind({ next, made, quota }: EndCardInput): EndCardKind {
 export function isMacLike(): boolean {
   return typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || "");
 }
+
+/**
+ * Where the playhead sits inside a joined clip, counted in clip time: sections play in order with the
+ * skipped parts left out. Before the first section it reads 0, in a gap it reads the end of the section
+ * before it, and past the last it reads the total.
+ */
+export function clipPosition(sections: readonly Range[], t: number): { at: number; total: number } {
+  const len = (s: Range) => Math.max(0, s.end - s.start);
+  const total = sections.reduce((n, s) => n + len(s), 0);
+  let offset = 0;
+  for (const s of sections) {
+    if (t >= s.start && t < s.end) return { at: offset + (t - s.start), total };
+    offset += len(s);
+  }
+  // Not inside any section: everything that has already ended counts.
+  return { at: sections.filter((s) => t >= s.end).reduce((n, s) => n + len(s), 0), total };
+}
+
+/** The inverse of clipPosition: the source time at `at` seconds into a joined clip. */
+export function clipToVideo(sections: readonly Range[], at: number): number {
+  let left = Math.max(0, at);
+  for (const s of sections) {
+    const len = Math.max(0, s.end - s.start);
+    if (left < len) return s.start + left;
+    left -= len;
+  }
+  const last = sections[sections.length - 1];
+  return last ? last.end : 0;
+}

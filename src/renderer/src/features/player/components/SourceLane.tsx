@@ -7,11 +7,11 @@
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { toX } from "../utils/timelineAxis";
+import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
 import LaneLabel from "./LaneLabel";
 
 const CURSORS = { pointer: "cursor-pointer", clip: "cursor-crosshair", flag: "cursor-cell", hand: "cursor-grab", zoom: "cursor-zoom-in" } as const;
-const FIRST_CLIP_HINT = "Drag on the timeline, or press I and O, to pick the part you want. Then Clip.";
 
 export default function SourceLane({ c }: { c: TimelineController }) {
   const covered = [...c.sections, ...c.used.filter((u) => u.end > u.start)].sort((a, b) => a.start - b.start);
@@ -38,7 +38,7 @@ export default function SourceLane({ c }: { c: TimelineController }) {
       >
         {c.opening ? null : (
           <>
-            <Filmstrip axis={c.axis} levels={c.storyboards} height={32} />
+            {c.firstClipHint ? null : <Filmstrip axis={c.axis} levels={c.storyboards} height={32} />}
             {dim.map((d) => {
               const x = toX(c.axis, d.start);
               return (
@@ -92,9 +92,18 @@ export default function SourceLane({ c }: { c: TimelineController }) {
               </button>
             ))}
             {c.firstClipHint ? (
-              <span className="pointer-events-none absolute inset-[0px] flex items-center justify-center text-meta text-fg-dim">
-                <span className="rounded-chip bg-bg-overlay-80 px-[10px] py-[4px]">{FIRST_CLIP_HINT}</span>
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-body text-fg-dim">
+                <span>
+                  Drag on the timeline, or press <KeyHint>I</KeyHint> and <KeyHint>O</KeyHint>, to pick the part you want. Then Clip.
+                </span>
               </span>
+            ) : null}
+            {c.startPicked && c.duration > 0 ? (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute w-[3px] bg-ice"
+                style={{ left: toX(c.axis, c.start) - 1, top: 2, bottom: 2 }}
+              />
             ) : null}
           </>
         )}

@@ -24,7 +24,7 @@ export default function TimelineRuler({ c }: { c: TimelineController }) {
         ))}
         {c.fold.map((f) => (
           <span key={f.x} className="absolute text-center text-meta font-medium text-fg" style={{ left: f.x, width: f.width }}>
-            {foldLabel(f.skipped)}
+            {foldLabel(f.gap)}
           </span>
         ))}
       </div>
