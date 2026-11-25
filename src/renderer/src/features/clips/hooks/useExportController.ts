@@ -5,6 +5,10 @@
  *   mutations into what the screen shows: the Making row, the finished row with its Undo ring,
  *   and the waiting rows.
  */
+import { useCopyListSource } from "../../../modules/layout/hooks/copyListStore";
+import { exportListText, listFileName } from "../../../shared/utils/clipListText";
+import { validateClipName } from "../utils/clipName";
+import { suggestProjectName } from "../utils/projectName";
 import { useMakingClipId, useMakingName } from "../../../shared/utils/clipNameStore";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { isRetryingNote } from "../utils/clipFailure";
@@ -39,6 +43,20 @@ export function useExportController() {
   for (const f of finished) if (f.entry?.clipId) onTop.add(f.entry.clipId);
   const waiting = queries.waiting.filter((c) => !onTop.has(c.id));
   const made = queries.made.filter((c) => !onTop.has(c.id));
+
+  // The ··· menu's Copy as text and Save as .txt: the clips waiting in this video, as the list shows them.
+  const { info } = useClipperContext();
+  useCopyListSource("export", {
+    count: waiting.length,
+    emptyNote: "Nothing to copy yet. Clips you add show up here.",
+    text: () =>
+      exportListText({
+        videoId: queries.vid || undefined,
+        title: info?.title,
+        clips: waiting.map((c) => ({ name: (validateClipName(c.label).ok ? c.label.trim() : suggestProjectName(c)) || c.id, segments: c.segments })),
+      }),
+    fileName: () => listFileName(info?.title, "Clipr clips"),
+  });
 
   return {
     ...queries,
