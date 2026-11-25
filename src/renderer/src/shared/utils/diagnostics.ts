@@ -28,6 +28,7 @@ export const USER_FIXABLE_CODES: readonly string[] = Object.freeze([
   "network_dropped",
   "out_point_past_end",
   "save_folder_gone",
+  "folder_not_writable",
   "disk_full",
   "engine_behind",
   "YOUTUBE_AUTH_REQUIRED",
