@@ -146,12 +146,17 @@ export function extendLater(
 /** One occurrence. `line` is where it starts, `endLine` where it ends (differs for two-line hits). */
 export type Match = { line: number; endLine: number };
 
+/** Lower case with accents removed, so "cafe" finds "café". Only combining marks are dropped. */
+export function foldForSearch(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function normalizeQuery(q: string): string {
-  return q.trim().replace(/\s+/g, " ").toLowerCase();
+  return foldForSearch(q.trim().replace(/\s+/g, " "));
 }
 
 /**
- * Search the ENTIRE transcript. Case-insensitive, whitespace-insensitive. Lines are joined with a
+ * Search the ENTIRE transcript. Case-, accent- and whitespace-insensitive. Lines are joined with a
  * single space so a phrase that wraps across two caption lines still matches; each occurrence is
  * reported once, at the line it starts on. Occurrences do not overlap.
  */
@@ -163,7 +168,7 @@ export function searchTranscript(lines: readonly Line[], query: string): Match[]
   const starts: number[] = [];
   let joined = "";
   for (let i = 0; i < lines.length; i++) {
-    const text = lines[i].text.replace(/\s+/g, " ").trim().toLowerCase();
+    const text = foldForSearch(lines[i].text.replace(/\s+/g, " ").trim());
     if (text === "") continue; // empty caption lines must not add a stray separator
     if (joined !== "") joined += " ";
     starts.push(joined.length);
@@ -288,6 +293,12 @@ export function snapRangeToWords(lines: readonly Line[], a: LinePoint, b: LinePo
   const end = wordBoundsAt(lines[clampLine(hi.line)], hi.frac).end;
   return end > start ? { start, end } : null;
 }
+
+/** A press and release that barely moved inside one caption line is a click (seek), not a drag. */
+export function isClickDrag(a: LinePoint, b: LinePoint): boolean {
+  return a.line === b.line && Math.abs(a.frac - b.frac) < CLICK_FRACTION;
+}
+const CLICK_FRACTION = 0.02;
 
 export type TimeRange = { start: number; end: number };
 

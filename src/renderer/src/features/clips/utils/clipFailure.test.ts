@@ -74,3 +74,12 @@ test("C-6: a full or unwritable folder says so, with Change folder and no retry 
   assert.equal(failureCopy("disk", 1, "Clipr can’t write to that folder.").reason, "Clipr can’t write to that folder.");
   assert.deepEqual(failureActions("disk", 1), ["changeFolder"]);
 });
+
+test("B2-2: the engine's cap error says the real reason and offers no Retry", () => {
+  const kind = classifyClipFailure(undefined, "Clip length capped at 600 seconds (10 minutes)");
+  assert.equal(kind, "toolong");
+  assert.equal(failureCopy(kind, 1).reason, "Clips can be up to 10 minutes.");
+  assert.doesNotMatch(failureCopy(kind, 1).detail, /try once more/i);
+  assert.deepEqual(failureActions(kind, 1), []);
+  assert.deepEqual(failureActions(kind, 2), []);
+});
