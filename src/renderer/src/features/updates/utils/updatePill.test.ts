@@ -25,3 +25,15 @@ test("a restart refused while a clip is made explains itself; success says nothi
   assert.equal(restartRefusal({ ok: false, reason: "nothing-ready" }), null);
   assert.ok(restartRefusal({ ok: false, reason: "failed" }));
 });
+
+test("F-16: the download shows a quiet pill with its percent, fed by the status channel", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { downloadingLabel } = await import("./updatePill");
+  assert.equal(downloadingLabel(42.4), "Downloading update 42%");
+  assert.equal(downloadingLabel(140), "Downloading update 100%");
+  const hook = readFileSync(new URL("../hooks/useUpdateStatusEffects.ts", import.meta.url), "utf8");
+  assert.match(hook, /api\.onUpdateStatus\?\.\(/);
+  assert.match(hook, /s\.state === "downloading"/);
+  const pill = readFileSync(new URL("../components/UpdatePill.tsx", import.meta.url), "utf8");
+  assert.match(pill, /!pill && downloading !== null/);
+});
