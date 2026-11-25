@@ -33,7 +33,10 @@ export function timelineLine(p: Pick<FinalCutTimelineProps, "kind" | "lookName" 
   const on = p.kind === "look" && p.lookName ? "look" : p.kind === "source" ? "source" : "vertical";
   if (on === "look") {
     const f = p.lookFormat;
-    return f ? `${f.width} × ${f.height} · ${f.fps}p, from ${p.lookName}.` : `The size and frame rate of ${p.lookName}.`;
+    // D3-1: a look saved before its size was read has none to give, so it is vertical until its file is chosen again.
+    return f
+      ? `${f.width} × ${f.height} · ${f.fps}p, from ${p.lookName}.`
+      : `${p.lookName} has no size saved, so the project is ${VERTICAL_SIZE.width} × ${VERTICAL_SIZE.height} for now. Choose its Final Cut export again to read it.`;
   }
   if (on === "source") return "The video's own size and frame rate.";
   return `${VERTICAL_SIZE.width} × ${VERTICAL_SIZE.height}. Frame rate follows the video. ${p.lookName ? "" : "Upload a look to use its timeline instead."}`.trim();
