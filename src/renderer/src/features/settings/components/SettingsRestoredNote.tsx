@@ -1,19 +1,24 @@
 /**
  * File: SettingsRestoredNote.tsx
  * Path: src/renderer/src/features/settings/components/SettingsRestoredNote.tsx
- * Description: A quiet line at the bottom of the window on launch when the settings file was unreadable and the
- *   backup copy was restored ("Clipr restored your settings from <time>."). Dismisses on click; nothing else.
+ * Description: A quiet line at the bottom of the window: on launch when the settings file was unreadable and the
+ *   backup copy was restored ("Clipr restored your settings from <time>."), when nothing could be restored, and when
+ *   a save was refused. Dismisses on click; nothing else.
  */
 import { useEffect, useState } from "react";
-import { restoredNote } from "../utils/restoredNote";
+import { onSaveRefused } from "../../../shared/utils/persist";
+import { lostNote, restoredNote, savedRefusedNote } from "../utils/restoredNote";
 
 export default function SettingsRestoredNote() {
   const [text, setText] = useState("");
   useEffect(() => {
     let alive = true;
     void window.electronAPI?.settingsRestoredAt?.().then((iso) => alive && setText(restoredNote(iso))).catch(() => {});
+    void window.electronAPI?.settingsLost?.().then((kind) => alive && kind && setText(lostNote(kind))).catch(() => {});
+    const stop = onSaveRefused((key, reason) => alive && setText(savedRefusedNote(key, reason)));
     return () => {
       alive = false;
+      stop();
     };
   }, []);
   if (!text) return null;
