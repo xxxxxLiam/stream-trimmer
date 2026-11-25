@@ -83,7 +83,11 @@ export interface TranscriptResponse {
   available: boolean;
   /** True when lines carry word times, so word snapping is possible for this video. */
   wordTimings?: boolean;
-  note?: string;
+  /** True when the fetch itself failed (as opposed to the video having no captions). */
+  failed?: boolean;
+  /** The plain sentence to show when `failed`. */
+  error?: string;
+  kind?: string;
 }
 
 // Browsers yt-dlp can read a logged-in YouTube session from.

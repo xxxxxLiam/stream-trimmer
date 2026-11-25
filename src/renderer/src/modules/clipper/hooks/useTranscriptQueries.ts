@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatTimestamp, normalizeYouTubeUrl, parseJson, apiUrl, type TranscriptLine, type TranscriptResponse } from "../../../shared/utils/clip";
+import { transcriptOutcome } from "../../../shared/utils/transcriptOutcome";
 import { cookiePayload } from "../../../shared/utils/youtubeConnection";
 
 export function useTranscriptQueries({
@@ -35,12 +36,14 @@ export function useTranscriptQueries({
     setSeekRequest((prev) => ({ time, nonce: (prev?.nonce ?? 0) + 1 }));
   }, []);
   const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [transcriptQuery, setTranscriptQuery] = useState("");
 
   // Reset transcript whenever the video changes.
   useEffect(() => {
     setTranscript(null);
+    setTranscriptError(null);
     setShowTranscript(false);
     setTranscriptQuery("");
   }, [videoId]);
@@ -61,9 +64,13 @@ export function useTranscriptQueries({
         }),
       });
       const data = await parseJson<TranscriptResponse>(res);
-      setTranscript(data.available ? data.lines : []);
+      const out = transcriptOutcome(data);
+      setTranscript(out.lines);
+      setTranscriptError(out.error);
     } catch {
-      setTranscript([]);
+      const out = transcriptOutcome(null);
+      setTranscript(out.lines);
+      setTranscriptError(out.error);
     } finally {
       setLoadingTranscript(false);
     }
@@ -130,6 +137,7 @@ export function useTranscriptQueries({
     toggleTranscript,
     ensureTranscript,
     loadingTranscript,
+    transcriptError,
     transcript,
     rangeTranscript,
     filteredTranscript,

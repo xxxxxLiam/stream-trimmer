@@ -17,6 +17,12 @@ import { describeInfoFailure } from "../utils/infoFailure";
 import { markToolsReady } from "../services/toolStatus";
 import { infoSchema } from "../utils/schemas";
 import { parseVttTranscript } from "../utils/vtt";
+import {
+  describeMissingTranscript,
+  pickTranscriptFile,
+  TRANSCRIPT_SUB_LANGS,
+  UNREADABLE_TRANSCRIPT,
+} from "../utils/transcriptFetch";
 
 export function registerInfoRoutes(app: Express): void {
   app.post("/api/info", async (req: Request, res: Response) => {
@@ -82,6 +88,7 @@ export function registerInfoRoutes(app: Express): void {
     };
 
     let options: Record<string, unknown> = {};
+    let stderr = "";
     try {
       await withRunCookies(
         cookieModeFor(parsed.data.cookiesFromBrowser),
@@ -92,10 +99,9 @@ export function registerInfoRoutes(app: Express): void {
             skipDownload: true,
             writeAutoSubs: true,
             writeSubs: true,
-            subLangs: "en",
+            subLangs: TRANSCRIPT_SUB_LANGS,
             subFormat: "vtt",
             noPlaylist: true,
-            noWarnings: true,
             output: path.join(tempDir, "sub"),
             ffmpegLocation: resolvedFfmpeg,
             ...cookies,
@@ -103,19 +109,28 @@ export function registerInfoRoutes(app: Express): void {
           console.log(
             `[server] /api/transcript url=${parsed.data.url} options=${JSON.stringify(options)}`,
           );
-          return yt!.run(parsed.data.url, options, { env: childEnv() } as any);
+          // Warnings stay on: a refused subtitle download (HTTP 429) is only a warning, exit code 0.
+          return yt!.run(parsed.data.url, options, {
+            env: childEnv(),
+            onStderr: (text: string) => {
+              stderr = text;
+            },
+          } as any);
         },
       );
 
       const files = fs.readdirSync(tempDir);
       console.log("[server] transcript files:", files);
 
-      const vtt =
-        files.find((f) => /\.en\.vtt$/.test(f)) ||
-        files.find((f) => f.endsWith(".vtt"));
+      const vtt = pickTranscriptFile(files);
 
       if (!vtt) {
         cleanup();
+        const failure = describeMissingTranscript(stderr);
+        if (failure) {
+          console.log(`[server] /api/transcript fetch failed: ${stderr.trim().slice(-400)}`);
+          return res.json({ lines: [], available: false, failed: true, ...failure });
+        }
         return res.json({ lines: [], available: false });
       }
 
@@ -123,11 +138,18 @@ export function registerInfoRoutes(app: Express): void {
       cleanup();
 
       const { lines, wordTimings } = parseVttTranscript(raw);
-      res.json({ lines, available: lines.length > 0, wordTimings });
+      if (lines.length === 0) {
+        return res.json({ lines: [], available: false, failed: true, ...UNREADABLE_TRANSCRIPT });
+      }
+      res.json({ lines, available: true, wordTimings });
     } catch (e) {
       logYtError("/api/transcript", parsed.data.url, options, e);
       cleanup();
-      res.json({ lines: [], available: false, note: fullErrMessage(e) });
+      const failure = describeMissingTranscript(fullErrMessage(e)) ?? {
+        error: "Couldn't load the transcript. Try again in a moment.",
+        kind: "unknown",
+      };
+      res.json({ lines: [], available: false, failed: true, ...failure });
     }
   });
 }
