@@ -4,6 +4,7 @@
  * Description: What "In editor" on a saved clip does: with Save to folder chosen in the Clip menu it
  *   shows the file; with an editor chosen it sends that clip the way a new clip is sent.
  */
+import { sourceLinkFor } from "./videoSource";
 import { settingsWithDestination, type ClipDestination } from "../../features/player/utils/clipDestination";
 import type { HandoffContext } from "../../features/handoff/components/EditorHandoff";
 import type { DownloadEntry } from "./downloads";
@@ -44,7 +45,7 @@ export function planInEditor(
           label: undefined,
           path: entry.path,
           segments: entry.segments ?? [],
-          sourceUrl: entry.videoId ? `https://www.youtube.com/watch?v=${entry.videoId}` : undefined,
+          sourceUrl: entry.videoId ? sourceLinkFor(entry.videoId) : undefined,
           sourceTitle: entry.videoTitle || undefined,
           cutAt: entry.savedAt || undefined,
         },

@@ -210,7 +210,7 @@ export function useClipDownloadMutations({
             quality,
             ...(opts?.audioLanguage ? { audioLanguage: opts.audioLanguage } : {}),
             deliver: deliverPath ? "path" : "stream",
-            ...cookiePayload(),
+            ...cookiePayload(url),
           }),
         },
       );
