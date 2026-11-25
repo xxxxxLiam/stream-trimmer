@@ -352,6 +352,8 @@ function Layout({ active }: { active: boolean }) {
         projectName: projectName?.trim() || undefined,
         segments: segments.map((s) => ({ start: s.start, end: s.end })),
         sourceUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : sourceUrl || undefined,
+        sourceTitle: info?.title || undefined,
+        cutAt: Date.now(),
       };
       const cutFor = campaign?.id ?? null;
       setSessionByCampaign((prev) => addSessionClip(prev, cutFor, clip));

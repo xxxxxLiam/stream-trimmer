@@ -171,10 +171,14 @@ async function exportNamed(
   settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
   const structured = settings;
-  // Each clip carries the keyword the layout gives its source video (its collection in the event).
-  const keyword = importLayout(structured ?? {}, ctx).keyword;
+  // With a layout, the campaign's own Event field names the event ("Export" when blank). The video
+  // being open must not decide it: clips from other videos would land under this one.
+  const layout = structured?.layout;
+  const campaignEvent = layout ? structured?.mediaEvent ?? "" : eventName;
+  // Without a layout, each clip carries the keyword the old layout gives its source video.
+  const keyword = layout ? "" : importLayout(structured ?? {}, ctx).keyword;
   const clips = ctx.clips.map((c) => {
-    const withTitle = { ...c, keyword: c.keyword ?? keyword };
+    const withTitle = layout ? { ...c, sourceTitle: c.sourceTitle ?? ctx.sourceTitle } : { ...c, keyword: c.keyword ?? keyword };
     return typedProjectNames.has(c.id) ? { ...withTitle, projectName: typedProjectNames.get(c.id) } : withTitle;
   });
   let built;
@@ -188,13 +192,13 @@ async function exportNamed(
     };
     built = await buildSessionFcpxml(
       clips,
-      eventName,
+      campaignEvent,
       async (file) => {
         const r = await api.probe(file);
         if (!r.ok) throw new Error(r.error);
         return r;
       },
-      { library, libraryExists, project: structured ? projectOptions(structured, ctx) : undefined },
+      { library, libraryExists, layout, project: structured ? projectOptions(structured, ctx) : undefined },
     );
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
