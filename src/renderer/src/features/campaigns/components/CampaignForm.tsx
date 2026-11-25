@@ -54,8 +54,8 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
       </div>
       <div className="flex items-center gap-[12px]">
         <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
-          <span className="text-body leading-[normal]">Folder</span>
-          <span className="truncate text-meta text-fg-dim" title={folder}>{folder ? folderChipLabel(folder, 3) : "Set the Clips folder in Settings"}</span>
+          <span className="text-body leading-[normal]">Where clips go</span>
+          <span className="truncate text-meta text-fg-dim" title={folder}>{own ? folderChipLabel(folder, 3) : folder ? `${folderChipLabel(folder, 3)} (optional: choose your own)` : "Choose a folder"}</span>
         </div>
         {typeof window !== "undefined" && window.electronAPI?.pickDirectory && (
           <button
