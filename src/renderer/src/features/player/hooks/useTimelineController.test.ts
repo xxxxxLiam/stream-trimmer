@@ -62,6 +62,6 @@ test("zooming does not snap the view back to the playhead: only the playhead mov
 
 test("tool keys are wired, and the tool buttons show them in their tooltips", () => {
   assert.match(effects, /toolForKey\(e\)[\s\S]*setTool\(t\)/);
-  const bar = readFileSync(new URL("../../../modules/layout/components/BottomBar.tsx", import.meta.url), "utf8");
+  const bar = readFileSync(new URL("../components/TimelineTools.tsx", import.meta.url), "utf8");
   assert.match(bar, /title=\{`\$\{label\} \(\$\{TOOL_KEYS\[t\]\.toUpperCase\(\)\}\)`\}/);
 });
