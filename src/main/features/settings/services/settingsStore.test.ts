@@ -77,7 +77,7 @@ test("a removed key stays removed, and corrupt files do not throw", () => {
   fs.writeFileSync(file, "{ not json");
   // Nothing of the person's comes back (only main's own bookkeeping keys).
   const loaded = createSettingsStore(file).load();
-  assert.deepEqual(Object.keys(loaded).filter((k) => !/^clipper\.(settingsWritten)$/.test(k)), []);
+  assert.deepEqual(Object.keys(loaded).filter((k) => !/^clipper\.(settingsWritten|startFreshAnswered)$/.test(k)), []);
 });
 
 test("onChange hears each saved write, and stops when asked", () => {

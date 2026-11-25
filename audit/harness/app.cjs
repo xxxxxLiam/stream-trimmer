@@ -60,7 +60,8 @@ async function launchApp(opts = {}) {
       "--disable-gpu",
     ],
     cwd: opts.cwd || REPO,
-    env: { ...process.env, ...(opts.env || {}) },
+    // CLIPR_SKIP_START_FRESH: seeded settings look like an updated install, which would put the one-time prompt over every screen.
+    env: { ...process.env, CLIPR_SKIP_START_FRESH: "1", ...(opts.env || {}) },
   });
 
   app.process().stdout.on("data", (d) => logs.stdout.push(String(d)));
