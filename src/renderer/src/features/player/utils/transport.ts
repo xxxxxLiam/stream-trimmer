@@ -67,14 +67,15 @@ export const SECTION_LEAD = 0.25;
  * A joined clip (two or more sections with gaps) plays only its sections: while playing, reaching a section's
  * end jumps over the gap to the next section's start; after the last one it wraps to the first when looping
  * and otherwise stops there. Before the first section or inside a gap it jumps forward to the next start.
- * Null when playback is fine where it is. One section, or none, is left alone (the loop handles it).
+ * One picked range (saved or not) plays alone the same way: play starts at its start and stops at its end.
+ * Null when playback is fine where it is, and with no section at all (the whole video plays).
  */
 export function joinedStep(
   sections: readonly Range[],
   t: number,
   loop: boolean,
 ): { kind: "seek"; to: number } | { kind: "stop"; at: number } | null {
-  if (sections.length < 2) return null;
+  if (sections.length < 1) return null;
   for (let i = 0; i < sections.length; i++) {
     const s = sections[i];
     if (t < s.start) return { kind: "seek", to: s.start };
