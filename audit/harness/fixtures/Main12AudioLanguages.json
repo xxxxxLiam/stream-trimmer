@@ -54,10 +54,75 @@
    "wait": 300
   },
   {
+   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-expanded]')].find(x=>/Done/.test(x.textContent)); if(b&&b.getAttribute('aria-expanded')==='false') b.click();})()"
+  },
+  {
+   "wait": 300
+  },
+  {
    "click": "button[aria-label^='Audio:']"
   },
   {
    "wait": 300
   }
- ]
+ ],
+ "seed": {
+  "clipper.workspaces": {
+   "activeId": "ws_a",
+   "tabs": [
+    {
+     "id": "ws_a",
+     "name": "Podcast #214, the long talk",
+     "url": "https://www.youtube.com/watch?v=podcast214",
+     "campaignId": "acme",
+     "segments": [
+      {
+       "start": 4324,
+       "end": 4366
+      }
+     ]
+    },
+    {
+     "id": "ws_b",
+     "name": "Founder story, part 2",
+     "url": "https://www.youtube.com/watch?v=founder2",
+     "campaignId": "acme"
+    },
+    {
+     "id": "ws_c",
+     "name": "Q3 town hall",
+     "url": "https://www.youtube.com/watch?v=townhall",
+     "campaignId": "nova"
+    },
+    {
+     "id": "ws_d0",
+     "name": "Pricing AMA",
+     "url": "https://www.youtube.com/watch?v=done0",
+     "campaignId": "acme",
+     "done": true
+    },
+    {
+     "id": "ws_d1",
+     "name": "Launch recap",
+     "url": "https://www.youtube.com/watch?v=done1",
+     "campaignId": "nova",
+     "done": true
+    },
+    {
+     "id": "ws_d2",
+     "name": "Roadmap Q&A",
+     "url": "https://www.youtube.com/watch?v=done2",
+     "campaignId": "nova",
+     "done": true
+    },
+    {
+     "id": "ws_d3",
+     "name": "Hiring panel",
+     "url": "https://www.youtube.com/watch?v=done3",
+     "campaignId": "nova",
+     "done": true
+    }
+   ]
+  }
+ }
 }
