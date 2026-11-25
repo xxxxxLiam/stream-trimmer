@@ -62,8 +62,8 @@ export function useClipRangeState({
     }
   }, []);
 
-  // The point just set is never moved: an In past the Out starts a fresh range there (Out cleared), and
-  // an Out before the In does the mirror.
+  // The point just set is never moved: an In past the Out starts a fresh range there (Out cleared), but
+  // an Out before the In is stored beside it and the In stays (B3-1).
   const setStartFromSeconds = useCallback(
     (value: number) => {
       const r = applyIn(value, parseTimestamp(endText));
@@ -74,11 +74,9 @@ export function useClipRangeState({
   );
   const setEndFromSeconds = useCallback(
     (value: number) => {
-      const r = applyOut(value, parseTimestamp(startText));
-      setEndText(formatTimestamp(r.end));
-      if (r.clearStart) setStartText("");
+      setEndText(formatTimestamp(applyOut(value).end));
     },
-    [startText],
+    [],
   );
 
   // Both ends at once, in order. Setting them one after the other reads the other end's old text, so a

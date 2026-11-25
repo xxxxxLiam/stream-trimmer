@@ -28,9 +28,10 @@ export function applyIn(value: number, end: number | null): { start: number; cle
   return { start: value, clearEnd: end !== null && value >= end };
 }
 
-/** The mirror: an Out at or before In starts a fresh range ending there with In cleared. */
-export function applyOut(value: number, start: number | null): { end: number; clearStart: boolean } {
-  return { end: value, clearStart: start !== null && value <= start };
+/** The mirror, but gentler: an Out at or before the In is stored and the In is kept (B3-1), so the
+ *  In is never lost; the readout shows both and Clip says the end has to come after the start. */
+export function applyOut(value: number): { end: number } {
+  return { end: value };
 }
 
 /** Two times as a range, whichever order they were given in. */

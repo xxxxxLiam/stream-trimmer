@@ -127,3 +127,40 @@ test("V18-T-11/12: Alt shows the zoom-out cursor; tool keys and M stay quiet whi
   assert.match(lane, /cursorFor\(c\.tool, alt\)/);
   assert.equal((effects.match(/dialogOpen\(\)/g) ?? []).length, 2);
 });
+
+const clipCtl = readFileSync(new URL("./useClipController.ts", import.meta.url), "utf8");
+const clipBtn = readFileSync(new URL("../components/ClipButton.tsx", import.meta.url), "utf8");
+const appSrc = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
+const transcriptCol = readFileSync(new URL("../../transcript/components/TranscriptColumn.tsx", import.meta.url), "utf8");
+
+test("B3-1: an Out set before the In keeps the In, and the readout shows the stored Out", () => {
+  const setEnd = rangeState.slice(rangeState.indexOf("const setEndFromSeconds"), rangeState.indexOf("const setRangeFromSeconds"));
+  assert.doesNotMatch(setEnd, /setStartText/);
+  assert.match(src, /outText: range \? clockTime\(range\.end\) : endPicked \? clockTime\(clipper\.end\) : dash/);
+});
+
+test("B3-2: Esc during a range or edge drag restores the marks and ends the drag", () => {
+  assert.match(down, /marksBeforeDrag\.current = \{ start: clipper\.startText, end: clipper\.endText \}/);
+  const esc = src.slice(src.indexOf("B3-2"), src.indexOf("const lastScrub"));
+  assert.match(esc, /e\.key !== "Escape"/);
+  assert.match(esc, /clipper\.setStartText\(before\.start\)/);
+  assert.match(esc, /clipper\.setEndText\(before\.end\)/);
+  assert.match(esc, /s\.setDrag\(null\)/);
+});
+
+test("B3-3: Ctrl/Cmd+F is app-wide, opens the Transcript tab and focuses its search; the column no longer owns it", () => {
+  assert.match(appSrc, /e\.key\.toLowerCase\(\) !== "f"/);
+  assert.match(appSrc, /openPanelById\("transcript"\)/);
+  assert.match(appSrc, /getElementById\("ui-transcript-search"\)/);
+  assert.doesNotMatch(transcriptCol, /key\.toLowerCase\(\) === "f"/);
+});
+
+test("B2-9: Ctrl+Enter while Clip is blocked shows the reason the dimmed button shows", () => {
+  assert.match(clipCtl, /if \(reason\) return setReasonShown\(true\)/);
+  assert.match(clipBtn, /c\.reasonShown \? "inline-flex"/);
+});
+
+test("V18-T-6: overlapping clip bars are stacked into rows without text", () => {
+  assert.match(clipsLane, /packRows\(/);
+  assert.match(clipsLane, /!stacked\(/);
+});

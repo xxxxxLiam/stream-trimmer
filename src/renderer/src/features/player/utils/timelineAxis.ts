@@ -28,13 +28,13 @@ export function linearAxis(win: Win, width: number): Axis {
 
 /**
  * How many seconds the zoom shows: the whole video at 0 down to the closest useful stretch at exactly
- * 100, eased so the fine end has room. Every step of the slider changes the view (no dead top end).
+ * 100, eased (squared) so the fine end has room yet 90 and 100 still differ on a 10-minute video. Every step of the slider changes the view (no dead top end).
  */
 export function spanFor(duration: number, zoom: number): number {
   if (!(duration > 0)) return 0;
   if (duration <= MIN_WINDOW_SECONDS) return duration;
   const z = Math.min(100, Math.max(0, zoom)) / 100;
-  return MIN_WINDOW_SECONDS + (duration - MIN_WINDOW_SECONDS) * (1 - z) ** 3;
+  return MIN_WINDOW_SECONDS + (duration - MIN_WINDOW_SECONDS) * (1 - z) ** 2;
 }
 
 /** Zoom 0 shows the whole video; 100 shows about the closest useful stretch, around `focus`. */
@@ -154,7 +154,7 @@ export function zoomForSpan(duration: number, span: number): number {
   if (!(duration > 0) || !(span > 0) || span >= duration) return 0;
   if (span <= MIN_WINDOW_SECONDS) return duration <= MIN_WINDOW_SECONDS ? 0 : 100;
   const r = (span - MIN_WINDOW_SECONDS) / (duration - MIN_WINDOW_SECONDS);
-  return Math.min(100, Math.max(0, Math.round((1 - r ** (1 / 3)) * 10000) / 100));
+  return Math.min(100, Math.max(0, Math.round((1 - r ** (1 / 2)) * 10000) / 100));
 }
 
 /**

@@ -219,18 +219,7 @@ export default function TranscriptColumn({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [follow, w.playheadIndex]);
 
-  // Cmd/Ctrl+F focuses the search box.
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f" && searchRef.current) {
-        e.preventDefault();
-        searchRef.current.focus();
-        searchRef.current.select();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // Cmd/Ctrl+F is handled app-wide (routes/App.tsx): it opens this tab and focuses the search box.
 
   // ---- click to seek, drag to set a range -------------------------------------------------
   type Drag = { a: number; b: number; pa: LinePoint; pb: LinePoint };

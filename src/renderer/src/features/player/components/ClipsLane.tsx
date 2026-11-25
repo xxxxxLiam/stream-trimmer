@@ -12,7 +12,7 @@ import { setNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { playFrom } from "../../../shared/utils/playFrom";
 import type { TimelineController } from "../hooks/useTimelineController";
 import { lengthLabel } from "../hooks/useTimelineController";
-import { placeLabels } from "../utils/laneTools";
+import { packRows, placeLabels } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
@@ -101,13 +101,27 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     ...others,
   ];
   const places = placeLabels(bars, c.width);
+  // Overlapping bars are stacked into thinner rows with no text (their title still names them).
+  const slots = packRows(named.map((n) => span(n.start, n.end)));
+  const slotOf = (key: string) => {
+    const i = named.findIndex((n) => n.key === key);
+    return i < 0 ? { row: 0, rows: 1 } : slots[i];
+  };
+  const stacked = (key: string) => slotOf(key).rows > 1;
+  const styleOf = (key: string, start: number, end: number) => {
+    const sp = span(start, end);
+    const { row, rows } = slotOf(key);
+    if (rows < 2) return sp;
+    const h = Math.max(4, Math.floor(24 / rows));
+    return { ...sp, top: 5 + row * h, height: h };
+  };
   const placeOf = (key: string) => {
     const i = named.findIndex((n) => n.key === key);
     return i < 0 ? { inside: true, outsideWidth: 0 } : places[i];
   };
   const outside = (key: string, start: number, end: number, label: string) => {
     const pl = placeOf(key);
-    if (pl.inside) return null;
+    if (pl.inside || stacked(key)) return null;
     const sp = span(start, end);
     return (
       <span
@@ -134,9 +148,9 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                     title={u.label ?? u.clipId ?? timeName(u.start)}
                     onClick={() => playFrom(u.start)}
                     className={`${BAR} rounded-chip border border-frost text-center font-medium text-fg`}
-                    style={span(u.start, u.end)}
+                    style={styleOf(`used-${u.start}-${u.end}`, u.start, u.end)}
                   >
-                    {placeOf(`used-${u.start}-${u.end}`).inside
+                    {placeOf(`used-${u.start}-${u.end}`).inside && !stacked(`used-${u.start}-${u.end}`)
                       ? (u.label ?? u.clipId ?? timeName(u.start))
                       : ""}
                   </button>
@@ -163,9 +177,9 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                         ? "border-frost text-fg"
                         : "border-hairlineStrong text-fg-dim"
                     }`}
-                    style={span(b.start, b.end)}
+                    style={styleOf(`wait-${b.start}-${b.end}`, b.start, b.end)}
                   >
-                    {placeOf(`wait-${b.start}-${b.end}`).inside
+                    {placeOf(`wait-${b.start}-${b.end}`).inside && !stacked(`wait-${b.start}-${b.end}`)
                       ? (b.label ?? timeName(b.start))
                       : ""}
                   </button>
@@ -183,8 +197,8 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 <ClipNameField
                   name={building(sections[0].start)}
                   onRename={rename}
-                  className={`${BAR} rounded-chip border border-frost text-center font-medium ${placeOf("built").inside ? "text-fg" : "text-transparent focus:text-fg"}`}
-                  style={span(sections[0].start, sections[0].end)}
+                  className={`${BAR} rounded-chip border border-frost text-center font-medium ${placeOf("built").inside && !stacked("built") ? "text-fg" : "text-transparent focus:text-fg"}`}
+                  style={styleOf("built", sections[0].start, sections[0].end)}
                 />
                 {outside("built", sections[0].start, sections[0].end, building(sections[0].start))}
               </>
