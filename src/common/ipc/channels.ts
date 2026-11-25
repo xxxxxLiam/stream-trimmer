@@ -13,6 +13,7 @@ export const IPC = {
   diagnosticsRead: "diagnostics:read",
   diagnosticsReveal: "diagnostics:reveal",
   dialogPickDirectory: "dialog:pickDirectory",
+  dialogSaveText: "dialog:saveText",
   dialogPickFcpLibrary: "dialog:pickFcpLibrary",
   editorCopyFiles: "editor:copyFiles",
   editorInstalled: "editor:installed",

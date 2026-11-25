@@ -9,6 +9,7 @@ import electron from "electron";
 import { getMainWindow } from "../modules/windows/windows";
 import { readFcpLookFile } from "../features/editor/services/fcpLookFile";
 import { rememberPickedDir } from "../features/files/services/saveRoots";
+import { saveTextFile } from "../features/files/services/saveTextFile";
 
 const { app, dialog, ipcMain } = electron;
 
@@ -21,6 +22,22 @@ export function registerDialogHandlers() {
     if (res.canceled || res.filePaths.length === 0) return null;
     rememberPickedDir(res.filePaths[0]);
     return res.filePaths[0];
+  });
+
+  ipcMain.handle(IPC.dialogSaveText, async (_e: unknown, payload: any) => {
+    if (!payload || typeof payload.name !== "string" || typeof payload.text !== "string") return { ok: false, error: "Invalid save payload" };
+    return saveTextFile({
+      name: payload.name.slice(0, 120),
+      text: payload.text,
+      choose: async (name) => {
+        const res = await dialog.showSaveDialog(getMainWindow(), {
+          title: "Save as a text file",
+          defaultPath: path.join(app.getPath("documents"), name),
+          filters: [{ name: "Text file", extensions: ["txt"] }],
+        });
+        return res.canceled || !res.filePath ? null : res.filePath;
+      },
+    });
   });
 
   ipcMain.handle(IPC.dialogPickFcpLibrary, async () => {

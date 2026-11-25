@@ -48,6 +48,7 @@ try {
     startFreshPending: () => ipcRenderer.invoke(IPC.startFreshPending),
     startFreshAnswer: (choice: unknown) => ipcRenderer.invoke(IPC.startFreshAnswer, choice),
     settingsRestoredAt: () => ipcRenderer.invoke(IPC.settingsRestoredAt),
+    saveTextFile: (payload: unknown) => ipcRenderer.invoke(IPC.dialogSaveText, payload),
     pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.
