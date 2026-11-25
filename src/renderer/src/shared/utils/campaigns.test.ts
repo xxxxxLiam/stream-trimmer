@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  folderNameOf,
   campaignClipsDir,
   addUsedRanges,
   clipNumber,
@@ -25,6 +26,7 @@ import {
   sameFolder,
   updateCampaign,
   usedRangesFor,
+  campaignNameProblems,
   validateCampaign,
   type Campaign,
   CLIP_ID_PRESETS,
@@ -302,4 +304,21 @@ test("A-3: a campaign's folder is a folder named after it inside the Clips folde
   assert.equal(campaignClipsDir({ name: "A/B: C", clipsDir: "" }, "C:\\Clips\\"), "C:\\Clips\\A-B- C");
   assert.equal(campaignClipsDir({ name: "Acme", clipsDir: "" }, ""), "");
   assert.equal(createCampaign([], { name: "Acme" }).campaign.clipsDir, "", "a new campaign has no folder of its own until it chooses one");
+});
+
+test("A3-5, A4-2: Windows-reserved names are refused for a campaign, with a plain sentence", () => {
+  for (const bad of ["CON", "nul.", "COM1", "con.txt", "lpt9", "AUX ", ".con", "..nul"]) {
+    assert.match(campaignNameProblems(bad, [])[0] ?? "", /Windows can't use that name/, bad);
+  }
+  for (const ok of ["Acme", "Console", "COM10", "Nova 2", "A.B", "Dr. Pepper Inc.", "Acme."]) assert.deepEqual(campaignNameProblems(ok, []), [], ok);
+  assert.deepEqual(validateCampaign({ name: "NUL", clipsDir: "/a", dataDir: "/b", clipIdPattern: "{nn}" }), ["name-reserved"]);
+});
+
+test("A4-3: look-alike names are the same campaign; A4-5: a final dot is dropped from the folder", () => {
+  const cafe = "Caf\u00e9";
+  assert.match(campaignNameProblems(cafe.normalize("NFD"), [{ id: "1", name: cafe }])[0] ?? "", /already has that name/);
+  assert.match(campaignNameProblems("Acme\u200b", [{ id: "1", name: "Acme" }])[0] ?? "", /already has that name/);
+  assert.equal(folderNameOf("Dr. Pepper Inc."), "Dr. Pepper Inc");
+  assert.equal(folderNameOf("Acme\u200b"), "Acme");
+  assert.equal(folderNameOf(cafe.normalize("NFD")), folderNameOf(cafe));
 });

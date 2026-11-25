@@ -32,6 +32,8 @@ export type ColdStartProps = {
   backTo: { label: string; onBack: () => void } | null;
   folderLabel: string;
   onOpenFolder: () => void;
+  /** Said under the chips when Open finds the folder not made yet. */
+  folderNote?: string;
 };
 
 const Tick = () => (
@@ -138,6 +140,7 @@ export default function ColdStart(p: ColdStartProps) {
               {p.folderLabel}
             </button>
           </div>
+          {p.folderNote ? <p role="status" className="m-[0px] text-right text-meta text-fg-dim">{p.folderNote}</p> : null}
         </div>
       </div>
     </main>

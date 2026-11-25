@@ -118,8 +118,13 @@ export const DATA_FOLDER_NAME: string = CHANNEL_DATA_BUILT ? "channel-data" : "d
 
 /** "/a/b/clips" -> "/a/b/<data folder>". Keeps the separator style of the input. */
 /** A campaign name as one folder name: no path separators or characters a folder cannot hold. */
+/** Zero-width and bidi-control characters, which no one can see in a name. */
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+
 export function folderNameOf(name: string): string {
-  const safe = name.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+/, "");
+  // A4-3: invisible characters and NFC/NFD spellings must not make two names that read the same. A4-5: a final dot or space is
+  // dropped (Windows cannot end a folder name with one), so "Dr. Pepper Inc." is a fine name with the folder "Dr. Pepper Inc".
+  const safe = name.normalize("NFC").replace(INVISIBLE, "").replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+/, "").replace(/[.\s]+$/, "");
   return safe || "Campaign";
 }
 
@@ -149,7 +154,7 @@ export function sameFolder(a: string, b: string): boolean {
 
 export const MAX_NAME_LENGTH = 60;
 
-export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "folder-taken" | "folders-same" | "pattern-no-number";
+export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "name-reserved" | "folder-taken" | "folders-same" | "pattern-no-number";
 
 export function validateCampaign(
   c: Pick<Campaign, "name" | "clipsDir" | "dataDir" | "clipIdPattern">,
@@ -158,6 +163,7 @@ export function validateCampaign(
 ): CampaignProblem[] {
   const out: CampaignProblem[] = [];
   if (!c.name.trim()) out.push("name-empty");
+  else if (isWindowsReservedName(c.name)) out.push("name-reserved");
   else if (others?.some((o) => o.name.trim().toLowerCase() === c.name.trim().toLowerCase()))
     out.push("name-taken");
   if (sameFolder(c.clipsDir, c.dataDir)) out.push("folders-same");
@@ -170,10 +176,21 @@ export function campaignNameProblems(name: string, others: readonly Pick<Campaig
   const found: CampaignProblem[] = [];
   if (!name.trim()) found.push("name-empty");
   else if (name.trim().length > MAX_NAME_LENGTH) found.push("name-long");
-  else if (others.some((o) => o.id !== editingId && o.name.trim().toLowerCase() === name.trim().toLowerCase())) found.push("name-taken");
+  else if (isWindowsReservedName(name)) found.push("name-reserved");
+  else if (others.some((o) => o.id !== editingId && nameKey(o.name) === nameKey(name))) found.push("name-taken");
   // "A/B" and "A:B" would both save into the folder "A-B" and mix their clips.
   else if (others.some((o) => o.id !== editingId && folderNameOf(o.name).toLowerCase() === folderNameOf(name).toLowerCase())) found.push("folder-taken");
   return found.map(describeCampaignProblem);
+}
+
+/** Two names are the same campaign when they read the same: case, invisible characters and accent spelling aside. */
+function nameKey(name: string): string {
+  return name.normalize("NFC").replace(INVISIBLE, "").trim().toLowerCase();
+}
+
+/** A name whose folder Windows cannot make: a device name (CON, NUL, COM1...) with or without an extension. Judged on the folder name, so ".con" counts. */
+export function isWindowsReservedName(name: string): boolean {
+  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(folderNameOf(name).split(".")[0].trim());
 }
 
 export function describeCampaignProblem(p: CampaignProblem): string {
@@ -184,6 +201,8 @@ export function describeCampaignProblem(p: CampaignProblem): string {
       return `Keep the name to ${MAX_NAME_LENGTH} characters or fewer.`;
     case "name-taken":
       return "Another campaign already has that name.";
+    case "name-reserved":
+      return "Windows can't use that name for a folder. Add a word after it.";
     case "folder-taken":
       return "Another campaign already saves to a folder with that name. Change a character or two.";
     case "folders-same":

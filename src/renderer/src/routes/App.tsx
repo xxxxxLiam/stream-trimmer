@@ -19,6 +19,7 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
+import { clearInFlightCut, saveInFlightCut, takeInterruptedCut } from "../shared/utils/inFlightCut";
 import { consumeCrashFlag } from "../shared/utils/crashNoteStore";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
@@ -41,10 +42,11 @@ import { createSerialQueue } from "../features/clips/utils/serialQueue";
 import { pickedRangeOf } from "../features/player/utils/pickedRange";
 import { clipSections } from "../features/player/utils/clipDestination";
 import { matchingMoment } from "../features/clips/utils/finishBankedCut";
-import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
+import { CLIP_PADDING_SEC, padSections } from "../features/clips/utils/padSections";
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
+import { dialogOpen } from "../shared/utils/dialogOpen";
 import { setMakingClipId, setMakingName } from "../shared/utils/clipNameStore";
 import { setCutAttempt } from "../shared/utils/cutAttempt";
 import OverlayLoader from "../shared/components/OverlayLoader";
@@ -84,6 +86,7 @@ import { useDayHost } from "../features/workspace/hooks/useDayHost";
 import SymbolsDialog from "../features/symbols/components/SymbolsDialog"; // browser fallback of the Symbols window
 import CampaignStart from "../features/campaigns/components/CampaignStart";
 import SettingsDrawer from "../features/settings/components/SettingsDrawer";
+import { START_AT_SIGNIN } from "../features/settings/hooks/useSettingsController";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
@@ -295,8 +298,6 @@ function Layout({ active }: { active: boolean }) {
   const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
   const tips = useTipsController(!!info && active && (!!campaign || campaignPromptDismissed));
   const [importText, setImportText] = useState<string | null>(null);
-  // The footer's "Sign in for 1080p" opens Help on its sign-in page.
-  const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
   // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
   const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
@@ -329,7 +330,6 @@ function Layout({ active }: { active: boolean }) {
 
   const closeHelp = useCallback(() => {
     setHelpOpen(false);
-    setHelpStartAt(null);
   }, []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeSettings = useCallback(() => {
@@ -394,7 +394,7 @@ function Layout({ active }: { active: boolean }) {
   );
 
   // Cut: the clip's name (typed on the lane, else suggested) is the file's name, the row's name and
-  // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
+  // the editor project's name. Marked sections get 5 seconds at both ends; the
   // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
     async (segments: Segment[], retryName?: string) => {
@@ -406,12 +406,15 @@ function Layout({ active }: { active: boolean }) {
       const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
       // Recorded before anything starts: the marks are already cleared, so Retry and Save for later read this.
       setCutAttempt({ name, segments });
-      const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
+      const toCut = padSections(segments, CLIP_PADDING_SEC, duration || undefined);
       setMakingName(name);
       // A range that is a waiting moment is that moment: its id is what the use, the cut mark and Undo all key on.
       const moment = cutCampaignId ? matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments) : undefined;
       const groupId = moment?.id ?? name;
       setMakingClipId(moment?.id ?? null);
+      // Saved while it runs, so a quit or crash mid-cut does not lose the range the marks no longer hold (a waiting
+      // moment is already in the bank).
+      if (cutCampaignId && !moment) saveInFlightCut({ campaignId: cutCampaignId, videoId, name, segments });
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
       let madeAny = false;
       try {
@@ -427,6 +430,7 @@ function Layout({ active }: { active: boolean }) {
           afterSaved(fileName, undefined, segments, startSettings, undefined, groupId);
         }
       } finally {
+        clearInFlightCut();
         setMakingName(null);
         setMakingClipId(null);
       }
@@ -436,6 +440,11 @@ function Layout({ active }: { active: boolean }) {
   // Clips are made one after another. Pressing Clip hands the marked sections over and clears them at
   // once, so the next clip can be marked while this one is making (a failed clip has its own Retry).
   const cutQueue = useRef(createSerialQueue());
+  // A cut that was cut off by a quit or a crash: its range comes back as a waiting moment, name kept.
+  useEffect(() => {
+    const cut = takeInterruptedCut();
+    if (cut) bankStore.importClips(cut.campaignId, cut.videoId, [{ line: 1, id: null, label: cut.name, segments: cut.segments }]);
+  }, []);
   const cutMarked = (segs: Segment[]) => {
     void cutQueue.current.enqueue(() => cutClip(segs));
     clearSegments();
@@ -483,12 +492,15 @@ function Layout({ active }: { active: boolean }) {
       const k = e.key.toLowerCase();
       if (k === "/" && !e.shiftKey) {
         e.preventDefault();
+        // F4-2: one right drawer at a time, as the Help button does.
+        setSettingsOpen(false);
         setHelpOpen((v) => !v);
       } else if (k === ";" && !e.shiftKey) {
         e.preventDefault();
         setSymbolsOpen((v) => !v);
       } else if (k === "," && !e.shiftKey) {
         e.preventDefault();
+        setHelpOpen(false);
         setSettingsOpen((v) => !v);
       } else if (k === "b" && !e.shiftKey && !e.altKey) {
         e.preventDefault();
@@ -519,13 +531,32 @@ function Layout({ active }: { active: boolean }) {
     openPanelById(id);
     window.setTimeout(() => document.getElementById(tabDomId(id))?.focus(), 0);
   };
+  // Ctrl/Cmd+F from anywhere: bring the Transcript tab forward and put the keyboard in its search box.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "f") return;
+      if (dialogOpen()) return;
+      e.preventDefault();
+      openPanelById("transcript");
+      window.setTimeout(() => {
+        const box = document.getElementById("ui-transcript-search") as HTMLInputElement | null;
+        box?.focus();
+        box?.select();
+      }, 0);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openPanelById]);
   // Add a moment / Ctrl B: bank what is marked now (a just-marked In and Out, else the committed
   // sections), waiting, under the lane's name or a suggested one. The marks stay, so Clip still works.
   const addMoment = () => {
     if (!campaign?.id || !videoId) return;
     const range = pickedRangeOf({ startText, endText, start: rangeStart, end: rangeEnd, validationError });
     const sections = clipSections(tabSegments, range);
-    if (sections.length === 0) return;
+    if (sections.length === 0) {
+      showMomentNote("Mark a part first.");
+      return;
+    }
     const banked = clipsFor(bankStore.get(), campaign.id, videoId);
     // The same range is not added a second time (nor does it rename the one that is there): say so instead.
     const twin = bankedTwin(banked, sections);
@@ -541,9 +572,10 @@ function Layout({ active }: { active: boolean }) {
   const addMomentRef = useRef(addMoment);
   addMomentRef.current = addMoment;
   const openSignIn = () => {
-    setHelpStartAt("signin");
-    setSettingsOpen(false);
-    setHelpOpen(true);
+    // Sign-in is a setting, so it lives in Settings (Liam, 25 Nov), not in Help.
+    setSettingsStartAt(START_AT_SIGNIN);
+    setHelpOpen(false);
+    setSettingsOpen(true);
   };
   const panelHost: PanelHost = {
     playhead,
@@ -611,8 +643,9 @@ function Layout({ active }: { active: boolean }) {
 
   return (
     <>
-      <SettingsRestoredNote />
-      <StartFreshPrompt />
+      {/* E3-1: every workspace tab mounts this layout, so the window-wide notes belong to the visible one only. */}
+      {active && <SettingsRestoredNote />}
+      {active && <StartFreshPrompt />}
       
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
@@ -627,7 +660,6 @@ function Layout({ active }: { active: boolean }) {
         <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => {
-            setHelpStartAt(null);
             setSettingsOpen(false);
             setHelpOpen((v) => !v);
           }}
@@ -647,7 +679,7 @@ function Layout({ active }: { active: boolean }) {
             <PanelWorkspace />
             {active && (
               <>
-                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); }, onShowMe: (steps) => { closeHelp(); tips.startTour(steps); } }} />
+                <HelpDrawer open={helpOpen} onClose={closeHelp} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); }, onShowMe: (steps) => { closeHelp(); tips.startTour(steps); } }} />
                 {settingsDrawer}
                 <ImportDrawer text={importText} onClose={() => setImportText(null)} />
                 {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}

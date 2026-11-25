@@ -5,7 +5,8 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { grabbedEdge, pickHintLead, scissorsClick, zoomStep } from "./laneTools";
+import { grabbedEdge, pickHintLead, scissorsClick, zoomStep, zoomThumbPercent } from "./laneTools";
+import { ZOOM_MIN } from "../../../modules/layout/hooks/useToolState";
 
 test("scissors: the first click is a start, the second ends the range", () => {
   assert.deepEqual(scissorsClick(null, 100), { kind: "start", at: 100 });
@@ -29,8 +30,8 @@ test("alt zooms out", () => {
 });
 
 test("the first-clip hint matches the tool in hand", () => {
-  assert.equal(pickHintLead("clip"), "Click to set the start, click again for the end");
-  assert.equal(pickHintLead("pointer"), "Choose Select range, then drag on the timeline");
+  assert.equal(pickHintLead("clip"), "Click the pictures to set the start, click again for the end");
+  assert.equal(pickHintLead("pointer"), "Press D, then drag across the pictures");
 });
 
 test("B2-8: flag, hand and zoom each get their own hint, none says Drag", () => {
@@ -110,9 +111,51 @@ test("V18-T-11: the zoom tool's cursor zooms out while Alt is held", () => {
   assert.equal(cursorFor("hand", true), "cursor-grab", "Alt changes only the zoom tool");
 });
 
-test("V18-T-8: a slider position maps to a zoom and stays inside 0 to 100", () => {
-  assert.equal(zoomFromX(150, 100, 100), 50);
-  assert.equal(zoomFromX(50, 100, 100), 0);
+test("V18-T-8: a slider position maps to a zoom and stays inside the slider's range (zoomed out to 100)", () => {
+  assert.equal(zoomFromX(100, 100, 100), ZOOM_MIN);
+  assert.equal(zoomFromX(50, 100, 100), ZOOM_MIN);
   assert.equal(zoomFromX(500, 100, 100), 100);
+  assert.equal(zoomFromX(200, 100, 100), 100);
+  assert.equal(zoomFromX(150, 100, 100), (ZOOM_MIN + 100) / 2);
+  assert.equal(zoomThumbPercent(0), (-ZOOM_MIN / (100 - ZOOM_MIN)) * 100, "Fit sits a fifth of the way along");
+  assert.equal(zoomThumbPercent(zoomFromX(130, 100, 100)), 30);
   assert.equal(zoomFromX(150, 100, 0), 0);
+});
+
+import { packRows } from "./laneTools";
+
+test("V18-T-6: bars that overlap stack into rows; a lone bar stays full height", () => {
+  const slots = packRows([
+    { left: 0, width: 18 },
+    { left: 10, width: 18 },
+    { left: 20, width: 18 },
+    { left: 200, width: 18 },
+  ]);
+  assert.deepEqual(slots[0], { row: 0, rows: 2, from: 0, to: 38 });
+  assert.deepEqual(slots[1], { row: 1, rows: 2, from: 0, to: 38 });
+  assert.deepEqual(slots[2], { row: 0, rows: 2, from: 0, to: 38 }); // fits after the first ended at 18
+  assert.deepEqual(slots[3], { row: 0, rows: 1, from: 200, to: 218 });
+  assert.equal(new Set(slots.slice(0, 3).map((s) => `${s.row}`)).size, 2);
+});
+
+test("V18-T-6: packed rows never overlap inside a row", () => {
+  const bars = Array.from({ length: 30 }, (_, i) => ({ left: i * 5, width: 18 }));
+  const slots = packRows(bars);
+  for (let i = 0; i < bars.length; i++)
+    for (let j = i + 1; j < bars.length; j++)
+      if (slots[i].row === slots[j].row)
+        assert.ok(bars[j].left >= bars[i].left + bars[i].width || bars[i].left >= bars[j].left + bars[j].width);
+});
+
+import { edgeScroll } from "./laneTools";
+
+test("dragging near an end of the timeline scrolls it: harder the closer, full speed at or past the edge", () => {
+  assert.equal(edgeScroll(400, 800), 0);
+  assert.ok(edgeScroll(16, 800) < 0 && edgeScroll(16, 800) > -1);
+  assert.ok(edgeScroll(784, 800) > 0 && edgeScroll(784, 800) < 1);
+  assert.equal(edgeScroll(0, 800), -1);
+  assert.equal(edgeScroll(-200, 800), -1);
+  assert.equal(edgeScroll(1000, 800), 1);
+  assert.ok(edgeScroll(8, 800) < edgeScroll(24, 800)); // closer is stronger (more negative)
+  assert.equal(edgeScroll(5, 40), 0); // a lane too narrow for two zones never scrolls
 });

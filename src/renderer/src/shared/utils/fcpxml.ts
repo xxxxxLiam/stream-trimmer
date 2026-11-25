@@ -150,8 +150,9 @@ export function normalizeTimeline(raw: unknown): TimelineFormat {
     r.kind === "source" || r.kind === "custom" || r.kind === "vertical" || r.kind === "look" ? r.kind : "vertical";
   const fpsText = typeof r.fps === "string" ? r.fps.trim() : typeof r.fps === "number" ? String(r.fps) : "";
   let fps = DEFAULT_TIMELINE.fps;
-  if (fpsText === "source") fps = "source";
-  else if (fpsText !== "source" && parseRational(fpsText)) fps = fpsText;
+  // D3-2, D4-2: a stored rate (the old default 30, or one picked in the old Frame rate list) cannot be seen or changed on the
+  // Timeline switch, which says the rate follows the video, so for every kind but a custom size it is dropped. Custom keeps its own.
+  if (kind === "custom" && fpsText !== "source" && parseRational(fpsText)) fps = fpsText;
   return {
     kind,
     width: dimension(r.width, VERTICAL_SIZE.width),
@@ -741,7 +742,7 @@ export function groupByVideo(clips: Pick<FcpClip, "sourceUrl" | "sourceTitle">[]
 }
 
 /** A keyword value: commas separate keywords in Final Cut, so a title's own comma becomes a space. */
-const keywordText = (name: string) => name.replace(/,/g, " ").replace(/\s+/g, " ").trim();
+export const keywordText = (name: string) => name.replace(/,/g, " ").replace(/\s+/g, " ").trim();
 
 function legacyEvents(
   mediaEvent: string,
@@ -988,13 +989,18 @@ export function buildFcpxml(input: FcpxmlInput): string {
 
 /** A filename for the document: event name made safe, with the extension. */
 export function fcpxmlFilename(eventName: string, clipId?: string): string {
-  const safe = noEmDash(clipId ? `${eventName} ${clipId}` : eventName)
-    .replace(/[\\/:*?"<>|\u0000-\u001F]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^\.+/, "")
-    .slice(0, 80)
-    .trim();
+  const clean = (t: string) =>
+    noEmDash(t)
+      .replace(/[\\/:*?"<>|\u0000-\u001F]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "");
+  const MAX = 80;
+  const clip = clipId ? clean(clipId).slice(0, MAX) : "";
+  // The clip's name is the part that tells two documents apart, so it is what survives the cut: the Event name
+  // gives way, never the clip (a long Event name used to push every clip's name off the end).
+  const event = clean(eventName).slice(0, clip ? Math.max(0, MAX - clip.length - 1) : MAX).trim();
+  const safe = [event, clip].filter(Boolean).join(" ").trim();
   return `${safe || "Clips"}.fcpxml`;
 }
 

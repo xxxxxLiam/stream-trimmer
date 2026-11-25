@@ -1,6 +1,6 @@
 /**
  * File: CampaignForm.test.tsx
- * Description: Campaign form A (A-4): the new-campaign form asks for Name, Clips a day, Extra seconds and Folder and
+ * Description: Campaign form A (A-4): the new-campaign form asks for Name, Clips a day and Folder and
  *   nothing from the old form; a clashing name is refused; the old inline form is gone from the campaign menu.
  */
 import assert from "node:assert/strict";
@@ -21,9 +21,10 @@ test("a taken name (any case, padded) shows the message; editing may keep its ow
   assert.deepEqual(campaignNameProblems("  ", list), ["Give the campaign a name."]);
 });
 
-test("A-4: the form is Name, Clips a day, Extra seconds and Folder, with none of the old fields", () => {
+test("A-4: the form is Name, Clips a day and Folder, with none of the old fields", () => {
   const form = src("./CampaignForm.tsx");
-  for (const word of ["Name", "Clips a day", "Extra seconds at both ends", "Folder"]) assert.match(form, new RegExp(word));
+  for (const word of ["Name", "Clips a day", "Folder"]) assert.match(form, new RegExp(word));
+  assert.doesNotMatch(form, /Extra seconds|extraSeconds/, "the padding is a fixed 5 seconds");
   assert.doesNotMatch(form, /Aim for at least|Never longer than|MP3|Research folder|Data folder|Format|prefix|pattern/i);
   assert.match(form, /dailyQuota: quota/);
 });

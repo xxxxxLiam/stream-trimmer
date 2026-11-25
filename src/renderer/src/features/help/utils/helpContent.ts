@@ -166,7 +166,7 @@ export const HELP_ANSWERS: HelpAnswer[] = [
       {
         steps: [
           { text: "Sign in to YouTube in Chrome, Edge, Firefox or Brave. Clipr looks for it when it opens." },
-          { text: "If it can’t find one, press Sign in for 1080p at the bottom of the window." },
+          { text: "If it can’t find one, press Sign in for 1080p at the bottom of the window, or open Settings and choose Sign in for 1080p.", show: { target: "#ui-settings", advance: "click" } },
           { text: "Export your cookies.txt as that page says, then drop it there or choose the file." },
         ],
       },
@@ -257,7 +257,15 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     searchOnly: true,
     groups: [{ steps: [{ text: "Use − and + at the top right of the timeline to zoom, or pinch or hold Ctrl and scroll." }, { text: "Press Fit to see the whole video." }] }],
     labels: [],
-    synonyms: ["zoom", "fit", "timeline", "wider", "closer", "bigger", "smaller"],
+    synonyms: ["zoom", "zoom in", "zoom out", "fit", "timeline", "wider", "closer", "bigger", "smaller", "magnify"],
+  },
+  {
+    id: "window-zoom",
+    question: "How do I make the text bigger?",
+    searchOnly: true,
+    groups: [{ steps: [{ text: "Press Ctrl and + (⌘ and + on a Mac) to make everything in the window bigger, and Ctrl and − to make it smaller." }, { text: "Ctrl and 0 puts it back to normal." }] }],
+    labels: [],
+    synonyms: ["text bigger", "text size", "large text", "font size", "font", "bigger text", "smaller text", "window zoom", "magnify", "scale", "readable"],
   },
 ];
 
@@ -284,6 +292,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "F  H  Z", does: "Timeline tools: Flag, Hand, Zoom" },
   { keys: "Shift N", does: "Go to the next video" },
   { keys: "⌘ Enter", does: "Clip" },
+  { keys: "⌘ B", does: "Save the marked part for later (it goes to the Export panel)" },
   { keys: "R", does: "Retry the failed clip" },
   { keys: "⌘ R", does: "Show the last saved clip in Finder (File Explorer on Windows)" },
   { keys: "⌘ L", does: "Loop the marked part" },
@@ -293,5 +302,5 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "⌘ ,", does: "Settings" },
   { keys: "⌘ ;", does: "Symbols" },
   { keys: "⌘ /", does: "Help" },
-  { keys: "Esc", does: "Close a drawer or leave full screen" },
+  { keys: "Esc", does: "Close a drawer, leave full screen, or remove a range that is not a clip yet" },
 ];

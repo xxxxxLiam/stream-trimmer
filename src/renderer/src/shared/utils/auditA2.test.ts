@@ -24,7 +24,8 @@ test("A2-2: nothing still looking for a session is never called signed out", () 
 
 test("A2-2: a clip waits for the check, then asks for the quality the result allows; the launch check always ends", () => {
   const m = read("modules/clipper/hooks/useClipDownloadMutations.ts");
-  assert.match(m, /await whenSignInSettled\(\);\s*const quality = requestedQuality\(\{ signedOut: isSignedOut\(connectionNow\(\)\)/);
+  // What the wait could not decide counts as signed out (C3-1), so it never asks for 1080p with no session.
+  assert.match(m, /whenSignInSettled\(\),[\s\S]*const hadSession = connectionNow\(\)\.connected;\s*const quality = requestedQuality\(\{ signedOut: !hadSession/);
   assert.match(read("routes/App.tsx"), /\}\)\.finally\(endLaunchCheck\)/);
 });
 

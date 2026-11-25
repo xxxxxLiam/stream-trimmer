@@ -13,10 +13,8 @@ import HelpAnswer from "./HelpAnswer";
 import { tourOf } from "./HelpDrawer";
 import HelpReport, { type HelpReportProps } from "./HelpReport";
 import HelpShortcuts from "./HelpShortcuts";
-import HelpSignIn from "./HelpSignIn";
 import HelpTop, { type HelpTopProps } from "./HelpTop";
 import { HELP_ANSWERS, HELP_MORE } from "../utils/helpContent";
-import { cookieReason } from "../utils/cookieReasons";
 import { searchHelp } from "../utils/helpSearch";
 
 const noop = () => {};
@@ -134,33 +132,14 @@ test("shortcuts read Ctrl on Windows", () => {
   assert.match(renderToStaticMarkup(<HelpShortcuts ctrl={false} onBack={noop} onClose={noop} />), />⌘ Enter</);
 });
 
-test("sign-in page: honest line, three steps, drop zone; a refusal shows reason then fix", () => {
-  const base = { problem: null, done: false, onFile: noop, onChoose: noop, onBack: noop, onClose: noop };
-  const h = renderToStaticMarkup(<HelpSignIn {...base} />);
-  assert.match(h, /never posts, likes or changes anything/);
-  assert.match(h, /Drop cookies\.txt, or choose a file/);
-  assert.match(h, /Get cookies\.txt LOCALLY/);
-  assert.doesNotMatch(h, /Try again/);
-  const bad = renderToStaticMarkup(<HelpSignIn {...base} problem={cookieReason({ ok: false, reason: "wrong-site" })} />);
-  assert.match(bad, /role="alert"/);
-  assert.match(bad, /no YouTube cookies/);
-  assert.match(bad, /text-error/);
-});
-
-test("the engine's own sentences win over the fallback", () => {
-  const r = cookieReason({ ok: false, reason: "signed-out", message: "Signed out when exported.", fix: "Sign in, then export." });
-  assert.deepEqual(r, { reason: "Signed out when exported.", fix: "Sign in, then export." });
-  assert.match(cookieReason({ ok: false }).reason, /isn’t a cookies file/);
-  assert.match(cookieReason({ ok: false, kind: "too_old" }).reason, /ended this session/);
-  assert.match(cookieReason({ ok: false, kind: "wrong_site" }).reason, /no YouTube cookies/);
-  assert.match(cookieReason({ ok: false, kind: "wrong_format" }).reason, /isn’t a cookies file/);
-});
-
-test("the footer pill opens Help on its sign-in page", () => {
+test("Liam 25 Nov: sign-in is a setting, so Help has no sign-in page and the footer pill opens Settings", () => {
   const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
-  assert.match(app, /const openSignIn = \(\) => \{\s*setHelpStartAt\("signin"\)/);
+  assert.match(app, /const openSignIn = \(\) => \{[\s\S]{0,160}setSettingsStartAt\(START_AT_SIGNIN\);\s*setHelpOpen\(false\);\s*setSettingsOpen\(true\);/);
   assert.match(app, /onSignIn=\{openSignIn\}/);
-  assert.match(app, /<HelpDrawer open=\{helpOpen\} onClose=\{closeHelp\} startAt=\{helpStartAt\}/);
+  assert.match(app, /<HelpDrawer open=\{helpOpen\} onClose=\{closeHelp\} tips=/);
+  assert.throws(() => readFileSync(join(process.cwd(), "src/renderer/src/features/help/components/HelpSignIn.tsx"), "utf8"));
+  const help = readFileSync(join(process.cwd(), "src/renderer/src/features/help/components/HelpDrawer.tsx"), "utf8");
+  assert.doesNotMatch(help, /SignIn|cookies/);
 });
 
 test("F-9 and F-16: one report per click, the note goes with the report, Replay tips closes Help first", () => {
@@ -189,4 +168,15 @@ test("F2-8: the Paste key chip on Start uses a token, not an opacity modifier", 
   const src = readFileSync(join(process.cwd(), "src/renderer/src/features/start/components/ColdStart.tsx"), "utf8");
   assert.doesNotMatch(src, /opacity-(?!0")\d+/, "no dimmed text (the blinking caret's opacity-0 is not text)");
   assert.match(src, /<span className="text-meta font-normal text-bg">\{p\.pasteKey\}<\/span>/);
+});
+
+test("F3-2 and F3-3: focus goes to the result, a finished report is shown on reopening Help, and an unsent note stays", async () => {
+  const { readFileSync } = await import("node:fs");
+  const view = readFileSync(new URL("./HelpReport.tsx", import.meta.url), "utf8");
+  assert.match(view, /if \(kept \|\| sent\) done\.current\?\.focus\(\)/);
+  assert.match(renderToStaticMarkup(<HelpReport {...report} state="sent" />), /tabindex="-1" role="status"/);
+  const ctl = readFileSync(new URL("../hooks/useHelpController.ts", import.meta.url), "utf8");
+  assert.match(ctl, /reportRef\.current\.unseen && reportRef\.current\.state !== "writing" \? \{ kind: "report" \}/);
+  assert.match(ctl, /if \(report\.state !== "writing"\) \{\s*report\.reset\(\);\s*setNote\(""\)/);
+  assert.match(readFileSync(new URL("../hooks/useReportMutations.ts", import.meta.url), "utf8"), /setUnseen\(true\)/);
 });

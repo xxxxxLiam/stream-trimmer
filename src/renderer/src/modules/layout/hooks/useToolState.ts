@@ -12,7 +12,7 @@ export const TIMELINE_TOOLS: readonly TimelineTool[] = ["pointer", "clip", "rang
 
 export type ToolState = {
   tool: TimelineTool;
-  /** 0 shows the whole video, 100 is the closest zoom. */
+  /** 0 is Fit (the whole video), 100 the closest zoom, below 0 zoomed out past Fit. */
   zoom: number;
   /** Counts up on every Fit press; the timeline fits the view to the range when it changes. */
   fitRequests: number;
@@ -42,7 +42,9 @@ function set(patch: Partial<ToolState>) {
   for (const l of listeners) l();
 }
 
-export const clampZoom = (z: number) => Math.min(100, Math.max(0, Math.round(z * 100) / 100));
+/** Zoom 0 is Fit, 100 the closest, and down to here the view goes out until the video fills a third of the lane. */
+export const ZOOM_MIN = -25;
+export const clampZoom = (z: number) => Math.min(100, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
 
 export function setTool(tool: TimelineTool) {
   set({ tool });

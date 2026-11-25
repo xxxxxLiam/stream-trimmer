@@ -47,6 +47,8 @@ export function clipReason(s: {
   totalSeconds?: number;
   startSet?: boolean;
   endSet?: boolean;
+  /** A4-4: no campaign yet, so there is no folder to clip into. */
+  noCampaign?: boolean;
 }): string | null {
   const over = s.totalSeconds !== undefined ? overCapMessage(s.totalSeconds) : "";
   if (over && (s.hasRange || s.segments > 0)) return over;
@@ -55,7 +57,7 @@ export function clipReason(s: {
     if (s.endSet) return "Set a start first: click the timeline or press I";
     return "Set an end first: click the timeline or press O";
   }
-  return null;
+  return s.noCampaign ? "Make a campaign first: Settings, Campaigns, Add campaign" : null;
 }
 
 type Section = { start: number; end: number };

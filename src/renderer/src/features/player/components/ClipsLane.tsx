@@ -7,18 +7,25 @@
  *   dashed "skipped" stretch between. Names sit exactly as wide as their range, with an ellipsis
  *   and a tooltip.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { setNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { playFrom } from "../../../shared/utils/playFrom";
 import type { TimelineController } from "../hooks/useTimelineController";
 import { lengthLabel } from "../hooks/useTimelineController";
-import { placeLabels } from "../utils/laneTools";
+import { labelWidth, packRows, placeLabels } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
+import { MAX_CLIP_SECONDS, overCapMessage } from "../../../shared/utils/clip";
+import { useClipController } from "../hooks/useClipController";
+import { IconClose } from "../../../shared/components/PanelIcons";
 import ClipNameField from "./ClipNameField";
 import LaneLabel from "./LaneLabel";
 
+/** A bar never draws narrower than its padding and border (8 + 8 + 2), so rows are packed on this. */
+const MIN_BAR = 18;
+const ROW_H = 14;
+const OVER_LINE_H = 16;
 const BAR =
   "absolute top-[5px] h-[24px] overflow-hidden text-ellipsis whitespace-nowrap px-[8px] text-meta leading-[22px]";
 
@@ -38,7 +45,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     c.axis.pieces.some((p) => !p.folded && end >= p.t0 && start <= p.t1);
   const span = (start: number, end: number) => {
     const x = toX(c.axis, start);
-    return { left: x, width: Math.max(6, toX(c.axis, end) - x) };
+    return { left: x, width: Math.max(MIN_BAR, toX(c.axis, end) - x) };
   };
   // Drawn left to right as they sit in the video; the clip itself plays them in the order locked.
   // A section that is exactly a banked moment carries that moment's name; otherwise the suggestion.
@@ -68,6 +75,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     if (tabActive) setNextClipName(nextName);
   }, [nextName, tabActive]);
   useEffect(() => () => setNextClipName(null), []);
+  const clipNow = useClipController();
   const rename = (name: string) => setTyped({ key: sectionsKey, name });
 
   // Names that do not fit their bar continue into the free space after it (cut only when that runs out).
@@ -100,14 +108,55 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     ...named.map((n) => ({ ...span(n.start, n.end), label: n.label })),
     ...others,
   ];
+  // A range that is not a clip yet: its bar invites making the clip and can be removed.
+  const unsaved = !!c.range && sections.length === 1 && !c.waiting.some(isBuilt);
   const places = placeLabels(bars, c.width);
+  // Overlapping bars are stacked into thinner rows with no text (their title still names them).
+  const slots = packRows(named.map((n) => span(n.start, n.end)));
+  const slotOf = (key: string) => {
+    const i = named.findIndex((n) => n.key === key);
+    return i < 0 ? { row: 0, rows: 1, from: 0, to: 0 } : slots[i];
+  };
+  const stacked = (key: string) => slotOf(key).rows > 1;
+  const styleOf = (key: string, start: number, end: number) => {
+    const sp = span(start, end);
+    const { row, rows } = slotOf(key);
+    if (rows < 2) return sp;
+    return { ...sp, top: 5 + row * ROW_H, height: ROW_H - 2 };
+  };
+  // B4-1: a stacked bar is too thin for text, so its name sits beside the stack (right of it, else left),
+  // on the bar's own row; the lane grows to hold the rows.
+  const stackedLabel = (key: string, label: string) => {
+    if (!stacked(key)) return null;
+    const { row, from, to } = slotOf(key);
+    const w = labelWidth(label);
+    const right = Math.max(0, c.width - to - 4);
+    const onRight = right >= Math.min(w, 48) || from < w;
+    const style = onRight
+      ? { left: to + 4, width: Math.min(w, right), top: 5 + row * ROW_H }
+      : { left: Math.max(0, from - 4 - w), width: w, top: 5 + row * ROW_H, textAlign: "right" as const };
+    return (
+      <span
+        key={`${key}-stack-label`}
+        aria-hidden="true"
+        className="pointer-events-none absolute overflow-hidden text-ellipsis whitespace-nowrap text-meta leading-[12px] text-fg-dim"
+        style={style}
+      >
+        {label}
+      </span>
+    );
+  };
+  const laneRows = Math.max(1, ...slots.map((s) => s.rows));
+  // An unsaved range over the 10-minute cap says so under its bar, live as it is dragged, without a hover.
+  const overCap = unsaved && c.totalSeconds > MAX_CLIP_SECONDS ? overCapMessage(c.totalSeconds) : "";
+  const laneHeight = (laneRows > 1 ? 10 + laneRows * ROW_H : 34) + (overCap ? OVER_LINE_H : 0);
   const placeOf = (key: string) => {
     const i = named.findIndex((n) => n.key === key);
     return i < 0 ? { inside: true, outsideWidth: 0 } : places[i];
   };
   const outside = (key: string, start: number, end: number, label: string) => {
     const pl = placeOf(key);
-    if (pl.inside) return null;
+    if (pl.inside || stacked(key)) return null;
     const sp = span(start, end);
     return (
       <span
@@ -121,7 +170,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     );
   };
   return (
-    <div className="flex h-[34px] items-center">
+    <div className="flex items-center" style={{ height: laneHeight }}>
       <LaneLabel>Clips</LaneLabel>
       <div className="relative h-full flex-1 overflow-x-clip overflow-y-visible">
         {c.opening ? null : (
@@ -134,12 +183,13 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                     title={u.label ?? u.clipId ?? timeName(u.start)}
                     onClick={() => playFrom(u.start)}
                     className={`${BAR} rounded-chip border border-frost text-center font-medium text-fg`}
-                    style={span(u.start, u.end)}
+                    style={styleOf(`used-${u.start}-${u.end}`, u.start, u.end)}
                   >
-                    {placeOf(`used-${u.start}-${u.end}`).inside
+                    {placeOf(`used-${u.start}-${u.end}`).inside && !stacked(`used-${u.start}-${u.end}`)
                       ? (u.label ?? u.clipId ?? timeName(u.start))
                       : ""}
                   </button>
+                  {stackedLabel(`used-${u.start}-${u.end}`, u.label ?? u.clipId ?? timeName(u.start))}
                   {outside(
                     `used-${u.start}-${u.end}`,
                     u.start,
@@ -163,12 +213,13 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                         ? "border-frost text-fg"
                         : "border-hairlineStrong text-fg-dim"
                     }`}
-                    style={span(b.start, b.end)}
+                    style={styleOf(`wait-${b.start}-${b.end}`, b.start, b.end)}
                   >
-                    {placeOf(`wait-${b.start}-${b.end}`).inside
+                    {placeOf(`wait-${b.start}-${b.end}`).inside && !stacked(`wait-${b.start}-${b.end}`)
                       ? (b.label ?? timeName(b.start))
                       : ""}
                   </button>
+                  {stackedLabel(`wait-${b.start}-${b.end}`, b.label ?? timeName(b.start))}
                   {outside(
                     `wait-${b.start}-${b.end}`,
                     b.start,
@@ -178,14 +229,25 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 </span>
               ) : null,
             )}
-            {sections.length === 1 ? (
+            {unsaved ? (
+              <UnsavedRange
+                style={styleOf("built", sections[0].start, sections[0].end)}
+                length={c.lengthText}
+                blocked={clipNow.reason}
+                over={overCap}
+                lineTop={5 + laneRows * (laneRows > 1 ? ROW_H : 24) + 2}
+                onCreate={clipNow.clip}
+                onRemove={c.clearRange}
+              />
+            ) : sections.length === 1 ? (
               <>
                 <ClipNameField
                   name={building(sections[0].start)}
                   onRename={rename}
-                  className={`${BAR} rounded-chip border border-frost text-center font-medium ${placeOf("built").inside ? "text-fg" : "text-transparent focus:text-fg"}`}
-                  style={span(sections[0].start, sections[0].end)}
+                  className={`${BAR} rounded-chip border border-frost text-center font-medium ${placeOf("built").inside && !stacked("built") ? "text-fg" : "text-transparent focus:text-fg"}`}
+                  style={styleOf("built", sections[0].start, sections[0].end)}
                 />
+                {stackedLabel("built", building(sections[0].start))}
                 {outside("built", sections[0].start, sections[0].end, building(sections[0].start))}
               </>
             ) : null}
@@ -233,5 +295,67 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** The unsaved range's bar: Ice outline on a faint tint, a centred "Create clip" pill, and an × to remove it. */
+export function UnsavedRange({
+  style,
+  length,
+  blocked,
+  over = "",
+  lineTop = 31,
+  onCreate,
+  onRemove,
+}: {
+  style: CSSProperties;
+  length: string;
+  blocked: string | null;
+  /** The over-the-cap sentence, shown under the bar; empty when the range fits. */
+  over?: string;
+  lineTop?: number;
+  onCreate: () => void;
+  onRemove: () => void;
+}) {
+  const width = Number(style.width ?? 0);
+  const narrow = width < 150;
+  return (
+    <>
+    {over ? (
+      <span
+        role="alert"
+        data-unsaved-over
+        className="pointer-events-none absolute whitespace-nowrap text-meta leading-[14px] text-error"
+        style={{ left: Math.max(0, Number(style.left ?? 0)), top: lineTop }}
+      >
+        {over}
+      </span>
+    ) : null}
+    <span
+      data-unsaved-range
+      className={`absolute rounded-chip border border-dashed bg-ice-tint-12 ${over ? "border-error" : "border-ice"}`}
+      style={{ ...style, overflow: "visible" }}
+    >
+      <button
+        type="button"
+        onClick={onCreate}
+        aria-disabled={!!blocked}
+        title={blocked || undefined}
+        className={`absolute left-1/2 top-1/2 inline-flex h-[20px] -translate-x-1/2 -translate-y-1/2 items-center whitespace-nowrap rounded-[10px] px-[10px] text-meta font-medium leading-[normal] ${blocked ? "bg-hover text-disabled" : "bg-ice text-bg"}`}
+      >
+        Create clip · {length}
+      </button>
+      <button
+        type="button"
+        aria-label="Remove this range (Esc)"
+        title="Remove this range (Esc)"
+        onClick={onRemove}
+        className="absolute top-[1px] inline-flex h-[20px] w-[20px] items-center justify-center rounded-chip text-fg hover:bg-hover"
+        style={narrow ? { left: "100%", marginLeft: 4 } : { right: 2 }}
+      >
+        <IconClose />
+      </button>
+    </span>
+    </>
   );
 }

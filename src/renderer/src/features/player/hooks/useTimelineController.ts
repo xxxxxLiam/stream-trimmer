@@ -10,22 +10,26 @@ import { useEffect, useMemo, useRef, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
-import { getZoom, useToolState } from "../../../modules/layout/hooks/useToolState";
+import { ZOOM_MIN, getZoom, useToolState } from "../../../modules/layout/hooks/useToolState";
 import { useAudioLanguageState } from "../../../modules/layout/hooks/useAudioLanguageState";
 import { audioLanesOf } from "../../../shared/utils/audioLanguages";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
-import { clampX, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
+import { clampX, edgeScroll, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
-import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
+import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, END_PAD_PX, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
 import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
+import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
+import { dialogOpen } from "../../../shared/utils/dialogOpen";
 
 export const DRAG_START_PX = 3;
+/** Pixels of the window a full-speed edge scroll moves every 40 ms tick. */
+const EDGE_SCROLL_PX = 14;
 const dash = "—";
 
 export function useTimelineController() {
@@ -54,6 +58,8 @@ export function useTimelineController() {
     [store.segments, range?.start, range?.end],
   );
   const startPicked = clipper.startText.trim() !== "" && Number.isFinite(clipper.start) && clipper.start >= 0 && !range;
+  // B3-1: an Out set before the In is stored, so the readout shows it instead of a dash.
+  const endPicked = clipper.endText.trim() !== "" && Number.isFinite(clipper.end) && clipper.end >= 0 && !range;
   const joined = sections.length >= 2;
   const existingNames = useMemo(
     () => [...(videoId && active ? (active.usedRanges[videoId] ?? []) : []), ...store.banked].map((r) => (r as { label?: string }).label ?? "").filter(Boolean),
@@ -63,7 +69,9 @@ export function useTimelineController() {
   const suggestedName = useSuggestedName(videoId, clipper.info?.title ?? "", lines, sections, existingNames);
   const total = sectionsLength(sections);
 
-  const win = windowFor(duration, tools.zoom, s.focus ?? playhead);
+  // The room kept after the video's end (at Fit, and at the far right when zoomed in), as a share of the lane.
+  const padFrac = s.width > 0 ? END_PAD_PX / s.width : 0;
+  const win = windowFor(duration, tools.zoom, s.focus ?? playhead, padFrac);
   const liveFold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
   const live = { axis: (liveFold ? liveFold.axis : linearAxis(win, s.width)) as Axis, fold: liveFold?.fold ?? ([] as Fold[]), folded: !!liveFold };
   // The axis the pointer went down on stays for the whole drag: the drag itself creates a range, which
@@ -74,7 +82,7 @@ export function useTimelineController() {
   const axis = shown.axis;
   const folded = shown.folded;
   const view = tools.zoom > 0 && !folded ? win : null;
-  const ticks = axisTicks(axis);
+  const ticks = axisTicks(axis, 110, { start: 0, end: duration });
 
   const used: readonly NamedRange[] = videoId && active ? (active.usedRanges[videoId] ?? []) : [];
   const waiting = store.banked;
@@ -86,6 +94,7 @@ export function useTimelineController() {
     duration,
     playhead,
     zoom: tools.zoom,
+    padFrac,
     fitRequests: tools.fitRequests,
     focus: s.focus,
     setFocus: s.setFocus,
@@ -103,7 +112,9 @@ export function useTimelineController() {
   // The handlers sit on the whole timeline area (so a tool works in any part of it, including the
   // space under the tracks); the lanes start after the label column, so x is measured from the right.
   const laneLeft = (e: PointerEvent<HTMLElement>) => e.currentTarget.getBoundingClientRect().right - s.width;
-  const timeAt = (e: PointerEvent<HTMLElement>): number | null => toT(axis, e.clientX - laneLeft(e));
+  // Never past the video: the padding after its end, and the view out past Fit, are not footage.
+  const inVideo = (t: number | null) => (t === null ? null : Math.min(Math.max(0, t), duration));
+  const timeAt = (e: PointerEvent<HTMLElement>): number | null => inVideo(toT(axis, e.clientX - laneLeft(e)));
   const snap = (t: number, edge: "start" | "end") => Math.round(snapToWord(lines, t, edge));
 
   const setRange = (a: number, b: number) => {
@@ -127,8 +138,8 @@ export function useTimelineController() {
 
   /** Zoom to `zoom` keeping time `t`, at lane position `x`, under the same spot (a pinch or click zooms into the point). */
   const zoomAt = (x: number, t: number, zoom: number) => {
-    const next = Math.min(100, Math.max(0, zoom));
-    if (!folded && s.width > 0) s.setFocus(focusForAnchor(duration, next, t, x / s.width));
+    const next = Math.min(100, Math.max(ZOOM_MIN, zoom));
+    if (!folded && s.width > 0) s.setFocus(focusForAnchor(duration, next, t, x / s.width, padFrac));
     else s.setFocus(t);
     tools.setZoom(next);
   };
@@ -167,6 +178,7 @@ export function useTimelineController() {
     }
     if (tools.tool === "range") {
       // Select range: press and drag sets a range; a grabbed edge of the picked range resizes it.
+      marksBeforeDrag.current = { start: clipper.startText, end: clipper.endText };
       if (range) {
         const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
         if (edge) {
@@ -185,10 +197,53 @@ export function useTimelineController() {
     clipper.requestSeek(Math.round(t));
   };
 
+  // B3-2: Esc during a Select range drag puts the marks back as they were and ends the drag.
+  const marksBeforeDrag = useRef<{ start: string; end: string } | null>(null);
+  const dragKind = s.drag?.kind;
+  useEffect(() => {
+    if (dragKind !== "range" && dragKind !== "edge") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const before = marksBeforeDrag.current;
+      if (before) {
+        clipper.setStartText(before.start);
+        clipper.setEndText(before.end);
+      }
+      frozen.current = null;
+      s.setDrag(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragKind]);
+
+  // An unsaved range goes away with its ×, or with Esc (never mid-drag, never while typing or in a dialog or menu).
+  const clearRange = () => {
+    clipper.setStartText("");
+    clipper.setEndText("");
+    s.setScissorsStart(null);
+  };
+  const tabActive = useIsTabActive();
+  const hasRange = !!range;
+  const dragging = !!s.drag;
+  useEffect(() => {
+    if (!tabActive || !hasRange || dragging) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || dialogOpen() || document.querySelector('[role="menu"]')) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
+      clearRange();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabActive, hasRange, dragging]);
+
   const lastScrub = useRef<number | null>(null);
   const onLanePointerMove = (e: PointerEvent<HTMLElement>) => {
     const d = s.drag;
     if (!d || e.buttons !== 1) return;
+    pointer.current = { clientX: e.clientX, left: laneLeft(e) };
     if (d.kind === "pan") {
       const per = (win.end - win.start) / Math.max(1, s.width);
       s.setFocus(Math.min(duration, Math.max(0, d.startFocus - (e.clientX - d.startX) * per)));
@@ -205,14 +260,45 @@ export function useTimelineController() {
       }
       return;
     }
-    const t = timeAt(e);
+    dragTo(d, e.clientX, laneLeft(e));
+  };
+
+  /** Move the scrub / range / edge drag to where the pointer is (kept on the lane: past the end is the end). */
+  const dragTo = (d: NonNullable<typeof s.drag>, clientX: number, left: number) => {
+    const t = inVideo(toT(axis, clampX(clientX - left, s.width)));
     if (t === null) return;
     if (d.kind === "edge") {
       setRange(d.fixed, t);
-    } else if (d.kind === "range" && Math.abs(e.clientX - s.dragOrigin) >= DRAG_START_PX) {
+    } else if (d.kind === "range" && Math.abs(clientX - s.dragOrigin) >= DRAG_START_PX) {
       setRange(d.anchor, t);
     }
   };
+
+  // Dragging the playhead or a range edge to either end of a zoomed timeline scrolls it, so the rest of the
+  // video can be reached by dragging. The pointer keeps arriving while it is held at the edge or beyond it.
+  const pointer = useRef({ clientX: 0, left: 0 });
+  const scrollRef = useRef<() => void>(() => {});
+  scrollRef.current = () => {
+    const d = s.drag;
+    if (!d || d.kind === "pan" || !(duration > 0) || tools.zoom <= 0) return;
+    const v = edgeScroll(pointer.current.clientX - pointer.current.left, s.width);
+    if (!v) return;
+    const per = (win.end - win.start) / Math.max(1, s.width);
+    const next = Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + v * per * EDGE_SCROLL_PX));
+    if (frozen.current && frozen.current.folded) return;
+    if (frozen.current) frozen.current = { axis: linearAxis(windowFor(duration, tools.zoom, next, padFrac), s.width) as Axis, fold: [], folded: false };
+    s.setFocus(next);
+    if (d.kind === "scrub") {
+      const at = toT(axis, clampX(pointer.current.clientX - pointer.current.left, s.width));
+      if (at !== null) clipper.requestSeek(Math.round(Math.min(Math.max(0, at), duration)));
+    } else dragTo(d, pointer.current.clientX, pointer.current.left);
+  };
+  const scrolling = dragKind === "scrub" || dragKind === "range" || dragKind === "edge";
+  useEffect(() => {
+    if (!scrolling) return;
+    const id = window.setInterval(() => scrollRef.current(), 40);
+    return () => window.clearInterval(id);
+  }, [scrolling]);
 
   const onLanePointerUp = () => {
     const d = s.drag;
@@ -231,7 +317,7 @@ export function useTimelineController() {
       s.setFocus(Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + act.pixels * per)));
     } else {
       const x = e.clientX - left;
-      const at = toT(axis, x);
+      const at = inVideo(toT(axis, x));
       if (at !== null) zoomAt(x, at, getZoom() + act.amount);
       else tools.zoomBy(act.amount);
     }
@@ -281,7 +367,7 @@ export function useTimelineController() {
     startPicked,
     start: clipper.start,
     inText: range ? clockTime(range.start) : startPicked ? clockTime(clipper.start) : dash,
-    outText: range ? clockTime(range.end) : dash,
+    outText: range ? clockTime(range.end) : endPicked ? clockTime(clipper.end) : dash,
     lengthText: total > 0 ? lengthLabel(total) : dash,
     /** The whole joined clip in seconds, for the campaign's length rule. */
     totalSeconds: total,
@@ -291,6 +377,7 @@ export function useTimelineController() {
     onLaneWheel,
     onLaneClickCapture,
     addSection,
+    clearRange,
     removeSection: (i: number) => store.remove(i),
     seek: (t: number) => clipper.requestSeek(t),
   };

@@ -5,12 +5,12 @@
  *   checks the payload's shape and calls filesService; the folder confinement is
  *   in the service (saveRoots.ts, pathSafety.ts).
  */
-import { checkFolder } from "../features/files/services/folderCheck";
 import { checkFreeSpace } from "../features/files/services/freeSpace";
 import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import { getMainWindow } from "../modules/windows/windows";
 import {
+  checkSaveFolder,
   fileExists,
   saveClip,
   saveFile,
@@ -24,8 +24,8 @@ const { ipcMain } = electron;
 
 export function registerFilesHandlers() {
   // Before a clip starts: room for it where it will land? `ok` is false only when clearly short; null freeMb means unknown.
-  // Can Clipr write into this folder? { ok: true } or { ok: false, problem: "gone" | "refused" }. A malformed request is ok.
-  ipcMain.handle(IPC.fileCheckFolder, (_e: unknown, payload: unknown) => checkFolder(payload));
+  // Can Clipr write into this folder? { ok: true } or { ok: false, problem: "gone" | "refused" | "blocked" }. Only chosen folders are looked at; a malformed request is ok.
+  ipcMain.handle(IPC.fileCheckFolder, (_e: unknown, payload: unknown) => checkSaveFolder(payload));
   ipcMain.handle(IPC.fileFreeSpace, (_e: unknown, payload: unknown) => checkFreeSpace(payload) ?? { ok: true, neededMb: 0, freeMb: null });
   ipcMain.handle(IPC.clipSave, async (_e: unknown, payload: any) => {
     if (

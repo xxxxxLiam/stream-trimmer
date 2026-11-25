@@ -9,3 +9,6 @@ export function folderChipLabel(dir: string | null | undefined, depth = 2): stri
   if (parts.length === 0) return "Downloads/Clipr";
   return parts.slice(-depth).join("/");
 }
+
+/** What to say when Open finds a folder Clipr has not made yet: it is made with the first clip. */
+export const FOLDER_NOT_MADE_YET = "This folder will be made with your first clip.";

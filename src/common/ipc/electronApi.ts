@@ -73,7 +73,7 @@ export interface ElectronAPI {
   }) => Promise<{ ok: boolean; path?: string; error?: string }>;
   showInFolder: (
     targetPath: string,
-  ) => Promise<{ ok: boolean; error?: string }>;
+  ) => Promise<{ ok: boolean; error?: string; /** The path does not exist (yet): a folder is made with the first clip. */ missing?: boolean }>;
   /**
    * Undo of a just-made clip: moves its file to the Trash / Recycle Bin. Refuses anything outside
    * the user's clip folders; a file that's already gone is ok.
@@ -96,7 +96,7 @@ export interface ElectronAPI {
    * Can Clipr write into this folder? `gone` is a missing folder or an unmounted drive; `refused` is a folder that is
    * there but will not take a file (no permission, read-only). Run it when Clip is pressed and before a save.
    */
-  checkFolder?: (payload: { dirPath: string }) => Promise<{ ok: true } | { ok: false; problem: "gone" | "refused" }>;
+  checkFolder?: (payload: { dirPath: string }) => Promise<{ ok: true } | { ok: false; problem: "gone" | "refused" | "blocked" }>;
   startDrag?: (targetPath: string) => void;
   /** Reads the stored cookies.txt and reports whether a session is on disk. */
   probeYouTube?: () => Promise<{

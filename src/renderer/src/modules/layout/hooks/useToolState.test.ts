@@ -4,14 +4,16 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { TOOL_KEYS, TIMELINE_TOOLS, toolForKey, clampZoom, requestFit, resetToolStateForTest, setTool, setZoom, getToolStateForTest } from "./useToolState";
+import { TOOL_KEYS, TIMELINE_TOOLS, toolForKey, clampZoom, requestFit, resetToolStateForTest, setTool, setZoom, getToolStateForTest, ZOOM_MIN } from "./useToolState";
 
 test("zoom is clamped, Fit resets it and counts, the tool changes", () => {
   resetToolStateForTest();
   setZoom(250);
   assert.equal(getToolStateForTest().zoom, 100);
   setZoom(-5);
-  assert.equal(getToolStateForTest().zoom, 0);
+  assert.equal(getToolStateForTest().zoom, -5, "zooming out past Fit is allowed");
+  setZoom(-500);
+  assert.equal(getToolStateForTest().zoom, ZOOM_MIN);
   setZoom(40);
   requestFit();
   assert.deepEqual([getToolStateForTest().zoom, getToolStateForTest().fitRequests], [0, 1]);

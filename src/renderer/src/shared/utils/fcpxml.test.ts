@@ -324,6 +324,13 @@ test("filename is safe and ends in .fcpxml", () => {
   assert.equal(fcpxmlFilename(`a/b:c*d?"e`), "a b c d e.fcpxml");
   assert.equal(fcpxmlFilename("  "), "Clips.fcpxml");
   assert.equal(fcpxmlFilename("..hidden"), "hidden.fcpxml");
+  // D4-1: a long Event name gives way, never the clip's name, so two clips never share a file name.
+  const long = "Q".repeat(120);
+  const a = fcpxmlFilename(long, "Hot Take");
+  const b = fcpxmlFilename(long, "Big Deal");
+  assert.notEqual(a, b);
+  assert.match(a, / Hot Take\.fcpxml$/);
+  assert.ok(a.length <= 80 + ".fcpxml".length);
 });
 
 // ---- DTD -------------------------------------------------------------------
@@ -474,7 +481,9 @@ test("timeline choices: vertical, match source, custom, each with an explicit ra
   // bad stored values fall back to vertical 1080x1920 that follows the video's own rate
   assert.deepEqual(normalizeTimeline({ kind: "nope", fps: "banana", width: -4 }), { kind: "vertical", width: 1080, height: 1920, fps: "source" });
   assert.equal(normalizeTimeline({ kind: "vertical", fps: "source" }).fps, "source", "vertical may follow the video");
-  assert.equal(normalizeTimeline({ kind: "vertical", fps: "25" }).fps, "25", "an explicit rate is kept");
+  assert.equal(normalizeTimeline({ kind: "vertical", fps: "25" }).fps, "source", "D4-2: a stored rate never overrides follow-the-video");
+  assert.equal(normalizeTimeline({ kind: "vertical", fps: "29.97" }).fps, "source");
+  assert.equal(normalizeTimeline({ kind: "custom", fps: "25" }).fps, "25", "a custom size keeps its rate");
   assert.equal(DEFAULT_EDITOR_SETTINGS.timelineFormat.kind, "vertical");
   assert.equal(DEFAULT_EDITOR_SETTINGS.createProject, false);
 });

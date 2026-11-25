@@ -88,7 +88,8 @@ export default function CampaignMenu({
         <span className="w-[16px] text-center text-fg-dim">+</span>
         New campaign
       </button>
-      <CampaignForm open={wizard} onClose={() => setWizard(false)} onCreated={() => onClose?.()} />
+      {/* A3-1: backing out of the form closes the popover too, so the next click on the chip opens it instead of closing it. */}
+      <CampaignForm open={wizard} onClose={() => { setWizard(false); onClose?.(); }} onCreated={() => onClose?.()} />
     </div>
   );
 }

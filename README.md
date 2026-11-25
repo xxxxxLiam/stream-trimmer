@@ -130,7 +130,7 @@ Installers are written to `dist-electron/`. Each OS's installer must be built on
 
 ### Prerequisites (source builds only)
 
-- **Node.js 18+** (see `.nvmrc`).
+- **Node.js 22** (the version in `.nvmrc`).
 - **ffmpeg**, **yt-dlp**, and **deno** are downloaded and bundled automatically during the build (`scripts/bundle-binaries.cjs`). The packaged app ships them inside `Resources/bin`, so end users install nothing.
 
 ## How it works
@@ -205,8 +205,10 @@ cannot be read at all, because Chrome 127+ encrypts the cookie database
 against other programs. Cookies obtained that way are the rotating kind, so
 expect to redo them.
 
-Note that 1080p does not itself require a sign-in. Cookies are needed for
-age-restricted, members-only and private content, and to clear bot checks.
+Note that 1080p needs a YouTube sign-in in your browser, which Clipr picks up
+from the cookies file. Without one, clips come down at 360p. The same file is
+also needed for age-restricted, members-only and private content, and to clear
+bot checks.
 
 **Building from source:**
 
@@ -224,8 +226,9 @@ Provided as-is and **unmaintained**. If yt-dlp/ffmpeg change behaviour or YouTub
 
 ## Releasing new versions (auto-update)
 
-The desktop app auto-updates via `electron-updater`, reading from this repo's
-GitHub Releases. Each release must contain the platform installer **plus** the
+The desktop app auto-updates via `electron-updater`, reading from the public
+[xxxxxLiam/clipr](https://github.com/xxxxxLiam/clipr) repository's GitHub
+Releases. Each release must contain the platform installer **plus** the
 matching metadata file that `electron-builder` uploads:
 
 - Windows: `latest.yml`

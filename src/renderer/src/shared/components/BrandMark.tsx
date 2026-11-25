@@ -40,6 +40,8 @@ export default function BrandMark({
       style={{
         display: "block",
         filter: glow ? "drop-shadow(var(--glow-mark))" : undefined,
+        // An svg clips what it draws outside its box, and the glow is drawn outside it: let it fade out in full.
+        overflow: "visible",
         ...style,
       }}
     >
@@ -85,7 +87,7 @@ export function BrandLockup({ size = 28, glow = false }: BrandLockupProps) {
         height={LOCKUP_H * k}
         role="img"
         aria-label="Clipr"
-        style={{ display: "block" }}
+        style={{ display: "block", overflow: "visible" }}
       >
         <g
           style={{ filter: glow ? "drop-shadow(var(--glow-mark))" : undefined }}

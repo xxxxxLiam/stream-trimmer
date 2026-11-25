@@ -186,7 +186,7 @@ export default function ExportBar({
         </button>
         {at360 ? <span className="text-error">at 360p</span> : null}
         {showSignInPill ? (
-          <button type="button" id="ui-sign-in-pill" aria-label="Sign in for 1080p: opens Help" className={`${VALUE_BUTTON} group`} onClick={onSignIn}>
+          <button type="button" id="ui-sign-in-pill" aria-label="Sign in for 1080p: opens Settings" className={`${VALUE_BUTTON} group`} onClick={onSignIn}>
             <span className="inline-flex h-[28px] items-center whitespace-nowrap rounded-[14px] border border-ice px-[12px] text-meta font-medium text-ice group-hover:bg-ice-tint-12">
               Sign in for 1080p
             </span>

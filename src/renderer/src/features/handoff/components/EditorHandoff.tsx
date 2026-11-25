@@ -218,7 +218,7 @@ async function exportNamed(
       ? ` and ${built.projectNames.length} ${built.projectNames.length === 1 ? "project" : "projects"}`
       : "";
   if (!openWith) {
-    return { ok: true, message: `Saved ${built.filename} with ${count}${projects}.`, skipped: built.skipped, path: written.path };
+    return { ok: true, message: `Saved ${written.path.split(/[\\/]/).pop() ?? built.filename} with ${count}${projects}.`, skipped: built.skipped, path: written.path };
   }
   const opened = await api.openWith({ app: openWith, file: written.path });
   if (!opened.ok) {

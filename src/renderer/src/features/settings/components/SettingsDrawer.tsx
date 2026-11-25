@@ -6,19 +6,22 @@
  *   place, Back shows the parent's name, X and Escape close.
  */
 import { useEffect, useRef, useState } from "react";
+import { useDrawerFocus } from "../../../shared/hooks/useDrawerFocus";
 import { Drawer } from "../../../shared/components/Drawer";
 import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
 import SettingsCampaigns from "./SettingsCampaigns";
-import SettingsFolder from "./SettingsFolder";
+import SettingsSignIn from "./SettingsSignIn";
+import { useCookieDropMutations } from "../hooks/useCookieDropMutations";
+import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
 import { useFinalCutLook } from "../hooks/useFinalCutLook";
 import { useClipDestination } from "../../player/hooks/useClipDestination";
 import { campaignClipsDir, campaignNameProblems, type Campaign } from "../../../shared/utils/campaigns";
-import { folderChipLabel } from "../../../shared/utils/folderLabel";
+import { FOLDER_NOT_MADE_YET, folderChipLabel } from "../../../shared/utils/folderLabel";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { lookForCampaign, loadSavedLooks } from "../../../shared/utils/fcpLooks";
 import { destinationLabel } from "../../player/utils/clipDestination";
@@ -47,7 +50,12 @@ export type SettingsDrawerProps = {
 
 export default function SettingsDrawer({ open, onClose, startAt, tracks, editor, videoTitle }: SettingsDrawerProps) {
   const c = useSettingsController({ open, onClose, startAt });
-  const [destination] = useClipDestination();
+  const cookies = useCookieDropMutations();
+  const connection = useYouTubeConnection();
+  const [chosen] = useClipDestination();
+  // Liam, 25 Nov: a campaign's export settings are always here. With no editor chosen yet (or CapCut, which has
+  // nothing to set) the page is Final Cut Pro's, the first editor, so its library, event, layout and look are never out of reach.
+  const destination = hasEditorPage(chosen) ? chosen : "finalcut";
   const viewId = c.view.kind === "campaign" || c.view.kind === "editor" ? c.view.id : null;
   const activeCampaign = c.campaigns.campaigns.find((x) => x.id === viewId);
   const activeFcp = activeCampaign ? editor.settingsFor(activeCampaign.id) : undefined;
@@ -65,6 +73,18 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
   const armedAt = useRef(0);
+  const root = useRef<HTMLDivElement | null>(null);
+  // A3-3: Tab stays in the drawer, Esc or Close returns focus to the Settings button, and a new view lands on its heading.
+  const onKeyDown = useDrawerFocus(root, open, c.view.kind === "campaign" || c.view.kind === "editor" ? `${c.view.kind}:${c.view.id}` : c.view.kind, "#ui-settings");
+  // Opening lands on the drawer's heading too, so the keyboard does not start behind it.
+  useEffect(() => {
+    if (!open) return;
+    const h = root.current?.querySelector<HTMLElement>("h3");
+    if (h) {
+      h.tabIndex = -1;
+      h.focus();
+    }
+  }, [open]);
   // A-7: the first click on Delete arms it for a few seconds only; leaving the view or closing the drawer disarms it.
   const viewKey = c.view.kind === "campaign" ? c.view.id : c.view.kind === "editor" ? `editor:${c.view.id}` : c.view.kind;
   useEffect(() => {
@@ -96,7 +116,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
       custom: { width: fcp.timelineFormat.width, height: fcp.timelineFormat.height, fps: fcp.timelineFormat.fps },
       lookName: look?.saved.find((l) => l.id === look.currentId)?.name ?? "",
       lookFormat: lookFormat(campaign),
-      onPick: (kind) => editor.onChange(campaign.id, { ...fcp, timelineFormat: { ...fcp.timelineFormat, kind } }),
+      onPick: (kind) => editor.onChange(campaign.id, { ...fcp, timelineFormat: { ...fcp.timelineFormat, kind, fps: "source" } }),
     },
   });
 
@@ -143,9 +163,11 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onLengthRule={(patch) => c.campaigns.update(campaign.id, patch)}
         onPatch={(patch) => c.patchCampaign(campaign.id, patch)}
         onToggleLanguage={(code) => c.patchCampaign(campaign.id, { languages: toggleLanguage(c.prefsFor(campaign.id).languages, code) })}
-        onOpenFolder={() => {
+        onOpenFolder={async () => {
           const dir = campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir);
-          if (dir) void window.electronAPI?.showInFolder(dir);
+          if (!dir) return null;
+          const r = await window.electronAPI?.showInFolder(dir);
+          return r?.missing ? FOLDER_NOT_MADE_YET : null;
         }}
         onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}
         onRename={(next) => {
@@ -172,18 +194,19 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onClose={onClose}
       />
     );
-  } else if (view.kind === "campaigns") {
-    body = <SettingsCampaigns rows={c.rows} onEdit={(id) => c.setView({ kind: "campaign", id })} onAdd={() => c.setAdding(true)} onBack={c.back} onClose={onClose} />;
-  } else if (view.kind === "folder") {
+  } else if (view.kind === "signin") {
     body = (
-      <SettingsFolder
-        label={c.clipsFolderLabel}
-        problem={problem}
-        onChange={() => void c.campaigns.pickParentClipsDir().then((p) => setProblem(p ?? ""))}
+      <SettingsSignIn
+        problem={cookies.problem}
+        done={cookies.done}
+        onFile={(f) => void cookies.onFile(f)}
+        onChoose={() => void cookies.choose()}
         onBack={c.back}
         onClose={onClose}
       />
     );
+  } else if (view.kind === "campaigns") {
+    body = <SettingsCampaigns rows={c.rows} onEdit={(id) => c.setView({ kind: "campaign", id })} onAdd={() => c.setAdding(true)} onBack={c.back} onClose={onClose} />;
   } else {
     body = (
       <SettingsTopList
@@ -194,14 +217,17 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onAutoUpdate={c.setAutoUpdate}
         onPatchApp={c.patchApp}
         onOpenCampaigns={() => c.setView({ kind: "campaigns" })}
-        onOpenFolder={() => c.setView({ kind: "folder" })}
+        folderProblem={problem}
+        signedIn={connection.connected}
+        onOpenSignIn={() => c.setView({ kind: "signin" })}
+        onChangeFolder={() => void c.campaigns.pickParentClipsDir().then((p) => setProblem(p ?? ""))}
         onClose={onClose}
       />
     );
   }
 
   return (
-    <div id="ui-settings-drawer" className="absolute inset-y-0 right-0 z-30 max-w-full overflow-y-auto">
+    <div id="ui-settings-drawer" ref={root} onKeyDown={onKeyDown} className="absolute inset-y-0 right-0 z-30 max-w-full overflow-y-auto">
       <Drawer label="Settings">{body}</Drawer>
       <CampaignForm
         open={c.adding}

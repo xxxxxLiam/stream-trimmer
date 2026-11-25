@@ -4,6 +4,7 @@
  * Description: The pure decisions behind the timeline tools: the scissors' two clicks (a start, then
  *   an end; they only mark, never seek), grabbing a range's edge, and zooming in or out.
  */
+import { ZOOM_MIN } from "../../../modules/layout/hooks/useToolState";
 import { DEFAULT_SIZES } from "../../../modules/layout/utils/panelLayout";
 export const EDGE_GRAB_PX = 8;
 
@@ -34,17 +35,17 @@ export const zoomStep = (alt: boolean) => (alt ? -ZOOM_STEP : ZOOM_STEP);
 export function pickHintLead(tool: string): string {
   switch (tool) {
     case "clip":
-      return "Click to set the start, click again for the end";
+      return "Click the pictures to set the start, click again for the end";
     case "range":
-      return "Drag on the timeline";
+      return "Drag across the pictures";
     case "flag":
-      return "Flags mark a spot; use Select range to drag a part";
+      return "Flags mark a spot; press D, then drag across the pictures";
     case "hand":
-      return "The hand moves the view; use Select range to drag a part";
+      return "The hand moves the view; press D, then drag across the pictures";
     case "zoom":
-      return "Zoom resizes the view; use Select range to drag a part";
+      return "Zoom resizes the view; press D, then drag across the pictures";
     default:
-      return "Choose Select range, then drag on the timeline";
+      return "Press D, then drag across the pictures";
   }
 }
 
@@ -71,9 +72,11 @@ export const clampX = (x: number, width: number) => Math.min(Math.max(0, x), Mat
 export const cursorFor = (tool: keyof typeof TOOL_CURSORS, alt: boolean) =>
   tool === "zoom" && alt ? "cursor-zoom-out" : TOOL_CURSORS[tool];
 
-/** The zoom (0 to 100) for a press or drag at `clientX` on a slider whose track starts at `left`. */
+/** The zoom (ZOOM_MIN to 100) for a press or drag at `clientX` on a slider whose track starts at `left`. */
 export const zoomFromX = (clientX: number, left: number, width: number) =>
-  width > 0 ? Math.min(100, Math.max(0, ((clientX - left) / width) * 100)) : 0;
+  width > 0 ? ZOOM_MIN + Math.min(1, Math.max(0, (clientX - left) / width)) * (100 - ZOOM_MIN) : 0;
+/** Where the thumb sits (0 to 100 %) for a zoom. */
+export const zoomThumbPercent = (zoom: number) => ((Math.min(100, Math.max(ZOOM_MIN, zoom)) - ZOOM_MIN) / (100 - ZOOM_MIN)) * 100;
 
 /** The mouse cursor for each tool, over the whole timeline: an arrow, crosshair (scissors), resize bar (range), cell, hand and magnifier. */
 export const TOOL_CURSORS = {
@@ -108,6 +111,51 @@ export function placeLabels(bars: readonly LabelBar[], laneWidth: number): Label
     const room = (next ?? laneWidth) - right - 4;
     out[i] = room >= 24 ? { inside: false, outsideWidth: Math.min(room, labelWidth(b.label)) } : { inside: true, outsideWidth: 0 };
   });
+  return out;
+}
+
+/**
+ * Dragging the playhead (or a range edge) near either end of a zoomed timeline scrolls it: -1..1 for how hard
+ * to push left or right, 0 in the middle. Right at the edge, or past it, is full speed.
+ */
+export const EDGE_ZONE = 32;
+export function edgeScroll(x: number, width: number, zone = EDGE_ZONE): number {
+  if (!(width > 2 * zone)) return 0;
+  if (x < zone) return -Math.min(1, (zone - x) / zone);
+  if (x > width - zone) return Math.min(1, (x - (width - zone)) / zone);
+  return 0;
+}
+
+/**
+ * V18-T-6: bars that overlap on the lane (a long video at Fit makes every clip about 18px) are stacked
+ * into rows instead of drawn on top of each other. Bars in a cluster of overlaps share the cluster's row
+ * count; a bar that overlaps nothing stays alone in one row, drawn full height as before.
+ */
+export type RowSlot = { row: number; rows: number; from: number; to: number };
+export function packRows(bars: readonly { left: number; width: number }[]): RowSlot[] {
+  const out: RowSlot[] = bars.map((b) => ({ row: 0, rows: 1, from: b.left, to: b.left + b.width }));
+  const order = bars.map((_, i) => i).sort((a, b) => bars[a].left - bars[b].left || a - b);
+  let cluster: number[] = [];
+  let clusterRight = -Infinity;
+  const rowRights: number[] = [];
+  const flush = () => {
+    const from = Math.min(...cluster.map((i) => bars[i].left));
+    for (const i of cluster) Object.assign(out[i], { rows: rowRights.length, from, to: clusterRight });
+    cluster = [];
+    rowRights.length = 0;
+    clusterRight = -Infinity;
+  };
+  for (const i of order) {
+    const b = bars[i];
+    if (cluster.length && b.left >= clusterRight) flush();
+    let row = rowRights.findIndex((r) => b.left >= r);
+    if (row < 0) row = rowRights.push(0) - 1;
+    rowRights[row] = b.left + b.width;
+    out[i].row = row;
+    cluster.push(i);
+    clusterRight = Math.max(clusterRight, b.left + b.width);
+  }
+  flush();
   return out;
 }
 

@@ -70,9 +70,8 @@ export default function CentredDialog({
     <div
       data-covers-app=""
       className={`fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto p-4 sm:p-8 ${
-        modal ? "" : "pointer-events-none"
+        modal ? "bg-bg-overlay-50" : "pointer-events-none"
       }`}
-      style={modal ? { background: "rgba(0,0,0,0.45)" } : undefined}
       onMouseDown={(e) => {
         if (modal && e.target === e.currentTarget) onClose();
       }}

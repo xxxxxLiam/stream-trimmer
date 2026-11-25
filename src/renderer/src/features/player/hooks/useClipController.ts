@@ -8,8 +8,10 @@ import { useEffect, useRef, useState } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
+import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { availableDestinations, clipReason, clipSections, sectionsLength } from "../utils/clipDestination";
+import { dialogOpen } from "../../../shared/utils/dialogOpen";
 import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
 
@@ -18,6 +20,7 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
   const host = usePanelHost();
   const { segments } = useSegmentsState();
   const tabActive = useIsTabActive();
+  const { active: activeCampaign } = useCampaign();
   const [destination, setDestination] = useClipDestination();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -42,10 +45,23 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     totalSeconds: sectionsLength(toCut),
     startSet: startText.trim() !== "",
     endSet: endText.trim() !== "",
+    noCampaign: !activeCampaign,
   });
 
+  // B2-9: Ctrl+Enter while Clip is blocked shows the same line the dimmed button shows on hover.
+  const [reasonShown, setReasonShown] = useState(false);
+  useEffect(() => {
+    if (!reasonShown) return;
+    const id = window.setTimeout(() => setReasonShown(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [reasonShown]);
+  useEffect(() => {
+    if (!reason) setReasonShown(false);
+  }, [reason]);
+
   const clip = () => {
-    if (!reason) host.cutSegments(toCut);
+    if (reason) return setReasonShown(true);
+    host.cutSegments(toCut);
   };
   const clipRef = useRef(clip);
   clipRef.current = clip;
@@ -54,7 +70,8 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
   useEffect(() => {
     if (!opts.listenForKey || !tabActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      // F3-1: with a drawer or dialog open (Help's search, the report note) the key belongs to it, not to a clip behind it.
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !dialogOpen()) {
         e.preventDefault();
         clipRef.current();
       }
@@ -65,6 +82,7 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
 
   return {
     reason,
+    reasonShown,
     clip,
     hasRange,
     destination,

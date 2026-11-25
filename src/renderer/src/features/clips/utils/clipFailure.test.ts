@@ -184,3 +184,9 @@ test("a rejected saved sign-in gets its own row with Sign in", () => {
   assert.deepEqual(failureCopy("expired", 1), { reason: "YouTube ended your sign-in.", detail: "Sign in again, then Retry. Your range is kept." });
   assert.deepEqual(failureActions("expired", 1), ["signIn", "retry"]);
 });
+
+test("C4-5: a path through a file says a folder cannot be made there, not that the drive is unplugged", () => {
+  assert.equal(classifyClipFailure("folder_unusable"), "nofolder");
+  assert.deepEqual(failureCopy("nofolder", 1, undefined, false, undefined, "Acme"), { reason: "Clipr can’t make Acme’s folder there.", detail: "A file is in the way. Pick another folder." });
+  assert.deepEqual(failureActions("nofolder", 1), ["changeFolder"]);
+});

@@ -67,3 +67,20 @@ export const IconSaveFile = () => (
     <path d="M8 2.5v7M5 6.8L8 9.8l3-3M3 12.5h10" />
   </Row14>
 );
+export const IconMore = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false" className="flex-none">
+    <circle cx="3.5" cy="8" r="1.2" />
+    <circle cx="8" cy="8" r="1.2" />
+    <circle cx="12.5" cy="8" r="1.2" />
+  </svg>
+);
+export const IconRename = () => (
+  <Row14>
+    <path d="M10.5 3.5l2 2M3 13l.5-2.5 7-7 2 2-7 7z" />
+  </Row14>
+);
+export const IconOpenOnSite = () => (
+  <Row14>
+    <path d="M7 3H3.5A1 1 0 002.5 4v8.5a1 1 0 001 1H12a1 1 0 001-1V9M9.5 2.5h4v4M13.5 2.5L7.5 8.5" />
+  </Row14>
+);

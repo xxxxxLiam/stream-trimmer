@@ -329,9 +329,14 @@ async function writeFcpxml({ dirPath, filename, contents }: { dirPath?: unknown;
   if (typeof contents !== "string" || !contents.startsWith("<?xml")) {
     return { ok: false, error: "That is not an FCPXML document." };
   }
-  const target = path.join(dirPath, safeFilename(filename, ".fcpxml"));
+  const wanted = path.join(dirPath, safeFilename(filename, ".fcpxml"));
   try {
     await fsImpl.mkdir(dirPath, { recursive: true });
+    // A later send never overwrites an earlier file: " 2", " 3" before the extension, as clip files are named.
+    const ext = path.extname(wanted);
+    const stem = wanted.slice(0, wanted.length - ext.length);
+    let target = wanted;
+    for (let i = 2; i < 1000 && (await fsImpl.access(target).then(() => true, () => false)); i += 1) target = `${stem} ${i}${ext}`;
     await fsImpl.writeFile(target, contents, "utf8");
     return { ok: true, path: target };
   } catch (err: any) {

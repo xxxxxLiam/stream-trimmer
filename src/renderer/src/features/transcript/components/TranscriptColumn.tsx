@@ -119,7 +119,7 @@ export default function TranscriptColumn({
 }: TranscriptColumnProps) {
   const clipper = useClipperContext();
   const { active: campaign } = useCampaign();
-  const { info, videoId, transcript, loadingTranscript, ensureTranscript, seekRequest } = clipper;
+  const { info, videoId, transcript, transcriptError, loadingTranscript, ensureTranscript, seekRequest } = clipper;
 
   // Load lazily the first time a video is present.
   useEffect(() => {
@@ -219,18 +219,7 @@ export default function TranscriptColumn({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [follow, w.playheadIndex]);
 
-  // Cmd/Ctrl+F focuses the search box.
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f" && searchRef.current) {
-        e.preventDefault();
-        searchRef.current.focus();
-        searchRef.current.select();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // Cmd/Ctrl+F is handled app-wide (routes/App.tsx): it opens this tab and focuses the search box.
 
   // ---- click to seek, drag to set a range -------------------------------------------------
   type Drag = { a: number; b: number; pa: LinePoint; pb: LinePoint };
@@ -348,11 +337,14 @@ export default function TranscriptColumn({
             value={w.query}
             onChange={(e) => w.setQuery(e.target.value)}
             onKeyDown={onSearchKey}
-            disabled={!hasTranscript}
+            // B4-2: read-only, not disabled, so Ctrl+F can still put the keyboard here and typed letters
+            // never reach the tool keys while there is nothing to search.
+            readOnly={!hasTranscript}
+            aria-disabled={!hasTranscript}
             placeholder="Search, or click a line"
             autoComplete="off"
             spellCheck={false}
-            className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim disabled:text-disabled disabled:placeholder:text-disabled"
+            className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim aria-disabled:text-disabled aria-disabled:placeholder:text-disabled"
           />
           {w.counter && (
             <span className="flex-none text-meta text-fg-dim" aria-live="polite" aria-label={`Match ${w.counter}`}>
@@ -386,7 +378,7 @@ export default function TranscriptColumn({
         ) : !hasTranscript ? (
           <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">
             {transcript && transcript.length === 0
-              ? "No transcript available for this video."
+              ? (transcriptError ?? "No transcript available for this video.")
               : info
                 ? "No transcript loaded."
                 : "Load a video to see its transcript."}

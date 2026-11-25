@@ -13,8 +13,8 @@ import LaneLabel from "./LaneLabel";
 
 export default function AudioLanes({ c }: { c: TimelineController }) {
   if (c.audioLanes.length === 0 || c.opening) return null;
-  const first = c.axis.pieces[0]?.t0 ?? 0;
-  const last = c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? c.duration;
+  const first = Math.max(0, c.axis.pieces[0]?.t0 ?? 0);
+  const last = Math.min(c.duration, c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? c.duration);
   const left = toX(c.axis, first);
   const width = Math.max(0, toX(c.axis, last) - left);
   return (

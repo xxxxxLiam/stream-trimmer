@@ -21,6 +21,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.clipDestination",
   "clipper.clipsDir",
   "clipper.cookieBrowser",
+  "clipper.cutInFlight",
   "clipper.dataDir",
   "clipper.dataDirConfirmed",
   "clipper.downloads",
@@ -42,6 +43,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.tips.on",
   "clipper.tips.seen",
   "clipper.transcriptLane",
+  "clipper.audioLanes",
   "clipper.workspaces",
 ]);
 

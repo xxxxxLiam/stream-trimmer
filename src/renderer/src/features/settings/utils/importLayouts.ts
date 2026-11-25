@@ -4,7 +4,7 @@
  * Description: The layout templates a campaign can choose for Final Cut (A to D): their names, one-line
  *   descriptions, and the small tree that previews each one with the campaign's real names. Pure.
  */
-import type { FcpLayout } from "../../../shared/utils/fcpxml";
+import { keywordText, type FcpLayout } from "../../../shared/utils/fcpxml";
 
 export type LayoutOption = { id: FcpLayout; name: string; blurb: string };
 
@@ -39,12 +39,12 @@ export function layoutTree(id: FcpLayout, n: PreviewNames): TreeLine[] {
   const videos = n.videos.length > 0 ? n.videos : ["Your first video"];
   if (id === "export") {
     out.push({ depth: 1, label: n.event || "Export", note: "event" });
-    for (const v of videos) out.push({ depth: 2, label: v, note: "keyword collection" }, ...leaves(3));
+    for (const v of videos) out.push({ depth: 2, label: keywordText(v), note: "keyword collection" }, ...leaves(3));
   } else if (id === "video") {
     for (const v of videos) out.push({ depth: 1, label: v, note: "event" }, ...leaves(2));
   } else if (id === "day") {
     out.push({ depth: 1, label: n.day, note: "event" });
-    for (const v of videos) out.push({ depth: 2, label: v, note: "keyword collection" }, ...leaves(3));
+    for (const v of videos) out.push({ depth: 2, label: keywordText(v), note: "keyword collection" }, ...leaves(3));
   } else {
     out.push({ depth: 1, label: n.event || "Export", note: "event" }, ...leaves(2));
   }

@@ -81,3 +81,28 @@ test("App mounts it", () => {
   );
   assert.match(app, /<StartFreshPrompt \/>/);
 });
+
+test("E3-1: only the visible workspace tab mounts the start-fresh dialog and the restored note", () => {
+  const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
+  assert.match(app, /\{active && <StartFreshPrompt \/>\}/);
+  assert.match(app, /\{active && <SettingsRestoredNote \/>\}/);
+});
+
+test("A3-4: focus starts on Keep my data, stays in the dialog and Tab wraps inside it", () => {
+  const src = readFileSync(new URL("./StartFreshDialog.tsx", import.meta.url), "utf8");
+  assert.match(src, /useModalFocus\(root, "\[data-start-fresh-first\]"\)/);
+  assert.match(src, /ref=\{root\}[\s\S]*onKeyDown=\{onKeyDown\}/);
+  assert.match(renderToStaticMarkup(<StartFreshDialog busy={false} error="" onStartFresh={() => {}} onKeep={() => {}} />), /data-start-fresh-first[^>]*>Keep my data</);
+  const hook = readFileSync(new URL("../../../shared/hooks/useModalFocus.ts", import.meta.url), "utf8");
+  assert.match(hook, /addEventListener\("focusin"/);
+  assert.match(hook, /wrapTarget\(focusableIn/);
+});
+
+test("A3-6: the scrim is a named token in both dialogs, not a raw rgba", () => {
+  const dialog = readFileSync(new URL("./StartFreshDialog.tsx", import.meta.url), "utf8");
+  const centred = readFileSync(new URL("../../../shared/components/CentredDialog.tsx", import.meta.url), "utf8");
+  for (const src of [dialog, centred]) {
+    assert.match(src, /bg-bg-overlay-50/);
+    assert.doesNotMatch(src, /rgba\(/);
+  }
+});

@@ -109,7 +109,7 @@ test("DrawerHeader: back appears on the second view; close always names Settings
 test("Row states: open glows Ice, made glows Frost, dimmed fades, idle is flat", () => {
   assert.match(html(<Row state="open" />), /border-ice shadow-open/);
   assert.match(html(<Row state="made" />), /border-frost-tint-45 shadow-made/);
-  assert.match(html(<Row state="dimmed" />), /opacity-55/);
+  assert.match(html(<Row state="dimmed" />), /text-disabled/);
   assert.doesNotMatch(html(<Row />), /shadow-/);
 });
 
@@ -125,6 +125,12 @@ test("UndoRing drains with the seconds left", () => {
   assert.ok(offset(4) > 0 && offset(4) < offset(1));
   assert.ok(Math.abs(offset(0) - 2 * Math.PI * 13) < 0.01);
   assert.match(html(<UndoRing secondsLeft={4.2} onUndo={() => {}} icon={glyph} />), /aria-label="Undo, 5 seconds left"/);
+});
+
+test("the logo's glow is not cropped by its own box: the svg lets it overflow", () => {
+  assert.match(html(<BrandMark glow />), /overflow:\s*visible/);
+  const lockup = html(<BrandLockup size={64} glow />);
+  assert.match(lockup, /<svg[^>]*style="[^"]*overflow:\s*visible/);
 });
 
 test("BrandMark is the two-blade mark in Frost over Ice; the lockup adds the name", () => {

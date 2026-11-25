@@ -510,20 +510,21 @@ export function CampaignTabScope({
     [active, defaultFolders],
   );
 
+  // A campaign named by the caller (Settings edits any campaign, not just the tab's) gets the folder; without one, the tab's own.
   const setClipsDir = useCallback(
-    (dir: string) => setClipsDirGlobal(dir, id ?? undefined),
+    (dir: string, forId?: string) => setClipsDirGlobal(dir, idOrUndefined(forId) ?? id ?? undefined),
     [setClipsDirGlobal, id],
   );
   const setDataDir = useCallback(
-    (dir: string) => setDataDirGlobal(dir, id ?? undefined),
+    (dir: string, forId?: string) => setDataDirGlobal(dir, idOrUndefined(forId) ?? id ?? undefined),
     [setDataDirGlobal, id],
   );
   const pickClipsDir = useCallback(
-    () => pickClipsDirGlobal(id ?? undefined),
+    (forId?: string) => pickClipsDirGlobal(idOrUndefined(forId) ?? id ?? undefined),
     [pickClipsDirGlobal, id],
   );
   const pickDataDir = useCallback(
-    () => pickDataDirGlobal(id ?? undefined),
+    (forId?: string) => pickDataDirGlobal(idOrUndefined(forId) ?? id ?? undefined),
     [pickDataDirGlobal, id],
   );
 

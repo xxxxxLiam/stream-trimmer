@@ -131,3 +131,18 @@ test("C2-12: skipping one of two rows with the same name frees the other, and a 
   assert.deepEqual(afterRename.map((r) => r.problem), [undefined, undefined]);
   assert.equal(afterRename[1].name, "Second Take");
 });
+
+test("C4-2: header-less rows in the hint's order (name, start, end) read for the open video, comma or tab", () => {
+  const rows = parseMoments(["Honest Version, 1:12:04, 1:12:46", "Big Deal\t0:41:10\t0:41:51\t8.4"].join("\n"), ctx);
+  assert.deepEqual(rows.map((r) => [r.name, r.start, r.end, r.problem]), [["Honest Version", 4324, 4366, undefined], ["Big Deal", 2470, 2511, undefined]]);
+  assert.equal(rows[1].rating, 8.4);
+  // The Copy format (video first) still reads as before.
+  const copy = parseMoments(`${A}\t0:08:02\t0:08:35\tHot Take\t7\tMoney\t3\t`, ctx);
+  assert.deepEqual([copy[0].name, copy[0].start], ["Hot Take", 482]);
+});
+
+test("C4-4: a plain line that runs past the end of the open video says so", () => {
+  const rows = parseMoments("2:14:00-2:20:00 Ran Over", ctx);
+  assert.equal(rows[0].end, 8073);
+  assert.equal(rows[0].ranPastEnd, 8073);
+});
