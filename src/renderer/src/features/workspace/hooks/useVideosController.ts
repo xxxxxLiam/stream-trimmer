@@ -5,17 +5,15 @@
  *   waiting count, the pill search, opening a pasted link, folding a video into Done with its
  *   8 s Undo line.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { bankStore } from "../../../shared/utils/bank";
 import { extractVideoId } from "../../../shared/utils/clip";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
+import { doneUndoStore } from "../utils/doneUndoStore";
 import { useMakingClipId } from "../../../shared/utils/clipNameStore";
-import { linkKind, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
-
-/** How long "Moved … to Done · Undo" stays. */
-export const UNDO_MS = 8000;
+import { linkInText, linkKind, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
 
 export type VideoRow = {
   id: string;
@@ -39,15 +37,7 @@ export function useVideosController() {
   const [doneOpen, setDoneOpen] = useState(false);
   /** One line under the search when a pasted link cannot be opened (B-6). */
   const [linkError, setLinkError] = useState("");
-  const [undo, setUndo] = useState<{ id: string; title: string } | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
+  const undo = useSyncExternalStore(doneUndoStore.subscribe, doneUndoStore.get, doneUndoStore.get);
 
   const toRow = useCallback(
     (t: WorkspaceTab): VideoRow => {
@@ -74,9 +64,7 @@ export function useVideosController() {
   const doneVideo = useCallback(
     (row: VideoRow) => {
       ws.setTabDone(row.id, true);
-      setUndo({ id: row.id, title: row.title });
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => setUndo(null), UNDO_MS);
+      doneUndoStore.show({ id: row.id, title: row.title });
     },
     [ws],
   );
@@ -84,31 +72,35 @@ export function useVideosController() {
   const undoDone = useCallback(() => {
     if (!undo) return;
     ws.setTabDone(undo.id, false);
-    setUndo(null);
-    if (timer.current) clearTimeout(timer.current);
+    doneUndoStore.clear();
   }, [ws, undo]);
 
-  const submit = useCallback(() => {
-    const value = text.trim();
+  const submitValue = useCallback((raw: string) => {
+    const value = raw.trim();
     if (!value) return;
-    const kind = linkKind(value);
+    // Pasted share text: the video link inside it opens, the rest is dropped (B2-5).
+    const inside = /\s/.test(value) ? linkInText(value) : null;
+    const target = inside ?? value;
+    const kind = inside ? "video" : linkKind(value);
     if (kind === "bad") {
       setLinkError("That isn't a YouTube video link");
       return;
     }
     setLinkError("");
     if (kind === "video") {
-      const vid = extractVideoId(value);
+      const vid = extractVideoId(target);
       const same = vid ? ws.tabs.find((t) => t.url && extractVideoId(t.url) === vid) : undefined;
       if (same) {
         if (same.done) ws.setTabDone(same.id, false);
         ws.selectTab(same.id);
-      } else ws.addTab(value);
+      } else ws.addTab(target);
     } else {
       setPills((p) => (p.includes(value) ? p : [...p, value]));
     }
     setText("");
-  }, [text, ws]);
+  }, [ws]);
+
+  const submit = useCallback(() => submitValue(text), [submitValue, text]);
 
   return {
     opening,
@@ -121,6 +113,12 @@ export function useVideosController() {
     },
     linkError,
     submit,
+    /** True when pasted text held a video link and it was opened, so the box should take nothing. */
+    pasteText: (pasted: string): boolean => {
+      if (!/\s/.test(pasted.trim()) || !linkInText(pasted)) return false;
+      submitValue(pasted);
+      return true;
+    },
     removePill: (p: string) => setPills((all) => all.filter((x) => x !== p)),
     clearFilters: () => {
       setPills([]);

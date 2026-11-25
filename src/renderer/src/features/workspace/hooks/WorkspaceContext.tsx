@@ -28,6 +28,7 @@ import {
 import { setDone, nextOpenId } from "../utils/videoList";
 import { activeAfterClose, moveItem, stepIndex } from "../../../shared/utils/tabOps";
 import { workspaceShortcut } from "../utils/workspaceShortcuts";
+import { abandon, backTarget, savedWorkspace, type CameFrom, type Trying } from "../utils/tabHistory";
 
 const STORE_KEY = "clipper.workspaces";
 
@@ -144,6 +145,12 @@ export type WorkspaceState = {
   selectTab: (id: string) => void;
   /** Open a new video; with a link it loads that video. */
   addTab: (url?: string) => void;
+  /** The video "Back" returns to from tab `id` (the one it was added from), or null. */
+  backTargetFor: (id: string) => string | null;
+  /** Leave a video that would not open: it is dropped and the one you came from is shown. */
+  goBack: (id: string) => void;
+  /** The tab's link opened, so it is a real video now and is saved. */
+  markOpened: (id: string) => void;
   /** Fold a video into Done, or bring it back. Marking the open one moves to the next open video. */
   setTabDone: (id: string, done: boolean) => void;
   /** Close a tab. False when the user backed out of the confirmation and nothing closed. */
@@ -188,18 +195,59 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const activeRef = useRef(activeId);
   activeRef.current = activeId;
 
+  // A video added from a pasted link remembers where you were and is not saved until it has opened (B2-1).
+  const [cameFrom, setCameFrom] = useState<CameFrom>({});
+  const [trying, setTrying] = useState<Trying>({});
+  const cameFromRef = useRef(cameFrom);
+  cameFromRef.current = cameFrom;
+
   useEffect(() => {
-    writeSetting(STORE_KEY, { tabs, activeId });
-  }, [tabs, activeId]);
+    writeSetting(STORE_KEY, savedWorkspace(tabs, activeId, trying, cameFrom));
+  }, [tabs, activeId, trying, cameFrom]);
 
   const selectTab = useCallback((id: string) => setActiveId(id), []);
 
   const addTab = useCallback((url?: string) => {
     const id = newId();
     const link = typeof url === "string" ? url.trim() : "";
+    setCameFrom((prev) => ({ ...prev, [id]: activeRef.current }));
+    if (link) setTrying((prev) => ({ ...prev, [id]: true }));
     setTabs((prev) => [...prev, link ? { id, name: "", url: link } : { id, name: "" }]);
     setActiveId(id);
   }, []);
+
+  const backTargetFor = useCallback((id: string) => backTarget(tabsRef.current, cameFromRef.current, id), []);
+
+  const markOpened = useCallback((id: string) => {
+    setTrying((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  const goBack = useCallback((id: string) => {
+    const current = tabsRef.current;
+    const tab = current.find((t) => t.id === id);
+    const target = backTarget(current, cameFromRef.current, id);
+    // A video that opened stays in the list; one that never did goes away.
+    if (tab && (!tab.url || trying[id])) {
+      const gone = abandon(current, cameFromRef.current, id);
+      cancels.current.delete(id);
+      if (gone.tabs.length === 0) {
+        const fresh = { id: newId(), name: "" };
+        setTabs([fresh]);
+        setActiveId(fresh.id);
+        return;
+      }
+      setTabs(gone.tabs);
+      if (gone.activeId) setActiveId(gone.activeId);
+      return;
+    }
+    if (target) setActiveId(target);
+  }, [trying]);
+
 
   const setTabDone = useCallback((id: string, done: boolean) => {
     const current = tabsRef.current;
@@ -348,6 +396,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       labelFor,
       selectTab,
       addTab,
+      backTargetFor,
+      goBack,
+      markOpened,
       setTabDone,
       closeTab,
       moveTab,
@@ -365,6 +416,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       labelFor,
       selectTab,
       addTab,
+      backTargetFor,
+      goBack,
+      markOpened,
       setTabDone,
       closeTab,
       moveTab,
@@ -485,6 +539,7 @@ function TabBridge({
       pending.current = null;
     }
     if (!restored.current) return;
+    if (opened) ws.markOpened(id);
     if (pickedPending.current) {
       // The saved In/Out waits for the video's info; reporting now would overwrite it with nothing.
       if (!clipper.info) return;
