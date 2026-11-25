@@ -62,9 +62,13 @@ test("F4-2: Ctrl+, and Ctrl+/ swap the right drawers like the buttons, one at a 
   assert.match(src, /k === ","[\s\S]{0,200}setHelpOpen\(false\);\s*setSettingsOpen\(\(v\) => !v\)/);
 });
 
-test("F4-1: a failed update download clears the percent; F4-4: Done with this video meets the 44px target", () => {
+test("F4-1: a failed update download clears the percent; F4-4/List rows: Videos rows use the shared ⋯ row (44px action lines), no hover-only button", () => {
   const hook = readFileSync(new URL("../features/updates/hooks/useUpdateStatusEffects.ts", import.meta.url), "utf8");
   assert.match(hook, /s\.state === "error"\) setDownloading\(null\)/);
   const panel = readFileSync(new URL("../features/workspace/components/VideosPanel.tsx", import.meta.url), "utf8");
-  assert.match(panel, /aria-label="Done with this video"[\s\S]{0,200}h-\[44px\] w-\[44px\]/);
+  assert.match(panel, /<ActionRow[\s\S]{0,200}actions=\{actions\}/);
+  assert.match(panel, /Mark done[\s\S]{0,400}Open on YouTube[\s\S]{0,400}Remove video/);
+  assert.doesNotMatch(panel, /group-hover|Done with this video/);
+  const row = readFileSync(new URL("../shared/components/ActionRow.tsx", import.meta.url), "utf8");
+  assert.match(row, /h-\[44px\]/);
 });

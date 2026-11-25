@@ -245,7 +245,13 @@
    "wait": 200
   },
   {
-   "eval": "(()=>{const t=[...document.querySelectorAll('#ui-panels-left button')].find(b=>b.textContent.includes('Launch recap')); t.parentElement.querySelector(\"button[aria-label='Done with this video']\").click();})()"
+   "eval": "document.querySelector(\"#ui-panels-left button[aria-label='More for Launch recap']\").click()"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "[...document.querySelectorAll('#ui-panels-left [role=menuitem]')].find(b=>b.textContent.includes('Mark done')).click()"
   },
   {
    "wait": 300

@@ -154,12 +154,12 @@ export type WorkspaceState = {
   /** Fold a video into Done, or bring it back. Marking the open one moves to the next open video. */
   setTabDone: (id: string, done: boolean) => void;
   /** Close a tab. False when the user backed out of the confirmation and nothing closed. */
-  closeTab: (id: string) => boolean;
+  closeTab: (id: string, opts?: { silent?: boolean }) => boolean;
   /** Put tab `id` at `toIndex` (drag, or the keyboard move). */
   moveTab: (id: string, toIndex: number) => void;
   renameTab: (id: string, name: string) => void;
   /** Bring back the most recently closed tab (Ctrl/Cmd+Shift+T). Returns false when none. */
-  reopenTab: () => boolean;
+  reopenTab: (id?: string) => boolean;
   closedCount: number;
   /** A tab reports what it holds so a relaunch or reopen can restore it. */
   reportTabWork: (
@@ -259,10 +259,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const closeTab = useCallback(
-    (id: string): boolean => {
+    (id: string, opts?: { silent?: boolean }): boolean => {
       const busy = metaRef.current[id]?.busy;
+      // Remove video asks nothing (it is undoable for 8 s), so a silent close skips both prompts.
+      const silent = !!opts?.silent;
       if (busy) {
         const ok =
+          silent ||
           typeof window === "undefined" ||
           window.confirm(
             "This tab has a job running. Closing it will cancel that job. Continue?",
@@ -277,6 +280,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!busy) {
         const work = closing.segments?.length ?? 0;
         if (
+          !silent &&
           work > 0 &&
           typeof window !== "undefined" &&
           !window.confirm(
@@ -335,9 +339,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const reopenTab = useCallback((): boolean => {
-    const [last, ...rest] = closedRef.current;
+  const reopenTab = useCallback((id?: string): boolean => {
+    const at = id ? closedRef.current.findIndex((c) => c.tab.id === id) : 0;
+    const last = closedRef.current[at];
     if (!last) return false;
+    const rest = closedRef.current.filter((_, i) => i !== at);
     setClosed(rest);
     setTabs((prev) => reinsertTab(prev, last));
     setActiveId(last.tab.id);
