@@ -39,7 +39,6 @@ import { parseLook } from "../../../../../common/utils/fcpLook";
 import { normalizeCampaigns } from "../../../shared/utils/campaigns";
 import { KEY_LOOK_MIGRATED, loadSavedLooks, lookForCampaign } from "../../../shared/utils/fcpLooks";
 import { readSetting } from "../../../shared/utils/persist";
-import LookEditor from "./LookEditor";
 
 type Result = { ok: boolean; error?: string; missing?: string; path?: string };
 
@@ -364,7 +363,7 @@ const OPTIONS: { value: AfterCutting; label: string }[] = [
   { value: "finalcut", label: "Send to Final Cut Pro" },
 ];
 
-type SectionId = "library" | "projects" | "look" | "capcut";
+type SectionId = "library" | "projects" | "capcut";
 
 /** Last path segment, for a one-line summary of a long path. */
 function baseName(path: string): string {
@@ -373,18 +372,6 @@ function baseName(path: string): string {
     return decodeURIComponent(last);
   } catch {
     return last;
-  }
-}
-
-/** What "my look" is set to, and what is wrong with it if anything. */
-function describeLook(settings: EditorHandoffSettings): { summary: string; problem: string } {
-  if (!settings.applyLook) return { summary: "Off", problem: "" };
-  try {
-    const look = parseLook(settings.lookXml ?? "");
-    return { summary: look.found.length > 0 ? look.found.join(", ") : "On", problem: "" };
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    return { summary: "Needs attention", problem: `My look: ${why}` };
   }
 }
 
@@ -491,8 +478,7 @@ export default function EditorHandoff({
       libraryProblem = "The library path must be the full path, starting with /.";
     }
   }
-  const look = describeLook(settings);
-  const problems = [libraryProblem, look.problem].filter(Boolean);
+  const problems = [libraryProblem].filter(Boolean);
   const previewNames = resolveProjectNames(clips.slice(-3), {
     namePattern: settings.projectNamePattern,
     campaignName,
@@ -817,15 +803,6 @@ export default function EditorHandoff({
                   </select>
                 </label>
               </div>
-            </Section>
-            <Section
-              panelId={`${titleId}-look`}
-              title="My look"
-              summary={look.summary}
-              open={section === "look"}
-              onToggle={() => toggle("look")}
-            >
-              <LookEditor settings={settings} onChange={set} />
             </Section>
             <Section
               panelId={`${titleId}-capcut`}
