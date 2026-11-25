@@ -337,11 +337,14 @@ export default function TranscriptColumn({
             value={w.query}
             onChange={(e) => w.setQuery(e.target.value)}
             onKeyDown={onSearchKey}
-            disabled={!hasTranscript}
+            // B4-2: read-only, not disabled, so Ctrl+F can still put the keyboard here and typed letters
+            // never reach the tool keys while there is nothing to search.
+            readOnly={!hasTranscript}
+            aria-disabled={!hasTranscript}
             placeholder="Search, or click a line"
             autoComplete="off"
             spellCheck={false}
-            className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim disabled:text-disabled disabled:placeholder:text-disabled"
+            className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim aria-disabled:text-disabled aria-disabled:placeholder:text-disabled"
           />
           {w.counter && (
             <span className="flex-none text-meta text-fg-dim" aria-live="polite" aria-label={`Match ${w.counter}`}>

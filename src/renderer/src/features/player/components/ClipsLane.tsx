@@ -12,13 +12,16 @@ import { setNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { playFrom } from "../../../shared/utils/playFrom";
 import type { TimelineController } from "../hooks/useTimelineController";
 import { lengthLabel } from "../hooks/useTimelineController";
-import { packRows, placeLabels } from "../utils/laneTools";
+import { labelWidth, packRows, placeLabels } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import ClipNameField from "./ClipNameField";
 import LaneLabel from "./LaneLabel";
 
+/** A bar never draws narrower than its padding and border (8 + 8 + 2), so rows are packed on this. */
+const MIN_BAR = 18;
+const ROW_H = 14;
 const BAR =
   "absolute top-[5px] h-[24px] overflow-hidden text-ellipsis whitespace-nowrap px-[8px] text-meta leading-[22px]";
 
@@ -38,7 +41,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     c.axis.pieces.some((p) => !p.folded && end >= p.t0 && start <= p.t1);
   const span = (start: number, end: number) => {
     const x = toX(c.axis, start);
-    return { left: x, width: Math.max(6, toX(c.axis, end) - x) };
+    return { left: x, width: Math.max(MIN_BAR, toX(c.axis, end) - x) };
   };
   // Drawn left to right as they sit in the video; the clip itself plays them in the order locked.
   // A section that is exactly a banked moment carries that moment's name; otherwise the suggestion.
@@ -105,16 +108,39 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
   const slots = packRows(named.map((n) => span(n.start, n.end)));
   const slotOf = (key: string) => {
     const i = named.findIndex((n) => n.key === key);
-    return i < 0 ? { row: 0, rows: 1 } : slots[i];
+    return i < 0 ? { row: 0, rows: 1, from: 0, to: 0 } : slots[i];
   };
   const stacked = (key: string) => slotOf(key).rows > 1;
   const styleOf = (key: string, start: number, end: number) => {
     const sp = span(start, end);
     const { row, rows } = slotOf(key);
     if (rows < 2) return sp;
-    const h = Math.max(4, Math.floor(24 / rows));
-    return { ...sp, top: 5 + row * h, height: h };
+    return { ...sp, top: 5 + row * ROW_H, height: ROW_H - 2 };
   };
+  // B4-1: a stacked bar is too thin for text, so its name sits beside the stack (right of it, else left),
+  // on the bar's own row; the lane grows to hold the rows.
+  const stackedLabel = (key: string, label: string) => {
+    if (!stacked(key)) return null;
+    const { row, from, to } = slotOf(key);
+    const w = labelWidth(label);
+    const right = Math.max(0, c.width - to - 4);
+    const onRight = right >= Math.min(w, 48) || from < w;
+    const style = onRight
+      ? { left: to + 4, width: Math.min(w, right), top: 5 + row * ROW_H }
+      : { left: Math.max(0, from - 4 - w), width: w, top: 5 + row * ROW_H, textAlign: "right" as const };
+    return (
+      <span
+        key={`${key}-stack-label`}
+        aria-hidden="true"
+        className="pointer-events-none absolute overflow-hidden text-ellipsis whitespace-nowrap text-meta leading-[12px] text-fg-dim"
+        style={style}
+      >
+        {label}
+      </span>
+    );
+  };
+  const laneRows = Math.max(1, ...slots.map((s) => s.rows));
+  const laneHeight = laneRows > 1 ? 10 + laneRows * ROW_H : 34;
   const placeOf = (key: string) => {
     const i = named.findIndex((n) => n.key === key);
     return i < 0 ? { inside: true, outsideWidth: 0 } : places[i];
@@ -135,7 +161,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     );
   };
   return (
-    <div className="flex h-[34px] items-center">
+    <div className="flex items-center" style={{ height: laneHeight }}>
       <LaneLabel>Clips</LaneLabel>
       <div className="relative h-full flex-1 overflow-x-clip overflow-y-visible">
         {c.opening ? null : (
@@ -154,6 +180,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                       ? (u.label ?? u.clipId ?? timeName(u.start))
                       : ""}
                   </button>
+                  {stackedLabel(`used-${u.start}-${u.end}`, u.label ?? u.clipId ?? timeName(u.start))}
                   {outside(
                     `used-${u.start}-${u.end}`,
                     u.start,
@@ -183,6 +210,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                       ? (b.label ?? timeName(b.start))
                       : ""}
                   </button>
+                  {stackedLabel(`wait-${b.start}-${b.end}`, b.label ?? timeName(b.start))}
                   {outside(
                     `wait-${b.start}-${b.end}`,
                     b.start,
@@ -200,6 +228,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                   className={`${BAR} rounded-chip border border-frost text-center font-medium ${placeOf("built").inside && !stacked("built") ? "text-fg" : "text-transparent focus:text-fg"}`}
                   style={styleOf("built", sections[0].start, sections[0].end)}
                 />
+                {stackedLabel("built", building(sections[0].start))}
                 {outside("built", sections[0].start, sections[0].end, building(sections[0].start))}
               </>
             ) : null}
