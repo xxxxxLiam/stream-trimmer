@@ -4,6 +4,7 @@
  * Description: The splash window and the main window, and the one place that
  *   remembers which they are. Nothing else holds a reference to either.
  */
+import { isZoomInChord, maxZoomFactor, zoomInBlocked } from "./zoomLimit";
 import path from "node:path";
 import electron from "electron";
 import { isDev } from "../../shared/utils/env";
@@ -104,6 +105,23 @@ export async function createWindow(port: number) {
       }
     });
   }
+
+  // Zoom (Ctrl/Cmd +) shrinks the page's css width; past a point the preview has no room left. Stop
+  // zoom-in at that point, and pull the zoom back if a resize or a saved zoom already went past it.
+  const clampZoom = () => {
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    const wc = win.webContents;
+    const max = maxZoomFactor(win.getContentSize()[0]);
+    if (wc.getZoomFactor() > max + 1e-6) wc.setZoomFactor(max);
+  };
+  mainWindow.webContents.on("before-input-event", (event: Electron.Event, input: Electron.Input) => {
+    if (!mainWindow || mainWindow.isDestroyed() || !isZoomInChord(input)) return;
+    if (zoomInBlocked(mainWindow.webContents.getZoomLevel(), mainWindow.getContentSize()[0])) event.preventDefault();
+  });
+  mainWindow.webContents.on("zoom-changed", (_e: Electron.Event) => setTimeout(clampZoom, 0));
+  mainWindow.on("resize", clampZoom);
+  mainWindow.webContents.on("did-finish-load", clampZoom);
 
   const appUrl = isDev ? "http://localhost:8080/" : `http://127.0.0.1:${port}/`;
   const appOrigins = [new URL(appUrl).origin];

@@ -18,6 +18,9 @@ const STRIP_BUTTON = "inline-flex h-[44px] w-[36px] items-center justify-center 
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
+/** Drag payload type for moving a tab between groups. */
+export const PANEL_DRAG_TYPE = "application/x-clipr-panel";
+
 export type PanelTabStripProps = {
   /** Names the strip for screen readers, e.g. "Left panels". */
   label: string;
@@ -31,6 +34,8 @@ export type PanelTabStripProps = {
   onAdd: (id: PanelId) => void;
   /** Rows for the group menu, built by the group. */
   menuItems: MenuItem[];
+  /** A tab dropped on this strip, at `index` (or the end when undefined). */
+  onDropPanel?: (id: PanelId, index?: number) => void;
 };
 
 export default function PanelTabStrip({
@@ -43,7 +48,9 @@ export default function PanelTabStrip({
   addable,
   onAdd,
   menuItems,
+  onDropPanel,
 }: PanelTabStripProps) {
+  const [dropping, setDropping] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ start: false, end: false });
 
@@ -96,8 +103,33 @@ export default function PanelTabStrip({
     ? addable.map((d) => ({ key: d.id, label: d.title, onSelect: () => onAdd(d.id) }))
     : [{ key: "none", label: "Every panel is open", disabled: true, onSelect: () => {} }];
 
+  const hasPanel = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes(PANEL_DRAG_TYPE);
+  const dropOn = (e: React.DragEvent, index?: number) => {
+    if (!onDropPanel || !hasPanel(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropping(false);
+    const id = e.dataTransfer.getData(PANEL_DRAG_TYPE);
+    if (id) onDropPanel(id, index);
+  };
+
   return (
-    <div className="flex h-[45px] shrink-0 items-stretch gap-[4px] border-b border-hairline pl-[14px] pr-[4px]">
+    <div
+      data-dropping={dropping || undefined}
+      onDragOver={(e) => {
+        if (!onDropPanel || !hasPanel(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDropping(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+      }}
+      onDrop={(e) => dropOn(e)}
+      className={`flex h-[45px] shrink-0 items-stretch gap-[4px] border-b pl-[14px] pr-[4px] ${
+        dropping ? "border-ice" : "border-hairline"
+      }`}
+    >
       <div className="relative min-w-0 flex-1">
         <div
           ref={scroller}
@@ -117,6 +149,12 @@ export default function PanelTabStrip({
                 aria-selected={selected}
                 aria-controls={panelBodyDomId(t.id)}
                 tabIndex={selected ? 0 : -1}
+                draggable={!!onDropPanel}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(PANEL_DRAG_TYPE, t.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDrop={(e) => dropOn(e, tabs.findIndex((x) => x.id === t.id))}
                 onClick={() => onActivate(t.id)}
                 onKeyDown={(e) => onKeyDown(e, t.id, t.closable !== false)}
                 className={`inline-flex h-full shrink-0 items-center whitespace-nowrap text-body leading-[normal] ${

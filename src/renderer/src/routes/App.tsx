@@ -275,8 +275,9 @@ function Layout({ active }: { active: boolean }) {
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Tips never open beside the first-run campaign prompt: they wait for a campaign (or for the prompt to be dismissed).
+  // Only the open video shows tips; a hidden video must not run the timer or point at its own controls.
   const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
-  const tips = useTipsController(!!info && (!!campaign || campaignPromptDismissed));
+  const tips = useTipsController(!!info && active && (!!campaign || campaignPromptDismissed));
   const [importText, setImportText] = useState<string | null>(null);
   // The footer's "Sign in for 1080p" opens Help on its sign-in page.
   const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
@@ -551,6 +552,9 @@ function Layout({ active }: { active: boolean }) {
           <ColdStartScreen />
         ) : (
         <>
+        {/* Only the open video mounts the top bar, drawers, tip card and bottom bar, so there is one Help button,
+            one Settings button and one tip on screen however many videos are open. */}
+        {active && (
         <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => {
@@ -567,16 +571,22 @@ function Layout({ active }: { active: boolean }) {
           panelsMenuExtras={overlayItems}
           campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
         />
+        )}
         <PanelHostProvider value={panelHost}>
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
             <PanelWorkspace />
-            <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
-            {settingsDrawer}
-            <ImportDrawer text={importText} onClose={() => setImportText(null)} />
-            {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}
-            {tips.card && importText === null && !helpOpen && <TipCard {...tips.card} />}
+            {active && (
+              <>
+                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
+                {settingsDrawer}
+                <ImportDrawer text={importText} onClose={() => setImportText(null)} />
+                {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}
+                {tips.card && importText === null && !helpOpen && <TipCard {...tips.card} />}
+              </>
+            )}
           </div>
         </PanelHostProvider>
+        {active && (
         <BottomBar
           clipCount={languagePlans.length}
           tracks={info?.audioTracks}
@@ -589,6 +599,7 @@ function Layout({ active }: { active: boolean }) {
           // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
           onSignIn={openSignIn}
         />
+        )}
         </>
         )}
       </main>
