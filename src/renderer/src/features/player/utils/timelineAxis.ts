@@ -150,3 +150,8 @@ export function axisTicks(axis: Axis, minGapPx = 110): { t: number; x: number; l
   }
   return out;
 }
+
+/** The axis to draw and measure on: the one frozen when a drag began, else the live one. */
+export function axisDuringDrag<T>(frozen: T | null, live: T): T {
+  return frozen ?? live;
+}
