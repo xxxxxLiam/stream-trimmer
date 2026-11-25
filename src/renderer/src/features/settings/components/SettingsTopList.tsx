@@ -1,23 +1,23 @@
 /**
  * File: SettingsTopList.tsx
  * Path: src/renderer/src/features/settings/components/SettingsTopList.tsx
- * Description: Settings, top list (Settings.dc.html view 1): Your work (Campaigns, and the Clips folder with its Change button) and
- *   This computer (two switches). No Editor row, no quality row, no crash switch.
+ * Description: Settings, top list: Campaigns listed right here (a few at most, so no page of their own; each row
+ *   opens that campaign, whose folder is set there), YouTube sign-in, and This computer (two switches).
+ *   No global Clips folder row (Liam, 25 Nov), no Editor row, no quality row, no crash switch.
  */
-import { ChevronRow, DrawerHeader, SectionLabel, SwitchRow, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
+import { ChevronRow, DrawerHeader, SectionLabel, SwitchRow, drawerBody } from "../../../shared/components/DrawerRows";
 import type { AppPrefs } from "../utils/settingsPrefs";
 
+export type CampaignRow = { id: string; name: string; summary: string; languages: string | null };
+
 export type SettingsTopListProps = {
-  campaignNames: string;
-  clipsFolderLabel: string;
+  rows: CampaignRow[];
+  onEdit: (id: string) => void;
+  onAdd: () => void;
   app: AppPrefs;
   autoUpdate: boolean;
   onAutoUpdate: (on: boolean) => void;
   onPatchApp: (p: Partial<AppPrefs>) => void;
-  onOpenCampaigns: () => void;
-  folderProblem?: string;
-  /** The folder page held one control, so it is a flat Change button on the row (Liam, 25 Nov). */
-  onChangeFolder: () => void;
   signedIn?: boolean;
   onOpenSignIn: () => void;
   onClose: () => void;
@@ -28,24 +28,19 @@ export default function SettingsTopList(p: SettingsTopListProps) {
     <>
       <DrawerHeader closeName="Settings" title="Settings" onClose={p.onClose} />
       <div className={drawerBody}>
-      <SectionLabel first>Your work</SectionLabel>
-      <ChevronRow label="Campaigns" value={p.campaignNames || "None yet"} onOpen={p.onOpenCampaigns} divider />
-      <div className="flex h-target items-center gap-[8px]">
-        <div className="flex min-w-[0px] flex-1 flex-col">
-          <span className="text-body leading-[normal]">Clips folder</span>
-          <span className="truncate text-meta text-fg-dim">{p.clipsFolderLabel}</span>
-        </div>
-        <button type="button" aria-label="Change the clips folder" onClick={p.onChangeFolder} className={outlineButton}>
-          Change
-        </button>
-      </div>
-      {p.folderProblem && <p role="alert" className="m-[0px] text-meta text-error">{p.folderProblem}</p>}
+      <SectionLabel first>Campaigns</SectionLabel>
+      {p.rows.map((r) => (
+        <ChevronRow key={r.id} label={r.name} value={r.summary} onOpen={() => p.onEdit(r.id)} divider />
+      ))}
+      {p.rows.length === 0 && <p className="m-[0px] py-[8px] text-meta text-fg-dim">No campaigns yet.</p>}
+      <button type="button" aria-label="Add campaign" onClick={p.onAdd} className="mt-[8px] h-target rounded-control border border-hairlineStrong bg-raised text-body leading-[normal] text-fg hover:bg-hover">
+        Add campaign
+      </button>
       <SectionLabel>YouTube</SectionLabel>
       <ChevronRow label="Sign in for 1080p" value={p.signedIn ? "Signed in" : "Not signed in"} onOpen={p.onOpenSignIn} />
       <SectionLabel>This computer</SectionLabel>
       <SwitchRow label="Tell me when the queue finishes" on={p.app.notifyQueueDone} onFlip={() => p.onPatchApp({ notifyQueueDone: !p.app.notifyQueueDone })} divider />
       <SwitchRow label="Update automatically" on={p.autoUpdate} onFlip={() => p.onAutoUpdate(!p.autoUpdate)} />
-      <p className="m-[0px] mt-[12px] text-meta text-fg-dim">Pick a row to change it. A back arrow returns to this list.</p>
       </div>
     </>
   );

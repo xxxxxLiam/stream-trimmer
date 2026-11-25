@@ -81,8 +81,8 @@ export const HELP_ANSWERS: HelpAnswer[] = [
         ],
       },
     ],
-    note: "Clips save to your campaign’s folder. Change it in Settings › Clips folder.",
-    labels: ["History", "Settings", "Clips folder"],
+    note: "Clips save to your campaign’s folder. Change it in Settings: pick the campaign, then Folder.",
+    labels: ["History", "Settings", "Folder"],
     synonyms: ["download", "export", "save", "find", "folder", "missing", "lost", "location"],
   },
   {
@@ -217,8 +217,8 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     groups: [
       {
         steps: [
-          { text: "Open Settings, then Campaigns.", show: { target: "#ui-settings", advance: "click" } },
-          { text: "Pick the campaign and use − and + beside Clips a day." },
+          { text: "Open Settings.", show: { target: "#ui-settings", advance: "click" } },
+          { text: "Pick the campaign in the list and use − and + beside Clips a day." },
         ],
       },
     ],

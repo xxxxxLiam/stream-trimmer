@@ -11,7 +11,6 @@ import { Drawer } from "../../../shared/components/Drawer";
 import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
-import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsSignIn from "./SettingsSignIn";
 import { useCookieDropMutations } from "../hooks/useCookieDropMutations";
 import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
@@ -70,7 +69,6 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
     },
     { library: activeFcp ? folderChipLabel(activeFcp.fcpLibrary ?? "", 1) : "", event: activeFcp?.mediaEvent ?? "", videoTitle },
   );
-  const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
   const armedAt = useRef(0);
   const root = useRef<HTMLDivElement | null>(null);
@@ -205,22 +203,18 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onClose={onClose}
       />
     );
-  } else if (view.kind === "campaigns") {
-    body = <SettingsCampaigns rows={c.rows} onEdit={(id) => c.setView({ kind: "campaign", id })} onAdd={() => c.setAdding(true)} onBack={c.back} onClose={onClose} />;
   } else {
     body = (
       <SettingsTopList
-        campaignNames={c.campaignNames}
-        clipsFolderLabel={c.clipsFolderLabel}
+        rows={c.rows}
+        onEdit={(id) => c.setView({ kind: "campaign", id })}
+        onAdd={() => c.setAdding(true)}
         app={c.app}
         autoUpdate={c.autoUpdate}
         onAutoUpdate={c.setAutoUpdate}
         onPatchApp={c.patchApp}
-        onOpenCampaigns={() => c.setView({ kind: "campaigns" })}
-        folderProblem={problem}
         signedIn={connection.connected}
         onOpenSignIn={() => c.setView({ kind: "signin" })}
-        onChangeFolder={() => void c.campaigns.pickParentClipsDir().then((p) => setProblem(p ?? ""))}
         onClose={onClose}
       />
     );

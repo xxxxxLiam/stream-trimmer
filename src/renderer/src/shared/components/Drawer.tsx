@@ -2,7 +2,7 @@
  * File: Drawer.tsx
  * Path: src/renderer/src/shared/components/Drawer.tsx
  * Description: The right-hand drawer (Settings, Help): 440px, panel surface, strong hairline on its
- *   left edge, no shadow. DrawerHeader is the 44px title row with an optional back button (second
+ *   left edge, no shadow. It is as tall as its content (min-h-full), so the panel surface runs under everything when the drawer scrolls. DrawerHeader is the 44px title row with an optional back button (second
  *   view) and a close button.
  */
 import type { ReactNode } from "react";
@@ -12,7 +12,7 @@ export function Drawer({ label, children, padClass = "pl-[16px] pr-[17px] pb-[20
     <aside
       role="dialog"
       aria-label={label}
-      className={`box-border flex h-full w-[440px] flex-col border-l border-hairlineStrong bg-panel ${padClass}`}
+      className={`box-border flex min-h-full w-[440px] flex-col border-l border-hairlineStrong bg-panel ${padClass}`}
     >
       {children}
     </aside>
