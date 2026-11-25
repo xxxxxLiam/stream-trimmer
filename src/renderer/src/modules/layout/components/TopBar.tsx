@@ -24,7 +24,7 @@ export type TopBarProps = {
   onToggleSettings: () => void;
   /** Body of the campaign popover. */
   campaignMenu?: ReactNode;
-  /** Extra rows for the Panels menu (the overlays that have no panel: Copy blocks, Symbols). */
+  /** Owner build: the Channel data row of the Panels menu. Empty in the public build. */
   panelsMenuExtras?: MenuItem[];
 };
 

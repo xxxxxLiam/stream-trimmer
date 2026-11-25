@@ -257,7 +257,8 @@
   }
   .icon-btn[aria-pressed="true"],
   .icon-btn[aria-expanded="true"] {
-    border-color: var(--accent);
+    background: var(--c-raised);
+    border-color: var(--c-hairline-strong);
     color: var(--c-fg);
   }
 

@@ -43,7 +43,6 @@ import {
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
-import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
@@ -52,6 +51,7 @@ import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingE
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
 import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageState";
 import { nameForLanguage, planLanguages } from "../shared/utils/audioLanguages";
+import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
@@ -487,14 +487,12 @@ function Layout({ active }: { active: boolean }) {
     onOpenVideo: () => {},
   };
 
-  // Overlays that are not panels. They stay one key (and one Panels menu row) away.
-  const overlayItems: MenuItem[] = [
-    { key: "copy", label: "Copy blocks", onSelect: () => setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; }) },
-    { key: "symbols", label: "Symbols", onSelect: () => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; }) },
-    ...(CHANNEL_DATA_BUILT && channelAvailable
+  // Owner build only: the Channel data screen has no panel, so its way in and back is a Panels menu
+  // row. The public build's menu is exactly the board's. Copy blocks and Symbols have their keys.
+  const overlayItems: MenuItem[] =
+    CHANNEL_DATA_BUILT && channelAvailable
       ? [{ key: "channel", label: screen === "channel" ? "Back to workspace" : "Channel data", onSelect: () => setScreen(screen === "channel" ? "workspace" : "channel") } as MenuItem]
-      : []),
-  ];
+      : [];
   // The campaign menu's "<Campaign> settings" row calls this. The Start, Settings and Help build
   // swaps in its campaign form here; until then the menu falls back to its own inline form.
   // One global paste handler: a video link opens it, rows with times and a channel link go to the
@@ -507,6 +505,7 @@ function Layout({ active }: { active: boolean }) {
         flushAutoLoad();
       },
       onMoments: (text) => setImportText(text),
+      onChannel: () => setScreen("channel"),
     },
     { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
   );
@@ -538,8 +537,8 @@ function Layout({ active }: { active: boolean }) {
             setHelpOpen(false);
             setSettingsOpen((v) => !v);
           }}
-          campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
           panelsMenuExtras={overlayItems}
+          campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
         />
         {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
           <PanelHostProvider value={panelHost}>
