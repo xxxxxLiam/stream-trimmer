@@ -149,7 +149,7 @@ export function sameFolder(a: string, b: string): boolean {
 
 export const MAX_NAME_LENGTH = 60;
 
-export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "folder-taken" | "folders-same" | "pattern-no-number";
+export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "name-reserved" | "folder-taken" | "folders-same" | "pattern-no-number";
 
 export function validateCampaign(
   c: Pick<Campaign, "name" | "clipsDir" | "dataDir" | "clipIdPattern">,
@@ -158,6 +158,7 @@ export function validateCampaign(
 ): CampaignProblem[] {
   const out: CampaignProblem[] = [];
   if (!c.name.trim()) out.push("name-empty");
+  else if (isWindowsReservedName(c.name)) out.push("name-reserved");
   else if (others?.some((o) => o.name.trim().toLowerCase() === c.name.trim().toLowerCase()))
     out.push("name-taken");
   if (sameFolder(c.clipsDir, c.dataDir)) out.push("folders-same");
@@ -170,10 +171,17 @@ export function campaignNameProblems(name: string, others: readonly Pick<Campaig
   const found: CampaignProblem[] = [];
   if (!name.trim()) found.push("name-empty");
   else if (name.trim().length > MAX_NAME_LENGTH) found.push("name-long");
+  else if (isWindowsReservedName(name)) found.push("name-reserved");
   else if (others.some((o) => o.id !== editingId && o.name.trim().toLowerCase() === name.trim().toLowerCase())) found.push("name-taken");
   // "A/B" and "A:B" would both save into the folder "A-B" and mix their clips.
   else if (others.some((o) => o.id !== editingId && folderNameOf(o.name).toLowerCase() === folderNameOf(name).toLowerCase())) found.push("folder-taken");
   return found.map(describeCampaignProblem);
+}
+
+/** A name Windows cannot make a folder of: a device name (CON, NUL, COM1...) with or without an extension, or one ending in a dot. */
+export function isWindowsReservedName(name: string): boolean {
+  const t = name.trim();
+  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(t.split(".")[0].trim()) || /\.$/.test(t);
 }
 
 export function describeCampaignProblem(p: CampaignProblem): string {
@@ -184,6 +192,8 @@ export function describeCampaignProblem(p: CampaignProblem): string {
       return `Keep the name to ${MAX_NAME_LENGTH} characters or fewer.`;
     case "name-taken":
       return "Another campaign already has that name.";
+    case "name-reserved":
+      return "Windows can't use that name for a folder. Add a word after it, and leave off a final dot.";
     case "folder-taken":
       return "Another campaign already saves to a folder with that name. Change a character or two.";
     case "folders-same":

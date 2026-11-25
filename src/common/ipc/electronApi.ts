@@ -73,7 +73,7 @@ export interface ElectronAPI {
   }) => Promise<{ ok: boolean; path?: string; error?: string }>;
   showInFolder: (
     targetPath: string,
-  ) => Promise<{ ok: boolean; error?: string }>;
+  ) => Promise<{ ok: boolean; error?: string; /** The path does not exist (yet): a folder is made with the first clip. */ missing?: boolean }>;
   /**
    * Undo of a just-made clip: moves its file to the Trash / Recycle Bin. Refuses anything outside
    * the user's clip folders; a file that's already gone is ok.

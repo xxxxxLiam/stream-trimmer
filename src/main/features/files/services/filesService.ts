@@ -157,8 +157,10 @@ export function startDrag(sender: Electron.WebContents, targetPath: unknown) {
  */
 export function showInFolder(targetPath: string) {
   try {
+    // A folder Clipr has not made yet (it is made with the first clip) is not an error: say so, so the caller can tell the person.
+    const missing = !fs.existsSync(targetPath);
     shell.showItemInFolder(targetPath);
-    return { ok: true };
+    return { ok: true, ...(missing ? { missing: true } : {}) };
   } catch (err: any) {
     return {
       ok: false,

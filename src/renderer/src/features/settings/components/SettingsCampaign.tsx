@@ -28,7 +28,8 @@ export type SettingsCampaignProps = {
   editor: { label: string; summary: string; onOpen: () => void } | null;
   onPatch: (p: Partial<CampaignPrefs>) => void;
   onToggleLanguage: (code: string) => void;
-  onOpenFolder: () => void;
+  /** Opens the folder. Returns a sentence when it does not exist yet (it is made with the first clip), else null. */
+  onOpenFolder: () => Promise<string | null> | void;
   /** Choose a different folder for this campaign. Returns a sentence when it was refused, else null. */
   onChangeFolder: () => Promise<string | null>;
   /** Rename. Returns the problem sentences (empty, too long, taken) or none once saved. */
@@ -48,6 +49,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [nameProblem, setNameProblem] = useState("");
   const [folderProblem, setFolderProblem] = useState("");
+  const [folderNote, setFolderNote] = useState("");
   const [lengthDraft, setLengthDraft] = useState<{ min?: string; max?: string }>({});
   const [lengthProblem, setLengthProblem] = useState("");
   const commitLength = (end: "min" | "max") => {
@@ -195,11 +197,12 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
         <button type="button" aria-label={`Change the ${p.name} folder`} onClick={() => void p.onChangeFolder().then((e) => setFolderProblem(e ?? ""))} className={outlineButton}>
           Change
         </button>
-        <button type="button" aria-label={`Open the ${p.name} folder`} onClick={p.onOpenFolder} className={outlineButton}>
+        <button type="button" aria-label={`Open the ${p.name} folder`} onClick={() => void Promise.resolve(p.onOpenFolder()).then((n) => setFolderNote(n ?? ""))} className={outlineButton}>
           Open
         </button>
       </div>
       {folderProblem && <span role="alert" className="text-meta text-error">{folderProblem}</span>}
+      {folderNote && !folderProblem && <span role="status" className="text-meta text-fg-dim">{folderNote}</span>}
       </div>
       {p.editor && (
         <button type="button" aria-label={`${p.editor.label} settings for ${p.name}`} onClick={p.editor.onOpen} className="mt-[4px] flex min-h-[56px] items-center gap-[12px] rounded-control border border-hairlineStrong bg-raised px-[12px] py-[8px] text-left hover:bg-hover">

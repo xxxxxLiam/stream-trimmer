@@ -11,7 +11,7 @@ import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace } from "../../workspace/hooks/WorkspaceContext";
 import { extractVideoId } from "../../../shared/utils/clip";
 import { NOT_A_VIDEO, pasteKeyLabel, plainOpenError, shortLink, youtubeLinkFromText, type ToolsStatus } from "../utils/startUtils";
-import { folderChipLabel } from "../../../shared/utils/folderLabel";
+import { FOLDER_NOT_MADE_YET, folderChipLabel } from "../../../shared/utils/folderLabel";
 import { useStartEffects } from "./useStartEffects";
 import { useToolsStatusQueries } from "./useToolsStatusQueries";
 import type { ColdStartProps } from "../components/ColdStart";
@@ -46,8 +46,9 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
       .catch(() => {});
   }, [openLink]);
 
+  const [folderNote, setFolderNote] = useState("");
   const onOpenFolder = useCallback(() => {
-    if (dir) void window.electronAPI?.showInFolder(dir);
+    if (dir) void window.electronAPI?.showInFolder(dir).then((r) => setFolderNote(r?.missing ? FOLDER_NOT_MADE_YET : ""));
   }, [dir]);
 
   // The video you were on: the way back when this link will not open. Never "the last one in the list".
@@ -83,5 +84,6 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
     backTo: backId ? { label: ws.labelFor(backId), onBack: () => ws.goBack(ws.activeId) } : null,
     folderLabel: folderChipLabel(dir),
     onOpenFolder,
+    folderNote,
   };
 }

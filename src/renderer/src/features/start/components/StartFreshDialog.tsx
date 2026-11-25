@@ -6,6 +6,8 @@
  *   my data closes it. There is no "remind me later" and Esc and an outside click do nothing, so the
  *   question is answered once. Logic-free: the hook owns the answer.
  */
+import { useRef } from "react";
+import { useModalFocus } from "../../../shared/hooks/useModalFocus";
 import BrandMark from "../../../shared/components/BrandMark";
 import Button from "../../../shared/components/Button";
 
@@ -57,13 +59,17 @@ export default function StartFreshDialog({
   onStartFresh,
   onKeep,
 }: StartFreshDialogProps) {
+  const root = useRef<HTMLDivElement | null>(null);
+  // A3-4: focus starts on Keep my data (the harmless choice), stays in the dialog, and Tab wraps inside it.
+  const onKeyDown = useModalFocus(root, "[data-start-fresh-first]");
   return (
     <div
       data-covers-app=""
-      className="fixed inset-0 z-[60] flex items-center justify-center p-[32px]"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-bg-overlay-50 p-[32px]"
     >
       <div
+        ref={root}
+        onKeyDown={onKeyDown}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ui-start-fresh-title"
@@ -117,7 +123,7 @@ export default function StartFreshDialog({
             Start fresh
             <span className="text-meta font-normal">· Recommended</span>
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={onKeep}>
+          <Button variant="secondary" data-start-fresh-first="" disabled={busy} onClick={onKeep}>
             Keep my data
           </Button>
         </div>

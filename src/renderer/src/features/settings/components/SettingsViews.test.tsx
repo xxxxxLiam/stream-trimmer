@@ -162,3 +162,22 @@ test("A-5: a campaign can be renamed and its folder changed from its own view", 
   assert.match(drawer, /update\(campaign\.id, \{ name: next\.trim\(\), \.\.\.\(pinned \? \{ clipsDir: pinned \} : \{\}\) \}\)/);
   assert.match(drawer, /onChangeFolder=\{\(\) => c\.campaigns\.pickClipsDir\(campaign\.id\)\}/);
 });
+
+test("A3-1: backing out of the New campaign form closes the chip's popover as well", () => {
+  assert.match(read("features/campaigns/components/CampaignMenu.tsx"), /onClose=\{\(\) => \{ setWizard\(false\); onClose\?\.\(\); \}\}/);
+});
+
+test("A3-2: Open on a folder that is not made yet says it will be made with the first clip, on Settings and on Start", () => {
+  assert.match(read("features/settings/components/SettingsDrawer.tsx"), /r\?\.missing \? FOLDER_NOT_MADE_YET : null/);
+  assert.match(read("features/start/hooks/useStartController.ts"), /r\?\.missing \? FOLDER_NOT_MADE_YET : ""/);
+  const h = renderToStaticMarkup(<SettingsCampaign {...campaign} />);
+  assert.doesNotMatch(h, /made with your first clip/, "nothing is said before Open is pressed");
+  assert.match(readFileSync(join(process.cwd(), "src/main/features/files/services/filesService.ts"), "utf8"), /missing \? \{ missing: true \}/);
+});
+
+test("A3-3: Settings keeps focus inside, lands on its heading when it opens and returns to the Settings button", () => {
+  const drawer = read("features/settings/components/SettingsDrawer.tsx");
+  assert.match(drawer, /useDrawerFocus\(root, open, .*"#ui-settings"\)/);
+  assert.match(drawer, /ref=\{root\} onKeyDown=\{onKeyDown\}/);
+  assert.match(drawer, /querySelector<HTMLElement>\("h3"\)/);
+});
