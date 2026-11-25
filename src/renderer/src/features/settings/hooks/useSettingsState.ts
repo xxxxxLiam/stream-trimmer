@@ -4,13 +4,14 @@
  * Description: Reads and writes the drawer's own preferences (app switches and per-campaign quota,
  *   extra seconds and languages) in the persisted settings store.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import {
   APP_PREFS_KEY,
   AUTO_UPDATE_KEY,
   CAMPAIGN_PREFS_KEY,
   DEFAULT_CAMPAIGN_PREFS,
+  PREFS_CHANGED_EVENT,
   normalizeAppPrefs,
   normalizeCampaignPrefs,
   type AppPrefs,
@@ -22,6 +23,13 @@ export function useSettingsState() {
   const [byCampaign, setByCampaign] = useState<Record<string, unknown>>(() =>
     readSetting<Record<string, unknown>>(CAMPAIGN_PREFS_KEY, {}),
   );
+
+  // The new-campaign form writes a campaign's prefs from outside this hook; pick them up.
+  useEffect(() => {
+    const reread = () => setByCampaign(readSetting<Record<string, unknown>>(CAMPAIGN_PREFS_KEY, {}));
+    window.addEventListener(PREFS_CHANGED_EVENT, reread);
+    return () => window.removeEventListener(PREFS_CHANGED_EVENT, reread);
+  }, []);
 
   const patchApp = useCallback((patch: Partial<AppPrefs>) => {
     setApp((prev) => {

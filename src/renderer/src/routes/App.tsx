@@ -21,6 +21,7 @@ import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/cam
 import { useFlushPendingReports } from "../features/help/hooks/useReportMutations";
 import { loadLastLayout } from "../shared/utils/lastLayout";
 import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
+import { runLaunchSignIn } from "../shared/utils/launchSignIn";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
@@ -42,6 +43,7 @@ import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
   restoreConnection,
+  sweepBrowsers,
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
@@ -115,7 +117,12 @@ function useEditorSettings(campaignId: string | null) {
   return [settings, setSettings, settingsFor, setSettingsFor] as const;
 }
 
-function SavedToast() {
+/** True when a saved clip's detail says it came out at 360p (the toast then offers the sign-in). */
+export function lowQualityDetail(detail: string | undefined): boolean {
+  return /at 360p\b/.test(detail ?? "");
+}
+
+function SavedToast({ onSignIn }: { onSignIn?: () => void }) {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
     useClipperContext();
   // Deliberately sticky: the notice stays until the user opens the folder or
@@ -154,6 +161,11 @@ function SavedToast() {
               </span>
             )}
           </div>
+          {onSignIn && lowQualityDetail(savedNotice.detail) && (
+            <button type="button" onClick={onSignIn} className="btn ml-1 shrink-0">
+              Sign in for 1080p
+            </button>
+          )}
           {canReveal && (
             <button
               type="button"
@@ -300,7 +312,7 @@ function Layout({ active }: { active: boolean }) {
     setSettingsStartAt(null);
   }, []);
 
-  // Switching campaign re-points the saving folder, format and quality at once. The clips
+  // Switching campaign re-points the saving folder. The clips
   // folder lives on the campaign; the clipper still saves to its own saveDir, so mirror it.
   useEffect(() => {
     if (isElectron && folders.clipsDir && folders.clipsDir !== saveDir) {
@@ -309,28 +321,6 @@ function Layout({ active }: { active: boolean }) {
   }, [isElectron, folders.clipsDir, saveDir, setSaveDir]);
 
   const campaignId = campaign?.id ?? null;
-  // True from the moment a switch asks the clipper to change format/quality until it has.
-  // Without it the write-back below would copy the OLD values over the new campaign.
-  const repointing = useRef(false);
-  useEffect(() => {
-    if (!campaign) return;
-    repointing.current = campaign.format !== format || campaign.quality !== quality;
-    setFormat(campaign.format);
-    setQuality(campaign.quality);
-    // Only a switch (or first load) re-points; later edits flow the other way below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignId]);
-  // Format and quality are set in the footer and belong to the campaign.
-  useEffect(() => {
-    if (!campaign) return;
-    const same = campaign.format === format && campaign.quality === quality;
-    if (repointing.current) {
-      if (same) repointing.current = false;
-      return;
-    }
-    if (!same) update(campaign.id, { format, quality });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, quality]);
 
   // Once a clip is saved: remember it for the session batch and run the campaign's
   // "After cutting" choice. Never blocks or fails the cut itself.
@@ -518,6 +508,13 @@ function Layout({ active }: { active: boolean }) {
     setSettingsOpen(true);
   };
 
+  // The footer pill and the "Downloaded at 360p" toast both open Help on its sign-in page.
+  const openSignIn = () => {
+    setHelpStartAt("signin");
+    setSettingsOpen(false);
+    setHelpOpen(true);
+  };
+
   return (
     <>
       <SettingsRestoredNote />
@@ -564,11 +561,7 @@ function Layout({ active }: { active: boolean }) {
           at360={lowQuality}
           showSignInPill={lowQuality}
           // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
-          onSignIn={() => {
-            setHelpStartAt("signin");
-            setSettingsOpen(false);
-            setHelpOpen(true);
-          }}
+          onSignIn={openSignIn}
         />
         </>
         )}
@@ -579,7 +572,7 @@ function Layout({ active }: { active: boolean }) {
         onChosen={() => setCampaignPromptDismissed(true)}
       />
       <SymbolsDialog open={symbolsOpen} onClose={closeSymbols} />
-      {active && <SavedToast />}
+      {active && <SavedToast onSignIn={openSignIn} />}
     </>
   );
 }
@@ -588,10 +581,14 @@ function Shell() {
   useFlushPendingReports();
   const { tabs, activeId, setTabCampaign } = useWorkspace();
 
-  // No background polling. On launch we read the imported cookies.txt once
-  // and verify it silently; after that the user checks when they choose.
+  // No background polling. On launch we read the imported cookies.txt once and verify it silently; if that gives
+  // no session we quietly try the browsers' own YouTube sign-in, and report the result so the footer pill is right.
   useEffect(() => {
-    void restoreConnection();
+    void runLaunchSignIn({
+      restore: restoreConnection,
+      sweep: sweepBrowsers,
+      report: (usable) => window.electronAPI?.reportBrowserSignIn?.(usable),
+    });
   }, []);
 
   return (

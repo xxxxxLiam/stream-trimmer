@@ -142,7 +142,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           <p className="m-[0px] text-meta text-fg-dim">Shown only while Final Cut Pro is ticked in the Clip menu.</p>
         </div>
       )}
-      <button type="button" aria-label={`Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-[8px] h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
+      <button type="button" aria-label={p.confirmingDelete ? `Click again to delete ${p.name}` : `Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-[8px] h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
         {p.confirmingDelete ? `Click again to delete ${p.name}` : "Delete campaign"}
       </button>
       </div>
