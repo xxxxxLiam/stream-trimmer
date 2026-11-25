@@ -8,6 +8,7 @@ import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import { checkPageWrite } from "../features/settings/services/settingsKeys";
 import { getSettings } from "../features/settings/services/settingsService";
+import { answerStartFresh, isStartFreshPending } from "../features/settings/services/startFresh";
 
 const { ipcMain } = electron;
 
@@ -21,6 +22,10 @@ export function registerSettingsHandlers() {
     const at = getSettings()?.restoredAt?.();
     return typeof at === "number" ? new Date(at).toISOString() : null;
   });
+  ipcMain.handle(IPC.startFreshPending, () => isStartFreshPending(getSettings()));
+  ipcMain.handle(IPC.startFreshAnswer, (_e: unknown, choice: unknown) =>
+    answerStartFresh(choice, getSettings(), { documentsDir: electron.app.getPath("documents") }),
+  );
   ipcMain.handle(IPC.settingsLost, () => getSettings()?.lost?.() ?? null);
   ipcMain.handle(IPC.settingsSet, (_e: unknown, key: unknown, value: unknown) => {
     const settings = getSettings();

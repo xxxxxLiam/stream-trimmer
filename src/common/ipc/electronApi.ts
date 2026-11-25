@@ -167,6 +167,13 @@ export interface ElectronAPI {
   sendReport?: (payload: { kind: "crash" | "problem"; note?: string; error: string }) => Promise<{ ok: boolean; status?: "sent" | "kept" }>;
   /** ISO time when this launch restored the settings from the backup copy, else null. */
   settingsRestoredAt?: () => Promise<string | null>;
+  /** True on the first launch after updating from an earlier version (and until answered). Never on a fresh install. */
+  startFreshPending?: () => Promise<boolean>;
+  /**
+   * "fresh": backs campaigns, bank, history and settings up to Documents/Clipr backups/<date>, clears them and records the answer;
+   * the page then reloads into the cold start. "keep": changes nothing. A failed backup clears nothing and answers ok:false with a sentence.
+   */
+  startFreshAnswer?: (choice: "fresh" | "keep") => Promise<{ ok: true; backupDir?: string } | { ok: false; error: string }>;
   /** Why this launch started with nothing although the person had data: "unreadable" or "missing". Null when nothing was lost. */
   settingsLost?: () => Promise<"unreadable" | "missing" | null>;
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;

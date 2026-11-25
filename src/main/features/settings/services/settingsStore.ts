@@ -21,6 +21,9 @@ import { APPROVED_ROOTS_KEY, PAGE_KEYS } from "./settingsKeys";
  */
 const WRITTEN_KEY = "clipper.settingsWritten";
 
+/** Main-only: how the one-time "start fresh" prompt was settled ("fresh", "keep", or "new-install" when there was nothing to ask about). */
+export const START_FRESH_KEY = "clipper.startFreshAnswered";
+
 /** True when `data` holds anything the person set: at least one key the page writes, with a value. */
 function hasUserData(data: any): boolean {
   return !!data && typeof data === "object" && Object.keys(data).some((k) => PAGE_KEYS.has(k) && data[k] !== null && data[k] !== undefined);
@@ -97,6 +100,8 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
   let restoredAt: number | null = null;
   // When this run found no saved settings although the person clearly had some, and could not restore them.
   let lost: "unreadable" | "missing" | null = null;
+  // True when this launch found settings from an earlier version that have not been asked about "start fresh" yet.
+  let startFreshPending = false;
 
   /**
    * Keeps a copy of a file we cannot read BEFORE anything replaces it, next to
@@ -205,6 +210,14 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
         if (log && evidence === "missing") log("settings: no settings found, although there is a kept copy from before");
       }
     }
+    // The one-time "start fresh" prompt: an install that already holds data (any earlier version, including data moved
+    // in from the old "YouTube Clipper" folder) is asked once. A fresh install is marked at once, so data it makes
+    // later never triggers the prompt.
+    startFreshPending = false;
+    if (!(cache as any)[START_FRESH_KEY]) {
+      if (hasUserData(raw)) startFreshPending = true;
+      else (cache as any)[START_FRESH_KEY] = "new-install";
+    }
     removed.clear();
     loaded = true;
     // Write the migration back once, so the renderer and the file agree.
@@ -286,7 +299,19 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     return saved;
   }
 
-  return { load, all, set, persist, onChange, restoredAt: () => restoredAt, lost: () => lost, path: filePath };
+  /** Removes many keys with one save (and one kept copy), for "start fresh". */
+  function removeMany(keys: string[]) {
+    if (!loaded) load();
+    for (const key of keys) {
+      delete cache[key];
+      removed.add(key);
+    }
+    const saved = persist();
+    if (saved) for (const key of keys) for (const cb of listeners) { try { cb(key, null); } catch { /* a listener must not stop the rest */ } }
+    return saved;
+  }
+
+  return { load, all, set, removeMany, startFreshPending: () => startFreshPending, persist, onChange, restoredAt: () => restoredAt, lost: () => lost, path: filePath };
 }
 
 export {
