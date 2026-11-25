@@ -44,6 +44,7 @@ import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
 import { setMakingName } from "../shared/utils/clipNameStore";
+import { setCutAttempt } from "../shared/utils/cutAttempt";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
@@ -381,12 +382,15 @@ function Layout({ active }: { active: boolean }) {
   // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
   // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
-    async (segments: Segment[]) => {
+    async (segments: Segment[], retryName?: string) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
       const startSettings = withDestination(editorRef.current);
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
-      const name = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      // A retry keeps the failed attempt's name; a new cut takes the lane's, else a suggested one.
+      const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      // Recorded before anything starts: the marks are already cleared, so Retry and Save for later read this.
+      setCutAttempt({ name, segments });
       const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
       setMakingName(name);
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
@@ -488,6 +492,7 @@ function Layout({ active }: { active: boolean }) {
   const panelHost: PanelHost = {
     playhead,
     cutSegments: cutMarked,
+    cutAgain: (segs, name) => void cutQueue.current.enqueue(() => cutClip(segs, name)),
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),

@@ -12,6 +12,7 @@ import { clipTitle, getDownloads } from "../../../shared/utils/downloads";
 import { UNDO_SECONDS } from "../utils/exportRows";
 import { clipGroup } from "../utils/undoClip";
 import { classifyClipFailure, isRetryKey, rowFailure } from "../utils/clipFailure";
+import { getCutAttempt, setCutAttempt } from "../../../shared/utils/cutAttempt";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
@@ -54,10 +55,12 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         s.setFailed(null);
         s.failCount.current = { key: "", count: 0 };
         s.attempt.current = null;
+        setCutAttempt(null);
         // The next clip is "New clip" until a waiting moment names it.
         s.setMakingName("New clip");
       } else if (downloadPhase === "error" && error) {
-        const a = s.attempt.current ?? { name: "New clip", segments: seg.segments.map((x) => ({ start: x.start, end: x.end })) };
+        // The cut that ran last: the marks were cleared when Clip was pressed, so its range is kept here.
+        const a = getCutAttempt() ?? s.attempt.current ?? { name: "New clip", segments: seg.segments.map((x) => ({ start: x.start, end: x.end })) };
         const key = JSON.stringify(a.segments);
         s.failCount.current = { key, count: s.failCount.current.key === key ? s.failCount.current.count + 1 : 1 };
         const fromRow = failure?.row ? rowFailure(failure.row) : null;

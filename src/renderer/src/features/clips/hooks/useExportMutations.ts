@@ -19,12 +19,13 @@ import { clipGroup, undoClip } from "../utils/undoClip";
 import { UNDO_SECONDS } from "../utils/exportRows";
 import { clipNameFor } from "../utils/cutNaming";
 import { createSerialQueue } from "../utils/serialQueue";
+import { setCutAttempt } from "../../../shared/utils/cutAttempt";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
 export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
-  const { cutBanked, cutSegments } = usePanelHost();
+  const { cutBanked, cutAgain } = usePanelHost();
   const { recordUse, forgetUse } = useCampaign();
   const { removeDownload, pickSaveDir, saveDir, info, cancelDownload } = useClipperContext();
   const stopped = useRef(false);
@@ -54,6 +55,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
         s.setFailed(null);
         s.setMakingId(clip.id);
         s.attempt.current = { name, segments: clip.segments, bankId: clip.id };
+        setCutAttempt({ name, segments: clip.segments, bankId: clip.id });
         s.setNotice("");
         s.setFinished(null);
         stopped.current = false;
@@ -108,8 +110,8 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     }
     s.setFailed(null);
     s.attempt.current = { name: f.name, segments: f.segments };
-    cutSegments(f.segments);
-  }, [s, q.clips, make, cutSegments]);
+    cutAgain(f.segments, f.name);
+  }, [s, q.clips, make, cutAgain]);
 
   // The new folder lands in state after the picker closes, so retry through refs that always hold
   // the latest render, and only when the folder really changed.
