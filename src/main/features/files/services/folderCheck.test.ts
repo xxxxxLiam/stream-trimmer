@@ -15,12 +15,13 @@ test("a folder that takes files is ok, and the probe file is gone afterwards", (
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("a missing folder, a file where a folder should be, and an unmounted drive are all gone", () => {
+test("a missing folder and an unmounted drive are gone; a path through a file is blocked, not a missing drive", () => {
   const dir = tmp();
   assert.deepEqual(checkFolder({ dirPath: path.join(dir, "nope", "deeper") }, [dir]), { ok: false, problem: "gone" });
   const file = path.join(dir, "a.txt");
   fs.writeFileSync(file, "x");
-  assert.deepEqual(checkFolder({ dirPath: file }, [dir]), { ok: false, problem: "gone" });
+  assert.deepEqual(checkFolder({ dirPath: file }, [dir]), { ok: false, problem: "blocked" });
+  assert.deepEqual(checkFolder({ dirPath: path.join(file, "sub") }, [dir]), { ok: false, problem: "blocked" }, "C4-5: ENOTDIR");
   const unmounted = { statSync: () => { throw errno("ENOTCONN"); }, writeFileSync: () => {}, rmSync: () => {} };
   assert.deepEqual(checkFolder({ dirPath: path.join(dir, "x") }, [dir], { fs: unmounted }), { ok: false, problem: "gone" });
   fs.rmSync(dir, { recursive: true, force: true });

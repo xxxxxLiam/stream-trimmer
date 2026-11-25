@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { isInside } from "../../../shared/utils/pathSafety";
 
-export type FolderProblem = "gone" | "refused";
+export type FolderProblem = "gone" | "refused" | "blocked";
 export type FolderAnswer = { ok: true } | { ok: false; problem: FolderProblem };
 
 interface FolderFs {
@@ -21,12 +21,15 @@ interface FolderFs {
   rmSync: (p: string, opts: { force: boolean }) => void;
 }
 
-const GONE = new Set(["ENOENT", "ENOTDIR", "ENODEV", "ENXIO", "ENOTCONN"]);
+const GONE = new Set(["ENOENT", "ENODEV", "ENXIO", "ENOTCONN"]);
+/** The path runs through a file, so no folder can be made there: not a missing drive. */
+const BLOCKED = new Set(["ENOTDIR", "EEXIST"]);
 const REFUSED = new Set(["EACCES", "EPERM", "EROFS"]);
 
 function problemOf(err: unknown): FolderProblem | null {
   const code = (err as { code?: string } | null)?.code ?? "";
   if (GONE.has(code)) return "gone";
+  if (BLOCKED.has(code)) return "blocked";
   if (REFUSED.has(code)) return "refused";
   return null;
 }
@@ -38,7 +41,7 @@ export function checkFolder(raw: unknown, roots: string[], deps: { fs?: FolderFs
   if (!roots.some((r) => isInside(r, dirPath))) return { ok: false, problem: "refused" };
   const f = deps.fs ?? fs;
   try {
-    if (!f.statSync(dirPath).isDirectory()) return { ok: false, problem: "gone" };
+    if (!f.statSync(dirPath).isDirectory()) return { ok: false, problem: "blocked" };
   } catch (err) {
     const problem = problemOf(err);
     return problem ? { ok: false, problem } : { ok: true };

@@ -122,35 +122,37 @@ export function useClipDownloadMutations({
     );
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     downloadJobRef.current = jobId;
+    // Before anything is fetched: a missing drive, a folder that refuses writes, or a folder clearly short of room
+    // says so on the clip's row, and the engine is never asked. These sit outside the EventSource guard below,
+    // whose catch is for "no progress channel" and would swallow them.
+    let refusal: DownloadFailureError | null = null;
+    if (isElectron && saveDir && window.electronAPI?.checkFolder) {
+      let answer: unknown = null;
+      try {
+        answer = await window.electronAPI.checkFolder({ dirPath: saveDir });
+      } catch {
+        /* no answer: the clip goes ahead */
+      }
+      const problem = folderProblem(answer);
+      if (problem) refusal = new DownloadFailureError(FOLDER_FAILURE[problem].message, FOLDER_FAILURE[problem].code);
+    }
+    if (!refusal && isElectron && saveDir && window.electronAPI?.checkFreeSpace) {
+      const seconds = segs.reduce((sum, r) => sum + Math.max(0, r.end - r.start), 0);
+      let answer: Awaited<ReturnType<NonNullable<typeof window.electronAPI.checkFreeSpace>>> | null = null;
+      try {
+        answer = await window.electronAPI.checkFreeSpace({ dirPath: saveDir, seconds, quality: String(quality), audio: format !== "mp4", segments: segs.length });
+      } catch {
+        /* no answer: the clip goes ahead */
+      }
+      const room = roomProblem(answer);
+      if (room) {
+        refusal = new DownloadFailureError(ROOM_REASON, "disk_full");
+        refusal.room = room;
+      }
+    }
     let es: EventSource | null = null;
     try {
-      // Before anything is fetched: a missing drive or a folder that refuses writes says which on the clip's row.
-      if (isElectron && saveDir && window.electronAPI?.checkFolder) {
-        let answer: unknown = null;
-        try {
-          answer = await window.electronAPI.checkFolder({ dirPath: saveDir });
-        } catch {
-          /* no answer: the clip goes ahead */
-        }
-        const problem = folderProblem(answer);
-        if (problem) throw new DownloadFailureError(FOLDER_FAILURE[problem].message, FOLDER_FAILURE[problem].code);
-      }
-      // Before anything is fetched: a folder that is clearly short of room says so on the clip's row, and the clip waits.
-      if (isElectron && saveDir && window.electronAPI?.checkFreeSpace) {
-        const seconds = segs.reduce((sum, r) => sum + Math.max(0, r.end - r.start), 0);
-        let answer: Awaited<ReturnType<NonNullable<typeof window.electronAPI.checkFreeSpace>>> | null = null;
-        try {
-          answer = await window.electronAPI.checkFreeSpace({ dirPath: saveDir, seconds, quality: String(quality), audio: format !== "mp4", segments: segs.length });
-        } catch {
-          /* no answer: the clip goes ahead */
-        }
-        const room = roomProblem(answer);
-        if (room) {
-          const refused = new DownloadFailureError(ROOM_REASON, "disk_full");
-          refused.room = room;
-          throw refused;
-        }
-      }
+      if (refusal) throw refusal; // nothing is opened for a clip that is not going to start
       es = new EventSource(
         apiUrl(`/api/download/progress?jobId=${encodeURIComponent(jobId)}`),
       );
@@ -179,6 +181,7 @@ export function useClipDownloadMutations({
       /* EventSource unavailable — proceed without progress */
     }
     try {
+      if (refusal) throw refusal; // the pre-check's answer reaches the clip's row; the engine is never asked
       const res = await fetch(
         apiUrl(`/api/download?jobId=${encodeURIComponent(jobId)}`),
         {

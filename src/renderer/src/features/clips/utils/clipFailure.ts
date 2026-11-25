@@ -9,7 +9,7 @@ import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
 import { ROOM_REASON, roomDetail } from "../../../shared/utils/freeSpace";
 
-export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "expired" | "age" | "members" | "drivegone" | "norights" | "removed" | "refused" | "ratelimited" | "format" | "tools";
+export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "expired" | "age" | "members" | "drivegone" | "norights" | "nofolder" | "removed" | "refused" | "ratelimited" | "format" | "tools";
 export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater" | "signIn" | "showFolder";
 
 /** What a plain "the network is down" failure looks like in the engine's message (no YouTube error involved). */
@@ -29,6 +29,7 @@ export function classifyClipFailure(code: string | undefined, message?: string):
   if (code === "disk_full") return "disk";
   // The folder cannot be used: a missing folder or unplugged drive, or one that refuses writes (the engine's words tell them apart).
   if (code === "folder_not_writable" || (code === "save_folder_gone" && message && NOT_ALLOWED.test(message))) return "norights";
+  if (code === "folder_unusable") return "nofolder";
   if (code === "save_folder_gone") return "drivegone";
   if (code === "private_video") return "private"; // the code decides: the engine's one sentence says "private or members-only", so words cannot tell them apart
   if (code === "sign_in_needed" || code === "age_restricted") return "age";
@@ -81,6 +82,7 @@ export function failureCopy(
   }
   const folder = campaign ? `${campaign}’s folder` : "your clips folder";
   if (kind === "drivegone") return { reason: `The drive with ${folder} isn’t connected.`, detail: "Plug it back in and it carries on by itself, or pick another folder." };
+  if (kind === "nofolder") return { reason: `Clipr can’t make ${folder} there.`, detail: "A file is in the way. Pick another folder." };
   if (kind === "norights") return { reason: `Clipr isn’t allowed to save in ${folder}.`, detail: "Pick another folder, or give Clipr access to this one." };
   if (kind === "age") return { reason: "YouTube only shows this video to signed-in adults.", detail: "Sign in once and it tries again by itself. Your range is kept." };
   if (kind === "members") return { reason: "Only members of this channel can download it.", detail: "Your range is kept." };
@@ -105,7 +107,7 @@ export function failureCopy(
 
 /** Retry; after the retry also failed, Copy details joins it. */
 export function failureActions(kind: ClipFailureKind, attempts: number, final = false, signedIn = true): FailureAction[] {
-  if (kind === "disk" || kind === "drivegone") return ["changeFolder"];
+  if (kind === "disk" || kind === "drivegone" || kind === "nofolder") return ["changeFolder"];
   // Copy details joins only if the problem stays.
   if (kind === "norights") return attempts >= 2 ? ["changeFolder", "showFolder", "copyDetails"] : ["changeFolder", "showFolder"];
   if (kind === "age") return ["signIn", "saveForLater"];

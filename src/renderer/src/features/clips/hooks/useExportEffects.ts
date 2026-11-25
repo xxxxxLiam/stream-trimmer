@@ -7,7 +7,9 @@
  */
 import { closeCrashNote } from "../../../shared/utils/crashNoteStore";
 import { useEffect, useRef } from "react";
-import { bankStore } from "../../../shared/utils/bank";
+import { bankStore, clipsFor } from "../../../shared/utils/bank";
+import { getMakingName } from "../../../shared/utils/clipNameStore";
+import { clipNameFor } from "../utils/cutNaming";
 import { showMomentNote } from "../../../shared/utils/momentNoteStore";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
@@ -54,8 +56,9 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
     if (!wasDownloading.current && downloading && s.failed && !s.failed.bankId) {
       const f = s.failed;
       if (q.campaignId && q.vid) {
-        bankStore.importClips(q.campaignId, q.vid, [{ line: 1, id: null, label: "", segments: f.segments }]);
-        // Unnamed on purpose: its generated name is probably the one the next clip now takes.
+        // It keeps the name it had, unless the clip now being made has taken that very name (then " 2").
+        const label = f.name === "New clip" ? "" : clipNameFor({ candidates: [f.name], taken: [getMakingName() ?? "", ...clipsFor(bankStore.get(), q.campaignId, q.vid).map((c) => c.label)] });
+        bankStore.importClips(q.campaignId, q.vid, [{ line: 1, id: null, label, segments: f.segments }]);
         showMomentNote("Kept the clip that failed in Waiting.");
       }
       s.setFailed(null);
