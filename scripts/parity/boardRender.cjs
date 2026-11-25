@@ -19,6 +19,12 @@ const SNAPSHOTS = {
 /** Read at call time so the CLI flag can set it after load. */
 const snapshotDir = () => SNAPSHOTS[process.env.PARITY_SNAPSHOT] || process.env.PARITY_SNAPSHOT || SNAPSHOTS.snapshot;
 
+/** The folder that holds a board: the chosen snapshot, else the frozen one (a board published once and not redrawn, such as Start, stays there). */
+function boardDir(file) {
+  const dir = snapshotDir();
+  return fs.existsSync(path.join(dir, file)) ? dir : SNAPSHOTS.snapshot;
+}
+
 /** Runs in the page. Replaces the missing support.js. */
 const SHIM = `
 (() => {
@@ -83,7 +89,7 @@ const SHIM = `
 
 /** Frame size of a board, from canvas.json. */
 function boardFrame(file) {
-  const meta = JSON.parse(fs.readFileSync(path.join(snapshotDir(), "canvas.json"), "utf8"));
+  const meta = JSON.parse(fs.readFileSync(path.join(boardDir(file), "canvas.json"), "utf8"));
   const b = meta.boards[file];
   if (!b) throw new Error(`${file} is not in canvas.json`);
   return { width: b.w, height: b.h, title: b.title };
@@ -105,7 +111,7 @@ async function renderBoard(screen, opts = {}) {
       deviceScaleFactor: 1,
     });
     await page.route("**/support.js", (r) => r.fulfill({ contentType: "text/javascript", body: SHIM }));
-    await page.goto("file://" + path.join(snapshotDir(), file));
+    await page.goto("file://" + path.join(boardDir(file), file));
     await page.waitForSelector("html[data-board-ready]");
     await page.evaluate(() => document.fonts && document.fonts.ready);
     const pick = opts.window !== undefined ? { n: opts.window, w: 900, h: 500 } : opts.el !== undefined ? { n: opts.el, w: 300, h: Number(process.env.PARITY_EL_MIN_H) || 400 } : null;
@@ -183,7 +189,7 @@ async function renderBoardPanel(screen, text) {
   try {
     const page = await browser.newPage({ viewport: { width: frame.width, height: frame.height }, deviceScaleFactor: 1 });
     await page.route("**/support.js", (r) => r.fulfill({ contentType: "text/javascript", body: SHIM }));
-    await page.goto("file://" + path.join(snapshotDir(), file));
+    await page.goto("file://" + path.join(boardDir(file), file));
     await page.waitForSelector("html[data-board-ready]");
     await page.evaluate(() => document.fonts && document.fonts.ready);
     const handle = await page.evaluateHandle((t) => {
@@ -202,4 +208,4 @@ async function renderBoardPanel(screen, text) {
   }
 }
 
-module.exports = { MEASURE, renderBoardPanel, renderBoard, boardFrame, SHIM, snapshotDir, get SNAPSHOT() { return snapshotDir(); } };
+module.exports = { boardDir, MEASURE, renderBoardPanel, renderBoard, boardFrame, SHIM, snapshotDir, get SNAPSHOT() { return snapshotDir(); } };

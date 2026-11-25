@@ -10,7 +10,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { chromium } = require("playwright");
-const { SHIM, snapshotDir } = require("./boardRender.cjs");
+const { SHIM, boardDir } = require("./boardRender.cjs");
 
 const REPO = path.resolve(__dirname, "..", "..");
 
@@ -70,7 +70,7 @@ async function boardData(o) {
   try {
     const page = await browser.newPage({ viewport: { width: 1500, height: 1000 }, deviceScaleFactor: 1 });
     await page.route("**/support.js", (r) => r.fulfill({ contentType: "text/javascript", body: SHIM }));
-    await page.goto("file://" + path.join(snapshotDir(), file));
+    await page.goto("file://" + path.join(boardDir(file), file));
     await page.waitForSelector("html[data-board-ready]");
     await page.evaluate(() => document.fonts && document.fonts.ready);
     await page.evaluate((n) => {
