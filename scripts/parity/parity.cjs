@@ -14,6 +14,25 @@ const pixelmatch = require("pixelmatch");
 const { renderBoard } = require("./boardRender.cjs");
 
 const REPO = path.resolve(__dirname, "..", "..");
+/** The 1px border a board draws round its window. */
+const FRAME_PX = 1;
+
+/**
+ * Where the visible part of a board's window (frame.clip, in frame coordinates) lies inside the border:
+ * how much to trim from the board image, and the matching rect of the app window (which is the
+ * interior, FRAME_PX smaller on every side).
+ */
+function interiorOf(frame) {
+  const c = frame.clip;
+  const x0 = Math.max(c.x, FRAME_PX);
+  const y0 = Math.max(c.y, FRAME_PX);
+  const x1 = Math.min(c.x + c.width, frame.width - FRAME_PX);
+  const y1 = Math.min(c.y + c.height, frame.height - FRAME_PX);
+  return {
+    trim: { left: x0 - c.x, top: y0 - c.y, width: x1 - x0, height: y1 - y0 },
+    app: { x: x0 - FRAME_PX, y: y0 - FRAME_PX, width: x1 - x0, height: y1 - y0 },
+  };
+}
 
 function args() {
   const a = process.argv.slice(2);
@@ -50,7 +69,10 @@ function loadFixture(name) {
   // "extends": another fixture's name. Its keys apply first; seed and stub merge one level down, and
   // every other key here replaces the base's.
   if (!fx.extends) return fx;
+  // "stepsAppend": more steps run after the base's steps, so a composed board can reuse a base's setup
+  // (open video, range picked) and then do its own thing.
   const base = loadFixture(fx.extends);
+  if (fx.stepsAppend) fx.steps = [...(fx.steps || base.steps || []), ...fx.stepsAppend];
   return { ...base, ...fx, seed: { ...base.seed, ...fx.seed }, stub: base.stub ? { ...base.stub, ...fx.stub } : fx.stub };
 }
 
@@ -112,7 +134,7 @@ async function appRegion(win, frame, fx, useWindow) {
   }
   if (r) return r;
   if (!useWindow) throw new Error("--el needs a fixture region (selector or x, y, width, height)");
-  return frame.clip;
+  return interiorOf(frame).app;
 }
 
 /**
@@ -164,7 +186,10 @@ async function withApp(screen, fx, win0, fn) {
 }
 
 async function screenshotApp(screen, frame, fx, useWindow, dump) {
-  const win0 = fx.window || (useWindow ? { width: frame.width, height: frame.height } : { width: 1360, height: 760 });
+  // A board draws its window with a 1px border all round (the OS frame in the real app); the content
+  // inside it is what the app has to match, so the app window is 2px smaller each way and main() trims
+  // the same 1px from the board.
+  const win0 = fx.window || (useWindow ? { width: frame.width - 2 * FRAME_PX, height: frame.height - 2 * FRAME_PX } : { width: 1360, height: 760 });
   return withApp(screen, fx, win0, async (win) => {
     const clip = await appRegion(win, frame, fx, useWindow);
     if (dump) {
@@ -190,6 +215,12 @@ async function main() {
   if (o.dump && globalThis.__appDump) fs.writeFileSync(path.join(outDir, "app.json"), JSON.stringify(globalThis.__appDump, null, 1));
   fs.writeFileSync(path.join(outDir, "app.png"), appPng);
   let b = PNG.sync.read(boardPng);
+  if (o.window !== undefined && o.el === undefined && !fixture.region && !fixture.window) {
+    const t = interiorOf(frame).trim;
+    const inner = new PNG({ width: t.width, height: t.height });
+    PNG.bitblt(b, inner, t.left, t.top, t.width, t.height, 0, 0);
+    b = inner;
+  }
   let p = PNG.sync.read(appPng);
   if (b.width !== p.width || b.height !== p.height) {
     if (o.el === undefined) throw new Error(`size mismatch: board ${b.width}x${b.height}, app ${p.width}x${p.height}`);
@@ -240,4 +271,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { loadFixture, withApp };
+module.exports = { loadFixture, withApp, interiorOf };

@@ -1,0 +1,93 @@
+{
+ "_doc": "Board 03.2.4: Transcript tab open on the left.",
+ "extends": "MainMaking",
+ "stub": {
+  "vttFile": "podcast214-board.vtt"
+ },
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4324"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "i"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4366"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "o"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "click": "button[aria-label='Loop']"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4331; window.__fakeYTPlayer.pauseVideo()"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "click": "button:text-is('Fit')"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "document.activeElement && document.activeElement.blur()"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "click": "#ui-panels-left [role=tab]:has-text('Transcript')"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-expanded]')].find(x=>/Done/.test(x.textContent)); if(b&&b.getAttribute('aria-expanded')==='false') b.click();})()"
+  },
+  {
+   "hover": "span:text-is('clip length')"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-label=\"Make this clip\"]')];b[0].click()})()"
+  },
+  {
+   "waitFor": "[role=progressbar][aria-label*='%']"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "hover": "span:text-is('clip length')"
+  },
+  {
+   "wait": 200
+  }
+ ]
+}

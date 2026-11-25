@@ -1,0 +1,83 @@
+{
+ "_doc": "Board 03.2.2: MainBase, Honest Version made, Undo ring running. The saved toast (the stub's fixture clip is 360p, so it offers the sign-in) is dismissed: the board is the signed-in state.",
+ "extends": "MainBase",
+ "seed": {
+  "clipper.bank": {
+   "acme": {
+    "podcast214": [
+     {
+      "id": "b1",
+      "label": "Honest Version",
+      "segments": [
+       {
+        "start": 4324,
+        "end": 4366
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T1",
+      "rating": 9.1
+     },
+     {
+      "id": "b2",
+      "label": "Big Deal",
+      "segments": [
+       {
+        "start": 2470,
+        "end": 2511
+       }
+      ],
+      "status": "banked",
+      "category": "Hustle",
+      "tier": "T2",
+      "rating": 8.4
+     },
+     {
+      "id": "b3",
+      "label": "Hot Take",
+      "segments": [
+       {
+        "start": 482,
+        "end": 515
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T3",
+      "rating": 7.0
+     }
+    ]
+   }
+  }
+ },
+ "stub": {
+  "progress": [
+   0,
+   50,
+   100
+  ],
+  "writeMedia": true,
+  "exitCode": 0
+ },
+ "stepsAppend": [
+  {
+   "wait": 600
+  },
+  {
+   "eval": "(()=>{const rows=[...document.querySelectorAll(\"div.group\")];const r=rows.find(x=>x.textContent.includes(\"Honest Version\"));r.querySelector('button[aria-label=\"Make this clip\"]').click()})()"
+  },
+  {
+   "waitFor": "button[aria-label^=\"Undo,\"]"
+  },
+  {
+   "wait": 2600
+  },
+  {
+   "eval": "document.querySelector('button[aria-label=\"Dismiss\"]')?.click()"
+  },
+  {
+   "wait": 200
+  }
+ ]
+}

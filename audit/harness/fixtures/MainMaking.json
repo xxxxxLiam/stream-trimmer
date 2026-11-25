@@ -1,0 +1,189 @@
+{
+ "_doc": "MainBase with Cold Open being made (stub stalls at 58%): the Export panel of boards 03.2.1 and 03.2.3 to 03.2.7.",
+ "extends": "MainBase",
+ "seed": {
+  "clipper.bank": {
+   "acme": {
+    "podcast214": [
+     {
+      "id": "b0",
+      "label": "Cold Open",
+      "segments": [
+       {
+        "start": 130,
+        "end": 175
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "b1",
+      "label": "Honest Version",
+      "segments": [
+       {
+        "start": 4324,
+        "end": 4366
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T1",
+      "rating": 9.1
+     },
+     {
+      "id": "b2",
+      "label": "Big Deal",
+      "segments": [
+       {
+        "start": 2470,
+        "end": 2511
+       }
+      ],
+      "status": "banked",
+      "category": "Hustle",
+      "tier": "T2",
+      "rating": 8.4
+     },
+     {
+      "id": "b3",
+      "label": "Hot Take",
+      "segments": [
+       {
+        "start": 482,
+        "end": 515
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T3",
+      "rating": 7.0
+     }
+    ],
+    "founder2": [
+     {
+      "id": "c1",
+      "label": "",
+      "segments": [
+       {
+        "start": 100,
+        "end": 140
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c2",
+      "label": "",
+      "segments": [
+       {
+        "start": 200,
+        "end": 240
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c3",
+      "label": "",
+      "segments": [
+       {
+        "start": 300,
+        "end": 340
+       }
+      ],
+      "status": "banked"
+     }
+    ]
+   },
+   "nova": {
+    "townhall": [
+     {
+      "id": "c1",
+      "label": "",
+      "segments": [
+       {
+        "start": 100,
+        "end": 140
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c2",
+      "label": "",
+      "segments": [
+       {
+        "start": 200,
+        "end": 240
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c3",
+      "label": "",
+      "segments": [
+       {
+        "start": 300,
+        "end": 340
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c4",
+      "label": "",
+      "segments": [
+       {
+        "start": 400,
+        "end": 440
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c5",
+      "label": "",
+      "segments": [
+       {
+        "start": 500,
+        "end": 540
+       }
+      ],
+      "status": "banked"
+     }
+    ]
+   }
+  }
+ },
+ "stub": {
+  "progress": [
+   0,
+   59
+  ],
+  "progressDelayMs": 50,
+  "holdMs": 60000,
+  "writeMedia": true,
+  "exitCode": 0
+ },
+ "stepsAppend": [
+  {
+   "wait": 600
+  },
+  {
+   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-label=\"Make this clip\"]')];b[0].click()})()"
+  },
+  {
+   "waitFor": "[role=progressbar][aria-label*='%']"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "hover": "span:text-is('clip length')"
+  },
+  {
+   "wait": 200
+  }
+ ]
+}
