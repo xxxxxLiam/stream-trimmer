@@ -4,8 +4,14 @@
  * Description: Connects ColdStart to the clipper context. Shown while no video is open.
  */
 import ColdStart from "./ColdStart";
+import TitleBarDrag from "../../../modules/layout/components/TitleBarDrag";
 import { useStartController } from "../hooks/useStartController";
 
 export default function ColdStartScreen() {
-  return <ColdStart {...useStartController()} />;
+  return (
+    <>
+      <TitleBarDrag />
+      <ColdStart {...useStartController()} />
+    </>
+  );
 }

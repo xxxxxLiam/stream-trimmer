@@ -45,3 +45,13 @@ test("R2: the timeline is an inset rounded card above the fixed export bar", () 
   assert.match(cls, /\brounded-panel\b/);
   assert.ok(!/border-y/.test(cls));
 });
+
+test("R2: screens without a top bar still drag the window by a strip along the top edge", () => {
+  const start = readFileSync(new URL("../features/start/components/ColdStartScreen.tsx", import.meta.url), "utf8");
+  const crash = readFileSync(new URL("../shared/components/CrashScreen.tsx", import.meta.url), "utf8");
+  const strip = readFileSync(new URL("../modules/layout/components/TitleBarDrag.tsx", import.meta.url), "utf8");
+  assert.match(start, /<TitleBarDrag \/>/);
+  assert.match(crash, /<TitleBarDrag \/>/);
+  assert.match(strip, /barIsTitleBar\(chrome\)/);
+  assert.match(strip, /topbar-drag/);
+});
