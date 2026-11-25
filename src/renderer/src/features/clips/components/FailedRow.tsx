@@ -54,6 +54,7 @@ export default function FailedRow({ failed, failure, campaignName, signedIn = tr
               <CopyFailureDiagnostics
                 key={a}
                 pill={{ name: failed.name, className: `${HIT}`, pillClassName: QUIET }}
+                force
                 code={failure.code}
                 message={failure.message}
                 attempt={failure.attempt}

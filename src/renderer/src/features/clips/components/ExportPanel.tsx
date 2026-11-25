@@ -4,6 +4,8 @@
  * Description: The Export panel (the bank): the clip being made on top, then "Waiting in this video"
  *   with the suggested next on an Ice edge. Logic-free: everything comes from useExportController.
  */
+import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
+import { useMomentNote } from "../../../shared/utils/momentNoteStore";
 import { useEntryActions } from "../../../shared/hooks/useEntryActions";
 import { suggestProjectName } from "../utils/projectName";
 import { validateClipName } from "../utils/clipName";
@@ -22,10 +24,18 @@ const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platfor
 export default function ExportPanel() {
   const c = useExportController();
   const actions = useEntryActions();
+  // Every workspace tab renders its own Export; only the one in view says it.
+  const active = useIsTabActive();
+  const momentNote = useMomentNote();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
       <CrashNoteHost />
+      {active && momentNote && (
+        <p role="status" className="mx-[10px] mt-[10px] text-meta text-fg-dim">
+          {momentNote}
+        </p>
+      )}
       {c.making && <MakingRow kind="making" {...c.making} onCancel={c.cancel} />}
       {c.offline && <OfflineRow name={c.offline.name} percent={c.offline.percent} />}
       {c.failed && (

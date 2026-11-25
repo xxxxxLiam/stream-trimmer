@@ -33,7 +33,7 @@ export function useExportController() {
   const connected = useYouTubeConnection().connected;
   const kind = state.failed?.kind;
   useFolderResume(kind === "drivegone", actions.folder ?? "", actions.retry);
-  useSignInRetry(kind === "age" || kind === "members" || kind === "signin", connected, actions.retry);
+  useSignInRetry(kind === "age" || kind === "members" || kind === "signin" || kind === "expired", connected, actions.retry);
   const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
   // Each clip just made, with its own file and its own Undo seconds.

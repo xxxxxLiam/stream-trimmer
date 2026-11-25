@@ -4,6 +4,7 @@
  * Description: Root layout. Header, three-column workspace (transcript | centre | clips),
  *   footer, and the Phase B mount points. See BUILD-SPEC sections 3 and 12.
  */
+import { bankedTwin, showMomentNote } from "../shared/utils/momentNoteStore";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
@@ -525,12 +526,17 @@ function Layout({ active }: { active: boolean }) {
     const range = pickedRangeOf({ startText, endText, start: rangeStart, end: rangeEnd, validationError });
     const sections = clipSections(tabSegments, range);
     if (sections.length === 0) return;
-    const taken = [
-      ...downloads.map((d) => d.label.replace(/\.[^.]+$/, "")),
-      ...clipsFor(bankStore.get(), campaign.id, videoId).map((c) => c.label),
-    ];
+    const banked = clipsFor(bankStore.get(), campaign.id, videoId);
+    // The same range is not added a second time (nor does it rename the one that is there): say so instead.
+    const twin = bankedTwin(banked, sections);
+    if (twin) {
+      showMomentNote(`Already saved as ${twin.label || "a clip"}.`);
+      return;
+    }
+    const taken = [...downloads.map((d) => d.label.replace(/\.[^.]+$/, "")), ...banked.map((c) => c.label)];
     const label = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
     bankStore.importClips(campaign.id, videoId, [{ line: 1, id: null, label, segments: sections }]);
+    showMomentNote(`Saved for later as ${label}.`);
   };
   const addMomentRef = useRef(addMoment);
   addMomentRef.current = addMoment;
