@@ -164,3 +164,8 @@ test("F3-5 and F3-7: bigger text and zoom in find the zoom answer; a dimmed Row 
   assert.match(row, /dimmed: "border-transparent text-disabled"/);
   assert.doesNotMatch(row, /opacity-55/);
 });
+
+test("F3-1: Ctrl/⌘ Enter never makes a clip while a drawer or dialog is open", () => {
+  const src = readFileSync(join(ROOT, "features/player/hooks/useClipController.ts"), "utf8");
+  assert.match(src, /e\.key === "Enter" && !dialogOpen\(\)/);
+});

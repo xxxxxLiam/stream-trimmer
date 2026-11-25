@@ -10,6 +10,7 @@ import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { availableDestinations, clipReason, clipSections, sectionsLength } from "../utils/clipDestination";
+import { dialogOpen } from "../../../shared/utils/dialogOpen";
 import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
 
@@ -54,7 +55,8 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
   useEffect(() => {
     if (!opts.listenForKey || !tabActive) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      // F3-1: with a drawer or dialog open (Help's search, the report note) the key belongs to it, not to a clip behind it.
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !dialogOpen()) {
         e.preventDefault();
         clipRef.current();
       }
