@@ -152,3 +152,18 @@ test("V18-T-1: a zoomed view that keeps its centre does not follow the playhead 
   for (const p of [w.start + 5, w.end - 5, kept]) assert.deepEqual(windowForAnchor(duration, zoom, kept), w, `playhead ${p}`);
   assert.notDeepEqual(windowForAnchor(duration, zoom, w.end - 5), w, "centring on the playhead each move is what slid it");
 });
+
+import { spanFor as spanOf } from "./timelineAxis";
+
+test("V18-T-9: every zoom step changes the view, and 100 is the closest stretch", () => {
+  for (const duration of [600, 8073, 14400]) {
+    let prev = spanOf(duration, 0);
+    assert.equal(prev, duration);
+    for (let z = 10; z <= 100; z += 10) {
+      const now = spanOf(duration, z);
+      assert.ok(now < prev, `${duration}s zoom ${z}: ${now} should be under ${prev}`);
+      prev = now;
+    }
+    assert.equal(spanOf(duration, 100), 30);
+  }
+});
