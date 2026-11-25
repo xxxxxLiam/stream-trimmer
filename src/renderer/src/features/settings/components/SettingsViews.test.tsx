@@ -29,6 +29,7 @@ test("top list: campaigns listed here, sign-in, two switches; no Campaigns page,
   assert.match(h, /aria-label="Acme: 3 clips a day"/);
   assert.match(h, /aria-label="Nova: 2 clips a day"/);
   assert.match(h, /aria-label="Add campaign"/);
+  assert.match(h, /aria-label="Acme: 3 clips a day"[\s\S]*?<svg[^>]*viewBox="0 0 16 16"/, "a gear at the row's right");
   assert.doesNotMatch(h, /aria-label="Campaigns/);
   // The clips folder is per campaign only.
   assert.doesNotMatch(h, /Clips folder|Change the clips folder/);
@@ -222,4 +223,12 @@ test("Liam 25 Nov: the Languages dropdown ticks many, Original first and on, and
   assert.match(src, /\[\{ code: "original", label: "Original" \}, \.\.\.p\.dubs\]/);
   assert.match(src, /checked: prefs\.languages\.includes\(l\.code\), keepOpen: true/);
   assert.doesNotMatch(src, /aria-pressed=\{on\}/);
+});
+
+test("Liam 25 Nov: the campaign menu has a gear on each row, not a separate '<Campaign> settings' line", () => {
+  const menu = read("features/campaigns/components/CampaignMenu.tsx");
+  assert.match(menu, /aria-label=\{`\$\{c\.name\} settings`\}/);
+  assert.match(menu, /<IconGear \/>/);
+  assert.doesNotMatch(menu, /\{current\.name\} settings/);
+  assert.match(menu, /New campaign/);
 });

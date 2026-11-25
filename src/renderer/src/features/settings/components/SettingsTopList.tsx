@@ -6,6 +6,7 @@
  *   No global Clips folder row (Liam, 25 Nov), no Editor row, no quality row, no crash switch.
  */
 import { ChevronRow, DrawerHeader, SectionLabel, SwitchRow, drawerBody } from "../../../shared/components/DrawerRows";
+import { IconGear } from "../../../shared/components/icons";
 import type { AppPrefs } from "../utils/settingsPrefs";
 
 export type CampaignRow = { id: string; name: string; summary: string; languages: string | null };
@@ -30,7 +31,18 @@ export default function SettingsTopList(p: SettingsTopListProps) {
       <div className={drawerBody}>
       <SectionLabel first>Campaigns</SectionLabel>
       {p.rows.map((r) => (
-        <ChevronRow key={r.id} label={r.name} value={r.summary} onOpen={() => p.onEdit(r.id)} divider />
+        <button
+          key={r.id}
+          type="button"
+          aria-label={`${r.name}: ${r.summary}`}
+          onClick={() => p.onEdit(r.id)}
+          className="flex h-target items-center gap-[8px] border-b border-hairline bg-transparent text-left text-body leading-[normal] text-fg"
+        >
+          <span className="min-w-[0px] flex-1 truncate">{r.name}</span>
+          <span className="text-meta text-fg-dim">{r.summary}</span>
+          {/* Liam, 25 Nov: a gear at the far right says "this campaign's settings", the same as in the campaign menu. */}
+          <span className="inline-flex text-fg-dim"><IconGear /></span>
+        </button>
       ))}
       {p.rows.length === 0 && <p className="m-[0px] py-[8px] text-meta text-fg-dim">No campaigns yet.</p>}
       <button type="button" aria-label="Add campaign" onClick={p.onAdd} className="mt-[8px] h-target rounded-control border border-hairlineStrong bg-raised text-body leading-[normal] text-fg hover:bg-hover">
