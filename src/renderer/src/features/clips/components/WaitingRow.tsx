@@ -29,7 +29,7 @@ const chip = "rounded-chip border border-hairlineStrong px-[5px] py-[1px] text-m
 export default function WaitingRow({ clip, name, suggested, selected, made, onSelect, onMake, onRemove }: WaitingRowProps) {
   const edge = suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
   return (
-    <div className={`group relative mx-[6px] my-[2px] ${made ? "opacity-60" : ""}`}>
+    <div className="group relative mx-[6px] my-[2px]">
       <button
         type="button"
         aria-pressed={selected}
@@ -42,11 +42,11 @@ export default function WaitingRow({ clip, name, suggested, selected, made, onSe
           aria-label={made ? "Made" : "Waiting"}
         />
         <span className="min-w-0">
-          <span className="block whitespace-nowrap text-body font-medium leading-[normal]">{name}</span>
+          <span className={`block whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
           <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{rangeLine(clip)}</span>
         </span>
         <span className="ml-auto flex items-center gap-[3px]">
-          {clip.rating !== undefined && <span className="text-meta font-semibold leading-[normal]">{ratingText(clip.rating)}</span>}
+          {clip.rating !== undefined && <span className={`text-meta font-semibold leading-[normal] ${made ? "text-disabled" : ""}`}>{ratingText(clip.rating)}</span>}
           {clip.category && <span className={chip}>{clip.category}</span>}
           {clip.tier && <span className={chip}>{tierText(clip.tier)}</span>}
         </span>

@@ -26,7 +26,8 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   const seg = useSegmentsState();
   const { cutBanked, cutSegments } = usePanelHost();
   const { recordUse, forgetUse } = useCampaign();
-  const { removeDownload, pickSaveDir, saveDir, info } = useClipperContext();
+  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload } = useClipperContext();
+  const stopped = useRef(false);
   const { campaignId, vid } = q;
 
   const select = useCallback(
@@ -55,6 +56,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
         s.attempt.current = { name, segments: clip.segments, bankId: clip.id };
         s.setNotice("");
         s.setFinished(null);
+        stopped.current = false;
         clearAfterCuttingOutcome(); // the last clip's handoff answer is old news once the next one starts
         try {
           const ok = await cutBanked(clip, name);
@@ -66,15 +68,21 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
               s.setFinished({ entryId: newest.id, name, endsAt: Date.now() + UNDO_SECONDS * 1000 });
               s.setSecondsLeft(UNDO_SECONDS);
             }
-          } else s.setNotice(`${name} was not made. It is still waiting.`);
+          } else if (!stopped.current) s.setNotice(`${name} was not made. It is still waiting.`);
         } catch {
-          s.setNotice(`${name} was not made. It is still waiting.`);
+          if (!stopped.current) s.setNotice(`${name} was not made. It is still waiting.`);
         }
       };
       return queue.current.enqueue(run);
     },
     [campaignId, vid, cutBanked, recordUse, s, info?.title],
   );
+
+  // The ✕ / Esc on the Making row: the clip goes back to Waiting with its range kept, no notice, no confirm.
+  const stop = useCallback(() => {
+    stopped.current = true;
+    cancelDownload();
+  }, [cancelDownload]);
 
   const undo = useCallback(async () => {
     const entry = getDownloads().find((d) => d.id === s.finished?.entryId);
@@ -132,5 +140,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid],
   );
 
-  return { select, make, undo, remove, retry, changeFolder, showInBrowser, saveForLater };
+  return { select, make, stop, undo, remove, retry, changeFolder, showInBrowser, saveForLater };
 }
