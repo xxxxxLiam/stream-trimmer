@@ -7,6 +7,8 @@
  */
 import { closeCrashNote } from "../../../shared/utils/crashNoteStore";
 import { useEffect, useRef } from "react";
+import { bankStore } from "../../../shared/utils/bank";
+import { showMomentNote } from "../../../shared/utils/momentNoteStore";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { clipTitle, getDownloads } from "../../../shared/utils/downloads";
@@ -46,6 +48,18 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
   // clip's own failure row. A user cancel (phase idle, no error) shows nothing.
   const wasDownloading = useRef(false);
   useEffect(() => {
+    // A different cut starts while an earlier Clip-button cut sits failed: that range must not be lost (the marks
+    // were cleared when Clip was pressed, and one failed row holds one range). It is kept as a waiting moment.
+    // A Retry has already cleared its own row by now, so only another cut gets here.
+    if (!wasDownloading.current && downloading && s.failed && !s.failed.bankId) {
+      const f = s.failed;
+      if (q.campaignId && q.vid) {
+        bankStore.importClips(q.campaignId, q.vid, [{ line: 1, id: null, label: "", segments: f.segments }]);
+        // Unnamed on purpose: its generated name is probably the one the next clip now takes.
+        showMomentNote("Kept the clip that failed in Waiting.");
+      }
+      s.setFailed(null);
+    }
     if (wasDownloading.current && !downloading) {
       if (downloadPhase === "done") {
         const newest = getDownloads().find((d) => d.kind === "clip");
@@ -68,7 +82,9 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         const key = JSON.stringify(a.segments);
         s.failCount.current = { key, count: s.failCount.current.key === key ? s.failCount.current.count + 1 : 1 };
         const fromRow = failure?.row ? rowFailure(failure.row) : null;
-        const classified = classifyClipFailure(failure?.code, failure?.message ?? error);
+        const byCode = classifyClipFailure(failure?.code, failure?.message ?? error);
+        // Someone who never had a sign-in is not told theirs ended: they are asked to sign in.
+        const classified = byCode === "expired" && failure?.hadSession === false ? "signin" : byCode;
         // The connection went: not a failure to act on. The clip's row says so and it carries on when back,
         // unless it keeps failing while the machine says it is online (then the failure row with Retry is honest).
         if (isWaitingForConnection(classified, s.failCount.current.count, navigator.onLine !== false)) {

@@ -8,6 +8,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { bankStore, bankedRanges, clipsFor } from "../../../shared/utils/bank";
+import { ruleOf } from "../../../shared/utils/lengthRule";
 import { suggestedNextId, waitingClips } from "../utils/exportRows";
 
 export function useExportQueries() {
@@ -28,5 +29,5 @@ export function useExportQueries() {
       ? "Open a video to see its moments."
       : "";
 
-  return { campaignId, vid, clips, waiting, made, nextId, planned, gate, campaignName: active?.name ?? "" };
+  return { campaignId, vid, clips, waiting, made, nextId, planned, gate, campaignName: active?.name ?? "", lengthRule: ruleOf(active) };
 }

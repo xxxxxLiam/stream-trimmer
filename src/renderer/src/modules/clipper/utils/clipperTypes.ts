@@ -35,6 +35,8 @@ export interface DownloadFailureInfo {
   row?: ClipRowState;
   /** Set when the clip was refused before it started because the folder is clearly short of room. */
   room?: { neededMb: number; freeMb: number };
+  /** Whether a sign-in was in use when the clip started. Without one, "your sign-in ended" is never true. */
+  hadSession?: boolean;
 }
 
 export type DownloadOptions = {

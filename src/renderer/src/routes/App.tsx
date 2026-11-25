@@ -525,7 +525,10 @@ function Layout({ active }: { active: boolean }) {
     if (!campaign?.id || !videoId) return;
     const range = pickedRangeOf({ startText, endText, start: rangeStart, end: rangeEnd, validationError });
     const sections = clipSections(tabSegments, range);
-    if (sections.length === 0) return;
+    if (sections.length === 0) {
+      showMomentNote("Mark a part first.");
+      return;
+    }
     const banked = clipsFor(bankStore.get(), campaign.id, videoId);
     // The same range is not added a second time (nor does it rename the one that is there): say so instead.
     const twin = bankedTwin(banked, sections);
