@@ -56,8 +56,8 @@ test("Liam 25 Nov: the update pills are bright Frost, and a restart waiting for 
   assert.equal(waitingLabel("Cold Open"), "Restarts after Cold Open");
   assert.equal(waitingLabel(null), "Restarts after the clip");
   const pill = readFileSync(new URL("../components/UpdatePill.tsx", import.meta.url), "utf8");
-  assert.match(pill, /border border-frost bg-frost[^"]*text-bg/);
-  assert.match(pill, /border border-frost px-\[14px\] text-body text-frost/);
+  assert.match(pill, /border border-frost bg-frost[^"]*text-bg shadow-saved/);
+  assert.match(pill, /border border-frost bg-frost-tint-08 px-\[14px\] text-body font-medium text-frost/);
   assert.doesNotMatch(pill, /border-ice|text-ice/);
   assert.match(pill, /cancelRestartToUpdate/);
   const hook = readFileSync(new URL("../hooks/useUpdateStatusEffects.ts", import.meta.url), "utf8");

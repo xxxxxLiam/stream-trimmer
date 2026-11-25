@@ -15,7 +15,7 @@ export default function UpdatePill() {
   const pill = updatePillFor(ready);
   const outer = "mr-[8px] inline-flex h-[44px] items-center group";
   // Liam, 25 Nov: the update pills are bright Frost (the light), so they are noticed; Ice stays for live state elsewhere.
-  const frostOutline = "inline-flex h-[32px] items-center whitespace-nowrap rounded-[16px] border border-frost px-[14px] text-body text-frost";
+  const frostOutline = "inline-flex h-[32px] items-center whitespace-nowrap rounded-[16px] border border-frost bg-frost-tint-08 px-[14px] text-body font-medium text-frost";
   if (!pill && downloading !== null) {
     return (
       <span id="ui-update-pill" role="status" className="mr-[8px] inline-flex h-[44px] items-center">
@@ -25,7 +25,7 @@ export default function UpdatePill() {
   }
   if (!pill) return null;
   const face =
-    "inline-flex h-[32px] items-center whitespace-nowrap rounded-[16px] border border-frost bg-frost px-[14px] text-body font-medium text-bg group-hover:bg-frost-tint-80";
+    "inline-flex h-[32px] items-center whitespace-nowrap rounded-[16px] border border-frost bg-frost px-[14px] text-body font-medium text-bg shadow-saved group-hover:bg-frost-tint-80";
   if (pill.kind === "download") {
     return (
       <a id="ui-update-pill" className={outer} href={pill.url} target="_blank" rel="noreferrer" aria-label={pill.label}>
@@ -43,7 +43,7 @@ export default function UpdatePill() {
         aria-label={`${label} is made. Press to cancel`}
         onClick={() => void window.electronAPI?.cancelRestartToUpdate?.()}
       >
-        <span className={`${frostOutline} font-medium group-hover:bg-frost-tint-35`}>{label}</span>
+        <span className={`${frostOutline} group-hover:bg-frost-tint-35`}>{label}</span>
       </button>
     );
   }
