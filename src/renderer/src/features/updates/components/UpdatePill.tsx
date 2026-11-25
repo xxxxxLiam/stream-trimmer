@@ -5,12 +5,19 @@
  */
 import { useState } from "react";
 import { useUpdateStatusEffects } from "../hooks/useUpdateStatusEffects";
-import { restartRefusal, updatePillFor } from "../utils/updatePill";
+import { downloadingLabel, restartRefusal, updatePillFor } from "../utils/updatePill";
 
 export default function UpdatePill() {
-  const ready = useUpdateStatusEffects();
+  const { ready, downloading } = useUpdateStatusEffects();
   const [refusal, setRefusal] = useState<string | null>(null);
   const pill = updatePillFor(ready);
+  if (!pill && downloading !== null) {
+    return (
+      <span id="ui-update-pill" role="status" className="mr-[8px] inline-flex h-[44px] items-center">
+        <span className="inline-flex h-[32px] items-center whitespace-nowrap rounded-[16px] border border-hairlineStrong px-[14px] text-body text-fg-dim">{downloadingLabel(downloading)}</span>
+      </span>
+    );
+  }
   if (!pill) return null;
   const outer = "mr-[8px] inline-flex h-[44px] items-center group";
   const face =

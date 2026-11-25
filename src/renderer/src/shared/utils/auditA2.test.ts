@@ -36,6 +36,15 @@ test("A2-3: the top bar reads Done for today at quota, never '3 of 2 today'", ()
   assert.equal(todayCount(at(3)), "Done for today");
 });
 
+test("V18-F-2: clips cut from one video share its title as their id but still count one each", () => {
+  const c = createCampaign([], { name: "Acme", dailyQuota: 2 }).campaign;
+  const t = Date.now();
+  const made: Campaign = { ...c, usedRanges: { v: [{ start: 0, end: 5, clipId: "Podcast", at: t }, { start: 10, end: 15, clipId: "Podcast", at: t + 5000 }] } };
+  assert.equal(todayCount(made), "Done for today");
+  const joined: Campaign = { ...c, usedRanges: { v: [{ start: 0, end: 5, clipId: "Podcast", at: t }, { start: 10, end: 15, clipId: "Podcast", at: t }] } };
+  assert.equal(todayCount(joined), "1 of 2 today", "the ranges of one joined clip still count once");
+});
+
 test("A2-4: A/B and A:B share a folder, so the second is refused with a plain sentence", () => {
   const first = [{ id: "1", name: "A/B" }];
   const found = campaignNameProblems("A:B", first);

@@ -30,3 +30,11 @@ test("F-14: a History row with a missing file uses the disabled token, not opaci
   assert.doesNotMatch(src, /opacity-/);
   assert.match(src, /h\.missing\[e\.id\] \? "text-disabled"/);
 });
+
+test("a clip that ran past the end says where it stops, in one dim line; a made one does not", () => {
+  const clip = { id: "B01", label: "Big Deal", segments: [{ start: 8000, end: 8073 }], status: "banked", ranPastEnd: 8073 } as never;
+  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Big Deal" suggested={false} selected={false} onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} />);
+  assert.match(html, /Ran past the end; stops at 2:14:33/);
+  const made = renderToStaticMarkup(<WaitingRow clip={clip} name="Big Deal" suggested={false} selected={false} made onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} />);
+  assert.doesNotMatch(made, /Ran past the end/);
+});

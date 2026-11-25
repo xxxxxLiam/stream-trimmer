@@ -26,11 +26,21 @@ export function linearAxis(win: Win, width: number): Axis {
   return { pieces: [{ t0: win.start, t1: win.end, x0: 0, x1: width, folded: false }], width };
 }
 
+/**
+ * How many seconds the zoom shows: the whole video at 0 down to the closest useful stretch at exactly
+ * 100, eased so the fine end has room. Every step of the slider changes the view (no dead top end).
+ */
+export function spanFor(duration: number, zoom: number): number {
+  if (!(duration > 0)) return 0;
+  if (duration <= MIN_WINDOW_SECONDS) return duration;
+  const z = Math.min(100, Math.max(0, zoom)) / 100;
+  return MIN_WINDOW_SECONDS + (duration - MIN_WINDOW_SECONDS) * (1 - z) ** 3;
+}
+
 /** Zoom 0 shows the whole video; 100 shows about the closest useful stretch, around `focus`. */
 export function windowFor(duration: number, zoom: number, focus: number): Win {
   if (!(duration > 0)) return { start: 0, end: 0 };
-  const z = Math.min(100, Math.max(0, zoom)) / 100;
-  const span = Math.min(duration, Math.max(MIN_WINDOW_SECONDS, duration * (1 - z) ** 3));
+  const span = spanFor(duration, zoom);
   let start = focus - span / 2;
   start = Math.min(Math.max(0, start), duration - span);
   return { start, end: start + span };
@@ -142,7 +152,18 @@ export function foldedAxis(
 /** The zoom (0 to 100) that shows `span` seconds of a `duration` video. Inverse of windowFor. */
 export function zoomForSpan(duration: number, span: number): number {
   if (!(duration > 0) || !(span > 0) || span >= duration) return 0;
-  return Math.min(100, Math.max(0, Math.round((1 - (span / duration) ** (1 / 3)) * 10000) / 100));
+  if (span <= MIN_WINDOW_SECONDS) return duration <= MIN_WINDOW_SECONDS ? 0 : 100;
+  const r = (span - MIN_WINDOW_SECONDS) / (duration - MIN_WINDOW_SECONDS);
+  return Math.min(100, Math.max(0, Math.round((1 - r ** (1 / 3)) * 10000) / 100));
+}
+
+/**
+ * The window centre that keeps time `t` under the same spot of the lane (`frac`, 0 to 1) after a zoom to
+ * `zoom`: how a pinch or a click zooms into a point instead of sliding away from it.
+ */
+export function focusForAnchor(duration: number, zoom: number, t: number, frac: number): number {
+  const span = spanFor(duration, zoom);
+  return t - Math.min(1, Math.max(0, frac)) * span + span / 2;
 }
 
 /** Ruler ticks for every shown stretch of an axis, as pixels. The fold has none (it is labelled). */

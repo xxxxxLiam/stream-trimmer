@@ -6,6 +6,7 @@
  *   Delete campaign. No clip id fields, no format or quality.
  */
 import { useState } from "react";
+import { MAX_RULE_SEC } from "../../../shared/utils/campaigns";
 import { formatClock } from "../../../shared/utils/clock";
 import { parseTimestamp } from "../../../shared/utils/clip";
 import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
@@ -52,13 +53,24 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
   const commitLength = (end: "min" | "max") => {
     const text = lengthDraft[end];
     if (text === undefined) return;
-    const next = text.trim() === "" ? undefined : parseTimestamp(text);
-    const other = end === "min" ? p.lengthRule.max : p.lengthRule.min;
-    const bad = next === null || (next !== undefined && next < 1) ? "Use minutes and seconds, like 0:30."
-      : next !== undefined && other !== undefined && (end === "min" ? next > other : next < other) ? "The first time must not be longer than the second." : "";
+    const parsed = text.trim() === "" ? undefined : parseTimestamp(text);
+    const bad =
+      parsed === null || (parsed !== undefined && parsed < 1)
+        ? "Use minutes and seconds, like 0:30."
+        : parsed !== undefined && parsed > MAX_RULE_SEC
+          ? "A clip length rule can be at most 24:00:00."
+          : "";
     setLengthProblem(bad);
     setLengthDraft((d) => ({ ...d, [end]: undefined }));
-    if (!bad) p.onLengthRule(end === "min" ? { lengthMinSec: next ?? undefined } : { lengthMaxSec: next ?? undefined });
+    if (bad) return;
+    const next = parsed ?? undefined;
+    const other = end === "min" ? p.lengthRule.max : p.lengthRule.min;
+    // Typing past the other end in one step is allowed: the two swap, so the shorter is always first.
+    if (next !== undefined && other !== undefined && (end === "min" ? next > other : next < other)) {
+      p.onLengthRule({ lengthMinSec: end === "min" ? other : next, lengthMaxSec: end === "min" ? next : other });
+      return;
+    }
+    p.onLengthRule(end === "min" ? { lengthMinSec: next ?? undefined } : { lengthMaxSec: next ?? undefined });
   };
   const lengthField = (end: "min" | "max", label: string) => (
     <input

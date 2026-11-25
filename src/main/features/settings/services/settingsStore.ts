@@ -279,6 +279,8 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     // Guard against the startup-order bug: never write from a store that has
     // not read the file yet, or the first write blanks every saved key.
     if (!loaded) load();
+    // The answer is recorded: the prompt is no longer due in this run either, so a page reload cannot ask it again.
+    if (key === START_FRESH_KEY) startFreshPending = false;
     if (value === null || value === undefined) {
       delete cache[key];
       removed.add(key);

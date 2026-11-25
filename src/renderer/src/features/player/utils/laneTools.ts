@@ -67,6 +67,14 @@ export function wheelAction(e: { deltaX: number; deltaY: number; shiftKey: boole
 /** The pointer's x inside the lane, kept on the lane so a scrub that leaves it still reads the end. */
 export const clampX = (x: number, width: number) => Math.min(Math.max(0, x), Math.max(0, width));
 
+/** The zoom tool zooms out while Alt is held, and its cursor says so. */
+export const cursorFor = (tool: keyof typeof TOOL_CURSORS, alt: boolean) =>
+  tool === "zoom" && alt ? "cursor-zoom-out" : TOOL_CURSORS[tool];
+
+/** The zoom (0 to 100) for a press or drag at `clientX` on a slider whose track starts at `left`. */
+export const zoomFromX = (clientX: number, left: number, width: number) =>
+  width > 0 ? Math.min(100, Math.max(0, ((clientX - left) / width) * 100)) : 0;
+
 /** The mouse cursor for each tool, over the whole timeline: an arrow, crosshair (scissors), resize bar (range), cell, hand and magnifier. */
 export const TOOL_CURSORS = {
   pointer: "cursor-default",
@@ -95,7 +103,8 @@ export function placeLabels(bars: readonly LabelBar[], laneWidth: number): Label
     const b = bars[i];
     if (labelWidth(b.label) <= b.width) return;
     const right = b.left + b.width;
-    const next = order.slice(k + 1).map((j) => bars[j].left).find((l) => l >= right - 0.5);
+    // The next bar starting after this one, even when it overlaps this one: a name never runs over it.
+    const next = order.slice(k + 1).map((j) => bars[j].left).find((l) => l > b.left + 0.5);
     const room = (next ?? laneWidth) - right - 4;
     out[i] = room >= 24 ? { inside: false, outsideWidth: Math.min(room, labelWidth(b.label)) } : { inside: true, outsideWidth: 0 };
   });

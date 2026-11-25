@@ -50,6 +50,7 @@ export function setTool(tool: TimelineTool) {
 export function setZoom(zoom: number) {
   set({ zoom: clampZoom(zoom) });
 }
+export const getZoom = () => state.zoom;
 export function requestFit() {
   set({ zoom: 0, fitRequests: state.fitRequests + 1 });
 }

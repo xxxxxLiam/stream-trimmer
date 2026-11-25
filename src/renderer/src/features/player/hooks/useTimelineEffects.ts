@@ -10,6 +10,7 @@ import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { setTool, setZoom, toolForKey, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
 import type { Range } from "../../../shared/utils/segments";
 import { fitWindow, zoomForSpan, type Win } from "../utils/timelineAxis";
+import { dialogOpen } from "../../../shared/utils/dialogOpen";
 import { arrivedFromElsewhere } from "../utils/rangeOrigin";
 import { publishTimelineView } from "./useTimelineView";
 
@@ -32,6 +33,8 @@ type Args = {
   tool: TimelineTool;
   setScissorsStart: (t: number | null) => void;
   view: Win | null;
+  /** A scrub is in progress: the window holds still under the pointer. */
+  scrubbing: boolean;
 };
 
 export function useTimelineEffects(a: Args) {
@@ -41,7 +44,7 @@ export function useTimelineEffects(a: Args) {
   useEffect(() => {
     if (!tabActive || !a.videoId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || (e.key !== "m" && e.key !== "M")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || (e.key !== "m" && e.key !== "M") || dialogOpen()) return;
       const el = e.target as HTMLElement | null;
       if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
       e.preventDefault();
@@ -52,14 +55,14 @@ export function useTimelineEffects(a: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.playhead]);
 
-  // A, B, S, F, H, Z pick the tool (never while typing, never with a modifier).
+  // A, B, D, F, H, Z pick the tool (never while typing, never with a modifier).
   useEffect(() => {
     if (!tabActive) return;
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
       const t = toolForKey(e);
-      if (!t) return;
+      if (!t || dialogOpen()) return;
       e.preventDefault();
       setTool(t);
     };
@@ -99,10 +102,18 @@ export function useTimelineEffects(a: Args) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, a.videoId, a.duration, a.framed?.start, a.framed?.end]);
 
+  // Zoomed in with no centre of its own (the zoom came from the slider, the + and - buttons or a key), the
+  // view keeps the centre it has now. Without one it re-centred on the playhead on every move, so a scrub
+  // chased its own tail and every click slid the ruler.
+  useEffect(() => {
+    if (a.zoom > 0 && a.focus === null) a.setFocus(a.win.start + (a.win.end - a.win.start) / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.zoom, a.focus]);
+
   // Zoomed in, the window follows the playhead once it runs off the edge. Only when the playhead
   // moves: zooming or panning to look somewhere else must not snap the view back to it.
   useEffect(() => {
-    if (a.zoom === 0) return;
+    if (a.zoom === 0 || a.scrubbing) return; // a scrub never moves the axis under the pointer
     if (a.playhead < a.win.start || a.playhead > a.win.end) a.setFocus(a.playhead);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.playhead]);

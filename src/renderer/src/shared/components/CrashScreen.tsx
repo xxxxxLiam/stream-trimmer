@@ -5,6 +5,8 @@
  *   note, Copy details, Send report). No error text appears here; it goes into the details. Pressing Send
  *   report is the consent. Logic-free: CrashScreenHost feeds it.
  */
+import TitleBarDrag from "../../modules/layout/components/TitleBarDrag";
+
 export type CrashScreenProps = {
   state: "idle" | "sent" | "kept";
   copied: boolean;
@@ -18,6 +20,7 @@ const secondary = "h-target rounded-control border border-hairlineStrong bg-rais
 export default function CrashScreen(p: CrashScreenProps) {
   return (
     <div role="alert" id="ui-crash" className="flex h-screen w-full items-center justify-center bg-bg p-[24px] text-fg">
+      <TitleBarDrag />
       <div className="flex w-[480px] max-w-full flex-col gap-[16px] rounded-panel border border-hairline bg-panel p-[24px]">
         <h1 className="m-[0px] text-drawer-title font-medium">Clipr hit a problem</h1>
         <p className="m-[0px] text-body text-fg-dim">Your campaigns, clips and settings are saved. Reopen Clipr to carry on where you were.</p>

@@ -131,6 +131,13 @@ try {
 
     checkForUpdates: () => ipcRenderer.invoke(IPC.updaterCheck),
     restartToUpdate: () => ipcRenderer.invoke(IPC.updaterRestartToUpdate),
+    cancelRestartToUpdate: () => ipcRenderer.invoke(IPC.updaterCancelRestart),
+    getRestartWaiting: () => ipcRenderer.invoke(IPC.updaterRestartWaitingNow),
+    onRestartWaiting: (cb: (waiting: boolean) => void) => {
+      const listener = (_e: unknown, waiting: unknown) => cb(waiting === true);
+      ipcRenderer.on(IPC.updaterRestartWaiting, listener);
+      return () => ipcRenderer.removeListener(IPC.updaterRestartWaiting, listener);
+    },
     getUpdateReady: () => ipcRenderer.invoke(IPC.updaterReadyNow),
     onUpdateReady: (cb: (payload: unknown) => void) => {
       const listener = (_e: unknown, payload: unknown) => cb(payload);

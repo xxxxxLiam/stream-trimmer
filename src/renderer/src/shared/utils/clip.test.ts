@@ -85,3 +85,10 @@ test("C-15: a file name that is a Windows device name is made safe on every OS",
   assert.equal(sanitizeFilename("Con Air"), "Con Air", "only the bare device names");
   assert.equal(sanitizeFilename("Console"), "Console");
 });
+
+import { orderedRange } from "./clip";
+
+test("V18-T-3/4: two times make a range whichever came first", () => {
+  assert.deepEqual(orderedRange(30, 20), { start: 20, end: 30 });
+  assert.deepEqual(orderedRange(20, 30), { start: 20, end: 30 });
+});

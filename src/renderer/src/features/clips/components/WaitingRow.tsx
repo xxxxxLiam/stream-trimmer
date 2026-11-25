@@ -8,7 +8,7 @@
 import RowIconButton from "../../../shared/components/RowIconButton";
 import { IconMake, IconRemove } from "../../../shared/components/rowIcons";
 import type { BankedClip } from "../../../shared/utils/bank";
-import { rangeLine, ratingText } from "../utils/exportRows";
+import { boardTime, rangeLine, ratingText } from "../utils/exportRows";
 
 const tierText = (tier: string) => (/^\d+$/.test(tier) ? `T${tier}` : tier);
 
@@ -46,6 +46,9 @@ export default function WaitingRow({ clip, name, suggested, selected, made, onSe
         <span className="min-w-0">
           <span className={`block whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
           <span className={`mt-[2px] block whitespace-nowrap text-meta leading-[normal] ${made ? "text-disabled" : "text-fg-dim"}`}>{rangeLine(clip)}</span>
+          {clip.ranPastEnd !== undefined && !made && (
+            <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">Ran past the end; stops at {boardTime(clip.ranPastEnd)}</span>
+          )}
         </span>
         <span className="ml-auto flex items-center gap-[3px]">
           {clip.rating !== undefined && <span className={`text-meta font-semibold leading-[normal] ${made ? "text-disabled" : ""}`}>{ratingText(clip.rating)}</span>}

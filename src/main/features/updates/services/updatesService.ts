@@ -43,11 +43,20 @@ export async function checkForUpdate() {
   }
 }
 
-/** Restarts into the update unless a clip is being made. Never opens a dialog. */
+/** Restarts into the update, or arms a restart that waits for the clips to finish. Never opens a dialog. */
 export function restartToUpdate(): RestartToUpdateResult {
   return getUpdateController()?.restartToUpdate() ?? { ok: false, reason: "nothing-ready" };
 }
 
 export function pendingUpdateReady() {
   return getUpdateController()?.pendingReady() ?? null;
+}
+
+/** Ends a restart that is waiting for the clips to finish. */
+export function cancelRestartToUpdate() {
+  return { ok: true as const, cancelled: getUpdateController()?.cancelRestart() ?? false };
+}
+
+export function restartWaitingNow(): boolean {
+  return getUpdateController()?.restartWaiting() ?? false;
 }

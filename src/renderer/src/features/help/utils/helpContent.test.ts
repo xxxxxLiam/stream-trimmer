@@ -149,3 +149,11 @@ test("F2-4: transcript, speed, quota, layout, panels, fit and zoom find an answe
   assert.match(JSON.stringify(undo.groups), /8 seconds/);
   assert.doesNotMatch(JSON.stringify(undo.groups), /5 seconds/);
 });
+
+test("V18-T-10: the zoom answer says where the buttons are", () => {
+  const a = HELP_ANSWERS.find((x) => x.id === "timeline-zoom");
+  assert.ok(a);
+  const text = JSON.stringify(a.groups);
+  assert.match(text, /top right/);
+  assert.doesNotMatch(text, /bottom right/);
+});

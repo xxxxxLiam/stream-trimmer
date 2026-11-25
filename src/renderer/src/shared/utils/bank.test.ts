@@ -24,6 +24,7 @@ import {
   sortClips,
   type BankData,
   type BankedClip,
+  clearRanPastEnd,
 } from "./bank";
 import { parseBankImport } from "./bankImport";
 import { createCampaign } from "./campaigns";
@@ -222,4 +223,14 @@ test("removeCampaignBank drops one campaign's whole bank and leaves the rest", (
   assert.equal(next.other[V].length, 1);
   assert.ok(C in d, "input not mutated");
   assert.equal(removeCampaignBank(d, "absent"), d);
+});
+
+test("ranPastEnd is kept on import and goes when the clip is opened", () => {
+  const parsed = parseBankImport("Big Deal 0:59:00-1:05:00", { duration: 3600 }).clips;
+  const imported = importClips({}, C, V, parsed).data;
+  assert.equal(clipsFor(imported, C, V)[0].ranPastEnd, 3600);
+  const again = normalizeBank(JSON.parse(JSON.stringify(imported)));
+  assert.equal(clipsFor(again, C, V)[0].ranPastEnd, 3600, "survives saving");
+  const opened = clearRanPastEnd(imported, C, V, clipsFor(imported, C, V)[0].id);
+  assert.equal(clipsFor(opened, C, V)[0].ranPastEnd, undefined);
 });

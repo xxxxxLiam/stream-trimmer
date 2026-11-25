@@ -35,8 +35,11 @@ export function CopyFailureDiagnostics({
   diagnostics,
   label = "Copy diagnostics",
   pill,
+  force = false,
 }: {
   label?: string;
+  /** The row decided the problem stays (a second failed Retry), so the details are offered whatever the cause. */
+  force?: boolean;
   /** The Export row's quiet pill (board 03.6.3): a 44px hit area around a 28px pill. */
   pill?: { name: string; className: string; pillClassName: string };
   code?: string;
@@ -50,7 +53,7 @@ export function CopyFailureDiagnostics({
   // New failure, fresh button.
   useEffect(() => setState("idle"), [message, code]);
 
-  if (!offersDeveloperDiagnostics(code, message)) return null;
+  if (!force && !offersDeveloperDiagnostics(code, message)) return null;
 
   const copy = async () => {
     const report = buildDiagnosticsBundle({

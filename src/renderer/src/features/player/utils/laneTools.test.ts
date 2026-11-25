@@ -87,3 +87,32 @@ test("the default timeline is tall enough for the board's five lanes under the t
   // Transcript 32 + Source 44 + two Audio 32 + Clips 34, the ruler 18, the tools row 44 (+ its 10px below).
   assert.ok(DEFAULT_SIZES.timeline >= 32 + 44 + 32 + 32 + 34 + 18 + 44 + 10);
 });
+
+import { cursorFor, zoomFromX } from "./laneTools";
+
+test("V18-T-6: names laid out beside overlapping bars never run over the next bar or each other", () => {
+  // Seven clips within two minutes of a 2 h video at zoom 0: 18 px bars, 3 px apart.
+  const bars = Array.from({ length: 7 }, (_, i) => ({ left: 400 + i * 3, width: 18, label: `ACM-${i + 1}` }));
+  const p = placeLabels(bars, 1262);
+  // The last one has the free space after it; none of the others may print over a bar that starts after it.
+  p.forEach((pl, i) => {
+    if (pl.inside) return;
+    const end = bars[i].left + bars[i].width + 4 + pl.outsideWidth;
+    for (const other of bars) if (other.left > bars[i].left + 0.5) assert.ok(end <= other.left, `label ${i} runs over a bar at ${other.left}`);
+  });
+  assert.equal(p[0].inside, true, "no room beside a bar that overlaps the next: the name stays inside, cut");
+  assert.equal(p[6].inside, false, "the last clip has room after it");
+});
+
+test("V18-T-11: the zoom tool's cursor zooms out while Alt is held", () => {
+  assert.equal(cursorFor("zoom", false), "cursor-zoom-in");
+  assert.equal(cursorFor("zoom", true), "cursor-zoom-out");
+  assert.equal(cursorFor("hand", true), "cursor-grab", "Alt changes only the zoom tool");
+});
+
+test("V18-T-8: a slider position maps to a zoom and stays inside 0 to 100", () => {
+  assert.equal(zoomFromX(150, 100, 100), 50);
+  assert.equal(zoomFromX(50, 100, 100), 0);
+  assert.equal(zoomFromX(500, 100, 100), 100);
+  assert.equal(zoomFromX(150, 100, 0), 0);
+});

@@ -114,3 +114,56 @@ test("a tick that sits within half a second of the window start is kept", () => 
   const ticks = rulerTicks({ start: 4310.2, end: 4390 }, 1262);
   assert.equal(ticks[0]?.label, "1:11:50");
 });
+
+import { focusForAnchor, windowFor as windowForAnchor } from "./timelineAxis";
+
+test("V18-T-2: zooming into a point keeps the time under the pointer, step after step", () => {
+  const width = 1262;
+  for (const duration of [600, 8073, 14400]) {
+    for (const frac of [0.05, 0.3, 0.5, 0.9]) {
+      let zoom = 0;
+      let win = windowForAnchor(duration, zoom, duration / 2);
+      const t = win.start + frac * (win.end - win.start); // the time under the pointer to begin with
+      for (let step = 0; step < 8; step++) {
+        zoom = Math.min(100, zoom + 12);
+        win = windowForAnchor(duration, zoom, focusForAnchor(duration, zoom, t, frac));
+        const under = win.start + frac * (win.end - win.start);
+        const onePixel = (win.end - win.start) / width;
+        // Allowed to move only when the window is pushed against the start or end of the video.
+        const pushed = win.start === 0 || Math.abs(win.end - duration) < 1e-6;
+        if (!pushed) assert.ok(Math.abs(under - t) <= onePixel, `${duration}s frac ${frac} step ${step}: ${under} vs ${t}`);
+      }
+    }
+  }
+});
+
+test("V18-T-1: a zoomed view that keeps its centre does not follow the playhead around", () => {
+  const duration = 8073;
+  const zoom = 80;
+  const centreNow = (playhead: number) => {
+    const w = windowForAnchor(duration, zoom, playhead);
+    return w.start + (w.end - w.start) / 2;
+  };
+  const kept = centreNow(3000);
+  // Setting the centre from the window it shows changes nothing about the window...
+  assert.deepEqual(windowForAnchor(duration, zoom, kept), windowForAnchor(duration, zoom, 3000));
+  // ...and later playhead moves inside it leave the window alone (a null centre would have followed).
+  const w = windowForAnchor(duration, zoom, kept);
+  for (const p of [w.start + 5, w.end - 5, kept]) assert.deepEqual(windowForAnchor(duration, zoom, kept), w, `playhead ${p}`);
+  assert.notDeepEqual(windowForAnchor(duration, zoom, w.end - 5), w, "centring on the playhead each move is what slid it");
+});
+
+import { spanFor as spanOf } from "./timelineAxis";
+
+test("V18-T-9: every zoom step changes the view, and 100 is the closest stretch", () => {
+  for (const duration of [600, 8073, 14400]) {
+    let prev = spanOf(duration, 0);
+    assert.equal(prev, duration);
+    for (let z = 10; z <= 100; z += 10) {
+      const now = spanOf(duration, z);
+      assert.ok(now < prev, `${duration}s zoom ${z}: ${now} should be under ${prev}`);
+      prev = now;
+    }
+    assert.equal(spanOf(duration, 100), 30);
+  }
+});
