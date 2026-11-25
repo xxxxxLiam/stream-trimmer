@@ -24,6 +24,7 @@ import {
 import {
   addUsedRanges,
   applyDefaultFolders,
+  campaignClipsDir,
   countUsedRanges,
   createCampaign,
   defaultDataDir,
@@ -41,7 +42,7 @@ import {
   type UsedRange,
 } from "../../../shared/utils/campaigns";
 import { bankStore } from "../../../shared/utils/bank";
-import { KEY_LOOK_MIGRATED, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
+import { KEY_LOOK_MIGRATED, loadLastLookId, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 
 export type { Campaign, UsedRange } from "../../../shared/utils/campaigns";
@@ -87,6 +88,8 @@ export type CampaignState = {
    */
   pickClipsDir: (forId?: string) => Promise<string | null>;
   pickDataDir: (forId?: string) => Promise<string | null>;
+  /** Choose the Clips folder (the parent of every campaign's folder). Same result as pickClipsDir. */
+  pickParentClipsDir: () => Promise<string | null>;
   /** Accept the suggested data folder as it is. */
   confirmDataDir: () => void;
   /** Used ranges for a video under the active campaign. */
@@ -130,7 +133,7 @@ function idOrUndefined(v: unknown): string | undefined {
 function loadCampaigns(): Campaign[] {
   const list = normalizeCampaigns(readSetting<unknown>(KEY_CAMPAIGNS, []));
   if (readSetting<boolean>(KEY_LOOK_MIGRATED, false)) return list;
-  const legacy = readSetting<{ applyLook?: boolean; lookXml?: string }>(KEY_EDITOR, {});
+  const legacy = readSetting<unknown>(KEY_EDITOR, {});
   const moved = migratePastedLook(list, loadSavedLooks(), legacy);
   if (moved.migrated) {
     saveSavedLooks(moved.looks);
@@ -189,9 +192,11 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     (input: CampaignInput) => {
       const d = defaultsRef.current;
       const explicitData = input.dataDir !== undefined;
-      const clipsDir = input.clipsDir ?? d.clipsDir;
+      // A campaign has its own folder only when it chose one; otherwise it follows the Clips folder.
+      const clipsDir = input.clipsDir ?? "";
       const { campaigns: next, campaign } = createCampaign(campaignsRef.current, {
         ...input,
+        fcpLookId: input.fcpLookId ?? loadLastLookId(),
         clipsDir,
         dataDir: input.dataDir ?? (d.dataDir || undefined),
       });
@@ -229,7 +234,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
 
   const folders = useMemo<Folders>(
     () => ({
-      clipsDir: active?.clipsDir || defaults.clipsDir,
+      clipsDir: active ? campaignClipsDir(active, defaults.clipsDir) : defaults.clipsDir,
       dataDir: active?.dataDir || defaults.dataDir,
       dataDirConfirmed: defaults.dataDirConfirmed,
     }),
@@ -243,12 +248,11 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       const a = campaignsRef.current.find((c) => c.id === targetId);
       const data = a?.dataDir || d.dataDir;
       if (sameFolder(dir, data)) return "Clips and Data need different folders.";
+      // The campaign's own folder. The Clips folder (the parent) is changed only from Settings > Clips folder.
       if (a) commit(updateCampaign(campaignsRef.current, a.id, { clipsDir: dir }));
-      // New campaigns start from the last folder chosen.
-      saveDefaults({ ...d, clipsDir: dir, dataDir: d.dataDir || defaultDataDir(dir) });
       return null;
     },
-    [commit, saveDefaults],
+    [commit],
   );
 
   const setDataDir = useCallback(
@@ -264,6 +268,16 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     },
     [commit, saveDefaults],
   );
+
+  /** Settings > Clips folder > Change: moves the parent for every campaign that has not chosen its own folder. */
+  const pickParentClipsDir = useCallback(async () => {
+    const dir = await window.electronAPI?.pickDirectory();
+    if (!dir) return null;
+    const d = defaultsRef.current;
+    if (sameFolder(dir, d.dataDir)) return "Clips and Data need different folders.";
+    saveDefaults({ ...d, clipsDir: dir, dataDir: d.dataDir || defaultDataDir(dir) });
+    return null;
+  }, [saveDefaults]);
 
   const pickClipsDir = useCallback(
     async (forId?: string) => {
@@ -374,6 +388,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       setDataDir,
       pickClipsDir,
       pickDataDir,
+      pickParentClipsDir,
       confirmDataDir,
       usedFor,
       nextClipId,
@@ -395,6 +410,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       setDataDir,
       pickClipsDir,
       pickDataDir,
+      pickParentClipsDir,
       confirmDataDir,
       usedFor,
       nextClipId,
@@ -481,7 +497,7 @@ export function CampaignTabScope({
 
   const folders = useMemo<Folders>(
     () => ({
-      clipsDir: active?.clipsDir || defaultFolders.clipsDir,
+      clipsDir: active ? campaignClipsDir(active, defaultFolders.clipsDir) : defaultFolders.clipsDir,
       dataDir: active?.dataDir || defaultFolders.dataDir,
       dataDirConfirmed: defaultFolders.dataDirConfirmed,
     }),

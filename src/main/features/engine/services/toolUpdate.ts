@@ -29,6 +29,20 @@ export function ytDlpAsset(platform: string): string {
 }
 
 export const ytDlpDownloadUrl = (platform: string, tag: string) => `${RELEASES}/download/${tag}/${ytDlpAsset(platform)}`;
+export const ytDlpSumsUrl = (tag: string) => `${RELEASES}/download/${tag}/SHA2-256SUMS`;
+
+/** A release tag as yt-dlp writes it: a date, optionally with a build number. Nothing before, after or inside it. */
+export const TAG_PATTERN = /^\d{4}\.\d{2}\.\d{2}(?:\.\d+)?$/;
+
+/** The sha-256 the release's SHA2-256SUMS file lists for `asset`, or null when it lists none. */
+export function checksumFor(sums: string, asset: string): string | null {
+  for (const line of sums.split(/\r?\n/)) {
+    const m = /^([0-9a-f]{64})\s+\*?(.+?)\s*$/i.exec(line);
+    if (m && m[2] === asset) return m[1].toLowerCase();
+  }
+  return null;
+}
+
 export const LATEST_TAG_URL = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
 
 /** `yt-dlp-2026.11.23.exe` -> "2026.11.23"; anything else -> null. */
@@ -52,6 +66,10 @@ export interface ToolUpdateDeps {
   /** The yt-dlp version in use now, or null when none runs. */
   currentVersion: () => string | null;
   fetchLatestTag: () => Promise<string>;
+  /** The text of the release's SHA2-256SUMS file. */
+  fetchChecksums: (tag: string) => Promise<string>;
+  /** The sha-256 (hex) of a file on disk. */
+  checksumOf: (file: string) => Promise<string>;
   /** Downloads `url` to `dest` (a temp path beside the final file). */
   download: (url: string, dest: string) => Promise<void>;
   /** Makes `file` runnable and returns what `--version` prints, or null when it will not run. */
@@ -75,13 +93,17 @@ export async function updateYtDlp(d: ToolUpdateDeps): Promise<ToolUpdateResult> 
   try {
     const tag = (await d.fetchLatestTag()).trim();
     const current = d.currentVersion();
-    if (!/^\d{4}\.\d{2}\.\d{2}/.test(tag)) return { updated: false, why: "failed", error: `unexpected release tag ${tag}` };
+    if (!TAG_PATTERN.test(tag)) return { updated: false, why: "failed", error: `unexpected release tag ${tag}` };
     if (current && !isNewer(tag, current)) return { updated: false, why: "current" };
     d.onUpdating?.();
     const exe = d.platform === "win32" ? ".exe" : "";
     const finalName = `yt-dlp-${tag}${exe}`;
     const tmp = d.tmpPathFor(`${finalName}.download`);
     await d.download(ytDlpDownloadUrl(d.platform, tag), tmp);
+    // Never run a file whose checksum the release does not vouch for.
+    const expected = checksumFor(await d.fetchChecksums(tag), ytDlpAsset(d.platform));
+    if (!expected) return { updated: false, why: "failed", error: "the release lists no checksum for yt-dlp" };
+    if ((await d.checksumOf(tmp)).toLowerCase() !== expected) return { updated: false, why: "failed", error: "the downloaded yt-dlp did not match its checksum" };
     const ran = await d.verify(tmp);
     if (!ran) return { updated: false, why: "failed", error: "the downloaded yt-dlp did not run" };
     await d.install(tmp, finalName);

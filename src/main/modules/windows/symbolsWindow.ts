@@ -47,6 +47,10 @@ export async function openSymbolsWindow() {
     }
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  // This window shows one page and never goes anywhere else.
+  const stay = (event: Electron.Event) => event.preventDefault();
+  win.webContents.on("will-navigate", stay);
+  win.webContents.on("will-redirect", stay);
   win.once("ready-to-show", () => {
     if (!win.isDestroyed()) win.show();
   });

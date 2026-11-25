@@ -457,6 +457,7 @@ function TabBridge({
   const startText = clipper?.startText ?? "";
   const endText = clipper?.endText ?? "";
   const downloading = clipper?.downloading ?? false;
+  const opened = !!clipper?.info;
 
   // A cut works on a snapshot of the list, so editing it mid-cut would not reach the file.
   useLayoutEffect(() => {
@@ -498,9 +499,12 @@ function TabBridge({
       clipper.setEndText(end);
       return;
     }
+    // A link that has not opened (still loading, or failed) is not saved as a video: the tab keeps
+    // what it last held, so a private or mistyped link never turns up in the Videos list.
+    if (url && !opened) return;
     ws.reportTabWork(id, { url, segments, picked: { start: startText, end: endText } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, url, segments, startText, endText, clipper?.info]);
+  }, [id, url, segments, startText, endText, clipper?.info, opened]);
 
   return null;
 }

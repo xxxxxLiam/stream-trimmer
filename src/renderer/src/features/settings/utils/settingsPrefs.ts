@@ -14,7 +14,7 @@ export type ExtraSeconds = 0 | 1 | 2;
 export type CampaignPrefs = { extraSeconds: ExtraSeconds; languages: string[] };
 
 /** Shown for a campaign with no quota yet. Clips a day itself is `Campaign.dailyQuota`, which the top bar reads. */
-export const DEFAULT_DAILY_QUOTA = 3;
+export { DEFAULT_DAILY_QUOTA } from "../../../shared/utils/campaigns";
 
 export const APP_PREFS_KEY = "clipper.appPrefs";
 export const CAMPAIGN_PREFS_KEY = "clipper.campaignPrefs";
@@ -74,4 +74,28 @@ export function campaignSummary(quota: number, p: CampaignPrefs): string {
 /** "Languages: Original, Spanish", or null when the campaign only wants the original. */
 export function languagesLine(p: CampaignPrefs): string | null {
   return p.languages.length > 1 ? `Languages: ${p.languages.map(languageLabel).join(", ")}` : null;
+}
+
+/** Fired after a campaign's prefs are written from outside the settings drawer (the new-campaign form). */
+export const PREFS_CHANGED_EVENT = "clipr-campaign-prefs";
+
+/** Writes one campaign's prefs straight to the store and tells any open drawer to re-read them. */
+export function saveCampaignPrefs(
+  id: string,
+  patch: Partial<CampaignPrefs>,
+  read: (key: string) => Record<string, unknown>,
+  write: (key: string, value: unknown) => void,
+): void {
+  const all = read(CAMPAIGN_PREFS_KEY);
+  write(CAMPAIGN_PREFS_KEY, { ...all, [id]: { ...normalizeCampaignPrefs(all[id]), ...patch } });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PREFS_CHANGED_EVENT));
+}
+
+/** A deleted campaign's prefs go with it. */
+export function dropCampaignPrefs(id: string, read: (key: string) => Record<string, unknown>, write: (key: string, value: unknown) => void): void {
+  const all = { ...read(CAMPAIGN_PREFS_KEY) };
+  if (!(id in all)) return;
+  delete all[id];
+  write(CAMPAIGN_PREFS_KEY, all);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PREFS_CHANGED_EVENT));
 }

@@ -5,6 +5,7 @@
  *   it, undo the clip just made, remove a moment.
  */
 import { useCallback, useRef } from "react";
+import { clearAfterCuttingOutcome } from "../../handoff/components/EditorHandoff";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
@@ -12,10 +13,12 @@ import { bankStore, type BankedClip } from "../../../shared/utils/bank";
 import { getDownloads } from "../../../shared/utils/downloads";
 import { playFrom } from "../../../shared/utils/playFrom";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
-import { validateClipName } from "../utils/clipName";
 import { finishBankedCut } from "../utils/finishBankedCut";
 import { suggestProjectName } from "../utils/projectName";
-import { undoClip } from "../utils/undoClip";
+import { clipGroup, undoClip } from "../utils/undoClip";
+import { UNDO_SECONDS } from "../utils/exportRows";
+import { clipNameFor } from "../utils/cutNaming";
+import { createSerialQueue } from "../utils/serialQueue";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
@@ -23,7 +26,8 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   const seg = useSegmentsState();
   const { cutBanked, cutSegments } = usePanelHost();
   const { recordUse, forgetUse } = useCampaign();
-  const { removeDownload, pickSaveDir, saveDir } = useClipperContext();
+  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload } = useClipperContext();
+  const stopped = useRef(false);
   const { campaignId, vid } = q;
 
   const select = useCallback(
@@ -35,34 +39,57 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [seg, s],
   );
 
+  // Clips are made one after another: "Make this clip" while another is making joins the queue, and
+  // each one's name, Making row and Undo belong to it from the moment it starts.
+  const queue = useRef(createSerialQueue());
   const make = useCallback(
-    async (clip: BankedClip) => {
-      if (!campaignId || !vid) return;
-      // A clip's own label is its name when it is a good one; otherwise the offline suggestion.
-      const name = validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip);
-      s.setMakingName(name || clip.id);
-      s.setFailed(null);
-      s.setMakingId(clip.id);
-      s.attempt.current = { name: name || clip.id, segments: clip.segments, bankId: clip.id };
-      s.setNotice("");
-      s.setFinished(null);
-      try {
-        const ok = await cutBanked(clip, name);
-        if (ok) finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
-        else s.setNotice(`${name || clip.id} was not made. It is still waiting.`);
-      } catch {
-        s.setNotice(`${name || clip.id} was not made. It is still waiting.`);
-      }
+    (clip: BankedClip): Promise<void> => {
+      if (!campaignId || !vid) return Promise.resolve();
+      const run = async () => {
+        // One name: the clip's own when it is a good one, else the suggestion, else two words of the
+        // video's title. A name already saved for this video gets " 2".
+        const taken = getDownloads().map((d) => d.label.replace(/\.[^.]+$/, ""));
+        const name = clipNameFor({ candidates: [clip.label, suggestProjectName(clip)], videoTitle: info?.title, taken });
+        s.setMakingName(name);
+        s.setFailed(null);
+        s.setMakingId(clip.id);
+        s.attempt.current = { name, segments: clip.segments, bankId: clip.id };
+        s.setNotice("");
+        s.setFinished(null);
+        stopped.current = false;
+        clearAfterCuttingOutcome(); // the last clip's handoff answer is old news once the next one starts
+        try {
+          const ok = await cutBanked(clip, name);
+          if (ok) {
+            finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
+            // Its own Undo, even when the next queued clip starts at once.
+            const newest = getDownloads().find((d) => d.kind === "clip");
+            if (newest) {
+              s.setFinished({ entryId: newest.id, name, endsAt: Date.now() + UNDO_SECONDS * 1000 });
+              s.setSecondsLeft(UNDO_SECONDS);
+            }
+          } else if (!stopped.current) s.setNotice(`${name} was not made. It is still waiting.`);
+        } catch {
+          if (!stopped.current) s.setNotice(`${name} was not made. It is still waiting.`);
+        }
+      };
+      return queue.current.enqueue(run);
     },
-    [campaignId, vid, cutBanked, recordUse, s],
+    [campaignId, vid, cutBanked, recordUse, s, info?.title],
   );
+
+  // The ✕ / Esc on the Making row: the clip goes back to Waiting with its range kept, no notice, no confirm.
+  const stop = useCallback(() => {
+    stopped.current = true;
+    cancelDownload();
+  }, [cancelDownload]);
 
   const undo = useCallback(async () => {
     const entry = getDownloads().find((d) => d.id === s.finished?.entryId);
     s.setFinished(null);
     if (!entry) return;
     const res = await undoClip({
-      entry,
+      entries: clipGroup(entry, getDownloads()),
       trashFile: window.electronAPI?.undoClip,
       forgetUse,
       backToWaiting: (c, v, id) => bankStore.setStatus(c, v, id, "banked"),
@@ -113,5 +140,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid],
   );
 
-  return { select, make, undo, remove, retry, changeFolder, showInBrowser, saveForLater };
+  return { select, make, stop, undo, remove, retry, changeFolder, showInBrowser, saveForLater };
 }

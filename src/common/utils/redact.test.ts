@@ -46,3 +46,19 @@ test("path-style signed URLs, JSON-quoted tokens and bare cookie assignments are
   }
   assert.match(out, /\/file\/video\.mp4/);
 });
+
+// ---- E-10: shapes the first pass missed -------------------------------------------------------
+
+test("E-10: a surname after a space, a JSON-style session cookie, a visitor header, a non-ASCII email and a LAN address are all removed", () => {
+  const out = (s: string) => redact(s, { homeDir: null });
+  assert.doesNotMatch(out("failed to open C:\\Users\\Jane Doe\\Videos\\clip.mp4"), /Jane|Doe/);
+  assert.doesNotMatch(out("ERROR: /Users/Jane Doe/Movies/Clipr/a.mp4 not found"), /Jane|Doe/);
+  assert.doesNotMatch(out("cannot write /home/jane doe/clips/a.mp4"), /jane|doe/);
+  assert.doesNotMatch(out("C:\\Users\\jane>yt-dlp"), /jane/);
+  assert.doesNotMatch(out('{"SAPISID":"abcdef/xyz123","other":1}'), /abcdef/);
+  assert.doesNotMatch(out("x-goog-visitor-id: CgtabcDEF123"), /CgtabcDEF123/);
+  assert.doesNotMatch(out("contact jáne@exämple.com now"), /jáne|exämple/);
+  assert.doesNotMatch(out("proxy 192.168.1.20:8080 and 10.0.0.5"), /192\.168\.1\.20|10\.0\.0\.5/);
+  // Ordinary lines stay readable.
+  assert.match(out("engine on http://127.0.0.1:5174/ ok, version 2026.11.23"), /127\.0\.0\.1:5174.*2026\.11\.23/);
+});

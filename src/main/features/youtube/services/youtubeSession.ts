@@ -16,9 +16,10 @@ const { app, session } = electron;
 import path from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import { checkCookiesFile } from "./cookieFile";
+import { checkCookiesFile, readCookieFile } from "./cookieFile";
 import { resolveAuthState } from "./cookieState";
 import { signIn } from "../../../shared/utils/signInSignal";
+import * as logger from "../../../modules/logger/logger";
 
 // Only ever cleared, never read. See clear().
 const LEGACY_PARTITION = "persist:youtube";
@@ -81,17 +82,8 @@ async function probe() {
  * its own decryption.
  */
 async function importCookieFile(sourcePath: unknown) {
-  try {
-    if (typeof sourcePath !== "string" || !sourcePath) {
-      return { ok: false, error: "No file chosen." };
-    }
-    return await importCookieText(await fsp.readFile(sourcePath, "utf8"));
-  } catch (err: any) {
-    return {
-      ok: false,
-      error: err && err.message ? err.message : "Could not read that file.",
-    };
-  }
+  const read = await readCookieFile(sourcePath, (m) => logger.log("youtube", m));
+  return read.ok ? importCookieText(read.text) : read.refusal;
 }
 
 /**

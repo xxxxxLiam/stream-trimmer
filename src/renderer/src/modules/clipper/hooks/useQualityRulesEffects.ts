@@ -1,12 +1,13 @@
 /**
  * File: useQualityRulesEffects.ts
  * Path: src/renderer/src/modules/clipper/hooks/useQualityRulesEffects.ts
- * Description: Keeps the quality valid for the format and holds it at 360p while signed out.
+ * Description: Sets the quality a request asks for from the sign-in state (360p signed out, 1080p signed in) and
+ *   keeps it valid for the format. Nothing here is stored per campaign.
  */
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { type ClipFormat } from "../../../shared/utils/clip";
-import { isSignedOut, signedOutQuality, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
-import { AUDIO_QUALITIES, VIDEO_QUALITIES } from "../utils/clipperTypes";
+import { isSignedOut, requestedQuality, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
+import { AUDIO_QUALITIES } from "../utils/clipperTypes";
 
 export function useQualityRulesEffects({
   connection,
@@ -19,20 +20,14 @@ export function useQualityRulesEffects({
   quality: string;
   setQuality: (q: string) => void;
 }) {
-  // AF2-2: signed out, the engine only serves 360p, so hold the quality there (and give the
-  // user's choice back when they sign in) instead of failing the first Cut at the default Best.
-  const heldQuality = useRef<string | null>(null);
   const signedOut = isSignedOut(connection);
   useEffect(() => {
-    const next = signedOutQuality({ signedOut, format, quality, held: heldQuality.current });
-    heldQuality.current = next.held;
-    if (next.quality !== quality) setQuality(next.quality);
+    const next = requestedQuality({ signedOut, format, quality });
+    if (next !== quality) setQuality(next);
   }, [signedOut, format, quality]);
 
-  // Keep quality valid when switching format (resolutions vs bitrates).
+  // Audio keeps its bitrate list when the format is audio.
   useEffect(() => {
-    const allowed: readonly string[] =
-      format === "mp3" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
-    if (!allowed.includes(quality)) setQuality(allowed[0]);
+    if (format === "mp3" && !(AUDIO_QUALITIES as readonly string[]).includes(quality)) setQuality(AUDIO_QUALITIES[0]);
   }, [format, quality]);
 }

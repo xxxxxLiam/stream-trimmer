@@ -25,13 +25,23 @@ export default defineConfig(({ mode }) => {
     // goes to ./dist, which the main process loads.
     root: "src/renderer",
     envDir: process.cwd(),
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        // The dev server's hot-reload preamble is an inline script the page's content policy would refuse,
+        // so the policy meta is left out of dev pages. The built app keeps it.
+        name: "csp-build-only",
+        apply: "serve",
+        transformIndexHtml: (html: string) => html.replace(/\s*<meta\s+http-equiv="Content-Security-Policy"[\s\S]*?\/>/, ""),
+      },
+    ],
     base: "./",
     build: { outDir: "../../dist", emptyOutDir: true },
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __CHANNEL_DATA__: JSON.stringify(built),
       __OWNER_MACHINES__: JSON.stringify(built ? (env.VITE_OWNER_MACHINES ?? "") : ""),
+      __REPORT_RELAY_URL__: JSON.stringify((env.VITE_REPORT_RELAY_URL ?? "").trim()),
       __OWNER_SALT__: JSON.stringify(built ? (env.VITE_OWNER_SALT ?? "") : ""),
     },
     server: {

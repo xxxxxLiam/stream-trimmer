@@ -41,8 +41,26 @@ test("bad input is refused, not thrown", () => {
   assert.equal(suggestName({ videoId: "v1", ranges: [{ start: 1 }] }).ok, false);
 });
 
-test("only the latest few videos are kept", () => {
-  for (const id of ["a", "b", "c", "d", "e"]) prepareNames(id, lines);
-  assert.equal(suggestName({ videoId: "a", ranges: [{ start: 0, end: 20 }], videoTitle: "T" }).name, "T 1");
-  assert.equal(suggestName({ videoId: "e", ranges: [{ start: 0, end: 20 }], videoTitle: "T" }).name, "Red Shirt");
+const nameFor = (id: string) => suggestName({ videoId: id, ranges: [{ start: 0, end: 20 }], videoTitle: "T" }).name;
+
+test("seven videos open: the open one still gets its transcript name (C-2)", () => {
+  for (const id of ["a", "b", "c", "d", "e", "f", "g"]) prepareNames(id, lines);
+  assert.equal(nameFor("a"), "Red Shirt", "the first video loaded is the open one, and it was not dropped");
+  assert.equal(nameFor("g"), "Red Shirt");
+});
+
+test("many videos open: the least recently used go, the one being named never does", () => {
+  prepareNames("open", lines);
+  assert.equal(nameFor("open"), "Red Shirt");
+  for (let i = 0; i < 30; i++) prepareNames(`other${i}`, lines);
+  assert.equal(nameFor("open"), "Red Shirt", "still there after 30 more were loaded");
+  assert.equal(nameFor("other0"), "T 1", "the oldest of the others was dropped");
+  assert.equal(nameFor("other29"), "Red Shirt");
+});
+
+test("the title fallback is two words, without # or commas (C-2)", () => {
+  const long = { videoTitle: "Podcast #214, the long talk about everything" };
+  assert.equal(ask(long).name, "Podcast 214 1");
+  assert.equal(ask({ ...long, existing: ["Podcast 214 1"] }).name, "Podcast 214 2");
+  assert.equal(ask({ videoTitle: "#### !!!" }).name, "Clip 1");
 });

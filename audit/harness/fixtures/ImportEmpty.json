@@ -1,0 +1,5 @@
+{
+ "_doc": "Import moments opened empty from Export (board 04.2.1).",
+ "extends": "ChannelData",
+ "steps": [{ "wait": 1500 }, { "click": "text=Import moments" }, { "wait": 500 }]
+}

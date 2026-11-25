@@ -75,7 +75,7 @@ test("open failing surfaces the reason; non-macOS says macOS only", async () => 
   assert.match(win.error, /only runs on a Mac/);
   assert.match(win.error, /saved at/);
   const linux = await ed.openWithApp({ app: "capcut" }, { platform: "linux" });
-  assert.match(linux.error, /Mac or Windows only/);
+  assert.match(linux.error, /Mac and Windows only/);
 });
 
 test("only known editors can be launched; the file must exist", async () => {
@@ -145,4 +145,41 @@ test("Mac: Resolve is found inside its folder, and CapCut/Resolve open empty wit
     assert.deepEqual(call, ["open", ["-a", bundle]]);
     assert.deepEqual(shown, ["/c/a.mp4"]);
   }
+});
+
+test("Mac Premiere: 2025 beats CC 2019, and the clip is shown instead of being handed over (D-11, D-16)", async () => {
+  const tree = {
+    "/Applications": ["Adobe Premiere Pro CC 2019", "Adobe Premiere Pro 2025"],
+    "/Applications/Adobe Premiere Pro CC 2019": ["Adobe Premiere Pro CC 2019.app"],
+    "/Applications/Adobe Premiere Pro 2025": ["Adobe Premiere Pro 2025.app"],
+  };
+  const fsImpl = fakeFs(tree, ["/c/a.mp4"]);
+  assert.equal(ed.findApp("premiere", { ...mac, fsImpl }), "/Applications/Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app");
+  let call;
+  const shown = [];
+  const r = await ed.openWithApp({ app: "premiere", file: "/c/a.mp4" }, {
+    ...mac, fsImpl, showFile: (f) => shown.push(f),
+    exec: (cmd, args, cb) => { call = [cmd, args]; cb(null, "", ""); },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.opened, true);
+  assert.equal(r.revealed, true);
+  assert.deepEqual(call, ["open", ["-a", "/Applications/Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app"]]);
+  assert.deepEqual(shown, ["/c/a.mp4"]);
+});
+
+test("Final Cut takes the file: opened, not revealed", async () => {
+  const fsImpl = fakeFs({ "/Applications": ["Final Cut Pro.app"] }, ["/c/a.fcpxml"]);
+  const r = await ed.openWithApp({ app: "finalcut", file: "/c/a.fcpxml" }, { ...mac, fsImpl, exec: (c, a, cb) => cb(null, "", "") });
+  assert.equal(r.opened, true);
+  assert.equal(r.revealed, false);
+});
+
+test("reveal shows a .app instead of opening (launching) it", async () => {
+  const calls = [];
+  const shell = { openPath: async (p) => { calls.push(["openPath", p]); return ""; }, showItemInFolder: (p) => calls.push(["show", p]) };
+  const fsImpl = { statSync: () => ({ isDirectory: () => true }) };
+  await ed.reveal("/Applications/Final Cut Pro.app", { shell, fsImpl });
+  await ed.reveal("/c/clips", { shell, fsImpl });
+  assert.deepEqual(calls, [["show", "/Applications/Final Cut Pro.app"], ["openPath", "/c/clips"]]);
 });

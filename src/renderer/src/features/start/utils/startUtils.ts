@@ -31,3 +31,20 @@ export function toolsStatusFrom(body: unknown): ToolsStatus {
   const o = (body && typeof body === "object" ? (body as { overall?: unknown }).overall : undefined);
   return o === "checking" || o === "broken" ? o : "ready";
 }
+
+/** What the Start screen says when a video would not open and the engine gave no plain sentence. */
+export const OPEN_FAILED = "Clipr couldn't open that video. Check the link and try again.";
+
+/**
+ * The sentence under the link box for a failed open. The engine sends one plain sentence; anything that
+ * still looks like tool output (exit codes, "ERROR:", yt-dlp, stack lines, paths) is never shown.
+ */
+export function plainOpenError(raw: string | null | undefined): string {
+  const t = (raw ?? "").trim();
+  if (!t) return OPEN_FAILED;
+  const raw_ = /exitCode|exit code|ERROR:|yt-dlp|ffmpeg|Command failed|\n\s+at |\bat .+\(.+:\d+|[A-Za-z]:\\|\/(usr|home|Users|var|tmp)\//i;
+  return raw_.test(t) ? OPEN_FAILED : t;
+}
+
+/** What the box says when pasted or submitted text is not a link to one video. */
+export const NOT_A_VIDEO = "That is not a link to one video. Paste a YouTube video link.";

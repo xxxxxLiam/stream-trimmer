@@ -4,7 +4,7 @@
  * Description: The in/out range: parsed start and end, their validation and the helpers that set them.
  */
 import { useCallback, useEffect, useMemo } from "react";
-import { MAX_CLIP_SECONDS, formatTimestamp, parseTimestamp, type VideoInfo } from "../../../shared/utils/clip";
+import { applyIn, applyOut, formatTimestamp, overCapMessage, parseTimestamp, type VideoInfo } from "../../../shared/utils/clip";
 
 export function useClipRangeState({
   url,
@@ -44,9 +44,7 @@ export function useClipRangeState({
     if (startInvalid || endInvalid) return "Timestamp must look like HH:MM:SS";
     if (start >= end) return "Start must be before end";
     if (end > info.duration) return "End exceeds video duration";
-    if (end - start > MAX_CLIP_SECONDS)
-      return "Clip length capped at 10 minutes";
-    return "";
+    return overCapMessage(end - start);
   }, [url, info, start, end, startInvalid, endInvalid]);
 
   useEffect(() => {
@@ -64,13 +62,23 @@ export function useClipRangeState({
     }
   }, []);
 
+  // The point just set is never moved: an In past the Out starts a fresh range there (Out cleared), and
+  // an Out before the In does the mirror.
   const setStartFromSeconds = useCallback(
-    (value: number) => setStartText(formatTimestamp(Math.min(value, end - 1))),
-    [end],
+    (value: number) => {
+      const r = applyIn(value, parseTimestamp(endText));
+      setStartText(formatTimestamp(r.start));
+      if (r.clearEnd) setEndText("");
+    },
+    [endText],
   );
   const setEndFromSeconds = useCallback(
-    (value: number) => setEndText(formatTimestamp(Math.max(value, start + 1))),
-    [start],
+    (value: number) => {
+      const r = applyOut(value, parseTimestamp(startText));
+      setEndText(formatTimestamp(r.end));
+      if (r.clearStart) setStartText("");
+    },
+    [startText],
   );
 
   return {

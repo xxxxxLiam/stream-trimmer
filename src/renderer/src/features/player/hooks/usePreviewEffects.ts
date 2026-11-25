@@ -36,6 +36,12 @@ function typing(e: KeyboardEvent): boolean {
   return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
 }
 
+/** Space presses a focused button, switch, link or menu item; only on anything else does it play or pause. */
+export function onControl(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLElement | null;
+  return !!el?.closest?.('button, a[href], summary, [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"], [role="option"], [role="tab"], [role="radio"]');
+}
+
 export function usePreviewEffects(a: Args) {
   const { player, videoId, tabActive, duration, seekRequest, loop, sections, fullScreen } = a;
   const playerRef = useRef(player);
@@ -98,6 +104,7 @@ export function usePreviewEffects(a: Args) {
     };
     const onDown = (e: KeyboardEvent) => {
       if (e.altKey || typing(e)) return;
+      if (e.key === " " && onControl(e)) return;
       if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.key === "N") {
         e.preventDefault();
         argsRef.current.onNextVideo();
@@ -148,10 +155,18 @@ export function usePreviewEffects(a: Args) {
     };
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
+    // A keyup can be lost (the window loses focus or is hidden while the key is down): stop then too.
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") stopShuttle();
+    };
+    window.addEventListener("blur", stopShuttle);
+    document.addEventListener("visibilitychange", onHidden);
     return () => {
       stopShuttle();
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", stopShuttle);
+      document.removeEventListener("visibilitychange", onHidden);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActive, videoId, duration]);

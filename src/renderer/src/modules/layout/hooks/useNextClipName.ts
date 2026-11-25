@@ -16,6 +16,11 @@ export function setNextClipName(name: string | null) {
   listeners.forEach((l) => l());
 }
 
+/** What the name is right now, for code that is not a component (the cut reads it when Clip is pressed). */
+export function getNextClipName(): string | null {
+  return current;
+}
+
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => {

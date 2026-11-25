@@ -19,6 +19,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFile, execFileSync, spawn as spawnProcess } from "node:child_process";
+import { newestFirst } from "./editorVersion";
 import { findWindowsEditor, WINDOWS_SEARCH_PLACES, type WinDeps } from "./editorDiscoveryWin";
 
 /** The only applications this module will launch. Names never come from the UI. */
@@ -32,7 +33,7 @@ type AppDef = {
   macOnly?: boolean;
   /**
    * False when the editor can't take our project file: it is opened empty and the file is shown in
-   * Finder / File Explorer, ready to drag in. (CapCut always; Resolve until its import is verified.)
+   * Finder / File Explorer, ready to drag in. (CapCut, Premiere; Resolve until its import is verified.)
    */
   takesFile?: boolean;
 };
@@ -54,6 +55,9 @@ const APPS: Record<string, AppDef> = {
     // Versioned: "Adobe Premiere Pro 2025/Adobe Premiere Pro 2025.app".
     match: (name: string) => /^Adobe Premiere Pro.*\.app$/.test(name),
     folder: (name: string) => /^Adobe Premiere Pro/.test(name),
+    // Premiere has no project import here (an .mp4 handed to it as a document is not a project),
+    // so it opens empty and the clip is shown in Finder / File Explorer.
+    takesFile: false,
   },
   capcut: {
     label: "CapCut",
@@ -74,10 +78,6 @@ function readDir(dir: string, fsImpl: Pick<typeof fs, "readdirSync">): string[] 
   }
 }
 
-/** Highest number wins, so "2025" beats "2024" and "10" beats "9". */
-function byVersionDesc(a: string, b: string): number {
-  return b.localeCompare(a, undefined, { numeric: true });
-}
 
 /** Reads a registry key's default value with the system `reg` tool (Windows only). */
 function readRegistryDefault(key: string): string | null {
@@ -108,7 +108,7 @@ function findApp(key: string, { platform = process.platform, fsImpl = fs, home =
   }
   if (platform !== "darwin") return null;
   for (const dir of appDirs(home)) {
-    const names = readDir(dir, fsImpl).sort(byVersionDesc);
+    const names = readDir(dir, fsImpl).sort(newestFirst);
     for (const name of names) {
       if (app.match(name)) return path.join(dir, name);
     }
@@ -116,7 +116,7 @@ function findApp(key: string, { platform = process.platform, fsImpl = fs, home =
       for (const name of names.filter(app.folder)) {
         const inner = readDir(path.join(dir, name), fsImpl)
           .filter(app.match)
-          .sort(byVersionDesc);
+          .sort(newestFirst);
         if (inner.length) return path.join(dir, name, inner[0]);
       }
     }
@@ -156,7 +156,9 @@ const fileManagerName = (platform: NodeJS.Platform = process.platform) => (platf
  * Open the named editor, with `file` when that editor can take it. `app` is a key of APPS.
  * - Missing app: { ok:false, missing:"<name>", error } and the file stays put.
  * - An editor that can't take our file (takesFile:false) is opened empty, and the file is shown in
- *   Finder / File Explorer through `showFile`, ready to drag in ({ ok:true, shown:true }).
+ *   Finder / File Explorer through `showFile`, ready to drag in ({ ok:true, opened:true, revealed:true }).
+ *   Success always says what happened: `opened` (the editor started) and `revealed` (the file was shown).
+ *   Failure is { ok:false, error } with one plain sentence that says why.
  * - Mac: `open -a`. Windows: the found .exe run directly with the file as its argument, never through
  *   a shell string. Final Cut is Mac-only.
  */
@@ -177,7 +179,7 @@ function openWithApp(
   if (!def) return Promise.resolve({ ok: false, error: "That editor is not one this app can open." });
   const saved = file ? ` The file is saved at ${file}.` : "";
   if (platform !== "darwin" && platform !== "win32") {
-    return Promise.resolve({ ok: false, error: `Opening ${def.label} from here works on a Mac or Windows only.${saved}` });
+    return Promise.resolve({ ok: false, error: `Editor handoff works on Mac and Windows only.${saved}` });
   }
   if (def.macOnly && platform !== "darwin") {
     return Promise.resolve({ ok: false, error: `${def.label} only runs on a Mac.${saved}` });
@@ -204,9 +206,9 @@ function openWithApp(
   const done = () => {
     if (showAfter && showFile) {
       showFile(file as string);
-      return { ok: true, appPath, shown: true };
+      return { ok: true, appPath, opened: true, revealed: true, shown: true };
     }
-    return { ok: true, appPath };
+    return { ok: true, appPath, opened: true, revealed: false };
   };
   if (platform === "win32") {
     return new Promise((resolve) => {
@@ -390,7 +392,8 @@ async function reveal(target: unknown, { shell, fsImpl = fs }: any) {
   } catch {
     return { ok: false, error: `Nothing is at ${target}. It may have been moved, renamed or on an unmounted drive.` };
   }
-  if (stat.isDirectory()) {
+  // A .app is a folder to the file system, but opening it would launch it: show it instead.
+  if (stat.isDirectory() && !/\.app[\\/]?$/i.test(target)) {
     const failure = await shell.openPath(target);
     return failure ? { ok: false, error: failure } : { ok: true };
   }

@@ -6,6 +6,7 @@
  *   useStartController feeds it. States: empty, link already copied, checking tools, tool cannot be fixed.
  */
 import { BrandLockup } from "../../../shared/components/BrandMark";
+import PreparingLine from "../../player/components/PreparingLine";
 import type { ToolsStatus } from "../utils/startUtils";
 
 export type ColdStartProps = {
@@ -13,13 +14,22 @@ export type ColdStartProps = {
   value: string;
   onChange: (v: string) => void;
   onPasteButton: () => void;
+  /** The box got a paste or Enter: text that is not a video link then gets its sentence. */
+  onPasteText: () => void;
+  onSubmit: () => void;
   /** A YouTube link found on the clipboard, shown as a one-click offer. Never opened by itself. */
   offer: { text: string; short: string } | null;
   onUseOffer: () => void;
   toolsStatus: ToolsStatus;
   onRetryTools: () => void;
-  /** Sentence under the box when the pasted link is not a video. */
+  /** Sentence under the box when the link would not open. */
   problem: string;
+  /** Opens the same link again (the Try again beside the sentence). */
+  onRetryOpen: () => void;
+  /** The link is being read: the box says "Opening…" with the Preparing line. */
+  opening: boolean;
+  /** Return to a video that is already open, when there is one. */
+  backTo: { label: string; onBack: () => void } | null;
   folderLabel: string;
   onOpenFolder: () => void;
 };
@@ -71,7 +81,7 @@ export default function ColdStart(p: ColdStartProps) {
               </div>
             ) : (
               <div
-                className={`flex h-[64px] items-center gap-[12px] rounded-control border bg-raised pl-[20px] pr-[12px] ${
+                className={`relative flex h-[64px] items-center gap-[12px] rounded-control border bg-raised pl-[20px] pr-[12px] ${
                   waiting ? "border-ice-tint-50 shadow-box" : "border-hairlineStrong"
                 }`}
               >
@@ -86,6 +96,13 @@ export default function ColdStart(p: ColdStartProps) {
                   spellCheck={false}
                   value={p.value}
                   onChange={(e) => p.onChange(e.target.value)}
+                  onPaste={p.onPasteText}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      p.onSubmit();
+                    }
+                  }}
                   placeholder="Paste a YouTube link"
                   className="min-w-[0px] flex-1 bg-transparent text-[15px] text-fg outline-none"
                 />
@@ -93,11 +110,18 @@ export default function ColdStart(p: ColdStartProps) {
                   Paste
                   <span className="text-meta opacity-70">{p.pasteKey}</span>
                 </button>
+                {p.opening && <PreparingLine />}
               </div>
             )}
+            {p.opening && <div role="status" className="text-meta text-fg-dim">Opening…</div>}
             {checking && <div className="text-meta text-fg-dim">Updating download tools, about 20 s. Your link will open when they are ready.</div>}
             {broken && <Notice text="The download tools could not start. Try again." action="Try again" onAction={p.onRetryTools} />}
-            {p.problem && !broken && <div role="alert" className="rounded-control border border-error bg-raised px-[16px] py-[12px] text-body">{p.problem}</div>}
+            {p.problem && !broken && !p.opening && <Notice text={p.problem} action="Try again" onAction={p.onRetryOpen} />}
+            {p.backTo && !p.opening && (
+              <button type="button" onClick={p.backTo.onBack} className="self-start text-meta text-fg-dim underline hover:text-fg">
+                Back to {p.backTo.label}
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-[8px]">
             <span className={pill}><Tick />No ads</span>

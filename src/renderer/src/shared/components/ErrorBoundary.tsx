@@ -3,49 +3,13 @@
  * Path: src/renderer/src/shared/components/ErrorBoundary.tsx
  * Description: Top-level React error boundary (F-10). A render throw anywhere in the shell
  *   (B-1, C-1, a malformed updater payload) used to unmount the whole tree and leave a
- *   blank window. This shows the error and two ways out: try again (re-render) or reload.
- *   Work is persisted by the settings store, so a reload does not lose saved state.
+ *   blank window. It now hands the error to the crash screen it is given. Work is persisted
+ *   by the settings store, so reopening does not lose saved state.
  */
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-type Props = { children: ReactNode };
+type Props = { children: ReactNode; /** The crash screen, given the error (it goes into the report, never on screen). */ fallback: (error: Error) => ReactNode };
 type State = { error: Error | null };
-
-export function ErrorFallback({
-  error,
-  onRetry,
-  onReload,
-}: {
-  error: Error;
-  onRetry: () => void;
-  onReload: () => void;
-}) {
-  return (
-    <div
-      role="alert"
-      className="surface-ground flex h-screen w-full items-center justify-center p-6 text-fg"
-    >
-      <div className="surface-panel flex max-w-lg flex-col gap-3 p-6">
-        <h1 className="m-0 text-title text-fg">Something went wrong</h1>
-        <p className="m-0 text-body text-fg-dim">
-          The window hit an error and stopped drawing. Your saved campaigns and settings are
-          untouched. Try again, or reload the window.
-        </p>
-        <pre className="m-0 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-chip border border-hairline bg-raised p-2 font-mono text-meta text-fg-dim">
-          {error.message || String(error)}
-        </pre>
-        <div className="flex gap-2">
-          <button type="button" className="btn-primary" onClick={onRetry} id="ui-error-retry">
-            Try again
-          </button>
-          <button type="button" className="btn" onClick={onReload} id="ui-error-reload">
-            Reload window
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
@@ -59,15 +23,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (this.state.error) {
-      return (
-        <ErrorFallback
-          error={this.state.error}
-          onRetry={() => this.setState({ error: null })}
-          onReload={() => window.location.reload()}
-        />
-      );
-    }
+    if (this.state.error) return this.props.fallback(this.state.error);
     return this.props.children;
   }
 }

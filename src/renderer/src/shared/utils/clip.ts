@@ -5,6 +5,34 @@
  */
 export const MAX_CLIP_SECONDS = 600;
 
+function lengthWords(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
+/** Plain words for a range over the cap (the range stays; only Clip is held back), or "" when it fits. */
+export function overCapMessage(seconds: number): string {
+  return seconds > MAX_CLIP_SECONDS
+    ? `Clips can be up to ${MAX_CLIP_SECONDS / 60} minutes. This one is ${lengthWords(seconds)}.`
+    : "";
+}
+
+/**
+ * Setting In at `value` when Out is `end` (null when none): an In at or past Out starts a fresh range at
+ * that In with Out cleared. The point just set is never moved.
+ */
+export function applyIn(value: number, end: number | null): { start: number; clearEnd: boolean } {
+  return { start: value, clearEnd: end !== null && value >= end };
+}
+
+/** The mirror: an Out at or before In starts a fresh range ending there with In cleared. */
+export function applyOut(value: number, start: number | null): { end: number; clearStart: boolean } {
+  return { end: value, clearStart: start !== null && value <= start };
+}
+
 export type ClipFormat = "mp4" | "mp3";
 
 export type BitrateMap = Partial<Record<string, number>>; // kbps
@@ -188,6 +216,10 @@ export function sanitizeFilename(title: string | null | undefined): string {
     .replace(/^[.\s]+|[.\s]+$/g, "")
     .slice(0, 120)
     .trim();
+  // CON, PRN, AUX, NUL, COM1-9 and LPT1-9 are devices on Windows, with or without an extension. A
+  // name that is only one of them gets a plain word after it, on every OS, so a folder copied to
+  // Windows still opens.
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(cleaned.split(".")[0])) return `${cleaned} clip`;
   return cleaned || "clip";
 }
 
@@ -238,7 +270,8 @@ function isYouTubeHost(host: string): boolean {
  * "https://". Channels, handles, playlists and search pages have no id and give null.
  */
 export function extractVideoId(raw: string): string | null {
-  const text = raw.trim();
+  // Two links pasted together (from a chat or a note): the first one is the one that opens.
+  const text = raw.trim().split(/\s+/)[0] ?? "";
   if (!text) return null;
   let u: URL;
   try {
@@ -271,7 +304,7 @@ export function normalizeYouTubeUrl(url: string): string {
   const id = extractVideoId(url);
   if (!id) return url;
   try {
-    const u = new URL(url);
+    const u = new URL(url.trim().split(/\s+/)[0]);
     const t = u.searchParams.get("t") || u.searchParams.get("start");
     const q = new URLSearchParams({ v: id });
     if (t) q.set("t", t);

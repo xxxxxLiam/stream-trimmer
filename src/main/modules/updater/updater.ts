@@ -61,7 +61,7 @@ function releasesUrl() {
 // Releases are tagged `v<version>`; electron-updater reports the bare version.
 function releaseTag(version: unknown) {
   const text = String(version ?? "").trim();
-  if (!/^v?\d+\.\d+\.\d+/.test(text)) return null;
+  if (!/^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(text)) return null;
   return text.startsWith("v") ? text : `v${text}`;
 }
 

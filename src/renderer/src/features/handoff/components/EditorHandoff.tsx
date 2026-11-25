@@ -25,7 +25,7 @@ import {
   FRAME_RATE_CHOICES,
   buildSessionFcpxml,
   libraryLocation,
-  resolveEventName,
+  importLayout,
   resolveProjectNames,
   type AfterCutting,
   type FcpxmlProject,
@@ -34,7 +34,7 @@ import {
   type RawProbe,
   type SessionClip,
 } from "../../../shared/utils/fcpxml";
-import { mergeSessionClips, sessionCampaignKey, writeClipboard } from "../../../shared/utils/handoff";
+import { writeClipboard } from "../../../shared/utils/handoff";
 import { parseLook } from "../../../../../common/utils/fcpLook";
 import { normalizeCampaigns } from "../../../shared/utils/campaigns";
 import { KEY_LOOK_MIGRATED, loadSavedLooks, lookForCampaign } from "../../../shared/utils/fcpLooks";
@@ -97,7 +97,7 @@ export function projectOptions(
   settings: EditorHandoffSettings,
   ctx: { campaignId?: string | null; campaignName?: string; sourceTitle?: string },
 ): FcpxmlProject | undefined {
-  const eventName = resolveEventName({ from: "source", campaignName: ctx.campaignName, sourceTitle: ctx.sourceTitle });
+  const { eventName } = importLayout(settings, ctx);
   if (!eventName) return undefined;
   return {
     eventName,
@@ -140,6 +140,9 @@ export interface HandoffOutcome {
   /** Clips left out of the file, with the reason each. */
   skipped?: { id: string; reason: string }[];
   path?: string;
+  /** The clip this send was for, so a failure can be shown on that clip's Export row. */
+  clipId?: string;
+  clipPath?: string;
 }
 
 /** Probe, build ONE document for `ctx.clips`, write it, optionally open it. */
@@ -156,11 +159,7 @@ export async function exportFcpxml(
   if (ctx.clips.length === 0) {
     return { ok: false, message: "No clips yet. Cut one, then send it." };
   }
-  const eventName = resolveEventName({
-    from: "source",
-    campaignName: ctx.campaignName,
-    sourceTitle: ctx.sourceTitle,
-  });
+  const { eventName } = importLayout(settings ?? {}, ctx);
   return exportNamed(api, ctx, eventName, openWith, settings);
 }
 
@@ -172,9 +171,16 @@ async function exportNamed(
   settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
   const structured = settings;
-  const clips = ctx.clips.map((c) =>
-    typedProjectNames.has(c.id) ? { ...c, projectName: typedProjectNames.get(c.id) } : c,
-  );
+  // With a layout, the campaign's own Event field names the event ("Export" when blank). The video
+  // being open must not decide it: clips from other videos would land under this one.
+  const layout = structured?.layout;
+  const campaignEvent = layout ? structured?.mediaEvent ?? "" : eventName;
+  // Without a layout, each clip carries the keyword the old layout gives its source video.
+  const keyword = layout ? "" : importLayout(structured ?? {}, ctx).keyword;
+  const clips = ctx.clips.map((c) => {
+    const withTitle = layout ? { ...c, sourceTitle: c.sourceTitle ?? ctx.sourceTitle } : { ...c, keyword: c.keyword ?? keyword };
+    return typedProjectNames.has(c.id) ? { ...withTitle, projectName: typedProjectNames.get(c.id) } : withTitle;
+  });
   let built;
   try {
     const library = structured?.fcpLibrary.trim() || undefined;
@@ -186,13 +192,13 @@ async function exportNamed(
     };
     built = await buildSessionFcpxml(
       clips,
-      eventName,
+      campaignEvent,
       async (file) => {
         const r = await api.probe(file);
         if (!r.ok) throw new Error(r.error);
         return r;
       },
-      { library, libraryExists, project: structured ? projectOptions(structured, ctx) : undefined },
+      { library, libraryExists, layout, project: structured ? projectOptions(structured, ctx) : undefined },
     );
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
@@ -233,9 +239,16 @@ async function exportNamed(
  * `runAfterCutting` without anywhere to put its answer, so the answer is kept
  * here and the panel shows it, the same way it shows its own buttons' results.
  */
-let lastAuto: { outcome: HandoffOutcome; campaignId: string | null } | null = null;
+export type AfterCuttingAnswer = {
+  outcome: HandoffOutcome;
+  campaignId: string | null;
+  /** What it ran with, so "Send to another editor" can send the same clip again. */
+  ctx: HandoffContext;
+  settings: EditorHandoffSettings;
+};
+let lastAuto: AfterCuttingAnswer | null = null;
 const autoListeners = new Set<() => void>();
-export function getAfterCuttingOutcome(): { outcome: HandoffOutcome; campaignId: string | null } | null {
+export function getAfterCuttingOutcome(): AfterCuttingAnswer | null {
   return lastAuto;
 }
 export function subscribeAfterCutting(l: () => void): () => void {
@@ -244,32 +257,27 @@ export function subscribeAfterCutting(l: () => void): () => void {
     autoListeners.delete(l);
   };
 }
-function publishAuto(outcome: HandoffOutcome | null, campaignId: string | null): void {
+function publishAuto(outcome: HandoffOutcome | null, ctx: HandoffContext, settings: EditorHandoffSettings): void {
   if (!outcome) return;
-  lastAuto = { outcome, campaignId };
+  const last = ctx.clips[ctx.clips.length - 1];
+  lastAuto = {
+    outcome: { ...outcome, clipId: outcome.clipId ?? last?.id, clipPath: outcome.clipPath ?? last?.path },
+    campaignId: ctx.campaignId,
+    ctx,
+    settings,
+  };
   autoListeners.forEach((l) => l());
 }
 
-/**
- * Every clip cut this session, newest version of an id wins. Each cut calls `runAfterCutting`
- * with only its own clip; the document for the session has to hold all of them or the next send
- * would replace the file with a one-clip version.
- *
- * A batch belongs to exactly one CAMPAIGN (then the folder it is written to). The folder alone
- * is not an identity: a new campaign inherits the previous one's clips folder, so a batch keyed
- * by folder carried one client's clips into another client's Final Cut document.
- */
-const sessionBatch = new Map<string, SessionClip[]>();
-function rememberClips(ctx: HandoffContext): SessionClip[] {
-  const key = `${sessionCampaignKey(ctx.campaignId)}\u0001${ctx.clipsDir ?? ""}`;
-  const next = mergeSessionClips(sessionBatch.get(key) ?? [], ctx.clips);
-  sessionBatch.set(key, next);
-  return next;
+/** The Export row has shown the answer (or a new clip started): forget it. */
+export function clearAfterCuttingOutcome(): void {
+  if (!lastAuto) return;
+  lastAuto = null;
+  autoListeners.forEach((l) => l());
 }
 
 /** Forget every campaign's session clips and the last automatic outcome (tests; nothing in the app needs it). */
 export function resetSessionHandoff(): void {
-  sessionBatch.clear();
   lastAuto = null;
   autoListeners.forEach((l) => l());
 }
@@ -284,21 +292,19 @@ export async function runAfterCutting(
   settings: EditorHandoffSettings,
   ctx: HandoffContext,
 ): Promise<HandoffOutcome | null> {
-  const batch = rememberClips(ctx);
   let outcome: HandoffOutcome | null;
   try {
-    outcome = await runAfterCuttingInner(settings, ctx, batch);
+    outcome = await runAfterCuttingInner(settings, ctx);
   } catch (err) {
     outcome = { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
-  publishAuto(outcome, ctx.campaignId);
+  publishAuto(outcome, ctx, settings);
   return outcome;
 }
 
 async function runAfterCuttingInner(
   settings: EditorHandoffSettings,
   ctx: HandoffContext,
-  batch: SessionClip[],
 ): Promise<HandoffOutcome | null> {
   const api = bridge();
   const notes: string[] = [];
@@ -316,12 +322,8 @@ async function runAfterCuttingInner(
     }
   } else if (settings.afterCutting === "finalcut") {
     if (!api) return { ok: false, message: NEEDS_DESKTOP };
-    const eventName = resolveEventName({
-      from: "source",
-      campaignName: ctx.campaignName,
-      sourceTitle: ctx.sourceTitle,
-    });
-    outcome = await exportNamed(api, { ...ctx, clips: batch }, eventName, settings.afterCutting, settings);
+    const { eventName } = importLayout(settings, ctx);
+    outcome = await exportNamed(api, ctx, eventName, settings.afterCutting, settings);
   }
   if (api && settings.openIn && justSaved) {
     // The editor chosen in the Clip menu opens with the saved clip; where it can't take it, the
@@ -466,7 +468,7 @@ export default function EditorHandoff({
     };
   }, [open]);
   const ctx: HandoffContext = { campaignId, campaignName, sourceTitle, clipsDir, clips };
-  const eventName = resolveEventName({ from: "source", campaignName, sourceTitle });
+  const { eventName } = importLayout(settings, { campaignName, sourceTitle });
   const nextName = useNextProjectName();
   const libraryText = settings.fcpLibrary.trim();
   let libraryProblem = "";

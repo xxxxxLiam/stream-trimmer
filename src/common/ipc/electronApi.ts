@@ -23,6 +23,9 @@ export type UpdateStatusPayload =
   | { state: "ready"; version?: string }
   | { state: "error"; message: string; url?: string };
 
+/** Why a save failed: the disk is full, the folder can't be written, the folder is gone, or something else. */
+export type SaveFailureCode = "DISK_FULL" | "FOLDER_NOT_WRITABLE" | "FOLDER_GONE" | "SAVE_FAILED";
+
 export interface ElectronAPI {
   isElectron: true;
   settingsSnapshot?: Record<string, unknown>;
@@ -34,7 +37,7 @@ export interface ElectronAPI {
     dirPath: string;
     filename: string;
     data: ArrayBuffer | Uint8Array;
-  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
   /**
    * Moves a finished clip from the engine's temp directory to `dirPath`.
    * Only the path crosses the bridge, never the media.
@@ -43,7 +46,7 @@ export interface ElectronAPI {
     tempPath: string;
     dirPath: string;
     filename: string;
-  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
   saveFiles: (payload: {
     dirPath: string;
     folder: string;
@@ -132,7 +135,7 @@ export interface ElectronAPI {
     openWith: (payload: {
       app: "finalcut" | "premiere" | "resolve" | "capcut";
       file?: string;
-    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; shown?: boolean; error?: string }>;
+    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; opened?: boolean; revealed?: boolean; shown?: boolean; error?: string }>;
     reveal: (target: string) => Promise<{ ok: boolean; error?: string }>;
     copyFiles: (payload: {
       dirPath: string;
@@ -148,6 +151,13 @@ export interface ElectronAPI {
     ) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;
   };
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
+  /**
+   * Sends a crash report (kind "crash": the error) or a Report a problem note (kind "problem": note and error) through the
+   * report relay. main adds the app and system version and the cleaned log. "kept" means it is waiting for a later launch.
+   */
+  sendReport?: (payload: { kind: "crash" | "problem"; note?: string; error: string }) => Promise<{ ok: boolean; status?: "sent" | "kept" }>;
+  /** ISO time when this launch restored the settings from the backup copy, else null. */
+  settingsRestoredAt?: () => Promise<string | null>;
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
   revealDiagnostics?: () => Promise<{
     ok: boolean;

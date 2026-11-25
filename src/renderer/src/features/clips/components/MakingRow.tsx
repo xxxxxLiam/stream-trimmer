@@ -8,15 +8,16 @@
  *   px because the board's are (the app root is 13px).
  */
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
 import RowIconButton from "../../../shared/components/RowIconButton";
-import { IconInEditor, IconShowFile } from "../../../shared/components/rowIcons";
+import { IconClose, IconInEditor, IconShowFile } from "../../../shared/components/rowIcons";
 import { failureCopy } from "../utils/clipFailure";
 import { makingText, undoText } from "../utils/exportRows";
 import UndoRing from "./UndoRing";
 
 export type MakingRowProps =
-  | { kind: "making"; name: string; percent: number; phase: string; retrying?: boolean }
+  | { kind: "making"; name: string; percent: number; phase: string; retrying?: boolean; onCancel?: () => void }
   | {
       kind: "finished";
       name: string;
@@ -30,6 +31,41 @@ export type MakingRowProps =
 const NAME = "text-body font-medium leading-[normal]";
 const SUB = "mt-[2px] text-meta leading-[normal] text-fg-dim";
 
+// Board 03.2.12: a 32px ✕ on the hover fill at the row's right. Hover or focus shows "Stop making it · Esc"
+// below it; Esc does the same while nothing else (a drawer, a dialog, a field) is using the key.
+function StopButton({ onStop }: { onStop: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
+      onStop();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onStop]);
+  return (
+    <span className="group relative ml-auto flex-none">
+      <button
+        type="button"
+        aria-label="Stop making it"
+        aria-keyshortcuts="Escape"
+        onClick={onStop}
+        className="inline-flex size-[32px] items-center justify-center rounded-control bg-hover text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost"
+      >
+        <IconClose />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute right-0 top-[calc(100%+6px)] z-10 hidden whitespace-nowrap rounded-chip border border-hairlineStrong bg-hover px-[8px] py-[5px] text-meta leading-[normal] text-fg group-focus-within:block group-hover:block"
+      >
+        Stop making it<span className="ml-[8px] text-fg-dim">Esc</span>
+      </span>
+    </span>
+  );
+}
+
 export default function MakingRow(props: MakingRowProps) {
   if (props.kind === "making") {
     const preparing = props.retrying || (props.percent < 1 && props.phase !== "processing");
@@ -37,30 +73,35 @@ export default function MakingRow(props: MakingRowProps) {
       <div
         role="progressbar"
         aria-label={`${props.name}, ${preparing ? "preparing" : makingText(props.percent, props.phase)}`}
-        className="relative mx-[10px] mb-[6px] mt-[10px] overflow-hidden rounded-control bg-raised px-[10px] py-[9px]"
+        className="relative mx-[10px] mb-[6px] mt-[10px] flex items-center gap-[8px] rounded-control bg-raised py-[9px] pl-[10px] pr-[6px]"
       >
-        <div className={NAME}>{props.name}</div>
-        {props.retrying ? (
-          <div className="mt-[3px] text-meta leading-[1.45]">
-            <span className="text-error">{failureCopy("stopped", 1).reason}</span>{" "}
-            <span className="text-fg-dim">{RETRY_SENTENCE}</span>
-          </div>
-        ) : (
-          <div className={SUB}>{makingText(props.percent, props.phase)}</div>
-        )}
-        {preparing ? (
-          <>
-            <span className="absolute inset-x-0 bottom-0 h-[2px] bg-hairline" />
-            <motion.span
-              className="absolute bottom-0 h-[2px] w-[56px] rounded-[1px] bg-ice"
-              initial={{ left: "-56px" }}
-              animate={{ left: ["-56px", "100%"] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-            />
-          </>
-        ) : (
-          <span className="absolute bottom-0 left-0 h-[2px] bg-ice" style={{ width: `${Math.min(100, props.percent)}%` }} />
-        )}
+        <div className="min-w-0">
+          <div className={NAME}>{props.name}</div>
+          {props.retrying ? (
+            <div className="mt-[3px] text-meta leading-[1.45]">
+              <span className="text-error">{failureCopy("stopped", 1).reason}</span>{" "}
+              <span className="text-fg-dim">{RETRY_SENTENCE}</span>
+            </div>
+          ) : (
+            <div className={SUB}>{makingText(props.percent, props.phase)}</div>
+          )}
+        </div>
+        {props.onCancel && <StopButton onStop={props.onCancel} />}
+        <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-control">
+          {preparing ? (
+            <>
+              <span className="absolute inset-x-0 bottom-0 h-[2px] bg-hairline" />
+              <motion.span
+                className="absolute bottom-0 h-[2px] w-[56px] rounded-[1px] bg-ice"
+                initial={{ left: "-56px" }}
+                animate={{ left: ["-56px", "100%"] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </>
+          ) : (
+            <span className="absolute bottom-0 left-0 h-[2px] bg-ice" style={{ width: `${Math.min(100, props.percent)}%` }} />
+          )}
+        </span>
       </div>
     );
   }

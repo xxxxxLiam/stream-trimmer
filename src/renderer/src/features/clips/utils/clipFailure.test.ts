@@ -57,3 +57,20 @@ test("the retry sentence is recognised while the engine retries", () => {
   assert.equal(isRetryingNote("Clipr is updating its download tools and will try once more."), true);
   assert.equal(isRetryingNote("Downloading"), false);
 });
+
+test("C-8: a failure with a network cause says so and does not promise a retry that is not happening", () => {
+  assert.equal(classifyClipFailure(undefined, "getaddrinfo ENOTFOUND www.youtube.com"), "offline");
+  assert.equal(classifyClipFailure(undefined, "Network is unreachable"), "offline");
+  assert.equal(classifyClipFailure(undefined, "ERROR: Sign in to confirm you’re not a bot"), "stopped");
+  assert.equal(classifyClipFailure("private_video", "timed out"), "private", "a code of its own wins");
+  assert.equal(failureCopy("offline", 1).reason, "No internet connection.");
+  assert.doesNotMatch(failureCopy("offline", 1).detail, /try once more/);
+  assert.equal(failureCopy("offline", 2).detail, "", "after the second failure the row says only the reason");
+  assert.deepEqual(failureActions("offline", 2), ["retry", "copyDetails"]);
+});
+
+test("C-6: a full or unwritable folder says so, with Change folder and no retry of the download", () => {
+  assert.equal(failureCopy("disk", 1, "The Clips folder is full.").reason, "The Clips folder is full.");
+  assert.equal(failureCopy("disk", 1, "Clipr can’t write to that folder.").reason, "Clipr can’t write to that folder.");
+  assert.deepEqual(failureActions("disk", 1), ["changeFolder"]);
+});

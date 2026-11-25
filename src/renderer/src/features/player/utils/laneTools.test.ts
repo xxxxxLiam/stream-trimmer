@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { grabbedEdge, scissorsClick, zoomStep } from "./laneTools";
+import { grabbedEdge, pickHintLead, scissorsClick, zoomStep } from "./laneTools";
 
 test("scissors: the first click is a start, the second ends the range", () => {
   assert.deepEqual(scissorsClick(null, 100), { kind: "start", at: 100 });
@@ -26,4 +26,9 @@ test("an edge is grabbed within a few pixels, the nearer one wins", () => {
 test("alt zooms out", () => {
   assert.equal(zoomStep(false), 20);
   assert.equal(zoomStep(true), -20);
+});
+
+test("the first-clip hint matches the tool in hand", () => {
+  assert.equal(pickHintLead("clip"), "Click to set the start, click again for the end");
+  assert.equal(pickHintLead("pointer"), "Drag on the timeline");
 });

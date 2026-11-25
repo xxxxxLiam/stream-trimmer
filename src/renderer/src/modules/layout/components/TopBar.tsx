@@ -12,6 +12,7 @@ import { useCampaign } from "../../../features/campaigns/hooks/CampaignContext";
 import CampaignChip from "../../../features/campaigns/components/CampaignChip";
 import HelpButton from "../../../features/help/components/HelpButton";
 import UpdatePill from "../../../features/updates/components/UpdatePill";
+import { useToday } from "../../../shared/hooks/useToday";
 import { todayCount } from "../../../shared/utils/campaigns";
 import PanelsMenu from "./PanelsMenu";
 import type { MenuItem } from "./PopoverMenu";
@@ -31,7 +32,8 @@ export type TopBarProps = {
 export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleSettings, campaignMenu, panelsMenuExtras }: TopBarProps) {
   const { info } = useClipperContext();
   const { active } = useCampaign();
-  const today = todayCount(active);
+  const now = useToday();
+  const today = todayCount(active, now);
 
   return (
     <header className="topbar relative flex h-[53px] shrink-0 items-center gap-[12px] border-b border-hairline pl-[16px] pr-[12px]">

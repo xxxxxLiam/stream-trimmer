@@ -6,12 +6,17 @@
  *   Delete campaign. No clip id fields, no format or quality.
  */
 import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
+import FinalCutLayout, { type FinalCutLayoutProps } from "./FinalCutLayout";
 import FinalCutLook, { type FinalCutLookProps } from "./FinalCutLook";
 import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
-export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void;
+export type FinalCutFields = { library: string; event: string;
+  /** False for the layouts that name their own events (per video, per day): the Event field would do nothing. */
+  showEvent?: boolean; onChoose: () => void; onEvent: (v: string) => void;
   /** The "Your look" row; shown when the look files can be read (needs the Engine look reader). */
   look?: FinalCutLookProps;
+  /** The "Layout" row (how clips are laid out in Final Cut, with a preview). */
+  layout?: FinalCutLayoutProps;
 };
 
 export type SettingsCampaignProps = {
@@ -126,13 +131,18 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
               Choose
             </button>
           </div>
-          <label htmlFor="fcp-event" className="text-meta text-fg-dim">Event</label>
-          <input id="fcp-event" type="text" value={p.finalCut.event} onChange={(e) => p.finalCut?.onEvent(e.target.value)} className={fieldInput} />
+          {p.finalCut.showEvent !== false && (
+            <>
+              <label htmlFor="fcp-event" className="text-meta text-fg-dim">Event</label>
+              <input id="fcp-event" type="text" value={p.finalCut.event} placeholder="Export" onChange={(e) => p.finalCut?.onEvent(e.target.value)} className={fieldInput} />
+            </>
+          )}
+          {p.finalCut.layout && <FinalCutLayout {...p.finalCut.layout} />}
           {p.finalCut.look && <FinalCutLook {...p.finalCut.look} />}
-          <p className="m-[0px] text-meta text-fg-dim">Each video gets its own keyword collection inside the event. Shown only while Final Cut Pro is ticked in the Clip menu.</p>
+          <p className="m-[0px] text-meta text-fg-dim">Shown only while Final Cut Pro is ticked in the Clip menu.</p>
         </div>
       )}
-      <button type="button" aria-label={`Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-[8px] h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
+      <button type="button" aria-label={p.confirmingDelete ? `Click again to delete ${p.name}` : `Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-[8px] h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
         {p.confirmingDelete ? `Click again to delete ${p.name}` : "Delete campaign"}
       </button>
       </div>

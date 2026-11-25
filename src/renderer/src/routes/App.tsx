@@ -18,6 +18,11 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
+import { useFlushPendingReports } from "../features/help/hooks/useReportMutations";
+import { loadLastLayout } from "../shared/utils/lastLayout";
+import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
+import { runLaunchSignIn } from "../shared/utils/launchSignIn";
+import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
 import { CHANNEL_DATA_BUILT, useOwnerAccess } from "../shared/utils/ownerGate";
@@ -31,19 +36,28 @@ import {
 import { annotateDownload, getDownloads } from "../shared/utils/downloads";
 import { addSessionClip, sessionClipsFor, type SessionClipsByCampaign } from "../shared/utils/handoff";
 import { readSetting, writeSetting } from "../shared/utils/persist";
-import type { BankedClip } from "../shared/utils/bank";
+import { bankStore, clipsFor, type BankedClip } from "../shared/utils/bank";
+import { clipNameFor } from "../features/clips/utils/cutNaming";
+import { matchingMoment } from "../features/clips/utils/finishBankedCut";
+import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
+import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
+import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
+import { tabDomId } from "../modules/layout/components/PanelTabStrip";
+import { setMakingName } from "../shared/utils/clipNameStore";
 import OverlayLoader from "../shared/components/OverlayLoader";
 import DragOutHandle from "../shared/components/DragOutHandle";
 import { useSegmentsState } from "../shared/hooks/useSegmentsState";
 import type { Segment } from "../shared/utils/segments";
 import {
   restoreConnection,
+  sweepBrowsers,
   useYouTubeConnection,
 } from "../shared/utils/youtubeConnection";
 // Shell
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
+import SettingsRestoredNote from "../features/settings/components/SettingsRestoredNote";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
 import ImportDrawer from "../features/import/components/ImportDrawer";
@@ -56,7 +70,7 @@ import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
 import { getClipDestination } from "../features/player/hooks/useClipDestination";
-import { openInFor, toAfterCutting } from "../features/player/utils/clipDestination";
+import { settingsWithDestination } from "../features/player/utils/clipDestination";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
@@ -68,19 +82,24 @@ import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
 function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
-  const d = getClipDestination();
-  return { ...settings, afterCutting: toAfterCutting(d), openIn: openInFor(d) };
+  return settingsWithDestination(settings, getClipDestination());
 }
 
 const EDITOR_KEY = "clipper.editorHandoff";
 
 /** "After cutting" settings, kept per campaign beside the other campaign fields. */
+/** A campaign with no Final Cut settings yet starts with the layout picked last, the way a new campaign gets the last look. */
+function editorSettingsOf(raw: unknown): EditorHandoffSettings {
+  const settings = normalizeEditorSettings(raw);
+  return raw === undefined ? { ...settings, layout: loadLastLayout() ?? settings.layout } : settings;
+}
+
 function useEditorSettings(campaignId: string | null) {
   const [all, setAll] = useState<Record<string, unknown>>(() =>
     readSetting<Record<string, unknown>>(EDITOR_KEY, {}),
   );
   const settings: EditorHandoffSettings = campaignId
-    ? normalizeEditorSettings(all[campaignId])
+    ? editorSettingsOf(all[campaignId])
     : DEFAULT_EDITOR_SETTINGS;
   const setSettings = useCallback(
     (next: EditorHandoffSettings) => {
@@ -93,10 +112,24 @@ function useEditorSettings(campaignId: string | null) {
     },
     [campaignId],
   );
-  return [settings, setSettings] as const;
+  // Any campaign's settings, for the Settings drawer (every campaign's Final Cut fields show there).
+  const settingsFor = useCallback((id: string) => editorSettingsOf(all[id]), [all]);
+  const setSettingsFor = useCallback((id: string, next: EditorHandoffSettings) => {
+    setAll((prev) => {
+      const merged = { ...prev, [id]: next };
+      writeSetting(EDITOR_KEY, merged);
+      return merged;
+    });
+  }, []);
+  return [settings, setSettings, settingsFor, setSettingsFor] as const;
 }
 
-function SavedToast() {
+/** True when a saved clip's detail says it came out at 360p (the toast then offers the sign-in). */
+export function lowQualityDetail(detail: string | undefined): boolean {
+  return /at 360p\b/.test(detail ?? "");
+}
+
+function SavedToast({ onSignIn }: { onSignIn?: () => void }) {
   const { savedNotice, dismissSavedNotice, revealSaved, isElectron } =
     useClipperContext();
   // Deliberately sticky: the notice stays until the user opens the folder or
@@ -135,6 +168,11 @@ function SavedToast() {
               </span>
             )}
           </div>
+          {onSignIn && lowQualityDetail(savedNotice.detail) && (
+            <button type="button" onClick={onSignIn} className="btn ml-1 shrink-0">
+              Sign in for 1080p
+            </button>
+          )}
           {canReveal && (
             <button
               type="button"
@@ -213,6 +251,7 @@ function Layout({ active }: { active: boolean }) {
     info,
     download,
     downloads,
+    duration,
     setStartText,
     setEndText,
     setUrl,
@@ -224,7 +263,6 @@ function Layout({ active }: { active: boolean }) {
     active: campaign,
     folders,
     update,
-    nextClipId,
     recordUse,
     pickClipsDir,
     pickDataDir,
@@ -236,7 +274,10 @@ function Layout({ active }: { active: boolean }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const tips = useTipsController(!!info);
+  // Tips never open beside the first-run campaign prompt: they wait for a campaign (or for the prompt to be dismissed).
+  // Only the open video shows tips; a hidden video must not run the timer or point at its own controls.
+  const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
+  const tips = useTipsController(!!info && active && (!!campaign || campaignPromptDismissed));
   const [importText, setImportText] = useState<string | null>(null);
   // The footer's "Sign in for 1080p" opens Help on its sign-in page.
   const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
@@ -245,13 +286,12 @@ function Layout({ active }: { active: boolean }) {
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
   // nobody is nagged: someone who just wants to paste a link and cut once never set a
   // campaign up, and that is a legitimate way to use the app.
-  const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
 
 
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
 
-  const [editorSettings, setEditorSettings] = useEditorSettings(campaign?.id ?? null);
+  const [editorSettings, setEditorSettings, editorSettingsFor, setEditorSettingsFor] = useEditorSettings(campaign?.id ?? null);
   // Which audio languages the next Clip makes, remembered per campaign. No dubs: one plain clip.
   const [audioSel, setAudioSel] = useAudioLanguageState(campaign?.id ?? null);
   const languagePlans = useMemo(() => planLanguages(info?.audioTracks, audioSel), [info?.audioTracks, audioSel]);
@@ -281,7 +321,7 @@ function Layout({ active }: { active: boolean }) {
     setSettingsStartAt(null);
   }, []);
 
-  // Switching campaign re-points the saving folder, format and quality at once. The clips
+  // Switching campaign re-points the saving folder. The clips
   // folder lives on the campaign; the clipper still saves to its own saveDir, so mirror it.
   useEffect(() => {
     if (isElectron && folders.clipsDir && folders.clipsDir !== saveDir) {
@@ -290,41 +330,21 @@ function Layout({ active }: { active: boolean }) {
   }, [isElectron, folders.clipsDir, saveDir, setSaveDir]);
 
   const campaignId = campaign?.id ?? null;
-  // True from the moment a switch asks the clipper to change format/quality until it has.
-  // Without it the write-back below would copy the OLD values over the new campaign.
-  const repointing = useRef(false);
-  useEffect(() => {
-    if (!campaign) return;
-    repointing.current = campaign.format !== format || campaign.quality !== quality;
-    setFormat(campaign.format);
-    setQuality(campaign.quality);
-    // Only a switch (or first load) re-points; later edits flow the other way below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignId]);
-  // Format and quality are set in the footer and belong to the campaign.
-  useEffect(() => {
-    if (!campaign) return;
-    const same = campaign.format === format && campaign.quality === quality;
-    if (repointing.current) {
-      if (same) repointing.current = false;
-      return;
-    }
-    if (!same) update(campaign.id, { format, quality });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, quality]);
 
   // Once a clip is saved: remember it for the session batch and run the campaign's
   // "After cutting" choice. Never blocks or fails the cut itself.
   // `settings` are the ones in force when the cut STARTED: a switch while it runs must not apply
   // the new campaign's "After cutting" choice to this campaign's clip.
   const afterSaved = useCallback(
-    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string) => {
+    (clipId: string, label: string | undefined, segments: Segment[], settings: EditorHandoffSettings, projectName?: string, groupId?: string) => {
       const newest = getDownloads().find((d) => d.kind === "clip");
       if (newest) {
         annotateDownload(newest.id, {
           campaign: campaign?.name,
           campaignId: campaign?.id,
-          clipId,
+          // A clip and its language copies share one id, so Undo takes them all (the session clip
+          // keeps the per-language id).
+          clipId: groupId ?? clipId,
           segments: segments.map((s) => ({ start: s.start, end: s.end })),
           seconds: segments.reduce((sum, s) => sum + (s.end - s.start), 0),
           videoId: videoId ?? undefined,
@@ -341,6 +361,8 @@ function Layout({ active }: { active: boolean }) {
         projectName: projectName?.trim() || undefined,
         segments: segments.map((s) => ({ start: s.start, end: s.end })),
         sourceUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : sourceUrl || undefined,
+        sourceTitle: info?.title || undefined,
+        cutAt: Date.now(),
       };
       const cutFor = campaign?.id ?? null;
       setSessionByCampaign((prev) => addSessionClip(prev, cutFor, clip));
@@ -355,32 +377,42 @@ function Layout({ active }: { active: boolean }) {
     [videoId, sourceUrl, campaign?.id, campaign?.name, info?.title, folders.clipsDir, saveDir],
   );
 
-  // Cut: name the clip from the campaign pattern, then record its ranges as used so the
-  // no-reuse check and the bank stay in agreement with no bookkeeping.
+  // Cut: the clip's name (typed on the lane, else suggested) is the file's name, the row's name and
+  // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
+  // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
     async (segments: Segment[]) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
       const startSettings = withDestination(editorRef.current);
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
-      const clipId = campaign ? nextClipId(videoId, taken) : null;
+      const name = clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
+      const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
+      setMakingName(name);
       // One clip per ticked language: the original keeps the plain name, a dub adds its tag.
       let madeAny = false;
-      for (const plan of languagePlansRef.current) {
-        const base = clipId ?? (plan.suffix ? info?.title || "clip" : undefined);
-        const name = base ? nameForLanguage(base, plan) : undefined;
-        const ok = await download({ segments, clipId: name, audioLanguage: plan.language });
-        if (!ok) break;
-        if (!madeAny && cutCampaignId && clipId) recordUse(videoId, segments, clipId, cutCampaignId);
-        madeAny = true;
-        afterSaved(name ?? `clip-${Date.now()}`, undefined, segments, startSettings);
+      try {
+        for (const plan of languagePlansRef.current) {
+          const fileName = nameForLanguage(name, plan);
+          const ok = await download({ segments: toCut, clipId: fileName, audioLanguage: plan.language });
+          if (!ok) break;
+          if (!madeAny && cutCampaignId) {
+            recordUse(videoId, segments, name, cutCampaignId);
+            const moment = matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments);
+            if (moment) bankStore.markCut(cutCampaignId, videoId, moment.id);
+          }
+          madeAny = true;
+          afterSaved(fileName, undefined, segments, startSettings, undefined, name);
+        }
+      } finally {
+        setMakingName(null);
       }
       if (!madeAny) return;
       clearSegments();
       setStartText("");
       setEndText("");
     },
-    [videoId, campaign, info?.title, downloads, nextClipId, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
+    [videoId, campaign, info?.title, downloads, duration, download, recordUse, afterSaved, clearSegments, setStartText, setEndText],
   );
 
   // Clip bank: cut every segment of a banked clip as ONE file named after the bank id.
@@ -395,7 +427,7 @@ function Layout({ active }: { active: boolean }) {
         const ok = await download({ segments: clip.segments, clipId: nameForLanguage(baseId, plan), audioLanguage: plan.language });
         if (!ok) break;
         madeAny = true;
-        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName);
+        afterSaved(nameForLanguage(clip.id, plan), clip.label, clip.segments, startSettings, projectName, clip.id);
       }
       return madeAny;
     },
@@ -433,11 +465,18 @@ function Layout({ active }: { active: boolean }) {
       open={settingsOpen}
       onClose={closeSettings}
       startAt={settingsStartAt}
+      videoTitle={info?.title}
       tracks={info?.audioTracks}
-      editor={{ campaignId: campaign?.id ?? null, settings: editorSettings, onChange: setEditorSettings }}
+      editor={{ settingsFor: editorSettingsFor, onChange: setEditorSettingsFor }}
     />
   );
   const dayHost = useDayHost();
+  // The end card's buttons: show the panel (open and brought forward) and put the keyboard on its tab.
+  const { open: openPanelById } = usePanelLayoutState();
+  const focusPanel = (id: "export" | "videos") => {
+    openPanelById(id);
+    window.setTimeout(() => document.getElementById(tabDomId(id))?.focus(), 0);
+  };
   const panelHost: PanelHost = {
     playhead,
     cutSegments: (segs) => void cutClip(segs),
@@ -461,8 +500,8 @@ function Layout({ active }: { active: boolean }) {
     // (Settings) provides the daily quota. Until then the end card says "Nothing waiting".
     day: dayHost.day,
     onNextVideo: dayHost.onNextVideo,
-    onOpenBank: () => {},
-    onOpenVideo: () => {},
+    onOpenBank: () => focusPanel("export"),
+    onOpenVideo: () => focusPanel("videos"),
   };
 
   // Overlays that are not panels. They stay one key (and one Panels menu row) away.
@@ -496,8 +535,16 @@ function Layout({ active }: { active: boolean }) {
     setSettingsOpen(true);
   };
 
+  // The footer pill and the "Downloaded at 360p" toast both open Help on its sign-in page.
+  const openSignIn = () => {
+    setHelpStartAt("signin");
+    setSettingsOpen(false);
+    setHelpOpen(true);
+  };
+
   return (
     <>
+      <SettingsRestoredNote />
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
@@ -505,6 +552,9 @@ function Layout({ active }: { active: boolean }) {
           <ColdStartScreen />
         ) : (
         <>
+        {/* Only the open video mounts the top bar, drawers, tip card and bottom bar, so there is one Help button,
+            one Settings button and one tip on screen however many videos are open. */}
+        {active && (
         <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => {
@@ -521,16 +571,22 @@ function Layout({ active }: { active: boolean }) {
           panelsMenuExtras={overlayItems}
           campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
         />
+        )}
         <PanelHostProvider value={panelHost}>
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
             <PanelWorkspace />
-            <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
-            {settingsDrawer}
-            <ImportDrawer text={importText} onClose={() => setImportText(null)} />
-            {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}
-            {tips.card && importText === null && !helpOpen && <TipCard {...tips.card} />}
+            {active && (
+              <>
+                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
+                {settingsDrawer}
+                <ImportDrawer text={importText} onClose={() => setImportText(null)} />
+                {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}
+                {tips.card && importText === null && !helpOpen && <TipCard {...tips.card} />}
+              </>
+            )}
           </div>
         </PanelHostProvider>
+        {active && (
         <BottomBar
           clipCount={languagePlans.length}
           tracks={info?.audioTracks}
@@ -541,12 +597,9 @@ function Layout({ active }: { active: boolean }) {
           at360={lowQuality}
           showSignInPill={lowQuality}
           // The Help sidebar's sign-in page (Start, Settings and Help build) opens from here.
-          onSignIn={() => {
-            setHelpStartAt("signin");
-            setSettingsOpen(false);
-            setHelpOpen(true);
-          }}
+          onSignIn={openSignIn}
         />
+        )}
         </>
         )}
       </main>
@@ -556,18 +609,23 @@ function Layout({ active }: { active: boolean }) {
         onChosen={() => setCampaignPromptDismissed(true)}
       />
       <SymbolsDialog open={symbolsOpen} onClose={closeSymbols} />
-      {active && <SavedToast />}
+      {active && <SavedToast onSignIn={openSignIn} />}
     </>
   );
 }
 
 function Shell() {
+  useFlushPendingReports();
   const { tabs, activeId, setTabCampaign } = useWorkspace();
 
-  // No background polling. On launch we read the imported cookies.txt once
-  // and verify it silently; after that the user checks when they choose.
+  // No background polling. On launch we read the imported cookies.txt once and verify it silently; if that gives
+  // no session we quietly try the browsers' own YouTube sign-in, and report the result so the footer pill is right.
   useEffect(() => {
-    void restoreConnection();
+    void runLaunchSignIn({
+      restore: restoreConnection,
+      sweep: sweepBrowsers,
+      report: (usable) => window.electronAPI?.reportBrowserSignIn?.(usable),
+    });
   }, []);
 
   return (
@@ -604,8 +662,10 @@ function Shell() {
 }
 
 export default function App() {
+  // The window was reloaded by the main process after its page process died: show the crash screen.
+  if (wasCrashed(window.location.search)) return <CrashScreenHost error={new Error(CRASHED_ERROR)} />;
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallback={(error) => <CrashScreenHost error={error} />}>
       <WorkspaceProvider>
         <CampaignProvider>
           <Shell />
