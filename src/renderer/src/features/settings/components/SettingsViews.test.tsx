@@ -13,8 +13,9 @@ import SettingsCampaign, { type SettingsCampaignProps } from "./SettingsCampaign
 import SettingsEditor from "./SettingsEditor";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import SettingsCampaigns from "./SettingsCampaigns";
-import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
+import SettingsSignIn from "./SettingsSignIn";
+import { cookieReason } from "../utils/cookieReasons";
 import { parentOf } from "../hooks/useSettingsController";
 
 const noop = () => {};
@@ -22,10 +23,15 @@ const read = (f: string) => readFileSync(join(process.cwd(), "src/renderer/src",
 
 test("top list: Your work rows, two switches, nothing about editor, quality or crashes", () => {
   const h = renderToStaticMarkup(
-    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onOpenFolder={noop} onClose={noop} />,
+    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onChangeFolder={noop} onOpenSignIn={noop} onClose={noop} />,
   );
+  // Liam, 25 Nov: sign-in is a setting, so the Settings list has its row.
+  assert.match(h, /aria-label="Sign in for 1080p: Not signed in"/);
   assert.match(h, /aria-label="Campaigns: Acme, Nova"/);
-  assert.match(h, /aria-label="Clips folder: Downloads\/Clipr"/);
+  // Liam, 25 Nov: a page with one control is not a page; the Change button sits flat on the row.
+  assert.match(h, /Downloads\/Clipr/);
+  assert.match(h, /aria-label="Change the clips folder"/);
+  assert.doesNotMatch(h, /aria-label="Clips folder: /);
   assert.match(h, /role="switch"[^>]*aria-checked="true"[^>]*aria-label="Tell me when the queue finishes"/);
   assert.match(h, /aria-checked="false"[^>]*aria-label="Update automatically"/);
   assert.match(h, /aria-label="Close Settings"/);
@@ -34,7 +40,7 @@ test("top list: Your work rows, two switches, nothing about editor, quality or c
 
 test("campaigns list: summary lines, Edit per campaign, Add campaign", () => {
   const h = renderToStaticMarkup(
-    <SettingsCampaigns rows={[{ id: "a", name: "Acme", summary: "3 clips a day · 1s extra at both ends", languages: "Languages: Original, Spanish" }, { id: "n", name: "Nova", summary: "2 clips a day · 1s extra at both ends", languages: null }]} onEdit={noop} onAdd={noop} onBack={noop} onClose={noop} />,
+    <SettingsCampaigns rows={[{ id: "a", name: "Acme", summary: "3 clips a day", languages: "Languages: Original, Spanish" }, { id: "n", name: "Nova", summary: "2 clips a day", languages: null }]} onEdit={noop} onAdd={noop} onBack={noop} onClose={noop} />,
   );
   assert.match(h, /Languages: Original, Spanish/);
   assert.match(h, /aria-label="Edit Nova"/);
@@ -44,7 +50,7 @@ test("campaigns list: summary lines, Edit per campaign, Add campaign", () => {
 
 const campaign: SettingsCampaignProps = {
   name: "Acme",
-  prefs: { extraSeconds: 1, languages: ["original", "es"] },
+  prefs: { languages: ["original", "es"] },
   dubs: [{ code: "es", label: "Spanish" }, { code: "pt", label: "Portuguese" }],
   quota: 3,
   onQuota: noop,
@@ -63,11 +69,12 @@ const campaign: SettingsCampaignProps = {
   onClose: noop,
 };
 
-test("one campaign: quota, extra seconds, languages, folder; no id pattern, format or quality", () => {
+test("one campaign: quota, languages, folder; no id pattern, format or quality", () => {
   const h = renderToStaticMarkup(<SettingsCampaign {...campaign} />);
   assert.match(h, /Clips a day/);
   assert.match(h, /aria-label="One more clip a day"/);
-  assert.match(h, /aria-checked="true"[^>]*aria-label="1 seconds"/);
+  // Liam, 25 Nov: the padding is a fixed 5 seconds, so there is no choice to show.
+  assert.doesNotMatch(h, /Extra seconds|aria-label="\d seconds"/);
   assert.match(h, /aria-label="Spanish audio, ticked"/);
   assert.match(h, /aria-label="Portuguese audio, not ticked"/);
   assert.match(h, /aria-label="Open the Acme folder"/);
@@ -132,11 +139,9 @@ test("delete takes two clicks", () => {
   assert.match(renderToStaticMarkup(<SettingsCampaign {...campaign} confirmingDelete />), />Click again to delete Acme</);
 });
 
-test("clips folder view and Back targets", () => {
-  const h = renderToStaticMarkup(<SettingsFolder label="Downloads/Clipr" problem="" onChange={noop} onBack={noop} onClose={noop} />);
-  assert.match(h, /aria-label="Change the clips folder"/);
+test("Back targets, and there is no separate Clips folder page", () => {
+  assert.throws(() => read("features/settings/components/SettingsFolder.tsx"));
   assert.deepEqual(parentOf({ kind: "campaign", id: "a" }), { label: "Campaigns", view: { kind: "campaigns" } });
-  assert.deepEqual(parentOf({ kind: "folder" })?.label, "Settings");
   assert.equal(parentOf({ kind: "top" }), null);
 });
 
@@ -180,4 +185,35 @@ test("A3-3: Settings keeps focus inside, lands on its heading when it opens and 
   assert.match(drawer, /useDrawerFocus\(root, open, .*"#ui-settings"\)/);
   assert.match(drawer, /ref=\{root\} onKeyDown=\{onKeyDown\}/);
   assert.match(drawer, /querySelector<HTMLElement>\("h3"\)/);
+});
+
+test("sign-in page: honest line, three steps, drop zone; a refusal shows reason then fix", () => {
+  const base = { problem: null, done: false, onFile: noop, onChoose: noop, onBack: noop, onClose: noop };
+  const h = renderToStaticMarkup(<SettingsSignIn {...base} />);
+  assert.match(h, /never posts, likes or changes anything/);
+  assert.match(h, /Drop cookies\.txt, or choose a file/);
+  assert.match(h, /Get cookies\.txt LOCALLY/);
+  assert.doesNotMatch(h, /Try again/);
+  const bad = renderToStaticMarkup(<SettingsSignIn {...base} problem={cookieReason({ ok: false, reason: "wrong-site" })} />);
+  assert.match(bad, /role="alert"/);
+  assert.match(bad, /no YouTube cookies/);
+  assert.match(bad, /text-error/);
+});
+
+test("the engine's own sentences win over the fallback", () => {
+  const r = cookieReason({ ok: false, reason: "signed-out", message: "Signed out when exported.", fix: "Sign in, then export." });
+  assert.deepEqual(r, { reason: "Signed out when exported.", fix: "Sign in, then export." });
+  assert.match(cookieReason({ ok: false }).reason, /isn’t a cookies file/);
+  assert.match(cookieReason({ ok: false, kind: "too_old" }).reason, /ended this session/);
+  assert.match(cookieReason({ ok: false, kind: "wrong_site" }).reason, /no YouTube cookies/);
+  assert.match(cookieReason({ ok: false, kind: "wrong_format" }).reason, /isn’t a cookies file/);
+});
+
+
+test("Liam 25 Nov: a campaign's export settings are always on its page, Final Cut's when no editor is chosen", () => {
+  const withEditor = renderToStaticMarkup(<SettingsCampaign {...campaign} editor={{ label: "Final Cut Pro", summary: "Library · Export", onOpen: noop }} />);
+  assert.match(withEditor, />Export settings</);
+  assert.match(withEditor, /aria-label="Final Cut Pro settings for Acme"/);
+  const drawer = read("features/settings/components/SettingsDrawer.tsx");
+  assert.match(drawer, /const destination = hasEditorPage\(chosen\) \? chosen : "finalcut"/);
 });

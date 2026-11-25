@@ -2,7 +2,7 @@
  * File: settingsPrefs.ts
  * Path: src/renderer/src/features/settings/utils/settingsPrefs.ts
  * Description: The settings the drawer owns that are not on the Campaign record: two app switches and,
- *   per campaign, clips a day, extra seconds at both ends and audio languages. Pure functions; the
+ *   per campaign, clips a day and audio languages. Pure functions; the
  *   state hook stores the result. Anything unreadable falls back to the defaults.
  */
 
@@ -10,8 +10,7 @@ export type AppPrefs = { notifyQueueDone: boolean };
 
 /** The ordinary setting the updater reads (Engine): unset means on. */
 export const AUTO_UPDATE_KEY = "clipper.autoUpdate";
-export type ExtraSeconds = 0 | 1 | 2;
-export type CampaignPrefs = { extraSeconds: ExtraSeconds; languages: string[] };
+export type CampaignPrefs = { languages: string[] };
 
 /** Shown for a campaign with no quota yet. Clips a day itself is `Campaign.dailyQuota`, which the top bar reads. */
 export { DEFAULT_DAILY_QUOTA } from "../../../shared/utils/campaigns";
@@ -20,10 +19,9 @@ export const APP_PREFS_KEY = "clipper.appPrefs";
 export const CAMPAIGN_PREFS_KEY = "clipper.campaignPrefs";
 
 export const DEFAULT_APP_PREFS: AppPrefs = { notifyQueueDone: true };
-export const DEFAULT_CAMPAIGN_PREFS: CampaignPrefs = { extraSeconds: 1, languages: ["original"] };
+export const DEFAULT_CAMPAIGN_PREFS: CampaignPrefs = { languages: ["original"] };
 
 export const MAX_CLIPS_PER_DAY = 99;
-export const EXTRA_SECONDS_CHOICES: readonly ExtraSeconds[] = [0, 1, 2];
 
 /** Audio languages a campaign can ask for, besides the original track. */
 export const DUB_LANGUAGES: readonly { code: string; label: string }[] = [
@@ -46,11 +44,9 @@ export function normalizeAppPrefs(raw: unknown): AppPrefs {
 
 export function normalizeCampaignPrefs(raw: unknown): CampaignPrefs {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const extra = EXTRA_SECONDS_CHOICES.find((n) => n === r.extraSeconds);
   const langs = Array.isArray(r.languages) ? r.languages.filter((l): l is string => typeof l === "string" && l !== "") : [];
   const unique = [...new Set(["original", ...langs])];
   return {
-    extraSeconds: extra ?? DEFAULT_CAMPAIGN_PREFS.extraSeconds,
     languages: unique,
   };
 }
@@ -66,9 +62,9 @@ export function toggleLanguage(list: readonly string[], code: string): string[] 
   return list.includes(code) ? list.filter((l) => l !== code) : [...list, code];
 }
 
-/** "3 clips a day · 1s extra at both ends" */
-export function campaignSummary(quota: number, p: CampaignPrefs): string {
-  return `${quota} clip${quota === 1 ? "" : "s"} a day · ${p.extraSeconds}s extra at both ends`;
+/** "3 clips a day" */
+export function campaignSummary(quota: number): string {
+  return `${quota} clip${quota === 1 ? "" : "s"} a day`;
 }
 
 /** "Languages: Original, Spanish", or null when the campaign only wants the original. */

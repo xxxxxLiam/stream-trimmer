@@ -1,7 +1,7 @@
 /**
  * File: SettingsCampaign.tsx
  * Path: src/renderer/src/features/settings/components/SettingsCampaign.tsx
- * Description: One campaign (Settings.dc.html view 3): Name, Clips a day, Extra seconds at both ends,
+ * Description: One campaign (Settings.dc.html view 3): Name, Clips a day,
  *   Languages, Folder with Change and Open, one button for the ticked editor (opens its own page), and
  *   Delete campaign. No clip id fields, no format or quality.
  */
@@ -9,8 +9,8 @@ import { useState } from "react";
 import { MAX_RULE_SEC } from "../../../shared/utils/campaigns";
 import { formatClock } from "../../../shared/utils/clock";
 import { parseTimestamp } from "../../../shared/utils/clip";
-import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
-import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
+import { DrawerHeader, SectionLabel, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
+import { stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
 export type SettingsCampaignProps = {
   name: string;
@@ -129,27 +129,6 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
         <button type="button" aria-label="One more clip a day" onClick={() => p.onQuota(stepClipsPerDay(p.quota, 1))} className={stepButton}>+</button>
       </div>
       <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
-        <span className="text-body leading-[normal]">Extra seconds at both ends</span>
-        <div role="radiogroup" aria-label="Extra seconds at both ends" className="flex gap-[8px]">
-          {EXTRA_SECONDS_CHOICES.map((n) => {
-            const on = prefs.extraSeconds === n;
-            return (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                aria-label={`${n} seconds`}
-                onClick={() => p.onPatch({ extraSeconds: n })}
-                className={`h-target min-w-[44px] rounded-[22px] px-[12px] text-body leading-[normal] ${on ? "bg-ice text-bg" : "border border-hairlineStrong bg-raised text-fg"}`}
-              >
-                {n}s
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
         <div role="group" aria-label="Clip length" className="flex items-center gap-[8px]">
           <span className="flex-1 text-body leading-[normal]">Clip length</span>
           {lengthField("min", "Shortest clip length")}
@@ -204,6 +183,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
       {folderProblem && <span role="alert" className="text-meta text-error">{folderProblem}</span>}
       {folderNote && !folderProblem && <span role="status" className="text-meta text-fg-dim">{folderNote}</span>}
       </div>
+      {p.editor && <SectionLabel>Export settings</SectionLabel>}
       {p.editor && (
         <button type="button" aria-label={`${p.editor.label} settings for ${p.name}`} onClick={p.editor.onOpen} className="mt-[4px] flex min-h-[56px] items-center gap-[12px] rounded-control border border-hairlineStrong bg-raised px-[12px] py-[8px] text-left hover:bg-hover">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-fg-dim" aria-hidden="true">

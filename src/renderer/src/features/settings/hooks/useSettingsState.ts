@@ -2,7 +2,7 @@
  * File: useSettingsState.ts
  * Path: src/renderer/src/features/settings/hooks/useSettingsState.ts
  * Description: Reads and writes the drawer's own preferences (app switches and per-campaign quota,
- *   extra seconds and languages) in the persisted settings store.
+ *   languages) in the persisted settings store.
  */
 import { useCallback, useEffect, useState } from "react";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";

@@ -1,7 +1,7 @@
 /**
  * File: CampaignForm.tsx
  * Path: src/renderer/src/features/campaigns/components/CampaignForm.tsx
- * Description: The new-campaign form (campaign form A): Name, Clips a day, Extra seconds (0, 1, 2) and Folder.
+ * Description: The new-campaign form (campaign form A): Name, Clips a day and Folder.
  *   Nothing else is asked here; Languages and the Final Cut fields are in the campaign's own settings view, which
  *   opens next. The folder is a folder named after the campaign inside the Clips folder unless one is chosen.
  *   Always dismissible: Esc, the close button or Cancel leave nothing half-created.
@@ -13,12 +13,8 @@ import { MAX_NAME_LENGTH, campaignClipsDir, campaignNameProblems, type Campaign 
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import {
-  DEFAULT_CAMPAIGN_PREFS,
   DEFAULT_DAILY_QUOTA,
-  EXTRA_SECONDS_CHOICES,
-  saveCampaignPrefs,
   stepClipsPerDay,
-  type ExtraSeconds,
 } from "../../settings/utils/settingsPrefs";
 
 const step = "h-target w-target rounded-control border border-hairlineStrong bg-raised text-section text-fg hover:bg-hover";
@@ -28,7 +24,6 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
   const { create, campaigns, defaultFolders } = useCampaign();
   const [name, setName] = useState("");
   const [quota, setQuota] = useState(DEFAULT_DAILY_QUOTA);
-  const [extra, setExtra] = useState<ExtraSeconds>(DEFAULT_CAMPAIGN_PREFS.extraSeconds);
   const [own, setOwn] = useState("");
   const [problems, setProblems] = useState<string[]>([]);
   const folder = campaignClipsDir({ name: name.trim() || "Campaign", clipsDir: own }, defaultFolders.clipsDir);
@@ -39,7 +34,6 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
     setProblems(found);
     if (found.length) return;
     const made = create({ name, dailyQuota: quota, ...(own ? { clipsDir: own } : {}) });
-    saveCampaignPrefs(made.id, { extraSeconds: extra }, (k) => readSetting<Record<string, unknown>>(k, {}), writeSetting);
     onCreated?.(made);
     onClose();
   };
@@ -56,22 +50,6 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
           <button type="button" aria-label="Fewer clips a day" onClick={() => setQuota(stepClipsPerDay(quota, -1))} className={step}>−</button>
           <span aria-live="polite" className="w-[32px] text-center text-body">{quota}</span>
           <button type="button" aria-label="More clips a day" onClick={() => setQuota(stepClipsPerDay(quota, 1))} className={step}>+</button>
-        </div>
-      </div>
-      <div className="flex flex-col gap-[8px]">
-        <span className="text-body leading-[normal]">Extra seconds at both ends</span>
-        <div className="flex gap-[8px]" role="group" aria-label="Extra seconds at both ends">
-          {EXTRA_SECONDS_CHOICES.map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={extra === n}
-              onClick={() => setExtra(n)}
-              className={`h-target w-[44px] rounded-[22px] border text-body ${extra === n ? "border-ice bg-ice-tint-12 text-fg" : "border-hairlineStrong bg-raised text-fg hover:bg-hover"}`}
-            >
-              {n}s
-            </button>
-          ))}
         </div>
       </div>
       <div className="flex items-center gap-[12px]">

@@ -41,7 +41,7 @@ import { createSerialQueue } from "../features/clips/utils/serialQueue";
 import { pickedRangeOf } from "../features/player/utils/pickedRange";
 import { clipSections } from "../features/player/utils/clipDestination";
 import { matchingMoment } from "../features/clips/utils/finishBankedCut";
-import { extraSecondsFor, padSections } from "../features/clips/utils/padSections";
+import { CLIP_PADDING_SEC, padSections } from "../features/clips/utils/padSections";
 import { getNextClipName } from "../modules/layout/hooks/useNextClipName";
 import { usePanelLayoutState } from "../modules/layout/hooks/usePanelLayoutState";
 import { tabDomId } from "../modules/layout/components/PanelTabStrip";
@@ -85,6 +85,7 @@ import { useDayHost } from "../features/workspace/hooks/useDayHost";
 import SymbolsDialog from "../features/symbols/components/SymbolsDialog"; // browser fallback of the Symbols window
 import CampaignStart from "../features/campaigns/components/CampaignStart";
 import SettingsDrawer from "../features/settings/components/SettingsDrawer";
+import { START_AT_SIGNIN } from "../features/settings/hooks/useSettingsController";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
@@ -296,8 +297,6 @@ function Layout({ active }: { active: boolean }) {
   const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
   const tips = useTipsController(!!info && active && (!!campaign || campaignPromptDismissed));
   const [importText, setImportText] = useState<string | null>(null);
-  // The footer's "Sign in for 1080p" opens Help on its sign-in page.
-  const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
   // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
   const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
@@ -330,7 +329,6 @@ function Layout({ active }: { active: boolean }) {
 
   const closeHelp = useCallback(() => {
     setHelpOpen(false);
-    setHelpStartAt(null);
   }, []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeSettings = useCallback(() => {
@@ -395,7 +393,7 @@ function Layout({ active }: { active: boolean }) {
   );
 
   // Cut: the clip's name (typed on the lane, else suggested) is the file's name, the row's name and
-  // the editor project's name. Marked sections get the campaign's extra seconds at both ends; the
+  // the editor project's name. Marked sections get 5 seconds at both ends; the
   // ranges recorded as used are the marked ones. A range that is a waiting moment marks it cut.
   const cutClip = useCallback(
     async (segments: Segment[], retryName?: string) => {
@@ -407,7 +405,7 @@ function Layout({ active }: { active: boolean }) {
       const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
       // Recorded before anything starts: the marks are already cleared, so Retry and Save for later read this.
       setCutAttempt({ name, segments });
-      const toCut = padSections(segments, extraSecondsFor(cutCampaignId), duration || undefined);
+      const toCut = padSections(segments, CLIP_PADDING_SEC, duration || undefined);
       setMakingName(name);
       // A range that is a waiting moment is that moment: its id is what the use, the cut mark and Undo all key on.
       const moment = cutCampaignId ? matchingMoment(clipsFor(bankStore.get(), cutCampaignId, videoId), segments) : undefined;
@@ -564,9 +562,10 @@ function Layout({ active }: { active: boolean }) {
   const addMomentRef = useRef(addMoment);
   addMomentRef.current = addMoment;
   const openSignIn = () => {
-    setHelpStartAt("signin");
-    setSettingsOpen(false);
-    setHelpOpen(true);
+    // Sign-in is a setting, so it lives in Settings (Liam, 25 Nov), not in Help.
+    setSettingsStartAt(START_AT_SIGNIN);
+    setHelpOpen(false);
+    setSettingsOpen(true);
   };
   const panelHost: PanelHost = {
     playhead,
@@ -651,7 +650,6 @@ function Layout({ active }: { active: boolean }) {
         <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => {
-            setHelpStartAt(null);
             setSettingsOpen(false);
             setHelpOpen((v) => !v);
           }}
@@ -671,7 +669,7 @@ function Layout({ active }: { active: boolean }) {
             <PanelWorkspace />
             {active && (
               <>
-                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); }, onShowMe: (steps) => { closeHelp(); tips.startTour(steps); } }} />
+                <HelpDrawer open={helpOpen} onClose={closeHelp} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); }, onShowMe: (steps) => { closeHelp(); tips.startTour(steps); } }} />
                 {settingsDrawer}
                 <ImportDrawer text={importText} onClose={() => setImportText(null)} />
                 {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}
