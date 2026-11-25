@@ -9,8 +9,10 @@ import { useRef } from "react";
 import { IconSearch } from "../../../shared/components/PanelIcons";
 import { useAddVideoController } from "../hooks/useAddVideoController";
 
-export default function TopBarLinkField() {
-  const c = useAddVideoController();
+export type ChannelLink = { isChannelUrl: (text: string) => boolean; onLink: (url: string) => void };
+
+export default function TopBarLinkField({ channel }: { channel?: ChannelLink }) {
+  const c = useAddVideoController(channel);
   const input = useRef<HTMLInputElement>(null);
   c.bindInput(input);
   return (
