@@ -37,6 +37,14 @@ export function acceptPolledTime(polled: number, pending: PendingSeek, now: numb
   if (now >= pending.until) return true;
   return Math.abs(polled - pending.target) <= SEEK_SETTLE_SEC;
 }
+/**
+ * A seek must keep the play state: a paused (or never started, or ended) video stays paused when the
+ * playhead moves. The YouTube player starts playing on a seek from the cued and ended states, so the
+ * seek puts the pause back. 1 is playing and 3 is buffering.
+ */
+export function shouldStayPaused(playerState: number, autoplay: boolean): boolean {
+  return !autoplay && playerState !== 1 && playerState !== 3;
+}
 const EMBED_BLOCKED_CODES = [101, 150, 153];
 
 interface YTPlayer {
@@ -119,6 +127,7 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
   const [muted, setMuted] = useState(false);
   // Set while a seek is in flight; see acceptPolledTime.
   const pendingSeek = useRef<PendingSeek>(null);
+  const playRequestedAt = useRef(0);
 
   // A tab that is not on screen does not need a live player. The moment it is hidden the video
   // is paused and the poll stops; after SUSPEND_UNLOAD_MS the iframe is destroyed too, and the
@@ -257,17 +266,30 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
   const seekTo = useCallback((seconds: number, autoplay = false) => {
     try {
       const target = Math.max(0, seconds);
+      const stayPaused = shouldStayPaused(playerRef.current?.getPlayerState() ?? 2, autoplay);
       playerRef.current?.seekTo(target, true);
+      if (stayPaused) {
+        // The seek can start playback a moment later; put the pause back unless Play was pressed since.
+        const at = Date.now();
+        playerRef.current?.pauseVideo();
+        window.setTimeout(() => {
+          if (playRequestedAt.current < at && playerRef.current?.getPlayerState() === 1) playerRef.current.pauseVideo();
+        }, 300);
+      }
       // Show the new position at once, and ignore stale polls until the player catches up.
       pendingSeek.current = { target, until: Date.now() + SEEK_TIMEOUT_MS };
       setCurrentTime(target);
-      if (autoplay) playerRef.current?.playVideo();
+      if (autoplay) {
+        playRequestedAt.current = Date.now();
+        playerRef.current?.playVideo();
+      }
     } catch {
       /* not ready yet */
     }
   }, []);
 
   const play = useCallback(() => {
+    playRequestedAt.current = Date.now();
     try {
       playerRef.current?.playVideo();
     } catch {
