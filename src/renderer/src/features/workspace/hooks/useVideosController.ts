@@ -13,7 +13,7 @@ import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
 import { doneUndoStore } from "../utils/doneUndoStore";
 import { useMakingClipId } from "../../../shared/utils/clipNameStore";
-import { linkInText, linkKind, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
+import { matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
 
 export type VideoRow = {
   id: string;
@@ -39,8 +39,6 @@ export function useVideosController() {
   const [pills, setPills] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [doneOpen, setDoneOpen] = useState(false);
-  /** One line under the search when a pasted link cannot be opened (B-6). */
-  const [linkError, setLinkError] = useState("");
   const undo = useSyncExternalStore(doneUndoStore.subscribe, doneUndoStore.get, doneUndoStore.get);
 
   const toRow = useCallback(
@@ -108,50 +106,21 @@ export function useVideosController() {
     [ws],
   );
 
-  const submitValue = useCallback((raw: string) => {
-    const value = raw.trim();
+  /** Enter turns the typed words into a filter pill. Links are not taken here: they go in the top bar's field. */
+  const submit = useCallback(() => {
+    const value = text.trim();
     if (!value) return;
-    // Pasted share text: the video link inside it opens, the rest is dropped (B2-5).
-    const inside = /\s/.test(value) ? linkInText(value) : null;
-    const target = inside ?? value;
-    const kind = inside ? "video" : linkKind(value);
-    if (kind === "bad") {
-      setLinkError("That isn't a YouTube video link");
-      return;
-    }
-    setLinkError("");
-    if (kind === "video") {
-      const vid = extractVideoId(target);
-      const same = vid ? ws.tabs.find((t) => t.url && extractVideoId(t.url) === vid) : undefined;
-      if (same) {
-        if (same.done) ws.setTabDone(same.id, false);
-        ws.selectTab(same.id);
-      } else ws.addTab(target);
-    } else {
-      setPills((p) => (p.includes(value) ? p : [...p, value]));
-    }
+    setPills((p) => (p.includes(value) ? p : [...p, value]));
     setText("");
-  }, [ws]);
-
-  const submit = useCallback(() => submitValue(text), [submitValue, text]);
+  }, [text]);
 
   return {
     opening,
     rows,
     pills,
     text,
-    setText: (t: string) => {
-      setText(t);
-      setLinkError("");
-    },
-    linkError,
+    setText,
     submit,
-    /** True when pasted text held a video link and it was opened, so the box should take nothing. */
-    pasteText: (pasted: string): boolean => {
-      if (!/\s/.test(pasted.trim()) || !linkInText(pasted)) return false;
-      submitValue(pasted);
-      return true;
-    },
     removePill: (p: string) => setPills((all) => all.filter((x) => x !== p)),
     clearFilters: () => {
       setPills([]);
