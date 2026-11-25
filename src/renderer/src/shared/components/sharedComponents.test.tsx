@@ -109,7 +109,7 @@ test("DrawerHeader: back appears on the second view; close always names Settings
 test("Row states: open glows Ice, made glows Frost, dimmed fades, idle is flat", () => {
   assert.match(html(<Row state="open" />), /border-ice shadow-open/);
   assert.match(html(<Row state="made" />), /border-frost-tint-45 shadow-made/);
-  assert.match(html(<Row state="dimmed" />), /opacity-55/);
+  assert.match(html(<Row state="dimmed" />), /text-disabled/);
   assert.doesNotMatch(html(<Row />), /shadow-/);
 });
 

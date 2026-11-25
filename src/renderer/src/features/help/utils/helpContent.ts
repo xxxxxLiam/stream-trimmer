@@ -257,7 +257,7 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     searchOnly: true,
     groups: [{ steps: [{ text: "Use − and + at the top right of the timeline to zoom, or pinch or hold Ctrl and scroll." }, { text: "Press Fit to see the whole video." }] }],
     labels: [],
-    synonyms: ["zoom", "fit", "timeline", "wider", "closer", "bigger", "smaller"],
+    synonyms: ["zoom", "zoom in", "zoom out", "fit", "timeline", "wider", "closer", "bigger", "smaller", "text bigger", "large text", "font size", "bigger text", "magnify"],
   },
 ];
 
@@ -284,6 +284,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "F  H  Z", does: "Timeline tools: Flag, Hand, Zoom" },
   { keys: "Shift N", does: "Go to the next video" },
   { keys: "⌘ Enter", does: "Clip" },
+  { keys: "⌘ B", does: "Save the marked part for later (it goes to the Export panel)" },
   { keys: "R", does: "Retry the failed clip" },
   { keys: "⌘ R", does: "Show the last saved clip in Finder (File Explorer on Windows)" },
   { keys: "⌘ L", does: "Loop the marked part" },

@@ -190,3 +190,14 @@ test("F2-8: the Paste key chip on Start uses a token, not an opacity modifier", 
   assert.doesNotMatch(src, /opacity-(?!0")\d+/, "no dimmed text (the blinking caret's opacity-0 is not text)");
   assert.match(src, /<span className="text-meta font-normal text-bg">\{p\.pasteKey\}<\/span>/);
 });
+
+test("F3-2 and F3-3: focus goes to the result, a finished report is shown on reopening Help, and an unsent note stays", async () => {
+  const { readFileSync } = await import("node:fs");
+  const view = readFileSync(new URL("./HelpReport.tsx", import.meta.url), "utf8");
+  assert.match(view, /if \(kept \|\| sent\) done\.current\?\.focus\(\)/);
+  assert.match(renderToStaticMarkup(<HelpReport {...report} state="sent" />), /tabindex="-1" role="status"/);
+  const ctl = readFileSync(new URL("../hooks/useHelpController.ts", import.meta.url), "utf8");
+  assert.match(ctl, /reportRef\.current\.unseen && reportRef\.current\.state !== "writing" \? \{ kind: "report" \}/);
+  assert.match(ctl, /if \(report\.state !== "writing"\) \{\s*report\.reset\(\);\s*setNote\(""\)/);
+  assert.match(readFileSync(new URL("../hooks/useReportMutations.ts", import.meta.url), "utf8"), /setUnseen\(true\)/);
+});

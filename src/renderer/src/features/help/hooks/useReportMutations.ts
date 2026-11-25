@@ -21,12 +21,15 @@ async function readDetails(): Promise<string> {
 export function useReportMutations() {
   const [state, setState] = useState<ReportState>("writing");
   const [copied, setCopied] = useState(false);
+  // F3-3: a result that arrived while Help was closed has not been seen yet; reopening Help lands on it.
+  const [unseen, setUnseen] = useState(false);
 
   // A second click while the first report is on its way must not file a second one.
   const sending = useRef(false);
 
   const sendOnce = useCallback(async (note: string) => {
     setState(await sendReport("problem", note, "Reported from Help"));
+    setUnseen(true);
   }, []);
 
   const send = useCallback(async (note: string) => {
@@ -53,7 +56,10 @@ export function useReportMutations() {
   const reset = useCallback(() => {
     setState("writing");
     setCopied(false);
+    setUnseen(false);
   }, []);
 
-  return { state, copied, send, copyDetails, reset };
+  const markSeen = useCallback(() => setUnseen(false), []);
+
+  return { state, copied, unseen, send, copyDetails, reset, markSeen };
 }

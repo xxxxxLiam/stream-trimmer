@@ -130,3 +130,8 @@ test("A-9: pasted or submitted text that is not a video gets a sentence; a stale
   const { NOT_A_VIDEO } = await import("../utils/startUtils");
   assert.match(html({ value: "meeting notes", problem: NOT_A_VIDEO }), /That is not a link to one video\./);
 });
+
+test("E3-4: the Start screen carries the crash note, so a crash with no video open still offers Send report", () => {
+  const src = readFileSync(join(process.cwd(), "src/renderer/src/features/start/components/ColdStartScreen.tsx"), "utf8");
+  assert.match(src, /<CrashNoteHost \/>/);
+});

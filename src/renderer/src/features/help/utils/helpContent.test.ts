@@ -114,6 +114,7 @@ test("F-6: every shortcut listed is handled, and every handled shortcut is liste
     "A  B  D": /toolForKey\(e\)/,
     "F  H  Z": /toolForKey\(e\)/,
     "Shift N": /e\.shiftKey && !e\.metaKey && !e\.ctrlKey && e\.key === "N"/,
+    "⌘ B": /k === "b" && !e\.shiftKey && !e\.altKey/,
     "⌘ Enter": /\(e\.metaKey \|\| e\.ctrlKey\) && e\.key === "Enter"/,
     "R": /toLowerCase\(\) !== "r"/,
     "⌘ R": /k === "r" && !e\.shiftKey/,
@@ -131,7 +132,6 @@ test("F-6: every shortcut listed is handled, and every handled shortcut is liste
     assert.match(code, handled[s.keys], `${s.keys} (${s.does}) is not handled by any key handler`);
   }
   for (const k of Object.keys(handled)) assert.ok(SHORTCUTS.some((s) => s.keys === k), `${k} is handled but not listed`);
-  assert.ok(!SHORTCUTS.some((s) => s.keys === "⌘ B"), "nothing handles Ctrl/⌘ B");
 });
 
 test("F2-4: transcript, speed, quota, layout, panels, fit and zoom find an answer; lut is not resolution; Undo says 8 seconds", () => {
@@ -156,4 +156,16 @@ test("V18-T-10: the zoom answer says where the buttons are", () => {
   const text = JSON.stringify(a.groups);
   assert.match(text, /top right/);
   assert.doesNotMatch(text, /bottom right/);
+});
+
+test("F3-5 and F3-7: bigger text and zoom in find the zoom answer; a dimmed Row uses the disabled token", () => {
+  for (const q of ["zoom in", "text bigger", "large text", "font size"]) assert.ok(searchHelp(q).answers.some((a) => a.id === "timeline-zoom"), q);
+  const row = readFileSync(join(ROOT, "shared/components/Row.tsx"), "utf8");
+  assert.match(row, /dimmed: "border-transparent text-disabled"/);
+  assert.doesNotMatch(row, /opacity-55/);
+});
+
+test("F3-1: Ctrl/⌘ Enter never makes a clip while a drawer or dialog is open", () => {
+  const src = readFileSync(join(ROOT, "features/player/hooks/useClipController.ts"), "utf8");
+  assert.match(src, /e\.key === "Enter" && !dialogOpen\(\)/);
 });

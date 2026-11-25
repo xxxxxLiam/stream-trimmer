@@ -75,3 +75,12 @@ test("D2-10: the preview says Sep, names the clip from the video, and the list t
   assert.match(view, /e\.key === "Escape"[\s\S]{0,80}e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*p\.onToggleOpen\(\)/);
   assert.match(view, /e\.key === "ArrowDown"/);
 });
+
+test("D3-3: a keyword collection in the preview is named as in the file: the title's comma is dropped", () => {
+  const names = { library: "Acme", event: "", videos: ["Podcast #214, the long talk"], clip: "c", day: "3 Sep 2026" };
+  const labels = (id: "export" | "day" | "video") => layoutTree(id, names).map((l) => l.label);
+  assert.ok(labels("export").includes("Podcast #214 the long talk"));
+  assert.ok(labels("day").includes("Podcast #214 the long talk"));
+  assert.ok(labels("video").includes("Podcast #214, the long talk"), "an event keeps its title as written");
+  assert.ok(labels("day").includes("3 Sep 2026"));
+});
