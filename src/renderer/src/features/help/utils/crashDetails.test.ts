@@ -23,11 +23,11 @@ test("a path with a user name is cleaned by the report maker", () => {
   assert.doesNotMatch(r.details, /liam/);
 });
 
-test("E-2: a window reloaded at ?crashed=1 shows the crash screen, and Reopen drops the flag", () => {
+test("E-2: a window reloaded at ?crashed=1 opens the crash note, and Reopen drops the flag", () => {
   assert.equal(wasCrashed("?crashed=1"), true);
   assert.equal(wasCrashed(""), false);
   assert.equal(wasCrashed("?window=symbols"), false);
   assert.equal(reopenUrl("file:///app/index.html?crashed=1&x=2#/a"), "file:///app/index.html?x=2#/a");
   const app = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
-  assert.match(app, /if \(wasCrashed\(window\.location\.search\)\) return <CrashScreenHost/);
+  assert.match(app, /consumeCrashFlag\(window\.location\.search/);
 });
