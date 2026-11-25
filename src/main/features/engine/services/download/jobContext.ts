@@ -3,6 +3,7 @@
  * Path: src/main/features/engine/services/download/jobContext.ts
  * Description: The per-request state every download phase shares: the job, its cancel hooks and the run's mutable progress fields.
  */
+import { rememberChild } from "../childRegistry";
 import { type Request, type Response } from "express";
 import { type ChildProcess } from "node:child_process";
 import { STAGE_FOUND } from "../segments";
@@ -75,6 +76,7 @@ export function createDownloadCtx(req: Request, res: Response, input: DownloadRe
   });
   const trackChild = (child: ChildProcess) => {
     job.children.add(child);
+    rememberChild(child);
     child.once("close", () => job.children.delete(child));
     // Cancelled between the spawn decision and the spawn: do not let it run.
     if (job.cancelled) killTree(child);

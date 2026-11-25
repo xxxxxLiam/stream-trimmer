@@ -133,3 +133,38 @@ Say **not provable here** rather than passing these:
 Everything else — the whole UI, all persistence, all server endpoints and
 validation, the ffmpeg cutting pipeline, the owner gate, accessibility — is
 testable here, so test it rather than reasoning about it.
+
+## Parity against the canvas
+
+`npm run parity -- <Screen> [--fixture name] [--threshold 0.1] [--board-only]`
+
+1. Renders `<Screen>.dc.html` from the canvas snapshot (`PARITY_SNAPSHOT` overrides the folder, default
+   `/mnt/project-files/design/canvas-snapshot-2026-11-24/project`). The snapshot has no `support.js`,
+   so `scripts/parity/boardRender.cjs` stands in for it: it expands `<sc-for>`, `<sc-if>` and `{{path}}`
+   from the board's own `renderVals()` and screenshots at the frame size in `canvas.json`. Boards that
+   call `setState` render their initial state.
+2. Launches the real app through `app.cjs` with `fixtures/<fixture>.json` (default: the screen name):
+   `{ "seed": {settings.json}, "waitFor": "css selector", "steps": [{"click":sel},{"fill":[sel,text]},{"press":key},{"waitFor":sel},{"wait":ms},{"eval":"js"}] }`.
+   Seed campaigns, videos, transcript, markers and bank rows through the settings keys in `audit/inventory.md`.
+3. Writes `board.png`, `app.png`, `diff.png` and `side-by-side.png` (board | app | diff) to
+   `audit/out/parity/<Screen>/`. pixelmatch ignores anti-aliasing; exit code 1 when pixels differ.
+
+Needs a built app and a display: `node node_modules/electron/install.js` once, `npm run build:electron`,
+then `xvfb-run -a npm run parity -- Start`. `--board-only` needs neither.
+
+### Per-board crops, the pending snapshot and the workspace fixture
+
+- `--snapshot pending` reads the one-board-per-state set (Main01Layout … Main14Notes, Segments, FirstClip,
+  Settings, Help) from `design/canvas-pending`; `snapshot` (default) is the frozen 24 Nov canvas; or pass a folder.
+- `--window [n]` crops the board to the n-th app window it draws (the 14px-radius frame, usually 1360 by 760)
+  and sizes the real window's content to match, so the comparison skips the heading and margin. Output goes to
+  `audit/out/parity/<Screen>-window<n>/`.
+- `fixtures/Workspace.json` is the shared workspace: an open video, two campaigns, a bank, three open videos, and
+  `"stub"`: the fake yt-dlp answers the info call (`info`) and the transcript call from `podcast214.vtt`
+  (`vttFile`). The stub answers every link the same way, so other rows share the title. Add a step to a fixture to
+  reach a state (`{"click": "#sel"}`), e.g. open a menu before the shot.
+- A stubbed run links the stub root into `node_modules/electron/dist/resources/bin` for its duration, because the
+  packaged-shape app reads binaries there. Run one stubbed parity at a time. If ffmpeg or deno are not on PATH, point
+  `STUB_BIN_DIR` at a folder holding them.
+
+Example: `STUB_BIN_DIR=/path/to/bin xvfb-run -a npm run parity -- Main01Layout --snapshot pending --window 0 --fixture Workspace`

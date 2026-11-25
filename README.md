@@ -1,136 +1,106 @@
-# YouTube Clipper
+# Clipr
 
-Download a trimmed section (up to 10 minutes) of a YouTube video — video or audio — fully on your own machine. Paste a link, pick a range, and save just the part you want. No accounts, no ads, no upload to anyone's server.
+A desktop downloader for clippers. Paste a link, read the transcript to find
+the moment, mark in and out, and download just that section. Several moments
+from across one video can come down as one joined file. Then open it in Final
+Cut Pro, Premiere Pro, DaVinci Resolve or CapCut. Clipr downloads; it does not
+edit and it does not reframe.
 
-![screenshot](docs/screenshot.png)
+Everything runs on your machine. No account, no ads, nothing uploaded. The
+public downloads and landing page live in
+[xxxxxLiam/clipr](https://github.com/xxxxxLiam/clipr); this repository is the
+private source.
 
 ## Download the app
 
-No terminal, no setup. These links always point at the newest release:
+These links always point at the newest release:
 
 | Your computer | Download |
 | --- | --- |
-| **Windows 10/11** (64-bit) | [YouTube-Clipper-Windows-x64-Setup.exe](https://github.com/xxxxxLiam/stream-trimmer/releases/latest/download/YouTube-Clipper-Windows-x64-Setup.exe) |
-| **macOS** (Apple Silicon) | [YouTube-Clipper-macOS-AppleSilicon.dmg](https://github.com/xxxxxLiam/stream-trimmer/releases/latest/download/YouTube-Clipper-macOS-AppleSilicon.dmg) |
-| **Linux** (64-bit) | [YouTube-Clipper-Linux-x64.AppImage](https://github.com/xxxxxLiam/stream-trimmer/releases/latest/download/YouTube-Clipper-Linux-x64.AppImage) |
-
-Or browse every build on the [Releases](../../releases) page — note that GitHub
-hides the files under a collapsed **Assets** heading, so you may need to click
-that to see them.
+| **Windows 10/11** (64-bit) | [Clipr-Windows-x64-Setup.exe](https://github.com/xxxxxLiam/clipr/releases/latest/download/Clipr-Windows-x64-Setup.exe) |
+| **macOS** (Apple Silicon, M1 and newer; not Intel) | [Clipr-macOS-AppleSilicon.dmg](https://github.com/xxxxxLiam/clipr/releases/latest/download/Clipr-macOS-AppleSilicon.dmg) |
+| **Linux** (64-bit) | [Clipr-Linux-x64.AppImage](https://github.com/xxxxxLiam/clipr/releases/latest/download/Clipr-Linux-x64.AppImage) |
 
 yt-dlp and ffmpeg are bundled inside the app. There is nothing else to install.
 
-**The app is not code-signed**, because a signing certificate costs a few
-hundred a year. That is normal for free open-source tools, but it means both
-Windows and macOS will interrupt you once. Here is exactly what to click.
+**The app is not code-signed yet**, so Windows and macOS interrupt you once.
+The page at https://xxxxxliam.github.io/clipr/ has the exact steps with copy
+buttons; the short version follows.
 
 ### Windows
 
-There are up to three separate blocks, and each one looks final until you know
-where the override is.
+1. If the browser blocks the download, press **Ctrl+J**, click **⋯** next to
+   the file and choose **Keep** (then **Keep anyway** if asked).
+2. Right-click the file → **Properties** → tick **Unblock** → **OK**. If there
+   is no tick box, run this in PowerShell (the `*` also catches a renamed copy
+   such as `Setup (1).exe`; change `Downloads` if you saved it elsewhere):
 
-**1. Your browser may refuse to keep the file.** Edge and Chrome flag installers
-that few people have downloaded yet.
+   ```powershell
+   Get-ChildItem "$env:USERPROFILE\Downloads\Clipr-Windows-x64-Setup*.exe" | Unblock-File
+   ```
 
-- **Edge:** open the Downloads flyout (**Ctrl+J**), find the file, click the
-  **⋯** next to it → **Keep**. If it asks again, choose **Show more** →
-  **Keep anyway**.
-- **Chrome:** same idea — in the download bar or **Ctrl+J**, click the **⋯** →
-  **Keep**, then **Keep anyway** if prompted.
+3. Double-click it. If "Windows protected your PC" appears, click **More info**
+   then **Run anyway**.
 
-**2. Unblock the file before running it.** This step usually prevents the next
-one entirely, and it is the one most people miss:
-
-- Right-click `YouTube-Clipper-Windows-x64-Setup.exe` → **Properties**
-- At the bottom of the **General** tab, tick **Unblock**
-- **Apply** → **OK**, then double-click the installer
-
-**3. If SmartScreen still appears**, you will see a blue window titled
-**"Windows protected your PC"**. The only button is **Don't run** — the way
-through is the small link:
-
-- Click **More info** (under the message)
-- Then click **Run anyway**
-
-**If there is no "Run anyway" button at all,** Smart App Control is switched on.
-That is a Windows 11 feature which blocks unsigned apps outright with no
-override, and it is the one case where none of the above helps. Check
-**Windows Security → App & browser control → Smart App Control**. If it says
-**On**, your options are to turn it **Off** there, or not to install the app.
-
-⚠️ Check whether you can undo it before you do it. Smart App Control used to be
-a one-way switch: turning it off meant you could not turn it back on without
-resetting or reinstalling Windows. That was relaxed in April 2026 — on Windows 11
-24H2/25H2 with build 26100.8116 / 26200.8116 or newer, it can be toggled back
-on. Run `winver` to see your build. On anything older, treat it as permanent.
-Either way it is a real reduction in your machine's protection for the sake of
-one app, so if you are not comfortable with that, the honest answer is to wait
-until this app is signed.
+If there is no **Run anyway** button at all, Smart App Control is on and
+blocks unsigned apps outright. Check **Windows Security → App & browser
+control → Smart App Control**. Turning it off lowers your machine's protection;
+on Windows 11 24H2/25H2 with build 26100.8116 / 26200.8116 or newer it can be
+switched back on, on anything older treat it as permanent (`winver` shows your
+build). If you are not comfortable with that, wait until the app is signed.
 
 ### macOS
 
-1. Open the `.dmg` and drag **YouTube Clipper** to your Applications folder.
-2. macOS will refuse to open it: *"Apple could not verify YouTube Clipper is
-   free of malware."* Clear the download flag from a terminal:
+1. Open the `.dmg` and drag **Clipr** to Applications.
+2. Clear the download flag and open it, from Terminal:
 
    ```bash
-   xattr -dr com.apple.quarantine "/Applications/YouTube Clipper.app"
+   xattr -dr com.apple.quarantine /Applications/Clipr.app && open /Applications/Clipr.app
    ```
 
-3. Open it normally.
-
-You will need to run that command again after each update, because every
-download arrives freshly quarantined. On recent macOS versions the old
-right-click → **Open** trick no longer works for unsigned apps; the terminal
-command, or **System Settings → Privacy & Security → Open Anyway**, is the way.
+Right-click → **Open** no longer works for unsigned apps since macOS Sequoia
+(15). Without Terminal: let macOS refuse the app once, then **System Settings →
+Privacy & Security → Open Anyway**. The Mac app cannot update itself while it
+is unsigned, so it tells you when there is a new version and links the
+download; repeat the steps after each update.
 
 ### Linux
 
 ```bash
-chmod +x YouTube-Clipper-Linux-x64.AppImage
-./YouTube-Clipper-Linux-x64.AppImage
+chmod +x Clipr-Linux-x64.AppImage && ./Clipr-Linux-x64.AppImage
 ```
 
-## Features
+## What it does
 
-- **Clip, don't download the whole thing.** Grabs only the time range you select (via yt-dlp's `--download-sections`), so a 5-minute clip from a 2-hour video downloads in seconds, not minutes.
-- **Video or audio.** Export as **MP4** (video) or **MP3** (audio-only).
-- **Quality control.** Pick resolution for video (up to 1080p) or bitrate for audio (up to 320 kbps).
-- **Precise range selection** three ways: drag the dual-handle slider, type exact `HH:MM:SS` timestamps, or click lines in the transcript.
-- **Transcript view.** Pull the video's captions for your selected range, search within them, and copy the text. Click any line to set it as your clip's start or end.
-- **Choose where clips save** and name them automatically from the video title (desktop app).
-- **Estimated file size.** See an approximate download size that updates as you change the range, format, and quality.
-- **Runs 100% locally.** No accounts, ads, telemetry, or cloud — everything happens on your machine.
+- **Transcript-first.** Read the transcript to find the moment and jump to it.
+- **Mark a range, press Clip.** Drag on the timeline or set in and out with the
+  keyboard. Only that section downloads, so a 1-minute clip from a 3-hour
+  podcast comes down in seconds. There is no length cap.
+- **One file, several moments.** Add more sections and they come down joined,
+  in order, as one file.
+- **Campaigns.** Each client has its own folder, daily count and clip bank.
+- **Clip bank and history.** Import moments for a video, work down the list;
+  History shows what was already exported.
+- **Editor handoff.** The Clip menu picks the editor: Final Cut Pro (Mac only;
+  library and event named per campaign), Premiere Pro, DaVinci Resolve or
+  CapCut. The editors without project import open with the file shown in
+  Finder or File Explorer.
+- **No format or quality settings.** MP4 at 1080p, or the highest the video
+  has. The footer says "Makes N clips to [folder]".
 
-## Usage
+## Getting 1080p
 
-1. **Paste** a YouTube URL and click **Search** (or press Enter). YouTube Shorts links work too.
-2. The video loads and the range slider unlocks with the video's real length.
-3. **Choose your clip range** — any of:
-   - Drag the two slider handles, or
-   - Type exact `HH:MM:SS` values in the Start / End fields (leave Start blank to begin from 0), or
-   - Open the transcript and click a line to set it as the start or end.
-4. Pick **Format** (MP4/MP3) and **Quality**. The estimated file size updates as you go.
-5. Choose a **Save to** folder (desktop app), then click **Download** to save your clip.
+YouTube serves 360p to anyone who is not signed in. The footer says "at 360p"
+while that is the case, and its **Sign in for 1080p** button opens Help with
+the steps: export a `cookies.txt` from your own browser and drop it in. The
+file stays on your computer.
 
-> **Clip length is capped at 10 minutes.** Selections longer than that are blocked.
+## Reporting a problem
 
-### Using the transcript
-
-1. Click **View transcript** (above the preview). The video is replaced by the captions.
-2. **Search** within the transcript using the search box.
-3. **Click a line** to jump to it; use the inline **start/end** icons on a line to set that moment as your clip's start or end.
-4. **Copy** grabs the transcript text for your selected range.
-
-> Transcripts come from YouTube's auto-generated captions, so they may contain errors and lack punctuation. Not every video has captions available.
-
-### About the file-size estimate
-
-The size shown is an **estimate** (marked with `~`), calculated from the selected quality's bitrate and your clip length. The actual file may differ slightly — video bitrate varies moment to moment. MP3 estimates are more precise than MP4.
-
-### A note on the video preview
-
-Some creators disable embedded playback on their videos. When that happens the preview shows "Preview unavailable" — this is a YouTube setting, not an app error, and **it has no effect on downloading.** Clipping and downloading still work normally.
+In the app: **Help** → **Report a problem**, write a note, press **Send
+report**. Nothing is sent unless you press it. After a crash the same button
+is on the crash screen, with **Copy details** as an alternative. There is no
+public issue route.
 
 ## Building from source
 
@@ -139,8 +109,8 @@ Only needed if you want to develop or build the app yourself.
 ### Run in dev (browser)
 
 ```sh
-git clone <your-fork-or-this-repo> youtube-clipper
-cd youtube-clipper
+git clone <your-fork-or-this-repo> clipr
+cd clipr
 npm install
 npm run dev
 ```
@@ -218,7 +188,7 @@ is never rotated.
 3. Export youtube.com cookies with a "Get cookies.txt LOCALLY" style extension.
 4. Close the private window, so that session is never opened in the browser
    again.
-5. In the app: **Connect YouTube → Import cookies.txt**, and pick that file.
+5. In the app: the footer's **Sign in for 1080p** (or **Help → Sign in for 1080p**), then drop that file or choose it.
 
 The procedure is yt-dlp's own; see its
 [Exporting YouTube cookies](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies)
@@ -275,9 +245,9 @@ The workflow, in order:
 2. **version** — works out the bump (below), runs `npm version`, pushes the
    `Release vX.Y.Z` commit and its tag.
 3. **build** — native installers, in parallel on their own OS runners:
-   - `macos-latest` → `YouTube-Clipper-<version>-macOS-AppleSilicon.dmg` (arm64)
-   - `windows-latest` → `YouTube-Clipper-<version>-Windows-x64-Setup.exe`
-   - `ubuntu-latest` → `YouTube-Clipper-<version>-Linux-x64.AppImage`
+   - `macos-latest` → `Clipr-macOS-AppleSilicon.dmg` (arm64)
+   - `windows-latest` → `Clipr-Windows-x64-Setup.exe`
+   - `ubuntu-latest` → `Clipr-Linux-x64.AppImage`
 4. **publish** — flips the release public, marks it latest, and writes notes
    from the commits since the previous tag.
 

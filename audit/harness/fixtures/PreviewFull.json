@@ -1,0 +1,95 @@
+{
+ "_doc": "Full screen (Main06FullScreen): the fake player, the 1:12:04 to 1:12:46 range, playhead 1:12:31, the full-screen bar showing. The board's caption line reads 'the honest version is what people actually share' at 1:12:31, which the real transcript has at 1:12:09, so this fixture carries its own transcript.",
+ "extends": "Preview",
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 2503"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "m"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 5645"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "m"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4324"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "i"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4366"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "press": "o"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "click": "button[aria-label='Loop']"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "window.__fakeYTPlayer.t = 4351; window.__fakeYTPlayer.pauseVideo()"
+  },
+  {
+   "wait": 450
+  },
+  {
+   "click": "button[aria-label='Full screen']"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "window.dispatchEvent(new MouseEvent('mousemove'))"
+  }
+ ],
+ "stub": {
+  "vttFile": "podcast214-full.vtt",
+  "infos": {
+   "founder2": {
+    "title": "Founder story, part 2",
+    "duration": 3000
+   },
+   "townhall": {
+    "title": "Q3 town hall",
+    "duration": 5400
+   },
+   "pricing": {
+    "title": "Pricing AMA",
+    "duration": 2400
+   }
+  }
+ }
+}

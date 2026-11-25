@@ -5,6 +5,7 @@
  *   confined to the folders the user chose (see saveRoots.ts); payload shapes are
  *   validated by the IPC handlers before they reach these functions.
  */
+import { describeSaveError } from "./saveError";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -19,6 +20,7 @@ import {
 import * as logger from "../../../modules/logger/logger";
 import { getDragIcon } from "./dragIcon";
 import { saveRoots } from "./saveRoots";
+import { undoClipFile } from "./undoClip";
 
 const { shell } = electron;
 
@@ -58,7 +60,7 @@ export async function saveClip(payload: any) {
     return { ok: true, path: target };
   } catch (err: unknown) {
     logger.log("clip", `save failed: ${logger.describe(err)}`);
-    return { ok: false, error: logger.describe(err) };
+    return { ok: false, ...describeSaveError(err) };
   }
 }
 
@@ -79,10 +81,8 @@ export async function saveFile(payload: any) {
     const target = await writeWithoutOverwrite(dest.target, buf);
     return { ok: true, path: target };
   } catch (err: any) {
-    return {
-      ok: false,
-      error: err && err.message ? err.message : "Save failed",
-    };
+    logger.log("file", `save failed: ${logger.describe(err)}`);
+    return { ok: false, ...describeSaveError(err) };
   }
 }
 
@@ -117,10 +117,8 @@ export async function saveFiles(payload: any) {
     }
     return { ok: true, path: target };
   } catch (err: any) {
-    return {
-      ok: false,
-      error: err && err.message ? err.message : "Save failed",
-    };
+    logger.log("file", `export save failed: ${logger.describe(err)}`);
+    return { ok: false, ...describeSaveError(err) };
   }
 }
 
@@ -170,4 +168,9 @@ export function showInFolder(targetPath: string) {
       error: err && err.message ? err.message : "Failed to reveal",
     };
   }
+}
+
+/** Undo of a just-made clip: its file goes to the Trash / Recycle Bin. */
+export function undoClip(targetPath: unknown) {
+  return undoClipFile(targetPath, saveRoots(), (file) => shell.trashItem(file));
 }

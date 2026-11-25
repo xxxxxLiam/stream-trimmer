@@ -6,6 +6,9 @@
  * lives in common rather than as an ambient renderer type.
  */
 import type { CookieBrowser } from "../constants/cookieBrowsers";
+import type { FcpLookFileResult } from "../types/fcpLook";
+import type { CookieCheck, SignInSignal } from "../types/signIn";
+import type { RestartToUpdateResult, UpdateReady } from "../types/updates";
 
 export type UpdateStatusPayload =
   | { state: "checking" }
@@ -20,6 +23,9 @@ export type UpdateStatusPayload =
   | { state: "ready"; version?: string }
   | { state: "error"; message: string; url?: string };
 
+/** Why a save failed: the disk is full, the folder can't be written, the folder is gone, or something else. */
+export type SaveFailureCode = "DISK_FULL" | "FOLDER_NOT_WRITABLE" | "FOLDER_GONE" | "SAVE_FAILED";
+
 export interface ElectronAPI {
   isElectron: true;
   settingsSnapshot?: Record<string, unknown>;
@@ -31,7 +37,7 @@ export interface ElectronAPI {
     dirPath: string;
     filename: string;
     data: ArrayBuffer | Uint8Array;
-  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
   /**
    * Moves a finished clip from the engine's temp directory to `dirPath`.
    * Only the path crosses the bridge, never the media.
@@ -40,7 +46,7 @@ export interface ElectronAPI {
     tempPath: string;
     dirPath: string;
     filename: string;
-  }) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  }) => Promise<{ ok: boolean; path?: string; error?: string; code?: SaveFailureCode }>;
   saveFiles: (payload: {
     dirPath: string;
     folder: string;
@@ -59,6 +65,11 @@ export interface ElectronAPI {
   showInFolder: (
     targetPath: string,
   ) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Undo of a just-made clip: moves its file to the Trash / Recycle Bin. Refuses anything outside
+   * the user's clip folders; a file that's already gone is ok.
+   */
+  undoClip?: (targetPath: string) => Promise<{ ok: boolean; error?: string }>;
   fileExists?: (targetPath: string) => Promise<boolean>;
   startDrag?: (targetPath: string) => void;
   /** Reads the stored cookies.txt and reports whether a session is on disk. */
@@ -79,17 +90,30 @@ export interface ElectronAPI {
     error?: string;
   }>;
   /** Adopts cookies.txt text (a file dropped on the window). Validated in main. */
-  importYouTubeCookiesText?: (text: string) => Promise<{
-    ok: boolean;
-    count?: number;
-    kind?: string;
-    error?: string;
-  }>;
+  importYouTubeCookiesText?: (text: string) => Promise<CookieCheck & { error?: string }>;
   /**
    * True when this computer's salted id is in `list`. Only a boolean crosses
    * the bridge; the raw machine id stays in the main process.
    */
   isOwnerMachine?: (list: string[], salt: string) => Promise<boolean>;
+  /**
+   * Suggested clip names, offline. `prepare` builds the phrase table once when a transcript loads;
+   * `suggest` names a range (or several, for a joined clip). `skip` walks down the list for refresh.
+   * With no transcript prepared, the name is the video title plus a number.
+   */
+  clipNames?: {
+    prepare: (payload: {
+      videoId: string;
+      lines: { start: number; end: number; text: string }[];
+    }) => Promise<{ ok: boolean; error?: string }>;
+    suggest: (payload: {
+      videoId: string;
+      ranges: { start: number; end: number }[];
+      videoTitle: string;
+      existing: string[];
+      skip?: number;
+    }) => Promise<{ ok: boolean; name?: string; error?: string }>;
+  };
   /**
    * Editor handoff, implemented in electron/editorOpen.ts. Every call
    * resolves; failures are { ok: false, error } in plain words.
@@ -111,7 +135,7 @@ export interface ElectronAPI {
     openWith: (payload: {
       app: "finalcut" | "premiere" | "resolve" | "capcut";
       file?: string;
-    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; shown?: boolean; error?: string }>;
+    }) => Promise<{ ok: boolean; appPath?: string; missing?: string; opened?: boolean; revealed?: boolean; shown?: boolean; error?: string }>;
     reveal: (target: string) => Promise<{ ok: boolean; error?: string }>;
     copyFiles: (payload: {
       dirPath: string;
@@ -127,6 +151,13 @@ export interface ElectronAPI {
     ) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;
   };
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
+  /**
+   * Sends a crash report (kind "crash": the error) or a Report a problem note (kind "problem": note and error) through the
+   * report relay. main adds the app and system version and the cleaned log. "kept" means it is waiting for a later launch.
+   */
+  sendReport?: (payload: { kind: "crash" | "problem"; note?: string; error: string }) => Promise<{ ok: boolean; status?: "sent" | "kept" }>;
+  /** ISO time when this launch restored the settings from the backup copy, else null. */
+  settingsRestoredAt?: () => Promise<string | null>;
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
   revealDiagnostics?: () => Promise<{
     ok: boolean;
@@ -143,11 +174,27 @@ export interface ElectronAPI {
     browsers: CookieBrowser[];
   }>;
 
+  /** Opens the native picker for the user's Final Cut export and returns the parsed look, or a plain reason. */
+  pickFinalCutLook: () => Promise<FcpLookFileResult>;
+  /** The same reader for a file or .fcpxmld bundle dropped on the window. */
+  readFinalCutLook: (file: File) => Promise<FcpLookFileResult>;
+  /** The footer's "at 360p" and "Sign in for 1080p" pill read this. */
+  getSignInSignal: () => Promise<SignInSignal>;
+  onSignInSignal: (cb: (signal: SignInSignal) => void) => () => void;
+  /** The silent browser sweep's result: true when one browser's YouTube sign-in was usable. */
+  reportBrowserSignIn: (usable: boolean) => Promise<{ ok: boolean }>;
+  /** Opens the small always-on-top Symbols and phrases window (one instance). Esc closes it. */
+  openSymbols: () => Promise<{ ok: boolean }>;
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string;
     error?: string;
   }>;
-  quitAndInstall: () => Promise<{ ok: boolean; error?: string }>;
+  /** Restarts into the downloaded update; refuses with reason "busy" while a clip is being made. */
+  restartToUpdate: () => Promise<RestartToUpdateResult>;
+  /** An update that is ready right now (for a window that opened after the event). */
+  getUpdateReady: () => Promise<UpdateReady | null>;
+  /** One event when a version is ready: restart (Windows, Linux) or download (unsigned Mac). */
+  onUpdateReady: (cb: (payload: UpdateReady) => void) => () => void;
   onUpdateStatus: (cb: (payload: UpdateStatusPayload) => void) => () => void;
 }

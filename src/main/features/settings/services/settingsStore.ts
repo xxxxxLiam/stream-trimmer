@@ -12,6 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { siblingDir as siblingDataDir } from "../../../../common/utils/siblingDir";
+import { allowedRoots } from "../../../shared/utils/pathSafety";
+import { APPROVED_ROOTS_KEY } from "./settingsKeys";
 
 
 /**
@@ -41,6 +43,12 @@ function migrateSettings(input: any, { dataFolderName }: any = {}) {
   if (s["clipper.clipsDir"] && !s["clipper.dataDir"]) {
     if (dataFolderName) s["clipper.dataDir"] = siblingDataDir(s["clipper.clipsDir"], dataFolderName);
     if (s["clipper.dataDirConfirmed"] === undefined) s["clipper.dataDirConfirmed"] = false;
+  }
+  // Folders the app may write into are a list main keeps. Folders already chosen before this list
+  // existed are carried over once; after that only the folder picker adds to it.
+  if (s[APPROVED_ROOTS_KEY] === undefined) {
+    const chosen = allowedRoots(s);
+    if (chosen.length > 0) s[APPROVED_ROOTS_KEY] = chosen;
   }
   return s;
 }
@@ -74,6 +82,8 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
   // into the file on disk without a store that never loaded silently wiping
   // everything already saved there.
   const removed = new Set<string>();
+  // When this run restored the settings from the last good copy (ms of that copy), for the one line the app shows.
+  let restoredAt: number | null = null;
 
   /**
    * Keeps a copy of a file we cannot read BEFORE anything replaces it, next to
@@ -106,16 +116,34 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
     try {
       bytes = fs.readFileSync(filePath);
     } catch (err: any) {
-      if (err && err.code === "ENOENT") return { ok: true, data: {} };
+      if (err && err.code === "ENOENT") return { ok: true, data: {}, fromFile: false };
       // Present but unreadable (permissions, a directory...): do not claim it
       // is empty, and do not write over it.
-      return { ok: false, data: {} };
+      return { ok: false, data: {}, fromFile: false };
     }
     const parsed = parseSettingsText(bytes.toString("utf8"));
+    if (parsed.status === "ok") return { ok: true, data: parsed.data, fromFile: true };
+    // Unreadable or emptied: the last good copy, if there is one, is what the person had.
+    const good = readBackup();
     if (parsed.status === "invalid") {
-      return { ok: preserve(bytes), data: {} };
+      const kept = preserve(bytes);
+      if (good) return { ok: true, data: good.data, fromFile: false, restoredAt: good.at };
+      return { ok: kept, data: {}, fromFile: false };
     }
-    return { ok: true, data: parsed.data };
+    if (good) return { ok: true, data: good.data, fromFile: false, restoredAt: good.at };
+    return { ok: true, data: parsed.data, fromFile: true };
+  }
+
+  /** The last good copy (settings.json.bak) and when it was made, or null when there is none worth using. */
+  function readBackup(): { data: any; at: number } | null {
+    try {
+      const bak = `${filePath}.bak`;
+      const parsed = parseSettingsText(fs.readFileSync(bak, "utf8"));
+      if (parsed.status !== "ok" || Object.keys(parsed.data).length === 0) return null;
+      return { data: parsed.data, at: fs.statSync(bak).mtimeMs };
+    } catch {
+      return null;
+    }
   }
 
   function readFile() {
@@ -124,12 +152,17 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
 
   /** Reads the file into memory. Must run before the window is created. */
   function load() {
-    const raw = readFile();
+    const checked = readFileChecked();
+    const raw = checked.data;
     cache = migrateSettings(raw, { dataFolderName });
+    restoredAt = checked.restoredAt ? Math.round(checked.restoredAt) : null;
+    if (checked.restoredAt) {
+      if (log) log("settings.json was unreadable; restored from the last good copy");
+    }
     removed.clear();
     loaded = true;
     // Write the migration back once, so the renderer and the file agree.
-    if (JSON.stringify(raw) !== JSON.stringify(cache)) persist();
+    if (checked.restoredAt || JSON.stringify(raw) !== JSON.stringify(cache)) persist();
     return cache;
   }
 
@@ -145,8 +178,23 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
       for (const key of removed) delete merged[key];
       cache = merged;
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      // Keep the file as it was as the last good copy before it is replaced.
+      if (onDisk.fromFile && Object.keys(onDisk.data).length > 0) {
+        try {
+          fs.copyFileSync(filePath, `${filePath}.bak`);
+        } catch (err: unknown) {
+          console.error("[electron] could not keep a copy of settings:", err);
+        }
+      }
+      // Temp file, flushed to disk, then renamed over the real one: a power cut leaves the old file or the new one, never half.
       const tmp = `${filePath}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(cache, null, 2));
+      const fd = fs.openSync(tmp, "w");
+      try {
+        fs.writeSync(fd, JSON.stringify(cache, null, 2));
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
       fs.renameSync(tmp, filePath);
       return true;
     } catch (err: unknown) {
@@ -157,6 +205,14 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
 
   function all() {
     return cache;
+  }
+
+  const listeners = new Set<(key: string, value: unknown) => void>();
+
+  /** Calls `cb` after each successful write. Returns the way to stop listening. */
+  function onChange(cb: (key: string, value: unknown) => void) {
+    listeners.add(cb);
+    return () => listeners.delete(cb);
   }
 
   function set(key: unknown, value: unknown) {
@@ -171,10 +227,20 @@ function createSettingsStore(filePath: any, { log, dataFolderName }: any = {}) {
       cache[key] = value;
       removed.delete(key);
     }
-    return persist();
+    const saved = persist();
+    if (saved) {
+      for (const cb of listeners) {
+        try {
+          cb(key, value);
+        } catch (err: unknown) {
+          console.error("[electron] settings listener failed:", err);
+        }
+      }
+    }
+    return saved;
   }
 
-  return { load, all, set, persist, path: filePath };
+  return { load, all, set, persist, onChange, restoredAt: () => restoredAt, path: filePath };
 }
 
 export {

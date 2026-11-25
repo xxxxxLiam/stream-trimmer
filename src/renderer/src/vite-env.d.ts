@@ -8,12 +8,14 @@ interface ImportMetaEnv {
   readonly VITE_OWNER_MACHINES?: string;
   /** Salt for those hashes. Must be the same in every build. */
   readonly VITE_OWNER_SALT?: string;
+  /** https address of the crash-report relay. Empty: reports are kept and retried later. */
 }
 
 /** Baked by vite.config.ts. Prefer these over reading import.meta.env. */
 declare const __CHANNEL_DATA__: boolean;
+declare const __APP_VERSION__: string;
 declare const __OWNER_MACHINES__: string;
-declare const __OWNER_SALT__: string;x
+declare const __OWNER_SALT__: string;
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;

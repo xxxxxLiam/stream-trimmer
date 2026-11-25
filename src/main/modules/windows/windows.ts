@@ -4,9 +4,13 @@
  * Description: The splash window and the main window, and the one place that
  *   remembers which they are. Nothing else holds a reference to either.
  */
+import { isZoomInChord, maxZoomFactor, zoomInBlocked } from "./zoomLimit";
 import path from "node:path";
 import electron from "electron";
 import { isDev } from "../../shared/utils/env";
+import { rememberUiPort } from "./symbolsWindow";
+import { isAppUrl, isSafeExternalUrl } from "./navigationGuard";
+import { createCrashRecovery, crashedUrl } from "./crashRecovery";
 
 const { BrowserWindow, shell } = electron;
 
@@ -28,7 +32,7 @@ export function createSplash() {
     center: true,
     show: false,
     transparent: false,
-    backgroundColor: "#0B0B0C",
+    backgroundColor: "#0A0D0F",
     skipTaskbar: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
@@ -47,6 +51,7 @@ export function closeSplash() {
 }
 
 export async function createWindow(port: number) {
+  rememberUiPort(port);
   mainWindow = new BrowserWindow({
     // The window may not be smaller than the clipping loop needs. At the old
     // 900x600 floor the mark bar and the Cut button could never be on screen
@@ -58,7 +63,7 @@ export async function createWindow(port: number) {
     height: 820,
     minWidth: 1160,
     minHeight: 760,
-    backgroundColor: "#0B0B0C",
+    backgroundColor: "#0A0D0F",
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
@@ -101,17 +106,56 @@ export async function createWindow(port: number) {
     });
   }
 
-  // Open external links in the user's browser, not inside the app.
+  // Zoom (Ctrl/Cmd +) shrinks the page's css width; past a point the preview has no room left. Stop
+  // zoom-in at that point, and pull the zoom back if a resize or a saved zoom already went past it.
+  const clampZoom = () => {
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    const wc = win.webContents;
+    const max = maxZoomFactor(win.getContentSize()[0]);
+    if (wc.getZoomFactor() > max + 1e-6) wc.setZoomFactor(max);
+  };
+  mainWindow.webContents.on("before-input-event", (event: Electron.Event, input: Electron.Input) => {
+    if (!mainWindow || mainWindow.isDestroyed() || !isZoomInChord(input)) return;
+    if (zoomInBlocked(mainWindow.webContents.getZoomLevel(), mainWindow.getContentSize()[0])) event.preventDefault();
+  });
+  mainWindow.webContents.on("zoom-changed", (_e: Electron.Event) => setTimeout(clampZoom, 0));
+  mainWindow.on("resize", clampZoom);
+  mainWindow.webContents.on("did-finish-load", clampZoom);
+
+  const appUrl = isDev ? "http://localhost:8080/" : `http://127.0.0.1:${port}/`;
+  const appOrigins = [new URL(appUrl).origin];
+
+  // Open external links in the user's browser, not inside the app, and only ones that are safe to hand over.
+  const toBrowser = (url: string) => {
+    if (isSafeExternalUrl(url)) void shell.openExternal(url);
+  };
   mainWindow.webContents.setWindowOpenHandler(({ url }: Electron.HandlerDetails) => {
-    shell.openExternal(url);
+    toBrowser(url);
     return { action: "deny" };
+  });
+  // The window only ever shows the app. A link, a dropped file or a redirect that would take it
+  // elsewhere is stopped (a page that kept the preload bridge could otherwise reach the person's files).
+  const stayInApp = (event: Electron.Event, url: string) => {
+    if (isAppUrl(url, appOrigins)) return;
+    event.preventDefault();
+    toBrowser(url);
+  };
+  mainWindow.webContents.on("will-navigate", stayInApp);
+  mainWindow.webContents.on("will-redirect", stayInApp);
+
+  // If the page process dies, reload it once with the crashed flag so the app can say so (and offer Send report).
+  const recovery = createCrashRecovery();
+  mainWindow.webContents.on("render-process-gone", (_e: unknown, details: Electron.RenderProcessGoneDetails) => {
+    if (recovery.onGone(details?.reason ?? "crashed") !== "reload") return;
+    if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(crashedUrl(appUrl)).catch(() => undefined);
   });
 
   if (isDev) {
-    await mainWindow.loadURL("http://localhost:8080");
+    await mainWindow.loadURL(appUrl);
   } else {
     try {
-      await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
+      await mainWindow.loadURL(appUrl);
     } catch (err: unknown) {
       // Emergency fallback — the app still works, minus the video preview.
       console.error("[electron] http load failed, falling back to file://", err);

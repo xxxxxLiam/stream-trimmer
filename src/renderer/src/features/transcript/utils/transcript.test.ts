@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   MAX_DRAWN,
   WINDOW_SIZE,
+  snapRangeToWords,
+  wordBoundsAt,
   computeWindow,
   extendEarlier,
   extendLater,
@@ -350,5 +352,41 @@ describe("used ranges", () => {
   });
   it("no ranges -> not used", () => {
     assert.equal(isLineUsed({ start: 12, end: 13, text: "" }, []), false);
+  });
+});
+
+it("copy text: the whole transcript and only the words inside a range", async () => {
+  const { wholeTranscriptText, wordsInRanges } = await import("./transcript");
+  const lines = [
+    { start: 0, end: 4, text: "welcome back" },
+    { start: 4, end: 9, text: "that is a pricing problem" },
+    { start: 9, end: 15, text: "nobody wants to hear this" },
+  ];
+  assert.equal(wholeTranscriptText(lines), "welcome back\nthat is a pricing problem\nnobody wants to hear this");
+  assert.equal(wordsInRanges(lines, [{ start: 5, end: 10 }]), "that is a pricing problem\nnobody wants to hear this");
+  assert.equal(wordsInRanges(lines, []), "");
+});
+
+describe("dragging snaps to words (B-10)", () => {
+  const timed = { start: 10, end: 14, text: "so here is what", words: [
+    { start: 10, end: 10.8, text: "so" }, { start: 10.9, end: 11.9, text: "here" },
+    { start: 12, end: 12.6, text: "is" }, { start: 12.7, end: 14, text: "what" } ] };
+  const plain = { start: 20, end: 30, text: "aaaa bbbb", };
+  it("uses the cue's word times where present", () => {
+    assert.deepEqual(wordBoundsAt(timed, 0.3), { start: 10.9, end: 11.9 }); // "here"
+    assert.deepEqual(wordBoundsAt(timed, 0.99), { start: 12.7, end: 14 }); // "what"
+  });
+  it("spreads the line's time over its characters when there are no word times", () => {
+    const b = wordBoundsAt(plain, 0.9);
+    assert.ok(b.start > 20 && b.start < 30 && b.end === 30);
+  });
+  it("a drag runs from the start of the first word to the end of the last, in either direction", () => {
+    const lines = [timed, plain];
+    const fwd = snapRangeToWords(lines, { line: 0, frac: 0.3 }, { line: 0, frac: 0.99 });
+    assert.deepEqual(fwd, { start: 10.9, end: 14 });
+    assert.deepEqual(snapRangeToWords(lines, { line: 0, frac: 0.99 }, { line: 0, frac: 0.3 }), fwd);
+    const across = snapRangeToWords(lines, { line: 0, frac: 0.3 }, { line: 1, frac: 0.1 });
+    assert.equal(across?.start, 10.9);
+    assert.ok(across && across.end < 30 && across.end > 20, "ends mid-line, not at the end of the whole line");
   });
 });

@@ -7,9 +7,14 @@
  */
 
 /** A source-video range already used by a published clip. Seconds. */
-export type UsedRange = { start: number; end: number; clipId: string };
+export type UsedRange = {
+  start: number;
+  end: number;
+  clipId: string;
+  /** When the clip was made (ms since epoch). Older entries have none and never count as "today". */
+  at?: number;
+};
 
-export type CampaignFormat = "mp4" | "mp3";
 
 export type Campaign = {
   id: string;
@@ -22,18 +27,23 @@ export type Campaign = {
   clipIdPattern: string;
   /** Fills {prefix} in the pattern. */
   prefix: string;
-  format: CampaignFormat;
-  quality: string;
   /** Where cut clips go (deliverables). */
   clipsDir: string;
   /** Where channel-export CSVs go (research). Never the same folder as clipsDir. */
   dataDir: string;
   usedRanges: Record<string, UsedRange[]>;
+  /** Clips due per day; every campaign has one (default 3). The top bar shows "N of M today" from it. */
+  dailyQuota: number;
+  /** Id of this campaign's Final Cut look in the saved looks (fcpLooks.ts); none when unset. */
+  fcpLookId?: string;
 };
 
 export type CampaignInput = Partial<Omit<Campaign, "id" | "usedRanges">> & {
   name: string;
 };
+
+/** Clips a day a campaign starts with, and what an older campaign with none gets. */
+export const DEFAULT_DAILY_QUOTA = 3;
 
 export const DEFAULT_PATTERN = "{prefix}-{videoId}-{nn}";
 export const DEFAULT_BAND = { targetMinSec: 30, targetMaxSec: 60, hardMaxSec: 90 };
@@ -100,6 +110,24 @@ import { siblingDir } from "../../../../common/utils/siblingDir";
 export const DATA_FOLDER_NAME: string = CHANNEL_DATA_BUILT ? "channel-data" : "data";
 
 /** "/a/b/clips" -> "/a/b/<data folder>". Keeps the separator style of the input. */
+/** A campaign name as one folder name: no path separators or characters a folder cannot hold. */
+export function folderNameOf(name: string): string {
+  const safe = name.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+/, "");
+  return safe || "Campaign";
+}
+
+/**
+ * Where a campaign's clips go: its own folder when it chose one, else a folder named after it inside the
+ * Clips folder (the parent). Empty when there is no parent yet.
+ */
+export function campaignClipsDir(c: Pick<Campaign, "name" | "clipsDir">, parent: string): string {
+  if (c.clipsDir) return c.clipsDir;
+  const base = parent.replace(/[\\/]+$/, "");
+  if (!base) return "";
+  const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
+  return `${base}${sep}${folderNameOf(c.name)}`;
+}
+
 export function defaultDataDir(clipsDir: string): string {
   return siblingDir(clipsDir, DATA_FOLDER_NAME);
 }
@@ -112,7 +140,9 @@ export function sameFolder(a: string, b: string): boolean {
   return a !== "" && b !== "" && normFolder(a) === normFolder(b);
 }
 
-export type CampaignProblem = "name-empty" | "name-taken" | "folders-same" | "pattern-no-number";
+export const MAX_NAME_LENGTH = 60;
+
+export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "folders-same" | "pattern-no-number";
 
 export function validateCampaign(
   c: Pick<Campaign, "name" | "clipsDir" | "dataDir" | "clipIdPattern">,
@@ -128,10 +158,21 @@ export function validateCampaign(
   return out;
 }
 
+/** What stops a campaign being saved under this name: empty, or the same as another campaign's. */
+export function campaignNameProblems(name: string, others: readonly Pick<Campaign, "id" | "name">[], editingId?: string): string[] {
+  const found: CampaignProblem[] = [];
+  if (!name.trim()) found.push("name-empty");
+  else if (name.trim().length > MAX_NAME_LENGTH) found.push("name-long");
+  else if (others.some((o) => o.id !== editingId && o.name.trim().toLowerCase() === name.trim().toLowerCase())) found.push("name-taken");
+  return found.map(describeCampaignProblem);
+}
+
 export function describeCampaignProblem(p: CampaignProblem): string {
   switch (p) {
     case "name-empty":
       return "Give the campaign a name.";
+    case "name-long":
+      return `Keep the name to ${MAX_NAME_LENGTH} characters or fewer.`;
     case "name-taken":
       return "Another campaign already has that name.";
     case "folders-same":
@@ -156,11 +197,12 @@ export function createCampaign(
     hardMaxSec: input.hardMaxSec ?? DEFAULT_BAND.hardMaxSec,
     clipIdPattern: input.clipIdPattern?.trim() || DEFAULT_PATTERN,
     prefix: (input.prefix ?? "").trim() || defaultPrefix(name),
-    format: input.format ?? "mp4",
-    quality: input.quality ?? "best",
     clipsDir,
     dataDir: input.dataDir ?? (clipsDir ? defaultDataDir(clipsDir) : ""),
     usedRanges: {},
+    dailyQuota: input.dailyQuota && input.dailyQuota >= 1 ? Math.floor(input.dailyQuota) : DEFAULT_DAILY_QUOTA,
+    // The caller passes the last look picked, so a second client is one pick, not a second upload.
+    ...(input.fcpLookId ? { fcpLookId: input.fcpLookId } : {}),
   });
   return { campaigns: [...list, campaign], campaign };
 }
@@ -343,15 +385,34 @@ export function addUsedRanges(
   videoId: string,
   ranges: ReadonlyArray<{ start: number; end: number }>,
   clipId: string,
+  at: number = Date.now(),
 ): Campaign {
   const existing = c.usedRanges[videoId] ?? [];
   const next = [...existing];
   for (const r of ranges) {
     if (!(r.end > r.start)) continue;
     if (next.some((u) => u.clipId === clipId && u.start === r.start && u.end === r.end)) continue;
-    next.push({ start: r.start, end: r.end, clipId });
+    next.push({ start: r.start, end: r.end, clipId, at });
   }
   return { ...c, usedRanges: { ...c.usedRanges, [videoId]: next } };
+}
+
+/** Clips this campaign made today (local day), counting a joined clip once however many ranges it has. */
+export function clipsMadeToday(c: Campaign | null | undefined, now: number = Date.now()): number {
+  if (!c) return 0;
+  const dayStart = new Date(now).setHours(0, 0, 0, 0);
+  const ids = new Set<string>();
+  for (const list of Object.values(c.usedRanges)) {
+    for (const u of list) if (u.clipId && typeof u.at === "number" && u.at >= dayStart) ids.add(u.clipId);
+  }
+  return ids.size;
+}
+
+/** The top bar's count, "2 of 3 today", or null when the campaign has no daily quota. */
+export function todayCount(c: Campaign | null | undefined, now: number = Date.now()): string | null {
+  const quota = c?.dailyQuota;
+  if (!c || !quota || quota <= 0) return null;
+  return `${clipsMadeToday(c, now)} of ${quota} today`;
 }
 
 /** Takes a clip's ranges back out, e.g. when the user deletes a cut. */
@@ -391,7 +452,14 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         const clean = list.flatMap((u) => {
           const x = u as Record<string, unknown>;
           return x && typeof x.start === "number" && typeof x.end === "number"
-            ? [{ start: x.start, end: x.end, clipId: typeof x.clipId === "string" ? x.clipId : "" }]
+            ? [
+                {
+                  start: x.start,
+                  end: x.end,
+                  clipId: typeof x.clipId === "string" ? x.clipId : "",
+                  ...(typeof x.at === "number" && Number.isFinite(x.at) ? { at: x.at } : {}),
+                },
+              ]
             : [];
         });
         if (clean.length) used[vid] = clean;
@@ -406,11 +474,12 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         hardMaxSec: num(r.hardMaxSec, DEFAULT_BAND.hardMaxSec),
         clipIdPattern: typeof r.clipIdPattern === "string" && r.clipIdPattern ? r.clipIdPattern : DEFAULT_PATTERN,
         prefix: typeof r.prefix === "string" && r.prefix ? r.prefix : defaultPrefix(r.name),
-        format: r.format === "mp3" ? "mp3" : "mp4",
-        quality: typeof r.quality === "string" ? r.quality : "best",
+        // A saved format or quality from an older version is ignored: it is no longer a choice anywhere.
         clipsDir: typeof r.clipsDir === "string" ? r.clipsDir : "",
         dataDir: typeof r.dataDir === "string" ? r.dataDir : "",
         usedRanges: used,
+        dailyQuota: typeof r.dailyQuota === "number" && r.dailyQuota >= 1 ? Math.min(99, Math.floor(r.dailyQuota)) : DEFAULT_DAILY_QUOTA,
+        ...(typeof r.fcpLookId === "string" && r.fcpLookId ? { fcpLookId: r.fcpLookId } : {}),
       }),
     );
   }

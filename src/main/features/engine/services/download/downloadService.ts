@@ -8,7 +8,10 @@ import fs from "node:fs";
 import { STAGE_FOUND, classifyFailure, pruneWorkDir } from "../segments";
 import { BIN_DIR } from "../binaries";
 import { publishProgress } from "../progressChannel";
-import { sendFailure } from "../../utils/errors";
+import { fullErrMessage, sendFailure } from "../../utils/errors";
+import { RETRY_SENTENCE, rowStateFor } from "../../../../../common/types/clipRowState";
+import { updateTools } from "../toolUpdater";
+import { runWithToolRetry } from "./toolRetry";
 import { createClipBuilder } from "./clipBuild";
 import { handleFailure } from "./failureResponse";
 import { createDownloadCtx } from "./jobContext";
@@ -62,7 +65,23 @@ export async function runDownload(req: Request, res: Response) {
     console.log(
       `[server] download job=${jobId} using binDir=${BIN_DIR ?? "(none)"}`,
     );
-    await buildClip(PLAYER_CLIENTS_PRIMARY);
+    // A failure of the "tools out of date" class updates yt-dlp quietly and tries this clip
+    // once more. The clip's row says so in one sentence; nothing else is shown.
+    await runWithToolRetry(() => buildClip(PLAYER_CLIENTS_PRIMARY), {
+      isToolError: (e) => classifyFailure(fullErrMessage(e)).code === "engine_behind",
+      update: async (willUpdate) => (await updateTools({ onUpdating: willUpdate })).updated,
+      onRetrying: (e) =>
+        publishProgress(jobId, {
+          phase: "downloading",
+          percent: ctx.lastReported,
+          message: RETRY_SENTENCE,
+          row: rowStateFor(classifyFailure(fullErrMessage(e)), { retrying: true }),
+        }),
+      beforeRetry: () => {
+        throwIfCancelled();
+        pruneWorkDir(tempDir);
+      },
+    });
     throwIfCancelled();
 
     if (!fs.existsSync(outputPath)) {

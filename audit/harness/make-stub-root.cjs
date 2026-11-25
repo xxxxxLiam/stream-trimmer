@@ -17,11 +17,16 @@
  *
  *   {
  *     "info":      { "title": "...", "duration": 3600, "id": "abc" },
+ *     "infos":     { "<video id>": { "title": "..." } }   (per-video answers; others get "info")
  *     "exitCode":  0,          // non-zero to make yt-dlp fail
  *     "stderr":    "",         // text to emit on failure
  *     "delayMs":   0,          // stall, for slow-network and cancel tests
  *     "progress":  [0, 25, 100],
- *     "writeMedia": true       // copy the fixture clip to the output path
+ *     "failDownload": false, // only the download step fails (probes still work)
+ *     "holdMs": 0,           // stall after the last progress line
+ *     "progressDelayMs": 30, // pause between progress lines
+ *     "writeMedia": true,      // copy the fixture clip to the output path
+ *     "vtt": "WEBVTT...",      // text served as the transcript (or "vttFile": name beside stub.json)
  *   }
  */
 const fs = require("node:fs");
@@ -38,8 +43,13 @@ fs.mkdirSync(bin, { recursive: true });
 
 // Real ffmpeg/deno: the cut and concat must be genuine for the audit to mean
 // anything. Only the network-facing tool is replaced.
+const { execSync } = require("node:child_process");
+const onPath = (n) => { try { return execSync(`command -v ${n}`, { encoding: "utf8" }).trim(); } catch { return ""; } };
 for (const name of ["ffmpeg", "deno"]) {
-  const real = path.join(REPO, "resources", "bin", name);
+  // The repo's bundled binary when there is one, then $STUB_BIN_DIR/<name>, then whatever is on PATH.
+  const bundled = path.join(REPO, "resources", "bin", name);
+  const extra = process.env.STUB_BIN_DIR ? path.join(process.env.STUB_BIN_DIR, name) : "";
+  const real = fs.existsSync(bundled) ? bundled : extra && fs.existsSync(extra) ? extra : onPath(name) || bundled;
   const link = path.join(bin, name);
   if (fs.existsSync(real) && !fs.existsSync(link)) fs.symlinkSync(real, link);
 }
@@ -51,6 +61,9 @@ const DEFAULTS = {
   delayMs: 0,
   progress: [0, 50, 100],
   writeMedia: true,
+  failDownload: false,
+  holdMs: 0,
+  progressDelayMs: 30,
 };
 const stubJson = path.join(root, "stub.json");
 if (!fs.existsSync(stubJson)) {
@@ -85,24 +98,41 @@ async function main() {
 
   // Metadata probe: -J / --dump-json / --dump-single-json
   if (has("-J") || has("--dump-json") || has("--dump-single-json")) {
+    // cfg.infos: { "<video id>": { title, duration, ... } } answers a link to that video with its own
+    // metadata; any other link gets cfg.info.
+    const asked = (argv.join(" ").match(/v=([\\w-]+)/) || [])[1];
+    const own = (cfg.infos && asked && cfg.infos[asked]) || null;
+    const base = own ? Object.assign({}, cfg.info, { id: asked }, own) : cfg.info;
     const info = Object.assign({
-      _type: "video", webpage_url: "https://www.youtube.com/watch?v=" + cfg.info.id,
+      _type: "video", webpage_url: "https://www.youtube.com/watch?v=" + base.id,
       formats: [
         { format_id: "18",  ext: "mp4", height: 360,  vcodec: "avc1", acodec: "mp4a" },
         { format_id: "137", ext: "mp4", height: 1080, vcodec: "avc1", acodec: "none" },
         { format_id: "140", ext: "m4a", height: null, vcodec: "none", acodec: "mp4a" },
       ],
       subtitles: {}, automatic_captions: {}, comments: [],
-    }, cfg.info);
+    }, base);
     process.stdout.write(JSON.stringify(info) + "\\n");
     return;
   }
 
+  // Transcript: --skip-download with subtitles asks for <output>.en.vtt. cfg.vtt is the file's text.
+  if (has("--skip-download") && (has("--write-subs") || has("--write-auto-subs"))) {
+    const out = valOf("-o") || valOf("--output");
+    const vtt = cfg.vttFile ? fs.readFileSync(path.join(__dirname, "..", "..", cfg.vttFile), "utf8") : cfg.vtt;
+    if (out && vtt) fs.writeFileSync(out + ".en.vtt", vtt);
+    return;
+  }
+
   // Download: emit progress lines, then place the fixture at the output path.
+  // failDownload: only the download fails (probes still work); holdMs: stall after the last progress
+  // line, so a screenshot can catch the clip part-way; progressDelayMs: pause between progress lines.
+  if (cfg.failDownload) return fail();
   for (const p of cfg.progress || []) {
     process.stdout.write("[download]  " + p + ".0% of 10.00MiB at 1.00MiB/s ETA 00:01\\n");
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, cfg.progressDelayMs || 30));
   }
+  if (cfg.holdMs) await new Promise((r) => setTimeout(r, cfg.holdMs));
   if (cfg.writeMedia) {
     const out = valOf("-o") || valOf("--output");
     const fixture = path.join(__dirname, "..", "..", "fixture.mp4");

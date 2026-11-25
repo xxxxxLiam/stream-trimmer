@@ -3,69 +3,107 @@
 @tailwind utilities;
 
 /*
- * Design tokens, BUILD-SPEC sections 1 and 2.
- *
- * The accent is ONE HSL triplet. Every gradient, glow, tint and ring below is
- * derived from it, so changing --accent-h/s/l re-themes the whole app.
- * #FF6363 = hsl(0 100% 69.41%).
+ * Design tokens: Foundation boards Colour, Type and Components (Ice and Frost, "The Clean Cut").
+ * Flat surfaces: a fill and a hairline, no gradients, no plain drop shadows. Glow is a
+ * brand-colour zero-offset shadow and appears only for live state (the named --glow-* values).
+ * No raw hex or rgba in a component: use these tokens (Tailwind names in tailwind.config.ts).
  */
 :root {
-  --accent-h: 0;
-  --accent-s: 100%;
-  --accent-l: 69.41%;
+  /* Brand. Ice is the one signal colour; Frost is the light (playhead, saved flash). */
+  --ice-rgb: 95 216 202;
+  --frost-rgb: 184 228 234;
+  --error-rgb: 255 99 99;
+  --ice: rgb(var(--ice-rgb));
+  --frost: rgb(var(--frost-rgb));
+  --error: rgb(var(--error-rgb));
+  /* Legacy name: every old "accent" now reads as Ice. R2 to R6 remove it as they go. */
+  --accent: var(--ice);
+  --accent-up: var(--ice);
+  --accent-dn: var(--ice);
+  --accent-top: var(--ice);
 
-  --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
-  /* aUp = lighten(accent, 10%), aDn = darken(accent, 10%), aTop = lighten 20% */
-  --accent-up: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) + 10%));
-  --accent-dn: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) - 10%));
-  --accent-top: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) + 20%));
-  --accent-5: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.05);
-  --accent-8: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.08);
-  --accent-9: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.09);
-  --accent-16: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.16);
-  --accent-18: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.18);
-  --accent-30: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.3);
-  --accent-42: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.42);
-  --accent-45: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.45);
-  --accent-50: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.5);
+  /* Named Ice alpha tints, as the boards use them. */
+  --ice-tint-06: rgb(var(--ice-rgb) / 0.06);
+  --ice-tint-08: rgb(var(--ice-rgb) / 0.08);
+  --ice-tint-10: rgb(var(--ice-rgb) / 0.1);
+  --ice-tint-12: rgb(var(--ice-rgb) / 0.12);
+  --ice-tint-15: rgb(var(--ice-rgb) / 0.15);
+  --ice-tint-18: rgb(var(--ice-rgb) / 0.18);
+  --ice-tint-25: rgb(var(--ice-rgb) / 0.25);
+  --ice-tint-30: rgb(var(--ice-rgb) / 0.3);
+  --ice-tint-35: rgb(var(--ice-rgb) / 0.35);
+  --ice-tint-50: rgb(var(--ice-rgb) / 0.5);
+  --ice-tint-60: rgb(var(--ice-rgb) / 0.6);
+  --ice-tint-80: rgb(var(--ice-rgb) / 0.8);
+  --frost-tint-35: rgb(var(--frost-rgb) / 0.35);
+  --frost-tint-45: rgb(var(--frost-rgb) / 0.45);
+  --frost-tint-60: rgb(var(--frost-rgb) / 0.6);
+  --frost-tint-80: rgb(var(--frost-rgb) / 0.8);
+  --error-tint-15: rgb(var(--error-rgb) / 0.15);
+  /* Old alpha names, kept pointing at the nearest named tint. */
+  --accent-5: var(--ice-tint-06);
+  --accent-8: var(--ice-tint-08);
+  --accent-9: var(--ice-tint-10);
+  --accent-16: var(--ice-tint-15);
+  --accent-18: var(--ice-tint-18);
+  --accent-30: var(--ice-tint-30);
+  --accent-42: var(--ice-tint-35);
+  --accent-45: var(--ice-tint-50);
+  --accent-50: var(--ice-tint-50);
 
-  --c-bg: #0b0b0c;
-  --c-panel: #161618;
-  --c-raised: #1c1c1f;
-  --c-hover: #252527;
-  --c-plate: #08080a;
-  --c-fg: #f5f5f7;
-  --c-fg-dim: #969697;
-  --c-disabled: #909092;
-  --c-on-accent: #0b0b0c;
+  /* Surfaces, back to front. */
+  --c-bg: #0a0d0f;
+  --c-panel: #121619;
+  --c-raised: #181d21;
+  --c-hover: #232a2f;
+  --c-plate: #0a0d0f;
+  --c-fg: #f2f5f6;
+  --c-fg-dim: #94a0a5;
+  --c-disabled: #8b979c;
+  --c-on-accent: #0a0d0f;
   --c-hairline: rgba(255, 255, 255, 0.08);
   --c-hairline-strong: rgba(255, 255, 255, 0.14);
+  /* bg overlay alphas (scrims over video and under dialogs). */
+  --bg-overlay-50: rgb(10 13 15 / 0.5);
+  --bg-overlay-60: rgb(10 13 15 / 0.6);
+  --bg-overlay-75: rgb(10 13 15 / 0.75);
+  --bg-overlay-80: rgb(10 13 15 / 0.8);
+  --bg-overlay-92: rgb(10 13 15 / 0.92);
 
-  /* Premium layer. Image layers only; the base colour is added by the
-     .surface-* classes below because a colour cannot sit in background-image. */
-  --g-ground:
-    radial-gradient(1000px 620px at 78% -14%, var(--accent-8), transparent 66%),
-    radial-gradient(760px 520px at 4% 114%, var(--accent-5), transparent 68%);
-  --g-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 180px);
-  --g-panel-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 28px 56px -36px rgba(0, 0, 0, 0.9);
-  --g-raised: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
-  --g-raised-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
-  --g-primary: linear-gradient(180deg, var(--accent-up), var(--accent-dn));
-  --g-primary-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 1px 2px rgba(0, 0, 0, 0.45),
-    0 14px 32px -10px var(--accent-50);
-  --g-range-fill: linear-gradient(180deg, var(--accent-top), var(--accent-dn));
-  --g-range-glow: 0 0 28px var(--accent-42);
-  --g-accent-card: linear-gradient(180deg, var(--accent-16), var(--accent-5));
-  --g-accent-card-shadow:
-    inset 0 1px 0 var(--accent-30), 0 20px 44px -26px var(--accent-45);
-  --g-plate: radial-gradient(130% 95% at 50% 118%, var(--accent-9), transparent 62%);
-  --g-row-wash: linear-gradient(90deg, var(--accent-18), var(--accent-5) 62%, transparent);
-  --g-drawer-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06), -24px 0 64px -32px rgba(0, 0, 0, 0.95);
+  /* Named glows, exactly as the Colour board. They mean state, never decoration. */
+  --glow-cut: 0 0 24px rgb(var(--ice-rgb) / 0.6);
+  --glow-range: 0 0 14px rgb(var(--ice-rgb) / 0.8);
+  --glow-row: 0 0 16px rgb(var(--ice-rgb) / 0.55);
+  --glow-playhead: 0 0 10px rgb(var(--frost-rgb) / 0.8);
+  --glow-box: 0 0 0 4px rgb(var(--ice-rgb) / 0.08), 0 18px 40px -18px rgb(var(--ice-rgb) / 0.45);
+  --glow-spotlight: radial-gradient(closest-side, rgb(var(--ice-rgb) / 0.13), transparent 70%);
+  --glow-mark: 0 0 22px rgb(var(--frost-rgb) / 0.35);
+  --flash-saved: 0 0 12px rgb(var(--frost-rgb) / 0.45);
+  /* Component-board glows: the Clip button on hover, the open video row, the just-made row. */
+  --glow-clip-hover: 0 0 14px rgb(var(--ice-rgb) / 0.35);
+  --glow-open: 0 0 10px rgb(var(--ice-rgb) / 0.25);
+  --glow-made: 0 0 12px rgb(var(--frost-rgb) / 0.18);
 
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Flat-surface compatibility: the old premium-layer variables are now empty, so every
+     "background: var(--g-x), var(--c-y)" resolves to the flat colour. */
+  --g-ground: none;
+  --g-panel: none;
+  --g-panel-shadow: none;
+  --g-raised: none;
+  --g-raised-shadow: none;
+  --g-primary: none;
+  --g-primary-shadow: var(--glow-cut);
+  --g-range-fill: none;
+  --g-range-glow: var(--glow-range);
+  --g-accent-card: none;
+  --g-accent-card-shadow: none;
+  --g-plate: none;
+  --g-row-wash: none;
+  --g-drawer-shadow: none;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* There is no monospace in the app; the old name resolves to Inter with tabular figures. */
+  --font-mono: var(--font-sans);
 }
 
 @layer base {
@@ -73,7 +111,7 @@
   body,
   #root {
     @apply h-full text-fg font-sans text-body antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    font-feature-settings: "tnum" 0;
   }
   body {
     background: var(--g-ground), var(--c-bg);
@@ -102,7 +140,8 @@
   .tabular,
   .font-mono,
   time {
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings: "tnum", "zero";
   }
   :focus-visible {
     outline: 2px solid var(--accent);
@@ -134,11 +173,10 @@
   /* Error / warning: accent TEXT on an accent tint with an accent border.
      Never a filled accent fill (that is reserved for the primary action). */
   .card-alert {
-    background: var(--g-accent-card);
-    box-shadow: var(--g-accent-card-shadow);
-    border: 1px solid hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.55);
+    background: var(--c-raised);
+    border: 1px solid var(--error);
     border-radius: 8px;
-    color: var(--accent);
+    color: var(--c-fg);
   }
   .row-used-wash {
     background: var(--g-row-wash);
@@ -149,8 +187,8 @@
   .t-section { @apply text-section; }
   .t-body { @apply text-body; }
   .t-meta { @apply text-meta text-fg-dim; }
-  .t-numeral { @apply text-numeral font-mono; font-variant-numeric: tabular-nums; }
-  .t-timecode { @apply font-mono text-meta; font-variant-numeric: tabular-nums; }
+  .t-numeral { @apply text-numeral; font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "tnum", "zero"; }
+  .t-timecode { @apply text-meta; font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "tnum", "zero"; }
   .arabic-glyph {
     font-family: "Geeza Pro", "Al Bayan", "Arabic Typesetting", "Noto Naskh Arabic", serif;
     unicode-bidi: isolate;
@@ -215,10 +253,25 @@
   .icon-btn:disabled {
     color: var(--c-disabled);
   }
+  /* A top bar button that is on shows its label next to the icon, so it grows past the square. */
+  .icon-btn:has(> .icon-label) {
+    width: auto;
+    padding-inline: 12px;
+  }
   .icon-btn[aria-pressed="true"],
   .icon-btn[aria-expanded="true"] {
-    border-color: var(--accent);
+    background: var(--c-raised);
+    border-color: var(--c-hairline-strong);
     color: var(--c-fg);
+  }
+
+  /* The top bar's buttons are the 44px target the board draws (the shared icon button is 32px). */
+  .topbar .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .topbar .icon-btn:has(> .icon-label) {
+    width: auto;
   }
 
   .chip {
@@ -277,7 +330,7 @@
   .field:focus-visible {
     border-color: var(--accent);
     outline: none;
-    box-shadow: 0 0 0 3px var(--accent-18);
+    box-shadow: 0 0 0 3px var(--ice-tint-18);
   }
   .field:disabled {
     color: var(--c-disabled);
@@ -313,7 +366,7 @@
     border: 1px solid rgba(0, 0, 0, 0.4);
     box-shadow:
       0 1px 2px rgba(0, 0, 0, 0.5),
-      0 0 0 3px rgba(255, 99, 99, 0);
+      0 0 0 3px rgb(var(--ice-rgb) / 0);
     transition: box-shadow 120ms ease, transform 120ms ease;
     border-radius: 50%;
     cursor: pointer;
@@ -326,7 +379,7 @@
     border: 1px solid rgba(0, 0, 0, 0.4);
     box-shadow:
       0 1px 2px rgba(0, 0, 0, 0.5),
-      0 0 0 3px rgba(255, 99, 99, 0);
+      0 0 0 3px rgb(var(--ice-rgb) / 0);
     transition: box-shadow 120ms ease, transform 120ms ease;
     border-radius: 50%;
     cursor: pointer;
@@ -335,12 +388,12 @@
   .dual-input:focus-visible::-webkit-slider-thumb {
     box-shadow:
       0 1px 2px rgba(0, 0, 0, 0.5),
-      0 0 0 3px rgba(255, 99, 99, 0.5);
+      0 0 0 3px rgb(var(--ice-rgb) / 0.5);
   }
   .dual-input:focus-visible::-moz-range-thumb {
     box-shadow:
       0 1px 2px rgba(0, 0, 0, 0.5),
-      0 0 0 3px rgba(255, 99, 99, 0.5);
+      0 0 0 3px rgb(var(--ice-rgb) / 0.5);
   }
   .dual-input:disabled::-webkit-slider-thumb,
   .dual-input:disabled::-moz-range-thumb {
@@ -355,20 +408,7 @@
   background: var(--g-ground), var(--c-bg);
 }
 
-/* ---- Workspace columns ------------------------------------------------ */
-/* The columns respond to the width of their own area (the help drawer is a 400px sibling),
-   not the window. 840 = THREE_COLUMN_MIN_PX in ThreeColumnLayout.tsx: the default window
-   (1100) keeps three columns through one zoom step (880 at 125%), and the 900px minimum
-   gets them too. Below that the columns wrap, with the mark column FIRST so In, Out, Add
-   and Cut are what you see. Unlayered on purpose so these beat the max-h / max-w
-   utilities on the same elements. */
-.cols-host {
-  container-type: inline-size;
-}
-.cols-centre {
-  order: -1;
-}
-
+/* ---- Workspace panels ------------------------------------------------- */
 /* The player fills the centre column.
    It used to be capped by height — max-width: min(80vh, (100vh - 440px) * 16/9) — so that
    In/Out, Add and Cut stayed below the fold without scrolling. The cost was a letterboxed
@@ -377,7 +417,7 @@
    little and watch a bigger picture, which is the right trade for the one thing you stare
    at all session. The workspace area scrolls and is focusable, so the controls stay
    reachable by wheel, trackpad and keyboard with the bar hidden. */
-.cols-centre .aspect-video {
+.panel-centre .aspect-video {
   max-width: 100%;
 }
 
@@ -391,150 +431,46 @@
   margin: -2px;
 }
 
-/* ---- Resizable side columns --------------------------------------------- */
-/* ThreeColumnLayout sets --col-t / --col-c on .cols-row and data-sized once a width has
-   been dragged. They are read ONLY inside the wide container query, so stacked columns
-   never carry a width, and the handles do not exist (or show) below it either. */
-.col-handle,
-.col-pill,
-.col-rail {
-  display: none;
+/* ---- Panel handles and tab strips ---------------------------------------- */
+/* A thin hit area between two areas, with a 2px line drawn in it on hover and focus. */
+.panel-handle {
+  position: relative;
+  touch-action: none;
+  border-radius: 5px;
 }
-
-@container (min-width: 840px) {
-  .cols-row {
-    height: 100%;
-    flex-wrap: nowrap;
-  }
-  .cols-side {
-    max-height: none;
-    max-width: 400px;
-  }
-  .cols-transcript {
-    flex-basis: 240px;
-  }
-  .cols-clips {
-    max-width: 360px;
-    flex-basis: 220px;
-  }
-  .cols-centre {
-    order: 0;
-    min-height: 0;
-    overflow-y: auto;
-  }
-  /* Resizable side columns (see the note above this block). */
-  .cols-row[data-sized] .cols-transcript {
-    flex: 0 0 var(--col-t);
-    max-width: none;
-  }
-  .cols-row[data-sized] .cols-clips {
-    flex: 0 0 var(--col-c);
-    max-width: none;
-  }
-  /* A 12px hit area centred in the 8px gap, with a 2px line drawn in it. */
-  .col-handle {
-    display: block;
-    position: absolute;
-    top: 8px;
-    bottom: 8px;
-    width: 12px;
-    cursor: col-resize;
-    touch-action: none;
-    border-radius: 5px;
-    z-index: 1;
-  }
-  .col-handle::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 5px;
-    width: 2px;
-    border-radius: 1px;
-    background: transparent;
-  }
-  .col-handle:hover::after,
-  .col-handle:focus-visible::after {
-    background: var(--c-hairline-strong);
-  }
-  .col-handle:active::after {
-    background: var(--accent);
-  }
-  .col-handle:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 0;
-  }
-  .col-handle-transcript {
-    left: calc(8px + var(--col-t) + 4px - 6px);
-  }
-  .col-handle-clips {
-    right: calc(8px + var(--col-c) + 4px - 6px);
-  }
-  /* Hide / show. A hidden column is display:none (out of the tab order too) and a slim
-     labelled rail takes its place, so the way back is always visible and says what it
-     reopens. 32px = RAIL_PX in columnSizes.ts. The centre grows into the freed width. */
-  .cols-row[data-hide-transcript] .cols-transcript,
-  .cols-row[data-hide-clips] .cols-clips {
-    display: none;
-  }
-  .col-rail {
-    display: flex;
-    flex: 0 0 32px;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 0;
-    min-height: 0;
-    color: var(--c-fg-dim);
-    cursor: pointer;
-  }
-  .col-rail:hover {
-    background: var(--c-hover);
-    color: var(--c-fg);
-  }
-  .col-rail:focus-visible,
-  .col-pill:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 0;
-    color: var(--c-fg);
-  }
-  .col-rail-label {
-    writing-mode: vertical-rl;
-    font-size: 12px;
-    letter-spacing: 0.04em;
-  }
-  .col-pill {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 16px;
-    width: 16px;
-    height: 32px;
-    padding: 0;
-    z-index: 2;
-    cursor: pointer;
-    color: var(--c-fg-dim);
-    background: var(--c-raised);
-    border: 1px solid var(--c-hairline-strong);
-    border-radius: 5px;
-  }
-  .col-pill:hover {
-    background: var(--c-hover);
-    color: var(--c-fg);
-  }
-  .col-pill-transcript {
-    left: calc(8px + var(--col-t) + 4px - 8px);
-  }
-  .col-pill-clips {
-    right: calc(8px + var(--col-c) + 4px - 8px);
-  }
+.panel-handle::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  border-radius: 1px;
 }
-@container (min-width: 1040px) {
-  .cols-transcript {
-    flex-basis: 280px;
-  }
-  .cols-clips {
-    flex-basis: 260px;
-  }
+.panel-handle-v::after {
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+}
+.panel-handle-h::after {
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 2px;
+}
+.panel-handle:hover::after,
+.panel-handle:focus-visible::after {
+  background: var(--c-hairline-strong);
+}
+.panel-handle:active::after {
+  background: var(--ice);
+}
+.panel-handle:focus-visible {
+  outline: 2px solid var(--ice);
+  outline-offset: 0;
+}
+/* Tabs scroll sideways with no scrollbar; a fade shows on a side that has hidden tabs. */
+.tab-fade {
+  background: linear-gradient(to right, var(--c-panel), transparent);
+}
+.tab-fade-end {
+  background: linear-gradient(to left, var(--c-panel), transparent);
 }

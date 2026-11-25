@@ -5,7 +5,7 @@
  *   z-indexes the product actually uses; the live click is verified in the audit harness.
  */
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -42,15 +42,11 @@ test("F-3: the help button is drawn above every other z-index in the app", () =>
   assert.ok(HELP_BUTTON_Z > highest, `help button z ${HELP_BUTTON_Z} must exceed ${highest}`);
 });
 
-test("F-3: Symbols, Copy blocks and Help are all the one centred dialog, not three shapes", () => {
-  // They were a right-edge drawer plus two panels pinned under the header, which needed
-  // clearance maths between them to avoid overlapping. One shape removes that whole class
-  // of bug, so the rule worth protecting is that none of them grows its own overlay again.
-  for (const f of ["features/handoff/components/SymbolPalette.tsx", "features/handoff/components/CopyBlocks.tsx", "features/help/components/HelpDrawer.tsx"]) {
-    const src = readFileSync(join(SRC, f), "utf8");
-    assert.match(src, /<CentredDialog\b/, `${f} must render the shared dialog`);
-    assert.doesNotMatch(src, /className="surface-panel fixed/, `${f} must not pin its own panel`);
+test("F-3: Copy blocks and the Symbols palette are gone; Symbols in the browser build uses the shared dialog", () => {
+  for (const f of ["features/handoff/components/SymbolPalette.tsx", "features/handoff/components/CopyBlocks.tsx"]) {
+    assert.equal(existsSync(join(SRC, f)), false, `${f} was replaced by the Transcript Copy menu and the Symbols window`);
   }
+  assert.match(readFileSync(join(SRC, "features/symbols/components/SymbolsDialog.tsx"), "utf8"), /<CentredDialog\b/);
 });
 
 test("F-3: the dialog layer is above the app and below the spotlight", () => {
@@ -58,18 +54,21 @@ test("F-3: the dialog layer is above the app and below the spotlight", () => {
   assert.ok(dialog > 50 && dialog < 60, `dialog z ${dialog}`);
 });
 
-test("F-3: Help stays non-modal, or its own tutorials become impossible to follow", () => {
-  // A help step spotlights a real control and asks the user to press it. A scrim over the
-  // app would swallow that click, so Help must never become modal.
+test("F-3: Help is a drawer that blocks nothing, never a dialog with a scrim", () => {
   const help = readFileSync(join(SRC, "features/help/components/HelpDrawer.tsx"), "utf8");
-  assert.match(help, /modal=\{false\}/, "Help must pass modal={false}");
+  assert.doesNotMatch(help, /CentredDialog/, "Help must not become modal");
+  assert.match(help, /<Drawer label="Help">/);
 });
 
-test("F-3: the slot stays in the header layout and the button keeps its id", () => {
+test("F-1: the button renders in place, in the top bar's own tab order, and is portalled only while a layer covers the app", () => {
   const html = renderToStaticMarkup(createElement(HelpButton, { open: false, onToggle: () => {} }));
-  assert.match(html, /aria-hidden="true"/);
-  assert.match(html, /class="icon-btn[^"]*"/);
+  assert.match(html, /<button[^>]*id="ui-help-button"/, "the live button is in the markup where the top bar puts it");
+  assert.doesNotMatch(html, /<span[^>]*aria-hidden="true"/, "no hidden placeholder while nothing covers the app");
   const src = readFileSync(join(SRC, "features/help/components/HelpButton.tsx"), "utf8");
-  assert.match(src, /createPortal\(/);
+  assert.match(src, /covered && slot/, "the portal is for the covered case only");
+  assert.match(src, /data-covers-app/);
   assert.match(src, /id="ui-help-button"/);
+  for (const f of ["shared/components/CentredDialog.tsx", "shared/components/OverlayLoader.tsx"]) {
+    assert.match(readFileSync(join(SRC, f), "utf8"), /data-covers-app/, `${f} marks itself as covering the app`);
+  }
 });

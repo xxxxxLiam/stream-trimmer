@@ -24,6 +24,7 @@ export type ParsedClip = {
   segments: Segment[];
   category?: string;
   tier?: string;
+  rating?: number;
   note?: string;
 };
 

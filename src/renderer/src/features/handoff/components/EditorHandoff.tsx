@@ -25,7 +25,7 @@ import {
   FRAME_RATE_CHOICES,
   buildSessionFcpxml,
   libraryLocation,
-  resolveEventName,
+  importLayout,
   resolveProjectNames,
   type AfterCutting,
   type FcpxmlProject,
@@ -34,9 +34,11 @@ import {
   type RawProbe,
   type SessionClip,
 } from "../../../shared/utils/fcpxml";
-import { mergeSessionClips, sessionCampaignKey, writeClipboard } from "../../../shared/utils/handoff";
-import { parseLook } from "../utils/look";
-import LookEditor from "./LookEditor";
+import { writeClipboard } from "../../../shared/utils/handoff";
+import { parseLook } from "../../../../../common/utils/fcpLook";
+import { normalizeCampaigns } from "../../../shared/utils/campaigns";
+import { KEY_LOOK_MIGRATED, loadSavedLooks, lookForCampaign } from "../../../shared/utils/fcpLooks";
+import { readSetting } from "../../../shared/utils/persist";
 
 type Result = { ok: boolean; error?: string; missing?: string; path?: string };
 
@@ -45,7 +47,7 @@ export interface EditorBridge {
   installed: () => Promise<{ ok: boolean; apps?: { finalcut: boolean; premiere: boolean; capcut: boolean } }>;
   probe: (file: string) => Promise<({ ok: true } & RawProbe) | { ok: false; error: string }>;
   writeFcpxml: (p: { dirPath: string; filename: string; contents: string }) => Promise<Result>;
-  openWith: (p: { app: "finalcut" | "capcut"; file?: string }) => Promise<Result>;
+  openWith: (p: { app: "finalcut" | "premiere" | "resolve" | "capcut"; file?: string }) => Promise<Result & { shown?: boolean }>;
   /**
    * Whether a directory exists at this absolute path (needs `editor:pathExists`
    * in electron/editorOpen.ts). Absent bridge method: a library cannot be
@@ -93,9 +95,9 @@ function useNextProjectName(): string {
 /** The project block for the document, or undefined when no project is wanted. */
 export function projectOptions(
   settings: EditorHandoffSettings,
-  ctx: { campaignName?: string; sourceTitle?: string },
+  ctx: { campaignId?: string | null; campaignName?: string; sourceTitle?: string },
 ): FcpxmlProject | undefined {
-  const eventName = resolveEventName({ from: "source", campaignName: ctx.campaignName, sourceTitle: ctx.sourceTitle });
+  const { eventName } = importLayout(settings, ctx);
   if (!eventName) return undefined;
   return {
     eventName,
@@ -103,10 +105,20 @@ export function projectOptions(
     timeline: settings.timelineFormat,
     campaignName: ctx.campaignName,
     sourceTitle: ctx.sourceTitle,
-    // parseLook throws a plain-words error when the pasted export is unusable;
-    // the caller's try/catch turns that into a failed outcome.
-    ...(settings.applyLook ? { look: parseLook(settings.lookXml ?? "") } : {}),
+    // The campaign's saved look (see fcpLooks.ts). The caller's try/catch turns a plain-words
+    // error into a failed outcome.
+    ...(lookForCampaignId(ctx.campaignId, settings) ? { look: lookForCampaignId(ctx.campaignId, settings) } : {}),
   };
+}
+
+function lookForCampaignId(campaignId: string | null | undefined, settings: EditorHandoffSettings) {
+  const campaign = normalizeCampaigns(readSetting<unknown>("clipper.campaigns", [])).find((c) => c.id === campaignId);
+  // Before the one-time move, the old single pasted look still applies. A look that cannot be read
+  // throws its plain-words error.
+  if (!readSetting<boolean>(KEY_LOOK_MIGRATED, false)) {
+    return settings.applyLook && settings.lookXml ? parseLook(settings.lookXml) : undefined;
+  }
+  return lookForCampaign(campaign, loadSavedLooks());
 }
 
 export interface HandoffContext {
@@ -128,6 +140,9 @@ export interface HandoffOutcome {
   /** Clips left out of the file, with the reason each. */
   skipped?: { id: string; reason: string }[];
   path?: string;
+  /** The clip this send was for, so a failure can be shown on that clip's Export row. */
+  clipId?: string;
+  clipPath?: string;
 }
 
 /** Probe, build ONE document for `ctx.clips`, write it, optionally open it. */
@@ -144,11 +159,7 @@ export async function exportFcpxml(
   if (ctx.clips.length === 0) {
     return { ok: false, message: "No clips yet. Cut one, then send it." };
   }
-  const eventName = resolveEventName({
-    from: "source",
-    campaignName: ctx.campaignName,
-    sourceTitle: ctx.sourceTitle,
-  });
+  const { eventName } = importLayout(settings ?? {}, ctx);
   return exportNamed(api, ctx, eventName, openWith, settings);
 }
 
@@ -160,9 +171,16 @@ async function exportNamed(
   settings?: EditorHandoffSettings,
 ): Promise<HandoffOutcome> {
   const structured = settings;
-  const clips = ctx.clips.map((c) =>
-    typedProjectNames.has(c.id) ? { ...c, projectName: typedProjectNames.get(c.id) } : c,
-  );
+  // With a layout, the campaign's own Event field names the event ("Export" when blank). The video
+  // being open must not decide it: clips from other videos would land under this one.
+  const layout = structured?.layout;
+  const campaignEvent = layout ? structured?.mediaEvent ?? "" : eventName;
+  // Without a layout, each clip carries the keyword the old layout gives its source video.
+  const keyword = layout ? "" : importLayout(structured ?? {}, ctx).keyword;
+  const clips = ctx.clips.map((c) => {
+    const withTitle = layout ? { ...c, sourceTitle: c.sourceTitle ?? ctx.sourceTitle } : { ...c, keyword: c.keyword ?? keyword };
+    return typedProjectNames.has(c.id) ? { ...withTitle, projectName: typedProjectNames.get(c.id) } : withTitle;
+  });
   let built;
   try {
     const library = structured?.fcpLibrary.trim() || undefined;
@@ -174,13 +192,13 @@ async function exportNamed(
     };
     built = await buildSessionFcpxml(
       clips,
-      eventName,
+      campaignEvent,
       async (file) => {
         const r = await api.probe(file);
         if (!r.ok) throw new Error(r.error);
         return r;
       },
-      { library, libraryExists, project: structured ? projectOptions(structured, ctx) : undefined },
+      { library, libraryExists, layout, project: structured ? projectOptions(structured, ctx) : undefined },
     );
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) };
@@ -221,9 +239,16 @@ async function exportNamed(
  * `runAfterCutting` without anywhere to put its answer, so the answer is kept
  * here and the panel shows it, the same way it shows its own buttons' results.
  */
-let lastAuto: { outcome: HandoffOutcome; campaignId: string | null } | null = null;
+export type AfterCuttingAnswer = {
+  outcome: HandoffOutcome;
+  campaignId: string | null;
+  /** What it ran with, so "Send to another editor" can send the same clip again. */
+  ctx: HandoffContext;
+  settings: EditorHandoffSettings;
+};
+let lastAuto: AfterCuttingAnswer | null = null;
 const autoListeners = new Set<() => void>();
-export function getAfterCuttingOutcome(): { outcome: HandoffOutcome; campaignId: string | null } | null {
+export function getAfterCuttingOutcome(): AfterCuttingAnswer | null {
   return lastAuto;
 }
 export function subscribeAfterCutting(l: () => void): () => void {
@@ -232,32 +257,27 @@ export function subscribeAfterCutting(l: () => void): () => void {
     autoListeners.delete(l);
   };
 }
-function publishAuto(outcome: HandoffOutcome | null, campaignId: string | null): void {
+function publishAuto(outcome: HandoffOutcome | null, ctx: HandoffContext, settings: EditorHandoffSettings): void {
   if (!outcome) return;
-  lastAuto = { outcome, campaignId };
+  const last = ctx.clips[ctx.clips.length - 1];
+  lastAuto = {
+    outcome: { ...outcome, clipId: outcome.clipId ?? last?.id, clipPath: outcome.clipPath ?? last?.path },
+    campaignId: ctx.campaignId,
+    ctx,
+    settings,
+  };
   autoListeners.forEach((l) => l());
 }
 
-/**
- * Every clip cut this session, newest version of an id wins. Each cut calls `runAfterCutting`
- * with only its own clip; the document for the session has to hold all of them or the next send
- * would replace the file with a one-clip version.
- *
- * A batch belongs to exactly one CAMPAIGN (then the folder it is written to). The folder alone
- * is not an identity: a new campaign inherits the previous one's clips folder, so a batch keyed
- * by folder carried one client's clips into another client's Final Cut document.
- */
-const sessionBatch = new Map<string, SessionClip[]>();
-function rememberClips(ctx: HandoffContext): SessionClip[] {
-  const key = `${sessionCampaignKey(ctx.campaignId)}\u0001${ctx.clipsDir ?? ""}`;
-  const next = mergeSessionClips(sessionBatch.get(key) ?? [], ctx.clips);
-  sessionBatch.set(key, next);
-  return next;
+/** The Export row has shown the answer (or a new clip started): forget it. */
+export function clearAfterCuttingOutcome(): void {
+  if (!lastAuto) return;
+  lastAuto = null;
+  autoListeners.forEach((l) => l());
 }
 
 /** Forget every campaign's session clips and the last automatic outcome (tests; nothing in the app needs it). */
 export function resetSessionHandoff(): void {
-  sessionBatch.clear();
   lastAuto = null;
   autoListeners.forEach((l) => l());
 }
@@ -272,21 +292,19 @@ export async function runAfterCutting(
   settings: EditorHandoffSettings,
   ctx: HandoffContext,
 ): Promise<HandoffOutcome | null> {
-  const batch = rememberClips(ctx);
   let outcome: HandoffOutcome | null;
   try {
-    outcome = await runAfterCuttingInner(settings, ctx, batch);
+    outcome = await runAfterCuttingInner(settings, ctx);
   } catch (err) {
     outcome = { ok: false, message: err instanceof Error ? err.message : String(err) };
   }
-  publishAuto(outcome, ctx.campaignId);
+  publishAuto(outcome, ctx, settings);
   return outcome;
 }
 
 async function runAfterCuttingInner(
   settings: EditorHandoffSettings,
   ctx: HandoffContext,
-  batch: SessionClip[],
 ): Promise<HandoffOutcome | null> {
   const api = bridge();
   const notes: string[] = [];
@@ -304,12 +322,14 @@ async function runAfterCuttingInner(
     }
   } else if (settings.afterCutting === "finalcut") {
     if (!api) return { ok: false, message: NEEDS_DESKTOP };
-    const eventName = resolveEventName({
-      from: "source",
-      campaignName: ctx.campaignName,
-      sourceTitle: ctx.sourceTitle,
-    });
-    outcome = await exportNamed(api, { ...ctx, clips: batch }, eventName, settings.afterCutting, settings);
+    const { eventName } = importLayout(settings, ctx);
+    outcome = await exportNamed(api, ctx, eventName, settings.afterCutting, settings);
+  }
+  if (api && settings.openIn && justSaved) {
+    // The editor chosen in the Clip menu opens with the saved clip; where it can't take it, the
+    // file is shown in the folder instead.
+    const r = await api.openWith({ app: settings.openIn, file: justSaved.path });
+    outcome = { ok: r.ok, message: r.ok ? (r.shown ? "Opened the editor and showed the clip." : "Opened the editor.") : r.error ?? "The editor would not open." };
   }
   if (api && settings.capcutDropDir && ctx.clips.length > 0) {
     const r = await api.copyFiles({ dirPath: settings.capcutDropDir, files: ctx.clips.map((c) => c.path) });
@@ -345,7 +365,7 @@ const OPTIONS: { value: AfterCutting; label: string }[] = [
   { value: "finalcut", label: "Send to Final Cut Pro" },
 ];
 
-type SectionId = "library" | "projects" | "look" | "capcut";
+type SectionId = "library" | "projects" | "capcut";
 
 /** Last path segment, for a one-line summary of a long path. */
 function baseName(path: string): string {
@@ -354,18 +374,6 @@ function baseName(path: string): string {
     return decodeURIComponent(last);
   } catch {
     return last;
-  }
-}
-
-/** What "my look" is set to, and what is wrong with it if anything. */
-function describeLook(settings: EditorHandoffSettings): { summary: string; problem: string } {
-  if (!settings.applyLook) return { summary: "Off", problem: "" };
-  try {
-    const look = parseLook(settings.lookXml ?? "");
-    return { summary: look.found.length > 0 ? look.found.join(", ") : "On", problem: "" };
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    return { summary: "Needs attention", problem: `My look: ${why}` };
   }
 }
 
@@ -460,7 +468,7 @@ export default function EditorHandoff({
     };
   }, [open]);
   const ctx: HandoffContext = { campaignId, campaignName, sourceTitle, clipsDir, clips };
-  const eventName = resolveEventName({ from: "source", campaignName, sourceTitle });
+  const { eventName } = importLayout(settings, { campaignName, sourceTitle });
   const nextName = useNextProjectName();
   const libraryText = settings.fcpLibrary.trim();
   let libraryProblem = "";
@@ -472,8 +480,7 @@ export default function EditorHandoff({
       libraryProblem = "The library path must be the full path, starting with /.";
     }
   }
-  const look = describeLook(settings);
-  const problems = [libraryProblem, look.problem].filter(Boolean);
+  const problems = [libraryProblem].filter(Boolean);
   const previewNames = resolveProjectNames(clips.slice(-3), {
     namePattern: settings.projectNamePattern,
     campaignName,
@@ -554,7 +561,7 @@ export default function EditorHandoff({
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
-          className="surface-panel fixed left-1/2 top-1/2 z-[60] flex max-h-[calc(100%_-_32px)] w-[min(560px,calc(100%_-_32px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-6 overflow-y-auto rounded-panel border border-hairline p-6 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
+          className="surface-panel fixed left-1/2 top-1/2 z-[60] flex max-h-[calc(100%_-_32px)] w-[min(560px,calc(100%_-_32px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-6 overflow-y-auto rounded-panel border border-hairline p-6 shadow-[0_0_0_9999px_var(--bg-overlay-60)]"
         >
           <div className="flex items-center gap-3">
             <h2 id={titleId} className="text-section m-0 min-w-0 flex-1 font-medium text-fg">
@@ -798,15 +805,6 @@ export default function EditorHandoff({
                   </select>
                 </label>
               </div>
-            </Section>
-            <Section
-              panelId={`${titleId}-look`}
-              title="My look"
-              summary={look.summary}
-              open={section === "look"}
-              onToggle={() => toggle("look")}
-            >
-              <LookEditor settings={settings} onChange={set} />
             </Section>
             <Section
               panelId={`${titleId}-capcut`}

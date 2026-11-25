@@ -104,6 +104,15 @@ test("a separate video+audio pair is preferred over a pre-merged stream", async 
   assert.equal(tiers[tiers.length - 1], "best");
 });
 
+test("best stops at 1080p: every tier before the last resort is capped, so a 4K source is not fetched at 2160p", async (t) => {
+  const harness = await startHarness();
+  t.after(() => harness.stop());
+
+  const tiers = String((await execOptions(harness, "best")).format).split("/");
+  for (const tier of tiers.slice(0, -1)) assert.match(tier, /\[height<=1080\]/, tier);
+  assert.equal(tiers[tiers.length - 1], "best");
+});
+
 test("the audio ladder does not demand HLS either", async (t) => {
   const harness = await startHarness();
   t.after(() => harness.stop());

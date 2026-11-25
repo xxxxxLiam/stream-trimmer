@@ -38,6 +38,7 @@ export default function OverlayLoader({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.12 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/70 backdrop-blur-md"
+          data-covers-app=""
           role="status"
           aria-live="polite"
         >

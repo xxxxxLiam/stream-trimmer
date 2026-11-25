@@ -55,3 +55,27 @@ test("B-8: a closed tab goes back where it was, with its work, and only once", (
   assert.deepEqual(back[1].segments, [{ start: 1, end: 2 }]);
   assert.equal(reinsertTab(back, closed), back);
 });
+
+test("a video folded into Done stays Done across a relaunch", () => {
+  const parsed = parsePersisted(
+    JSON.parse(JSON.stringify({ tabs: [{ id: "a", name: "", done: true }, { id: "b", name: "" }], activeId: "b" })),
+  );
+  assert.equal(parsed?.tabs[0].done, true);
+  assert.equal(parsed?.tabs[1].done, undefined);
+});
+
+test("B-11: the picked In and Out are saved with the video and survive a relaunch", () => {
+  const tabs: WorkspaceTab[] = [{ id: "a", name: "" }];
+  const saved = applyTabWork(tabs, "a", {
+    url: "https://www.youtube.com/watch?v=AAA",
+    segments: [],
+    picked: { start: "1:12:04", end: "1:12:46" },
+  });
+  assert.deepEqual(saved[0].picked, { start: "1:12:04", end: "1:12:46" });
+  const back = parsePersisted(JSON.parse(JSON.stringify({ tabs: saved, activeId: "a" })));
+  assert.ok(back);
+  assert.deepEqual(back.tabs[0].picked, { start: "1:12:04", end: "1:12:46" });
+  // Nothing picked clears it again.
+  const cleared = applyTabWork(saved, "a", { url: "https://www.youtube.com/watch?v=AAA", segments: [], picked: { start: "", end: "" } });
+  assert.equal(cleared[0].picked, undefined);
+});

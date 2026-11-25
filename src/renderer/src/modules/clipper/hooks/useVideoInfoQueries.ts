@@ -4,7 +4,7 @@
  * Description: Loads video info for the pasted link, automatically (debounced) or on demand.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MAX_CLIP_SECONDS, formatTimestamp, normalizeYouTubeUrl, parseJson, apiUrl, type VideoInfo } from "../../../shared/utils/clip";
+import { normalizeYouTubeUrl, parseJson, apiUrl, type VideoInfo } from "../../../shared/utils/clip";
 import { videoUrlProblem } from "../utils/downloadErrors";
 import { cookiePayload } from "../../../shared/utils/youtubeConnection";
 
@@ -52,7 +52,8 @@ export function useVideoInfoQueries({
       if (!res.ok) throw new Error(data.error || "Failed to load video info");
       setInfo(data);
       setStartText("");
-      setEndText(formatTimestamp(Math.min(data.duration, MAX_CLIP_SECONDS)));
+      // Nothing is picked on a fresh video: the first clip starts with an empty Source lane.
+      setEndText("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load video info");
       setInfo(null);

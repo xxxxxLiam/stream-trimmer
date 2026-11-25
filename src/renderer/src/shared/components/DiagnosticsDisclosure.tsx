@@ -33,7 +33,12 @@ export function CopyFailureDiagnostics({
   message,
   attempt,
   diagnostics,
+  label = "Copy diagnostics",
+  pill,
 }: {
+  label?: string;
+  /** The Export row's quiet pill (board 03.6.3): a 44px hit area around a 28px pill. */
+  pill?: { name: string; className: string; pillClassName: string };
   code?: string;
   message: string;
   attempt?: FailureAttempt;
@@ -61,6 +66,14 @@ export function CopyFailureDiagnostics({
     timer.current = window.setTimeout(() => setState("idle"), res.ok ? CONFIRM_MS : 4000);
   };
 
+  if (pill) {
+    return (
+      <button type="button" aria-label={`Copy details for ${pill.name}`} className={pill.className} onClick={() => void copy()}>
+        <span className={pill.pillClassName}>{state === "copied" ? "Copied" : state === "failed" ? "Could not copy" : "Copy details"}</span>
+      </button>
+    );
+  }
+
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <button
@@ -70,7 +83,7 @@ export function CopyFailureDiagnostics({
         style={state === "copied" ? { borderColor: "var(--accent)" } : undefined}
       >
         <Clipboard size={12} />
-        {state === "copied" ? "Copied" : "Copy diagnostics"}
+        {state === "copied" ? "Copied" : label}
       </button>
       {state === "failed" ? (
         <span role="status" className="text-meta text-fg-dim">

@@ -1,0 +1,22 @@
+{
+ "_doc": "The video has ended: the end card over the picture (Main05EndOfVideo). Use with --window 0; PreviewEndEl is the same state cropped to the preview panel, for --el.",
+ "extends": "Preview",
+ "initGlobals": {
+  "__fakeYT": {
+   "start": 8073,
+   "ended": true
+  }
+ },
+ "mask": [],
+ "steps": [
+  {
+   "wait": 2000
+  },
+  {
+   "eval": "document.activeElement && document.activeElement.blur()"
+  },
+  {
+   "wait": 300
+  }
+ ]
+}

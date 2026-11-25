@@ -39,6 +39,10 @@ try {
       }
     })(),
     setSetting: (key: unknown, value: unknown) => ipcRenderer.invoke(IPC.settingsSet, key, value),
+    // Send report (crash screen) and Report a problem (Help): { kind, note?, error }. Kept for a later launch if the relay is unreachable.
+    sendReport: (payload: unknown) => ipcRenderer.invoke(IPC.reportSend, payload),
+    // ISO time of the copy this launch restored the settings from, or null.
+    settingsRestoredAt: () => ipcRenderer.invoke(IPC.settingsRestoredAt),
     pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.
@@ -53,6 +57,7 @@ try {
     saveExport: (payload: unknown) => ipcRenderer.invoke(IPC.exportSave, payload),
     showInFolder: (targetPath: unknown) =>
       ipcRenderer.invoke(IPC.fileShowInFolder, targetPath),
+    undoClip: (targetPath: unknown) => ipcRenderer.invoke(IPC.fileUndoClip, targetPath),
     fileExists: (targetPath: unknown) => ipcRenderer.invoke(IPC.fileExists, targetPath),
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.
@@ -73,6 +78,11 @@ try {
     // Owner gate. Main hashes the local machine id with the supplied salt and
     // answers with a boolean only; the raw id never crosses the bridge.
     isOwnerMachine: (list: unknown, salt: unknown) => ipcRenderer.invoke(IPC.ownerCheck, list, salt),
+    // Suggested clip names, offline: prepare once per transcript, then suggest per range.
+    clipNames: {
+      prepare: (payload: unknown) => ipcRenderer.invoke(IPC.clipNamesPrepare, payload),
+      suggest: (payload: unknown) => ipcRenderer.invoke(IPC.clipNamesSuggest, payload),
+    },
     // Editor handoff (electron/editorOpen.ts). Paths and small payloads only.
     editor: {
       installed: () => ipcRenderer.invoke(IPC.editorInstalled),
@@ -90,11 +100,29 @@ try {
     // Secondary route: opens YouTube in the user's own browser, so yt-dlp can
     // be pointed at that browser's cookie store instead of an imported file.
     openYouTubeSignIn: () => ipcRenderer.invoke(IPC.shellOpenYouTubeSignIn),
+    openSymbols: () => ipcRenderer.invoke(IPC.symbolsOpen),
     getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
     getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 
+    pickFinalCutLook: () => ipcRenderer.invoke(IPC.fcpLookPick),
+    // A file or .fcpxmld bundle dropped on the window: its path is read here, the text is read in main.
+    readFinalCutLook: (file: File) => ipcRenderer.invoke(IPC.fcpLookRead, electron.webUtils.getPathForFile(file)),
+    getSignInSignal: () => ipcRenderer.invoke(IPC.signInStatus),
+    reportBrowserSignIn: (usable: boolean) => ipcRenderer.invoke(IPC.signInReportBrowser, usable),
+    onSignInSignal: (cb: (payload: unknown) => void) => {
+      const listener = (_e: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on(IPC.signInSignal, listener);
+      return () => ipcRenderer.removeListener(IPC.signInSignal, listener);
+    },
+
     checkForUpdates: () => ipcRenderer.invoke(IPC.updaterCheck),
-    quitAndInstall: () => ipcRenderer.invoke(IPC.updaterQuitAndInstall),
+    restartToUpdate: () => ipcRenderer.invoke(IPC.updaterRestartToUpdate),
+    getUpdateReady: () => ipcRenderer.invoke(IPC.updaterReadyNow),
+    onUpdateReady: (cb: (payload: unknown) => void) => {
+      const listener = (_e: unknown, payload: unknown) => cb(payload);
+      ipcRenderer.on(IPC.updaterReady, listener);
+      return () => ipcRenderer.removeListener(IPC.updaterReady, listener);
+    },
     onUpdateStatus: (cb: (payload: unknown) => void) => {
       const listener = (_e: unknown, payload: unknown) => cb(payload);
       ipcRenderer.on(IPC.updaterStatus, listener);

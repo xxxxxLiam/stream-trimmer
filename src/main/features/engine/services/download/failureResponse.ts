@@ -12,6 +12,8 @@ import { CancelledError } from "../downloadJobs";
 import { publishProgress } from "../progressChannel";
 import { buildRunDiagnostics } from "../runDiagnostics";
 import { cookieErrorMessage, fullErrMessage, isCookieError, logYtError, sendFailure } from "../../utils/errors";
+import { RETRY_SPENT } from "./toolRetry";
+import { rowStateFor } from "../../../../../common/types/clipRowState";
 import { DownloadCtx } from "./jobContext";
 import { Runner } from "./progressRunner";
 import { Workspace } from "./workspace";
@@ -69,10 +71,13 @@ export function handleFailure(ctx: DownloadCtx, ws: Workspace, runner: Runner, e
         failure = refusedFailure(tail);
       }
     }
+    // After the one tool-update retry a second failure is final (Copy details shows).
+    const row = rowStateFor(failure, { retried: (e as Record<string, unknown> | null)?.[RETRY_SPENT] === true });
     publishProgress(jobId, {
       phase: "error",
       percent: 0,
       message: failure.error,
+      row,
     });
-    sendFailure(res, failure, { diagnostics });
+    sendFailure(res, failure, { diagnostics, row });
 }

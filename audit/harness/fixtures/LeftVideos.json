@@ -1,0 +1,285 @@
+{
+ "_doc": "Left panel on the Videos tab, board 03.2.1 sample data.",
+ "seed": {
+  "clipper.dataDirConfirmed": true,
+  "clipper.campaigns": [
+   {
+    "id": "acme",
+    "name": "Acme",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "ACM",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/tmp/Clips/Acme",
+    "dataDir": "/tmp/Data/Acme",
+    "usedRanges": {
+     "podcast214": [
+      {
+       "start": 482,
+       "end": 515,
+       "clipId": "ACM-podcast214-01",
+       "at": "$NOW"
+      },
+      {
+       "start": 900,
+       "end": 940,
+       "clipId": "ACM-podcast214-02",
+       "at": "$NOW"
+      }
+     ]
+    },
+    "dailyQuota": 3
+   },
+   {
+    "id": "nova",
+    "name": "Nova",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "NOV",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/tmp/Clips/Nova",
+    "dataDir": "/tmp/Data/Nova",
+    "usedRanges": {},
+    "dailyQuota": 2
+   }
+  ],
+  "clipper.activeCampaign": "acme",
+  "clipper.workspaces": {
+   "activeId": "ws_a",
+   "tabs": [
+    {
+     "id": "ws_a",
+     "name": "Podcast #214, the long talk",
+     "url": "https://www.youtube.com/watch?v=podcast214",
+     "campaignId": "acme",
+     "segments": [
+      {
+       "start": 4324,
+       "end": 4366
+      }
+     ]
+    },
+    {
+     "id": "ws_b",
+     "name": "Founder story, part 2",
+     "url": "https://www.youtube.com/watch?v=founder2",
+     "campaignId": "acme"
+    },
+    {
+     "id": "ws_c",
+     "name": "Q3 town hall",
+     "url": "https://www.youtube.com/watch?v=townhall",
+     "campaignId": "nova"
+    },
+    {
+     "id": "ws_d0",
+     "name": "Pricing AMA",
+     "url": "https://www.youtube.com/watch?v=done0",
+     "campaignId": "acme",
+     "done": true
+    },
+    {
+     "id": "ws_d1",
+     "name": "Launch recap",
+     "url": "https://www.youtube.com/watch?v=done1",
+     "campaignId": "nova",
+     "done": true
+    },
+    {
+     "id": "ws_d2",
+     "name": "Roadmap Q&A",
+     "url": "https://www.youtube.com/watch?v=done2",
+     "campaignId": "nova",
+     "done": true
+    },
+    {
+     "id": "ws_d3",
+     "name": "Hiring panel",
+     "url": "https://www.youtube.com/watch?v=done3",
+     "campaignId": "nova",
+     "done": true
+    }
+   ]
+  },
+  "clipper.bank": {
+   "acme": {
+    "podcast214": [
+     {
+      "id": "b1",
+      "label": "Honest Version",
+      "segments": [
+       {
+        "start": 4324,
+        "end": 4366
+       }
+      ],
+      "status": "banked",
+      "category": "Money",
+      "tier": "T1",
+      "rating": 9.1
+     },
+     {
+      "id": "b2",
+      "label": "Big Deal",
+      "segments": [
+       {
+        "start": 2470,
+        "end": 2511
+       }
+      ],
+      "status": "banked",
+      "category": "Hustle",
+      "tier": "T2",
+      "rating": 8.4
+     },
+     {
+      "id": "b3",
+      "label": "Hot Take",
+      "segments": [
+       {
+        "start": 482,
+        "end": 515
+       }
+      ],
+      "status": "cut",
+      "category": "Money",
+      "tier": "T3",
+      "rating": 7.0
+     }
+    ],
+    "founder2": [
+     {
+      "id": "c1",
+      "label": "",
+      "segments": [
+       {
+        "start": 100,
+        "end": 140
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c2",
+      "label": "",
+      "segments": [
+       {
+        "start": 200,
+        "end": 240
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c3",
+      "label": "",
+      "segments": [
+       {
+        "start": 300,
+        "end": 340
+       }
+      ],
+      "status": "banked"
+     }
+    ]
+   },
+   "nova": {
+    "townhall": [
+     {
+      "id": "c1",
+      "label": "",
+      "segments": [
+       {
+        "start": 100,
+        "end": 140
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c2",
+      "label": "",
+      "segments": [
+       {
+        "start": 200,
+        "end": 240
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c3",
+      "label": "",
+      "segments": [
+       {
+        "start": 300,
+        "end": 340
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c4",
+      "label": "",
+      "segments": [
+       {
+        "start": 400,
+        "end": 440
+       }
+      ],
+      "status": "banked"
+     },
+     {
+      "id": "c5",
+      "label": "",
+      "segments": [
+       {
+        "start": 500,
+        "end": 540
+       }
+      ],
+      "status": "banked"
+     }
+    ]
+   }
+  },
+  "clipper.signInSkipped": true,
+  "clipper.tips.on": false
+ },
+ "stub": {
+  "info": {
+   "id": "podcast214",
+   "title": "Podcast #214, the long talk",
+   "duration": 8073,
+   "uploader": "The Long Talk"
+  },
+  "vttFile": "podcast214-board.vtt",
+  "exitCode": 0,
+  "progress": [
+   0,
+   50,
+   100
+  ],
+  "writeMedia": true
+ },
+ "waitFor": "#root *",
+ "steps": [
+  {
+   "wait": 1500
+  }
+ ],
+ "mask": [
+  {
+   "x": 330,
+   "y": 97,
+   "width": 700,
+   "height": 313
+  }
+ ]
+}

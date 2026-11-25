@@ -5,12 +5,14 @@
  *   because the preload reads the settings snapshot synchronously while the
  *   window is being created.
  */
+import { registerClipNamesHandlers } from "./clipNamesHandlers";
 import { registerDialogHandlers } from "./dialogHandlers";
 import { registerDiagnosticsHandlers } from "./diagnosticsHandlers";
 import { registerEditorHandlers } from "./editorHandlers";
 import { registerExportHandlers } from "./exportHandlers";
 import { registerFilesHandlers } from "./filesHandlers";
 import { registerOwnerHandlers } from "./ownerHandlers";
+import { registerReportHandlers } from "./reportHandlers";
 import { registerSettingsHandlers } from "./settingsHandlers";
 import { registerSystemHandlers } from "./systemHandlers";
 import { registerUpdaterHandlers } from "./updaterHandlers";
@@ -25,6 +27,8 @@ export function registerHandlers() {
   registerYoutubeHandlers();
   registerOwnerHandlers();
   registerEditorHandlers();
+  registerClipNamesHandlers();
   registerDiagnosticsHandlers();
   registerSystemHandlers();
+  registerReportHandlers();
 }

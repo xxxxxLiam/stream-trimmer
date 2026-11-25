@@ -19,6 +19,7 @@ const {
     all: () => Record<string, unknown>;
     set: (key: string, value: unknown) => boolean;
     persist: () => boolean;
+    onChange: (cb: (key: string, value: unknown) => void) => () => boolean;
   };
 } = require("./settingsStore.ts");
 
@@ -72,6 +73,18 @@ test("a removed key stays removed, and corrupt files do not throw", () => {
   store.set("clipper.saveDir", null);
   assert.equal(createSettingsStore(file).load()["clipper.saveDir"], undefined);
 
+  fs.rmSync(`${file}.bak`, { force: true }); // with a good copy it would be restored (settingsSafety.test.ts)
   fs.writeFileSync(file, "{ not json");
   assert.deepEqual(createSettingsStore(file).load(), {});
+});
+
+test("onChange hears each saved write, and stops when asked", () => {
+  const store = createSettingsStore(tempFile());
+  store.load();
+  const heard: unknown[] = [];
+  const stop = store.onChange((key, value) => heard.push([key, value]));
+  store.set("clipper.autoUpdate", false);
+  stop();
+  store.set("clipper.autoUpdate", true);
+  assert.deepEqual(heard, [["clipper.autoUpdate", false]]);
 });

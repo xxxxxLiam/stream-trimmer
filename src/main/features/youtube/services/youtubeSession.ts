@@ -16,12 +16,10 @@ const { app, session } = electron;
 import path from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import { validateCookieText } from "./cookieFile";
-import {
-  isRelevantDomain,
-  parseCookieRows,
-  resolveAuthState,
-} from "./cookieState";
+import { checkCookiesFile, readCookieFile } from "./cookieFile";
+import { resolveAuthState } from "./cookieState";
+import { signIn } from "../../../shared/utils/signInSignal";
+import * as logger from "../../../modules/logger/logger";
 
 // Only ever cleared, never read. See clear().
 const LEGACY_PARTITION = "persist:youtube";
@@ -84,17 +82,8 @@ async function probe() {
  * its own decryption.
  */
 async function importCookieFile(sourcePath: unknown) {
-  try {
-    if (typeof sourcePath !== "string" || !sourcePath) {
-      return { ok: false, error: "No file chosen." };
-    }
-    return await importCookieText(await fsp.readFile(sourcePath, "utf8"));
-  } catch (err: any) {
-    return {
-      ok: false,
-      error: err && err.message ? err.message : "Could not read that file.",
-    };
-  }
+  const read = await readCookieFile(sourcePath, (m) => logger.log("youtube", m));
+  return read.ok ? importCookieText(read.text) : read.refusal;
 }
 
 /**
@@ -108,18 +97,10 @@ async function importCookieFile(sourcePath: unknown) {
 async function importCookieText(text: unknown) {
   try {
     const raw = String(text || "");
-    // A JSON export is the commonest wrong turn: several extensions offer it
-    // beside the Netscape format. Say so rather than "doesn't look right".
-    if (/^\s*[\[{]/.test(raw)) {
-      return {
-        ok: false,
-        kind: "wrong_format",
-        error:
-          "That file is JSON. Export it again and choose the Netscape (cookies.txt) format.",
-      };
-    }
-    const check = validateCookieText(raw);
-    if (!check.ok) return { ok: false, kind: classify(raw), error: check.reason };
+    // One check, four approved reasons (see cookieFile.ts). `error` repeats the
+    // message for callers written before the reasons existed.
+    const check = checkCookiesFile(raw);
+    if (!check.ok) return { ...check, error: check.message };
 
     const target = cookieFilePath();
     const tmp = `${target}.import-${process.pid}-${Date.now()}`;
@@ -134,6 +115,7 @@ async function importCookieText(text: unknown) {
     } catch {
       /* best effort on Windows */
     }
+    signIn.setFileUsable(true);
     return { ok: true, count: check.count };
   } catch (err: any) {
     return {
@@ -141,14 +123,6 @@ async function importCookieText(text: unknown) {
       error: err && err.message ? err.message : "Could not read that file.",
     };
   }
-}
-
-/** Which of the three ways a cookies.txt can be wrong this one is. */
-function classify(text: unknown) {
-  const rows = parseCookieRows(text);
-  if (!String(text || "").trim() || rows.length === 0) return "wrong_format";
-  if (!rows.some((row) => isRelevantDomain(row.domain))) return "no_youtube_cookies";
-  return "signed_out";
 }
 
 async function clear() {
@@ -165,6 +139,7 @@ async function clear() {
   } catch {
     /* ignore */
   }
+  signIn.setFileUsable(false);
   return { ok: true };
 }
 

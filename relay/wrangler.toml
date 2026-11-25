@@ -1,0 +1,5 @@
+# For anyone who prefers the CLI: `npx wrangler deploy` from this folder, then `npx wrangler secret put GITHUB_TOKEN`.
+# The dashboard route (paste relay/dist/worker.js) needs none of this.
+name = "clipr-relay"
+main = "dist/worker.js"
+compatibility_date = "2024-11-01"

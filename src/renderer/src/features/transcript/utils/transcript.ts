@@ -254,6 +254,41 @@ export function snapRange(lines: readonly Line[], a: number, b: number): LineRan
   return snapRangeByIndex(lines, first, last);
 }
 
+/**
+ * The word under a point `frac` (0 to 1) of the way along a line's text, with its times. Uses the
+ * cue's word times when they line up with the words of the text; otherwise spreads the line's time
+ * over its characters.
+ */
+export function wordBoundsAt(line: Line, frac: number): { start: number; end: number } {
+  const spans = [...line.text.matchAll(/\S+/g)].map((m) => ({ from: m.index ?? 0, to: (m.index ?? 0) + m[0].length }));
+  if (spans.length === 0 || !(line.text.length > 0)) return { start: line.start, end: line.end };
+  const pos = Math.min(1, Math.max(0, frac)) * line.text.length;
+  let idx = spans.findIndex((sp) => pos < sp.to);
+  if (idx < 0) idx = spans.length - 1;
+  if (line.words && line.words.length === spans.length) {
+    return { start: line.words[idx].start, end: line.words[idx].end };
+  }
+  const dur = line.end - line.start;
+  return {
+    start: line.start + (spans[idx].from / line.text.length) * dur,
+    end: line.start + (spans[idx].to / line.text.length) * dur,
+  };
+}
+
+export type LinePoint = { line: number; frac: number };
+
+/** A drag from one point to another, snapped to the words at its ends (order does not matter). */
+export function snapRangeToWords(lines: readonly Line[], a: LinePoint, b: LinePoint): { start: number; end: number } | null {
+  if (lines.length === 0) return null;
+  const clampLine = (n: number) => Math.min(Math.max(n, 0), lines.length - 1);
+  const swap = a.line > b.line || (a.line === b.line && a.frac > b.frac);
+  const lo = swap ? b : a;
+  const hi = swap ? a : b;
+  const start = wordBoundsAt(lines[clampLine(lo.line)], lo.frac).start;
+  const end = wordBoundsAt(lines[clampLine(hi.line)], hi.frac).end;
+  return end > start ? { start, end } : null;
+}
+
 export type TimeRange = { start: number; end: number };
 
 /** Does a caption line overlap a used range? Zero-length lines count when their instant is inside. */
@@ -265,4 +300,15 @@ export function lineOverlaps(line: Line, r: TimeRange): boolean {
 export function isLineUsed(line: Line, ranges: readonly TimeRange[]): boolean {
   for (const r of ranges) if (lineOverlaps(line, r)) return true;
   return false;
+}
+
+/** The whole transcript as plain text, one caption line per row. */
+export function wholeTranscriptText(lines: readonly Line[]): string {
+  return lines.map((l) => l.text.trim()).filter(Boolean).join("\n");
+}
+
+/** The words said inside the given time ranges, in order, one caption line per row. */
+export function wordsInRanges(lines: readonly Line[], ranges: readonly TimeRange[]): string {
+  const picked = lines.filter((l) => ranges.some((r) => lineOverlaps(l, r)));
+  return wholeTranscriptText(picked);
 }

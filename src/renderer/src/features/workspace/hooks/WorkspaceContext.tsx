@@ -25,7 +25,9 @@ import {
   useSegmentsState,
   type SegmentStore,
 } from "../../../shared/hooks/useSegmentsState";
-import { activeAfterClose, indexForDigit, moveItem, stepIndex } from "../../../shared/utils/tabOps";
+import { setDone, nextOpenId } from "../utils/videoList";
+import { activeAfterClose, moveItem, stepIndex } from "../../../shared/utils/tabOps";
+import { workspaceShortcut } from "../utils/workspaceShortcuts";
 
 const STORE_KEY = "clipper.workspaces";
 
@@ -41,6 +43,10 @@ export type WorkspaceTab = {
   segments?: Segment[];
   /** The campaign this tab is cutting for. Each tab keeps its own. */
   campaignId?: string;
+  /** Folded into "Done" in the Videos list. Nothing is deleted. */
+  done?: boolean;
+  /** The In and Out picked by hand and not yet locked in, as the timestamps the fields hold (B-11). */
+  picked?: { start: string; end: string };
 };
 
 /** How many closed tabs Ctrl+Shift+T can bring back. */
@@ -52,6 +58,11 @@ export function cleanTab(t: WorkspaceTab): WorkspaceTab {
   const out: WorkspaceTab = { id: t.id, name: typeof t.name === "string" ? t.name : "" };
   if (typeof t.url === "string" && t.url) out.url = t.url;
   if (typeof t.campaignId === "string" && t.campaignId) out.campaignId = t.campaignId;
+  if (t.done === true) out.done = true;
+  const pk = t.picked;
+  if (pk && typeof pk.start === "string" && typeof pk.end === "string" && (pk.start.trim() || pk.end.trim())) {
+    out.picked = { start: pk.start.trim(), end: pk.end.trim() };
+  }
   if (Array.isArray(t.segments)) {
     const segs = t.segments.filter(
       (s) => s && Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start,
@@ -82,7 +93,7 @@ export function parsePersisted(raw: PersistedState | null | undefined): Persiste
 export function applyTabWork(
   tabs: WorkspaceTab[],
   id: string,
-  work: { url: string; segments: readonly Segment[] },
+  work: { url: string; segments: readonly Segment[]; picked?: { start: string; end: string } },
 ): WorkspaceTab[] {
   let changed = false;
   const next = tabs.map((t) => {
@@ -92,7 +103,9 @@ export function applyTabWork(
     const same =
       t.url === url &&
       a.length === work.segments.length &&
-      a.every((s, i) => s.start === work.segments[i].start && s.end === work.segments[i].end);
+      a.every((s, i) => s.start === work.segments[i].start && s.end === work.segments[i].end) &&
+      cleanTab({ id: t.id, name: t.name, picked: work.picked }).picked?.start === t.picked?.start &&
+      cleanTab({ id: t.id, name: t.name, picked: work.picked }).picked?.end === t.picked?.end;
     if (same) return t;
     changed = true;
     return cleanTab({
@@ -101,6 +114,8 @@ export function applyTabWork(
       url,
       segments: work.segments as Segment[],
       campaignId: t.campaignId,
+      done: t.done,
+      picked: work.picked,
     });
   });
   return changed ? next : tabs;
@@ -127,7 +142,10 @@ export type WorkspaceState = {
   meta: Record<string, TabMeta>;
   labelFor: (id: string) => string;
   selectTab: (id: string) => void;
-  addTab: () => void;
+  /** Open a new video; with a link it loads that video. */
+  addTab: (url?: string) => void;
+  /** Fold a video into Done, or bring it back. Marking the open one moves to the next open video. */
+  setTabDone: (id: string, done: boolean) => void;
   /** Close a tab. False when the user backed out of the confirmation and nothing closed. */
   closeTab: (id: string) => boolean;
   /** Put tab `id` at `toIndex` (drag, or the keyboard move). */
@@ -137,7 +155,10 @@ export type WorkspaceState = {
   reopenTab: () => boolean;
   closedCount: number;
   /** A tab reports what it holds so a relaunch or reopen can restore it. */
-  reportTabWork: (id: string, work: { url: string; segments: readonly Segment[] }) => void;
+  reportTabWork: (
+    id: string,
+    work: { url: string; segments: readonly Segment[]; picked?: { start: string; end: string } },
+  ) => void;
   /** Remember which campaign a tab is cutting for. */
   setTabCampaign: (id: string, campaignId: string) => void;
   reportTab: (
@@ -173,10 +194,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const selectTab = useCallback((id: string) => setActiveId(id), []);
 
-  const addTab = useCallback(() => {
+  const addTab = useCallback((url?: string) => {
     const id = newId();
-    setTabs((prev) => [...prev, { id, name: "" }]);
+    const link = typeof url === "string" ? url.trim() : "";
+    setTabs((prev) => [...prev, link ? { id, name: "", url: link } : { id, name: "" }]);
     setActiveId(id);
+  }, []);
+
+  const setTabDone = useCallback((id: string, done: boolean) => {
+    const current = tabsRef.current;
+    setTabs(setDone(current, id, done));
+    if (done && activeRef.current === id) {
+      const next = nextOpenId(current, id);
+      if (next) setActiveId(next);
+    }
   }, []);
 
   const closeTab = useCallback(
@@ -201,7 +232,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           work > 0 &&
           typeof window !== "undefined" &&
           !window.confirm(
-            `This tab has ${work} marked segment${work === 1 ? "" : "s"} that have not been cut. Close it anyway? Ctrl+Shift+T brings it back.`,
+            `This tab has ${work} marked segment${work === 1 ? "" : "s"} that have not been cut. Close it anyway?`,
           )
         )
           return false;
@@ -270,44 +301,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const closeTabRef = useRef(closeTab);
   closeTabRef.current = closeTab;
 
-  // Browser tab shortcuts. Cmd on macOS, Ctrl elsewhere; Alt-modified chords are left alone.
+  // Ctrl/Cmd+number, +Tab and +PageUp/Down move between videos. T, W and Shift+T are not ours (B-13).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
       const ids = tabsRef.current.map((t) => t.id);
-      const k = e.key.toLowerCase();
-      if (k === "t") {
-        if (e.shiftKey) {
-          if (closedRef.current.length === 0) return;
-          e.preventDefault();
-          reopenTab();
-        } else {
-          e.preventDefault();
-          if (!e.repeat) addTabRef.current();
-        }
-      } else if (k === "w" && !e.shiftKey) {
-        e.preventDefault();
-        if (!e.repeat) closeTabRef.current(activeRef.current);
-      } else if (!e.shiftKey && /^[1-9]$/.test(k)) {
-        const i = indexForDigit(Number(k), ids.length);
-        if (i === null) return;
-        e.preventDefault();
-        setActiveId(ids[i]);
-      } else if (k === "tab" || (!e.shiftKey && (k === "pagedown" || k === "pageup"))) {
-        const back = k === "pageup" || (k === "tab" && e.shiftKey);
-        e.preventDefault();
+      const action = workspaceShortcut(e, ids.length);
+      if (!action) return;
+      e.preventDefault();
+      if (action.kind === "select") setActiveId(ids[action.index]);
+      else if (action.kind === "step") {
         const at = ids.indexOf(activeRef.current);
-        setActiveId(ids[stepIndex(at, back ? -1 : 1, ids.length)]);
-      } else if (e.shiftKey && (k === "pagedown" || k === "pageup")) {
-        // Chrome's chord for moving the current tab along the strip.
-        e.preventDefault();
-        const at = ids.indexOf(activeRef.current);
-        moveTab(activeRef.current, at + (k === "pageup" ? -1 : 1));
-      }
+        setActiveId(ids[stepIndex(at, action.back ? -1 : 1, ids.length)]);
+      } else moveTab(activeRef.current, ids.indexOf(activeRef.current) + action.delta);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [reopenTab, moveTab]);
+  }, [moveTab]);
 
   const reportTab = useCallback<WorkspaceState["reportTab"]>(
     (id, next) => {
@@ -339,6 +348,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       labelFor,
       selectTab,
       addTab,
+      setTabDone,
       closeTab,
       moveTab,
       renameTab,
@@ -355,6 +365,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       labelFor,
       selectTab,
       addTab,
+      setTabDone,
       closeTab,
       moveTab,
       renameTab,
@@ -443,15 +454,14 @@ function TabBridge({
   const { segments } = useSegmentsState();
   const id = tabId ?? (active ? ws?.activeId : undefined);
   const url = clipper?.url ?? "";
+  const startText = clipper?.startText ?? "";
+  const endText = clipper?.endText ?? "";
   const downloading = clipper?.downloading ?? false;
-
-  // A cut works on a snapshot of the list, so editing it mid-cut would not reach the file.
-  useLayoutEffect(() => {
-    store.setLocked(downloading);
-  }, [store, downloading]);
+  const opened = !!clipper?.info;
 
   // Restore once, on mount, from what this tab last reported.
   const pending = useRef<string | null>(null);
+  const pickedPending = useRef<{ start: string; end: string } | null>(null);
   const restored = useRef(false);
   useEffect(() => {
     if (restored.current || !id || !ws || !clipper) return;
@@ -459,6 +469,8 @@ function TabBridge({
     const saved = ws.tabs.find((t) => t.id === id);
     if (!saved?.url || clipper.url) return;
     pending.current = saved.url;
+    // Loading the video's info clears the In and Out, so the saved pick goes back after it (B-11).
+    pickedPending.current = saved.picked ?? null;
     store.restore(extractVideoId(saved.url), saved.segments ?? []);
     clipper.setUrl(saved.url);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -473,9 +485,21 @@ function TabBridge({
       pending.current = null;
     }
     if (!restored.current) return;
-    ws.reportTabWork(id, { url, segments });
+    if (pickedPending.current) {
+      // The saved In/Out waits for the video's info; reporting now would overwrite it with nothing.
+      if (!clipper.info) return;
+      const { start, end } = pickedPending.current;
+      pickedPending.current = null;
+      clipper.setStartText(start);
+      clipper.setEndText(end);
+      return;
+    }
+    // A link that has not opened (still loading, or failed) is not saved as a video: the tab keeps
+    // what it last held, so a private or mistyped link never turns up in the Videos list.
+    if (url && !opened) return;
+    ws.reportTabWork(id, { url, segments, picked: { start: startText, end: endText } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, url, segments]);
+  }, [id, url, segments, startText, endText, clipper?.info, opened]);
 
   return null;
 }

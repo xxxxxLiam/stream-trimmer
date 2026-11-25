@@ -66,36 +66,8 @@ export interface YouTubeConnectionState {
   importRejected: boolean;
 }
 
-/** The four states the user is ever shown. `checking` is transient. */
-export type SessionStatus =
-  | "signed_in"
-  | "expiring_soon"
-  | "expired"
-  | "not_signed_in"
-  | "checking";
-
-export const EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
-
-export const SESSION_LABEL: Record<Exclude<SessionStatus, "checking">, string> = {
-  signed_in: "Signed in",
-  expiring_soon: "Signed in, expires soon",
-  expired: "Sign-in expired",
-  not_signed_in: "Not signed in",
-};
-
-/** Pure: what to tell the user, from the connection state and the clock. */
-export function deriveSessionStatus(
-  s: Pick<YouTubeConnectionState, "connected" | "expired" | "expiresAt" | "restoring" | "busy" | "probed">,
-  now: number = Date.now(),
-): SessionStatus {
-  if (s.restoring || (s.busy && !s.probed)) return "checking";
-  if (s.connected) {
-    if (s.expiresAt !== null && s.expiresAt <= now) return "expired";
-    if (s.expiresAt !== null && s.expiresAt - now <= EXPIRY_WARNING_MS) return "expiring_soon";
-    return "signed_in";
-  }
-  return s.expired ? "expired" : "not_signed_in";
-}
+/** The states a sign-in can be in; `checking` is transient. */
+export type SessionStatus = "signed_in" | "expiring_soon" | "expired" | "not_signed_in" | "checking";
 
 /** "Fri 12 Mar 2027": the day it stops working, in the user's own locale. */
 export function formatExpiryDay(expiresAt: number): string {
@@ -112,59 +84,19 @@ export function formatExpiryDay(expiresAt: number): string {
 }
 
 /**
- * Why a download came back at 360p, and the one fix. Null when the session is
- * healthy, so a 360p result is then not explained by sign-in at all. Callers
- * show this INSTEAD of silently handing over a 360p file.
+ * Which quality a request asks for. No format or quality choice exists anywhere (decisions: MP4 at 1080p, or the
+ * highest the video has below that), so nothing is stored per campaign. The engine refuses an MP4 above 360p
+ * without a sign-in, so signed out the request goes out at 360p; signed in it asks for 1080p. Audio is unchanged.
+ * Pure so the rule is testable; the clipper's quality state is only ever set from it.
  */
-export function lowQualityExplanation(
-  status: SessionStatus,
-): { message: string; action: string } | null {
-  if (status === "signed_in" || status === "expiring_soon" || status === "checking") {
-    return null;
-  }
-  return {
-    message:
-      status === "expired"
-        ? "Only 360p was offered because your saved YouTube sign-in has expired. YouTube serves higher formats to signed-in requests."
-        : "Only 360p was offered because you are not signed in to YouTube. YouTube serves higher formats to signed-in requests.",
-    action: "Re-import cookies.txt",
-  };
-}
-
-/**
- * AF2-2. The engine refuses an MP4 request above 360p when there is no sign-in, so "Continue
- * without signing in (360p)" only works if the quality the app asks for is 360p. A fresh install
- * defaults to Best, which made a skipped user's first Cut fail. While signed out the quality is
- * held at 360p and the user's own choice is remembered, then put back on sign-in. Pure so the
- * rule is testable; useClipperController owns the state it is applied to.
- */
-export function signedOutQuality(input: {
-  signedOut: boolean;
-  format: string;
-  quality: string;
-  /** What the user had chosen before it was held down, if anything. */
-  held: string | null;
-}): { quality: string; held: string | null } {
-  const { signedOut, format, quality, held } = input;
-  if (format !== "mp4") return { quality, held };
-  if (signedOut) {
-    const above = quality === "best" || Number(quality) > 360;
-    return above ? { quality: "360", held: quality } : { quality, held };
-  }
-  if (held !== null) return { quality: quality === "360" ? held : quality, held: null };
-  return { quality, held };
+export function requestedQuality(input: { signedOut: boolean; format: string; quality: string }): string {
+  if (input.format !== "mp4") return input.quality;
+  return input.signedOut ? "360" : "1080";
 }
 
 /** No session and none being restored: every request goes out signed out. */
 export function isSignedOut(s: Pick<YouTubeConnectionState, "connected" | "restoring">): boolean {
   return !s.connected && !s.restoring;
-}
-
-/** True while the first-run sign-in dialog is the thing on screen (not the launch placeholder, not skipped). */
-export function isSignInGateUp(
-  s: Pick<YouTubeConnectionState, "connected" | "restoring" | "skipped">,
-): boolean {
-  return !s.connected && !s.restoring && !s.skipped;
 }
 
 export interface CookiePayload {
@@ -744,30 +676,4 @@ export function continueSignedOut(): void {
 export function resumeSignIn(): void {
   writeSetting(SKIPPED_KEY, null);
   set({ skipped: false });
-}
-
-/** Secondary path: check one specific browser, when the user picks it. */
-export function checkBrowserConnection(): Promise<boolean> {
-  return checkConnection(state.browser);
-}
-
-export async function openYouTubeSignIn(): Promise<void> {
-  set({ message: undefined, reason: undefined });
-  try {
-    const api = electron();
-    if (api?.openYouTubeSignIn) {
-      const result = await api.openYouTubeSignIn();
-      if (!result.ok) throw new Error(result.error || "Could not open YouTube.");
-    } else {
-      window.open("https://www.youtube.com/signin", "_blank", "noopener");
-    }
-    set({
-      browserStatus: "ready",
-      message: "Sign in to YouTube, leave the browser tab open, then return here.",
-    });
-  } catch (error) {
-    set({
-      message: error instanceof Error ? error.message : "Could not open YouTube.",
-    });
-  }
 }

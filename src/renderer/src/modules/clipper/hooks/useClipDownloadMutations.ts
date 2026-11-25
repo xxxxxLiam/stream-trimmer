@@ -3,13 +3,14 @@
  * Path: src/renderer/src/modules/clipper/hooks/useClipDownloadMutations.ts
  * Description: Cuts the clip: progress, cancel, the engine request and saving the result.
  */
+import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { useCallback, useRef, useState } from "react";
 import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl, buildClipFilename, sanitizeFilename, type ClipFormat, type VideoInfo } from "../../../shared/utils/clip";
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 import { cookiePayload, markDisconnected, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
-import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, videoUrlProblem } from "../utils/downloadErrors";
+import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, saveFailure, videoUrlProblem } from "../utils/downloadErrors";
 import { type SavedFiles } from "./useSavedFilesState";
 
 export function useClipDownloadMutations({
@@ -154,6 +155,7 @@ export function useClipDownloadMutations({
             ...(segs.length > 1 ? { segments: segs } : { start: cutStart, end: cutEnd }),
             format,
             quality,
+            ...(opts?.audioLanguage ? { audioLanguage: opts.audioLanguage } : {}),
             deliver: deliverPath ? "path" : "stream",
             ...cookiePayload(),
           }),
@@ -164,6 +166,7 @@ export function useClipDownloadMutations({
           error?: string;
           code?: string;
           diagnostics?: FailureDiagnostics;
+          row?: ClipRowState;
           cancelled?: boolean;
         };
         const data = await parseJson<FailureBody>(res).catch(
@@ -177,6 +180,7 @@ export function useClipDownloadMutations({
           data.error || "Download failed",
           data.code,
           data.diagnostics,
+          data.row,
         );
       }
       // For `deliver: "path"` the body is a few bytes of JSON naming the
@@ -232,7 +236,11 @@ export function useClipDownloadMutations({
               filename,
               data: await blob!.arrayBuffer(),
             });
-        if (!result.ok) throw new Error(result.error);
+        if (!result.ok) {
+          // A full or unwritable folder is its own failure (Change folder), not "YouTube stopped it".
+          const folder = saveFailure(result);
+          throw folder.code ? new DownloadFailureError(folder.reason ?? result.error ?? "", folder.code) : new Error(result.error);
+        }
         setLastSavedPath(result.path ?? null);
         setSavedNotice({
           kind: "clip",
@@ -296,6 +304,7 @@ export function useClipDownloadMutations({
           message,
           code: engineFailure?.code,
           diagnostics: engineFailure?.diagnostics,
+          row: engineFailure?.row,
           attempt: {
             operation: "download clip",
             videoId: extractVideoId(url),

@@ -8,9 +8,8 @@
  */
 import { useState } from "react";
 import CentredDialog from "../../../shared/components/CentredDialog";
-import CampaignWizard from "./CampaignWizard";
+import CampaignForm from "./CampaignForm";
 import { useCampaign } from "../hooks/CampaignContext";
-import { formatLength } from "../../../shared/utils/segments";
 
 export default function CampaignStart({
   open,
@@ -28,7 +27,7 @@ export default function CampaignStart({
   if (!open) return null;
   if (wizard || campaigns.length === 0) {
     return (
-      <CampaignWizard
+      <CampaignForm
         open
         onClose={() => {
           setWizard(false);
@@ -42,8 +41,7 @@ export default function CampaignStart({
   return (
     <CentredDialog open onClose={onClose} title="Which campaign is this tab for?" widthClass="max-w-[480px]" id="ui-campaign-start">
       <p className="m-0 text-meta text-fg-dim">
-        Pick the client you are cutting for. Clip names, length, format and save folder all switch
-        to match.
+        Pick the client you are cutting for. The save folder and the clips-a-day count switch to match.
       </p>
       <ul className="m-0 flex list-none flex-col gap-1 p-0" role="listbox" aria-label="Campaigns">
         {campaigns.map((c) => (
@@ -52,7 +50,7 @@ export default function CampaignStart({
               type="button"
               role="option"
               aria-selected={c.id === activeId}
-              className={`btn w-full min-w-0 justify-start text-left ${c.id === activeId ? "border-accent" : ""}`}
+              className={`btn w-full min-w-0 justify-start text-left ${c.id === activeId ? "border-ice" : ""}`}
               onClick={() => {
                 setActiveId(c.id);
                 onChosen?.(c.id);
@@ -60,9 +58,7 @@ export default function CampaignStart({
               }}
             >
               <span className="min-w-0 flex-1 truncate">{c.name}</span>
-              <span className="shrink-0 font-mono text-meta text-fg-dim">
-                {formatLength(c.targetMinSec)} to {formatLength(c.targetMaxSec)}
-              </span>
+              <span className="shrink-0 text-meta text-fg-dim">{c.dailyQuota ? `${c.dailyQuota} a day` : ""}</span>
             </button>
           </li>
         ))}

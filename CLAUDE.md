@@ -48,32 +48,50 @@ instead, and fix it without bringing the bar back.
 ## Design tokens
 
 These are computed and contrast-checked; do not introduce values outside
-them.
+them. Ice and Frost palette ("The Clean Cut"). The Tailwind names and the
+CSS variables in `src/renderer/src/styles.css` carry them; a component never
+holds a raw hex or rgba.
 
 ```
-bg #0B0B0C   panel #161618   raised #1C1C1F   hover #252527
+bg #0A0D0F   panel #121619   raised #181D21   hover #232A2F
 hairline rgba(255,255,255,0.08)   hairlineStrong rgba(255,255,255,0.14)
-fg #F5F5F7        fg-dim #969697 (the only muted tier)
-disabled #909092  accent #FF6363
-radius: panel 14, control 8, chip 5
+fg #F2F5F6        fg-dim #94A0A5 (the only muted tier)
+disabled #8B979C
+ice #5FD8CA (the one signal colour)   frost #B8E4EA (the light: playhead, saved flash)
+error #FF6363 (failure only: a 1px border and the sentence, never a fill)
+radius: panel 14, control 8, chip 5      spacing step 4      target 44
+type: Inter (bundled), 20 / 15 / 13 / 12, weights 400 and 500,
+      named exceptions text-cliplength 22 and text-drawer-title 17
 ```
 
-`rgba(255,255,255,0.35)` was removed for failing WCAG AA at 3.25:1. There are
-exactly two readable text tiers, `fg` and `fg-dim`; a third does not exist.
-Disabled text uses the `disabled` token, never `fg-dim` with an opacity
-modifier — that lands around 2:1.
+WCAG contrast, measured: fg 17.79 on bg, 16.60 on panel, 15.50 on raised,
+13.28 on hover. fg-dim 7.27 / 6.78 / 6.33 / 5.42 on the same four. Disabled
+6.50 / 6.07 / 5.66 / 4.85. All clear AA (4.5:1).
 
-The product's logo is `src/renderer/src/shared/components/BrandMark.tsx`, traced from the
-installer icon so the window and the dock show one mark. It stands alone:
-there is no wordmark beside it.
+There are exactly two readable text tiers, `fg` and `fg-dim`; a third does not
+exist. Nothing under 12px. Disabled text uses the `disabled` token, never
+`fg-dim` with an opacity modifier. Surfaces are flat (fill plus hairline); no
+gradients and no plain drop shadows. Glow is a brand-colour shadow that marks
+live state only, from the named set (`glow-cut`, `glow-range`, `glow-row`,
+`glow-playhead`, `glow-box`, `glow-mark`, `flash-saved`). Ice alpha tints have
+names too (`ice-tint-12` and so on). Ice appears at most twice per screen.
+
+The product's logo is `src/renderer/src/shared/components/BrandMark.tsx`: the
+scissor-blade mark, with the "Clipr" wordmark beside it in the app (lockup C:
+the mark with "Clipr" in Inter 500, its r cut by a diagonal slit with the top
+piece in Ice; the paths come from `design/clipr-lockup-c.svg`, never rebuilt by
+hand; below 32px the mark stands alone). The app, installer and tray icons are
+mark-only.
 
 ## Who this is for
 
-One user: a clipper cutting many short vertical clips out of long podcasts
-and interviews, across several client campaigns a day. The test any change
-has to pass is whether it gets more clips out of one long video per hour.
-Features set once a session belong in the footer or settings, not in the
-loop.
+One user: a solo freelance video editor who clips for an agency or clients
+across several campaigns a day. Each campaign has a small daily quota, so
+under 15 clips a day in total, but every quota has to land on time and the
+clips have to be good enough to win views. Sources run from 10 minutes to
+multi-hour. The test any change has to pass is whether every campaign's
+quota gets done sooner and done well. Features set once a session belong in
+the footer or settings, not in the loop. See `plans/icp.md` in project files.
 
 ## Testing
 
