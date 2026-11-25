@@ -5,6 +5,7 @@
  *   remembers which they are. Nothing else holds a reference to either.
  */
 import { isZoomInChord, maxZoomFactor, zoomInBlocked } from "./zoomLimit";
+import { appMenuTemplate } from "./appMenu";
 import path from "node:path";
 import electron from "electron";
 import { isDev } from "../../shared/utils/env";
@@ -12,7 +13,7 @@ import { rememberUiPort } from "./symbolsWindow";
 import { isAppUrl, isSafeExternalUrl } from "./navigationGuard";
 import { createCrashRecovery, crashedUrl } from "./crashRecovery";
 
-const { BrowserWindow, shell } = electron;
+const { BrowserWindow, Menu, shell } = electron;
 
 let mainWindow: Electron.BrowserWindow | null = null;
 let splashWindow: Electron.BrowserWindow | null = null;
@@ -122,6 +123,21 @@ export async function createWindow(port: number) {
   mainWindow.webContents.on("zoom-changed", (_e: Electron.Event) => setTimeout(clampZoom, 0));
   mainWindow.on("resize", clampZoom);
   mainWindow.webContents.on("did-finish-load", clampZoom);
+
+  // The View menu's Zoom In must obey the same cap as the key chord, so the menu is ours (see appMenu.ts).
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      appMenuTemplate(process.platform, () => {
+        const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+        if (!win || win.isDestroyed()) return null;
+        return {
+          getZoomLevel: () => win.webContents.getZoomLevel(),
+          setZoomLevel: (l: number) => win.webContents.setZoomLevel(l),
+          contentWidth: () => win.getContentSize()[0],
+        };
+      }) as Electron.MenuItemConstructorOptions[],
+    ),
+  );
 
   const appUrl = isDev ? "http://localhost:8080/" : `http://127.0.0.1:${port}/`;
   const appOrigins = [new URL(appUrl).origin];
