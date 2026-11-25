@@ -27,8 +27,8 @@ export type SettingsDrawerProps = {
   startAt: string | null;
   /** Audio tracks of the open video; its dubs become the language chips. */
   tracks?: AudioTrack[];
-  /** The active campaign's Final Cut settings; other campaigns' are not loaded. */
-  editor: { campaignId: string | null; settings: EditorHandoffSettings; onChange: (s: EditorHandoffSettings) => void };
+  /** Any campaign's Final Cut settings, and writing them. */
+  editor: { settingsFor: (campaignId: string) => EditorHandoffSettings; onChange: (campaignId: string, s: EditorHandoffSettings) => void };
 };
 
 export default function SettingsDrawer({ open, onClose, startAt, tracks, editor }: SettingsDrawerProps) {
@@ -45,7 +45,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
 
   let body;
   if (view.kind === "campaign" && campaign) {
-    const isActive = editor.campaignId === campaign.id;
+    const fcp = editor.settingsFor(campaign.id);
     body = (
       <SettingsCampaign
         name={campaign.name}
@@ -55,16 +55,17 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
         onQuota={(n) => c.campaigns.update(campaign.id, { dailyQuota: n })}
         folderLabel={folderChipLabel(campaign.clipsDir, 3)}
         finalCut={
-          isActive && destination === "finalcut"
+          destination === "finalcut"
             ? {
-                library: editor.settings.fcpLibrary ? (editor.settings.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
-                event: editor.settings.mediaEvent,
+                library: fcp.fcpLibrary ? (fcp.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
+                // The campaign name stands in until the Event is edited.
+                event: fcp.mediaEvent || campaign.name,
                 onChoose: () => {
                   void window.electronAPI?.pickFcpLibrary?.().then((p) => {
-                    if (p) editor.onChange({ ...editor.settings, fcpLibrary: p });
+                    if (p) editor.onChange(campaign.id, { ...fcp, fcpLibrary: p });
                   });
                 },
-                onEvent: (v) => editor.onChange({ ...editor.settings, mediaEvent: v }),
+                onEvent: (v) => editor.onChange(campaign.id, { ...fcp, mediaEvent: v }),
                 look,
               }
             : null

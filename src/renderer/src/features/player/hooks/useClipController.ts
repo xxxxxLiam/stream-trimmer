@@ -35,7 +35,12 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
   }, []);
 
   const hasRange = range !== null;
-  const reason = clipReason({ hasRange, segments: segments.length, busy: !!downloading });
+  const reason = clipReason({
+    hasRange,
+    segments: segments.length,
+    busy: !!downloading,
+    rangeSeconds: range ? range.end - range.start : undefined,
+  });
   const toCut = clipSections(segments, range);
 
   const clip = () => {

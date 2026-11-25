@@ -5,6 +5,7 @@
  *   sticks and nothing is chosen for the user (Save to folder is the baseline). Also the reason
  *   Clip is dimmed, which shows on hover and on focus.
  */
+import { overCapMessage } from "../../../shared/utils/clip";
 import type { AfterCutting, EditorHandoffSettings } from "../../../shared/utils/fcpxml";
 
 export type ClipDestination = "folder" | "premiere" | "finalcut" | "resolve" | "capcut";
@@ -32,8 +33,9 @@ export function toAfterCutting(d: ClipDestination): AfterCutting {
   return d === "finalcut" ? "finalcut" : "nothing";
 }
 
-export function clipReason(s: { hasRange: boolean; segments: number; busy: boolean }): string | null {
+export function clipReason(s: { hasRange: boolean; segments: number; busy: boolean; rangeSeconds?: number }): string | null {
   if (s.busy) return "A clip is being made. Clip is ready when it's done.";
+  if (s.hasRange && s.rangeSeconds !== undefined && overCapMessage(s.rangeSeconds)) return overCapMessage(s.rangeSeconds);
   if (!s.hasRange && s.segments === 0) return "Set an end first: click the timeline or press O";
   return null;
 }

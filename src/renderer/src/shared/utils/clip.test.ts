@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractVideoId, normalizeYouTubeUrl } from "./clip";
+import { applyIn, applyOut, extractVideoId, normalizeYouTubeUrl, overCapMessage } from "./clip";
 import { videoUrlProblem } from "../../modules/clipper/hooks/useClipperController";
 
 const ID = "mmmmmmmmmmm";
@@ -60,4 +60,18 @@ test("B-5 still holds: pages that are not a single video give no id", () => {
     assert.equal(extractVideoId(u), null, u);
     if (u.trim()) assert.match(videoUrlProblem(u) ?? "", /not a single video/, u);
   }
+});
+
+test("a range over the cap says so in plain words, and a range inside it says nothing", () => {
+  assert.equal(overCapMessage(1000), "Clips can be up to 10 minutes. This one is 16:40.");
+  assert.equal(overCapMessage(600), "");
+});
+
+test("In past Out starts a fresh range at that In; Out before In does the mirror", () => {
+  assert.deepEqual(applyIn(4324, 2999), { start: 4324, clearEnd: true });
+  assert.deepEqual(applyIn(100, 200), { start: 100, clearEnd: false });
+  assert.deepEqual(applyIn(100, null), { start: 100, clearEnd: false });
+  assert.deepEqual(applyOut(50, 100), { end: 50, clearStart: true });
+  assert.deepEqual(applyOut(150, 100), { end: 150, clearStart: false });
+  assert.deepEqual(applyOut(5, null), { end: 5, clearStart: false });
 });
