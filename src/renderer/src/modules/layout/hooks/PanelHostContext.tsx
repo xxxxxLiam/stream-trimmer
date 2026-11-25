@@ -41,6 +41,8 @@ export type PanelHost = {
   openSymbols: () => void;
   /** Open Import moments (the + menu in Export), empty or with pasted rows. */
   openImport: (text?: string) => void;
+  /** Open Channel data (the Videos menu), with a channel link if one was pasted. Owner builds only. */
+  openChannel: (url?: string) => void;
 };
 
 const PanelHostContext = createContext<PanelHost | null>(null);

@@ -1,12 +1,13 @@
 /**
  * File: dialogHandlers.ts
  * Path: src/main/ipc/dialogHandlers.ts
- * Description: The two native folder pickers.
+ * Description: The native pickers: a folder, a Final Cut library, and the Final Cut look file.
  */
 import { IPC } from "../../common/ipc/channels";
 import path from "node:path";
 import electron from "electron";
 import { getMainWindow } from "../modules/windows/windows";
+import { readFcpLookFile } from "../features/editor/services/fcpLookFile";
 import { rememberPickedDir } from "../features/files/services/saveRoots";
 
 const { app, dialog, ipcMain } = electron;
@@ -44,5 +45,17 @@ export function registerDialogHandlers() {
     }
     // Deliberately not added to pickedDirs: that list is where the app may write clips.
     return picked;
+  });
+
+  ipcMain.handle(IPC.fcpLookPick, async () => {
+    const res = await dialog.showOpenDialog(getMainWindow(), {
+      title: "Choose your Final Cut export",
+      message: "Pick the project you exported with File, then Export XML.",
+      // A .fcpxmld is a package, which macOS treats as a file; elsewhere only files are offered.
+      properties: process.platform === "darwin" ? ["openFile", "openDirectory"] : ["openFile"],
+      filters: [{ name: "Final Cut export", extensions: ["fcpxmld", "fcpxml", "txt", "xml", "rtf"] }],
+    });
+    if (res.canceled || res.filePaths.length === 0) return { ok: false, cancelled: true, reason: "" };
+    return readFcpLookFile(res.filePaths[0]);
   });
 }

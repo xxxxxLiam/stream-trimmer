@@ -35,7 +35,10 @@ import {
   type SessionClip,
 } from "../../../shared/utils/fcpxml";
 import { mergeSessionClips, sessionCampaignKey, writeClipboard } from "../../../shared/utils/handoff";
-import { parseLook } from "../utils/look";
+import { parseLook } from "../../../../../common/utils/fcpLook";
+import { normalizeCampaigns } from "../../../shared/utils/campaigns";
+import { KEY_LOOK_MIGRATED, loadSavedLooks, lookForCampaign } from "../../../shared/utils/fcpLooks";
+import { readSetting } from "../../../shared/utils/persist";
 import LookEditor from "./LookEditor";
 
 type Result = { ok: boolean; error?: string; missing?: string; path?: string };
@@ -93,7 +96,7 @@ function useNextProjectName(): string {
 /** The project block for the document, or undefined when no project is wanted. */
 export function projectOptions(
   settings: EditorHandoffSettings,
-  ctx: { campaignName?: string; sourceTitle?: string },
+  ctx: { campaignId?: string | null; campaignName?: string; sourceTitle?: string },
 ): FcpxmlProject | undefined {
   const eventName = resolveEventName({ from: "source", campaignName: ctx.campaignName, sourceTitle: ctx.sourceTitle });
   if (!eventName) return undefined;
@@ -103,10 +106,20 @@ export function projectOptions(
     timeline: settings.timelineFormat,
     campaignName: ctx.campaignName,
     sourceTitle: ctx.sourceTitle,
-    // parseLook throws a plain-words error when the pasted export is unusable;
-    // the caller's try/catch turns that into a failed outcome.
-    ...(settings.applyLook ? { look: parseLook(settings.lookXml ?? "") } : {}),
+    // The campaign's saved look (see fcpLooks.ts). The caller's try/catch turns a plain-words
+    // error into a failed outcome.
+    ...(lookForCampaignId(ctx.campaignId, settings) ? { look: lookForCampaignId(ctx.campaignId, settings) } : {}),
   };
+}
+
+function lookForCampaignId(campaignId: string | null | undefined, settings: EditorHandoffSettings) {
+  const campaign = normalizeCampaigns(readSetting<unknown>("clipper.campaigns", [])).find((c) => c.id === campaignId);
+  // Before the one-time move, the old single pasted look still applies. A look that cannot be read
+  // throws its plain-words error.
+  if (!readSetting<boolean>(KEY_LOOK_MIGRATED, false)) {
+    return settings.applyLook && settings.lookXml ? parseLook(settings.lookXml) : undefined;
+  }
+  return lookForCampaign(campaign, loadSavedLooks());
 }
 
 export interface HandoffContext {

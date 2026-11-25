@@ -1,10 +1,11 @@
 /**
- * File: look.ts
- * Path: src/renderer/src/features/handoff/utils/look.ts
+ * File: fcpLook.ts
+ * Path: src/common/utils/fcpLook.ts
  * Description: A user's own Final Cut "look" (scale, colour effects, LUT, audio
  *   enhancements). It is read from the text of a Final Cut XML export of one
  *   clip that already has the look on it, so nothing personal is built into
- *   the app. Pure string work: no disk, no Electron.
+ *   the app. Pure string work: no disk, no Electron. In common because main reads
+ *   and checks the file a user picks, and the renderer writes the look into projects.
  */
 
 export interface Look {
@@ -19,12 +20,33 @@ export interface Look {
 }
 
 const NOT_AN_EXPORT =
-  "That does not look like a Final Cut XML export. In Final Cut choose File, then Export XML, and paste the text of the file here.";
+  "That does not look like a Final Cut XML export. In Final Cut choose File, then Export XML, and choose that file here.";
+
+/**
+ * TextEdit saves rich text (.rtf) by default, which wraps the XML in a header,
+ * ends every line with a backslash and closes with a brace. Those stray
+ * characters would land inside the project Final Cut opens, so peel them off.
+ * Plain XML passes through untouched.
+ */
+export function plainTextOf(text: string): string {
+  if (!/^\s*\{\\rtf/.test(text)) return text;
+  const first = text.indexOf("<");
+  const last = text.lastIndexOf(">");
+  if (first < 0 || last < first) return text;
+  return text
+    .slice(first, last + 1)
+    .replace(/\\\r?\n/g, "\n")
+    .replace(/\\par\b ?/g, "\n")
+    .replace(/\\tab\b ?/g, "\t")
+    .replace(/\\'([0-9a-f]{2})/gi, (_m, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\u(-?\d+)\??/g, (_m, n: string) => String.fromCharCode(Number(n) < 0 ? Number(n) + 65536 : Number(n)))
+    .replace(/\\([{}\\])/g, "$1");
+}
 
 /** Read the look off the first clip on the first timeline of an exported project. */
 export function parseLook(text: string): Look {
-  const source = text.trim();
-  if (!source) throw new Error("Paste the text of your Final Cut export first.");
+  const source = plainTextOf(text).trim();
+  if (!source) throw new Error("That file is empty. Export your Final Cut project again.");
 
   const version = /<fcpxml\b[^>]*\sversion="(\d+\.\d+)"/.exec(source)?.[1];
   const spine = source.indexOf("<spine");
@@ -78,6 +100,7 @@ export function parseLook(text: string): Look {
   const scale = /<adjust-transform\b[^>]*\sscale="([\d.]+)\s+[\d.]+"/.exec(clip)?.[1];
   if (scale) found.push(`Scale ${Math.round(Number(scale) * 100)}%`);
   found.push(...names);
+  if (/<adjust-volume\b/.test(clip)) found.push("Volume");
   if (/<adjust-loudness\b/.test(clip)) found.push("Loudness");
   if (/<adjust-voiceIsolation\b/.test(clip)) found.push("Voice Isolation");
   if (found.length === 0) found.push("Your changes");

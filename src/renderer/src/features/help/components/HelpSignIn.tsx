@@ -6,7 +6,7 @@
  *   error red, then the fix, under the drop zone. No dialog, toast or Try again button.
  */
 import { useState, type DragEvent } from "react";
-import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
+import { DrawerHeader, drawerBodyRoomy, outlineButton } from "../../../shared/components/DrawerRows";
 import type { CookieReason } from "../utils/cookieReasons";
 
 export type HelpSignInProps = {
@@ -34,12 +34,12 @@ export default function HelpSignIn(p: HelpSignInProps) {
   return (
     <>
       <DrawerHeader title="Sign in for 1080p" back="Help" onBack={p.onBack} closeName="Help" onClose={p.onClose} />
-      <div className={`${drawerBody} gap-3`}>
-        <p className="m-0 text-body">Clipr only reads your sign-in to download. It never posts, likes or changes anything.</p>
-        <ol className="m-0 flex list-none flex-col gap-2 p-0">
+      <div className={drawerBodyRoomy}>
+        <p className="m-[0px] text-body">Clipr only reads your sign-in to download. It never posts, likes or changes anything.</p>
+        <ol className="m-[0px] flex list-none flex-col gap-[8px] p-[0px]">
           {STEPS.map((t, i) => (
-            <li key={t} className="flex gap-3 text-body">
-              <span className="flex size-6 flex-none items-center justify-center rounded-full border border-hairlineStrong text-meta text-fg-dim">{i + 1}</span>
+            <li key={t} className="flex gap-[12px] text-body">
+              <span className="flex size-[24px] flex-none items-center justify-center rounded-full border border-hairlineStrong text-meta text-fg-dim">{i + 1}</span>
               <span>{t}</span>
             </li>
           ))}
@@ -51,13 +51,13 @@ export default function HelpSignIn(p: HelpSignInProps) {
           }}
           onDragLeave={() => setOver(false)}
           onDrop={onDrop}
-          className={`flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-control border border-dashed p-4 text-center text-body ${over ? "border-ice bg-ice-tint-08" : "border-hairlineStrong bg-raised"}`}
+          className={`flex min-h-[96px] flex-col items-center justify-center gap-[8px] rounded-control border border-dashed p-[16px] text-center text-body ${over ? "border-ice bg-ice-tint-08" : "border-hairlineStrong bg-raised"}`}
         >
           <span>Drop cookies.txt, or choose a file</span>
           <button type="button" aria-label="Choose a cookies file" onClick={p.onChoose} className={outlineButton}>Choose a file</button>
         </div>
         {p.problem && (
-          <div role="alert" className="flex flex-col gap-1">
+          <div role="alert" className="flex flex-col gap-[4px]">
             <span className="text-body text-error">{p.problem.reason}</span>
             <span className="text-body text-fg">{p.problem.fix}</span>
           </div>

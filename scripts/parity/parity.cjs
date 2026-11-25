@@ -62,6 +62,8 @@ async function runSteps(win, steps, app) {
     else if (s.waitFor) await win.waitForSelector(s.waitFor);
     else if (s.wait) await win.waitForTimeout(s.wait);
     else if (s.eval) await win.evaluate(s.eval);
+    else if (s.hover) await win.hover(s.hover);
+    else if (s.log) console.log("log:", JSON.stringify(await win.evaluate(s.log)));
   }
 }
 
@@ -161,7 +163,11 @@ async function screenshotApp(screen, frame, fx, useWindow) {
   }
   // Regions neither side can honestly show (the video picture, which needs YouTube): painted the same
   // flat colour on both, so they never count as a difference. Rects are relative to the compared image.
-  for (const m of fixture.mask || []) {
+  // A window board draws OS window dots that the real window frame supplies, which also pushes the
+  // campaign chip and the day count 72px right; that strip is masked unless a fixture sets keepDots.
+  const masks = [...(fixture.mask || [])];
+  if (o.window !== undefined && o.el === undefined && !fixture.keepDots) masks.push({ x: 0, y: 0, width: 260, height: 54 });
+  for (const m of masks) {
     for (const img of [b, p]) {
       for (let y = m.y; y < Math.min(img.height, m.y + m.height); y++) {
         for (let x = m.x; x < Math.min(img.width, m.x + m.width); x++) {

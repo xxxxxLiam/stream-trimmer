@@ -13,6 +13,7 @@ import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
+import { useClipDestination } from "../../player/hooks/useClipDestination";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { DEFAULT_DAILY_QUOTA, toggleLanguage } from "../utils/settingsPrefs";
 import type { AudioTrack } from "../../../shared/utils/clip";
@@ -31,6 +32,7 @@ export type SettingsDrawerProps = {
 
 export default function SettingsDrawer({ open, onClose, startAt, tracks, editor }: SettingsDrawerProps) {
   const c = useSettingsController({ open, onClose, startAt });
+  const [destination] = useClipDestination();
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
   if (!open) return null;
@@ -47,9 +49,9 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
         dubs={(tracks ?? []).filter((t) => t.kind !== "original").map((t) => ({ code: t.language, label: t.label }))}
         quota={campaign.dailyQuota ?? DEFAULT_DAILY_QUOTA}
         onQuota={(n) => c.campaigns.update(campaign.id, { dailyQuota: n })}
-        folderLabel={folderChipLabel(campaign.clipsDir)}
+        folderLabel={folderChipLabel(campaign.clipsDir, 3)}
         finalCut={
-          isActive && editor.settings.afterCutting === "finalcut"
+          isActive && destination === "finalcut"
             ? {
                 library: editor.settings.fcpLibrary ? (editor.settings.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
                 event: editor.settings.mediaEvent,

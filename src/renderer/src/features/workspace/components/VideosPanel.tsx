@@ -26,7 +26,7 @@ function Row({
   return (
     <div
       className={
-        "group relative mx-[10px] my-[3px] flex items-center gap-[10px] rounded-control border bg-raised p-2 " +
+        "group relative mx-[10px] my-[3px] flex items-center gap-[10px] rounded-control border bg-raised p-[8px] " +
         (row.isOpen ? "border-ice shadow-row" : "border-transparent")
       }
     >
@@ -34,18 +34,18 @@ function Row({
         type="button"
         onClick={onOpen}
         aria-current={row.isOpen ? "true" : undefined}
-        className="flex min-w-0 flex-1 items-center gap-[10px] text-left"
+        className="flex min-w-[0px] flex-1 items-center gap-[10px] text-left"
       >
         <span aria-hidden="true" className="h-[26px] w-[44px] flex-none rounded-chip bg-hover" />
-        <span className="min-w-0">
+        <span className="min-w-[0px]">
           <span
             className={
-              "block truncate text-body font-medium " + (row.done ? "text-fg-dim" : "text-fg")
+              "block truncate text-body leading-[normal] font-medium " + (row.done ? "text-fg-dim" : "text-fg")
             }
           >
             {row.title}
           </span>
-          <span className="mt-0.5 block text-meta text-fg-dim">{subline(row)}</span>
+          <span className="mt-[2px] block text-meta leading-[normal] text-fg-dim">{subline(row)}</span>
         </span>
       </button>
       {onDone && (
@@ -60,7 +60,7 @@ function Row({
           </button>
           <span
             role="tooltip"
-            className="pointer-events-none absolute -top-[30px] right-[-4px] z-10 whitespace-nowrap rounded-chip border border-hairlineStrong bg-hover px-2 py-1 text-meta text-fg"
+            className="pointer-events-none absolute -top-[30px] right-[-4px] z-10 whitespace-nowrap rounded-chip border border-hairlineStrong bg-hover px-[8px] py-[4px] text-meta text-fg"
           >
             Done with this video
           </span>
@@ -83,11 +83,11 @@ export default function VideosPanel() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-[0px] flex-1 flex-col">
       <div
         id="ui-source-chip"
         role="search"
-        className="mx-[10px] mb-[6px] mt-[10px] flex h-target flex-none items-center gap-2 rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
+        className="mx-[10px] mb-[6px] mt-[10px] flex h-target flex-none items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
       >
         <IconSearch />
         {v.pills.map((p) => (
@@ -111,7 +111,7 @@ export default function VideosPanel() {
           placeholder={v.pills.length ? "" : "Search or paste a link"}
           autoComplete="off"
           spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim"
+          className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim"
         />
         {v.filtered && (
           <button type="button" className="flex-none text-meta text-fg-dim hover:text-fg" onClick={v.clearFilters}>
@@ -120,20 +120,20 @@ export default function VideosPanel() {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-[0px] flex-1 overflow-y-auto">
         {v.opening && (
           <div
             role="status"
-            className="relative mx-[10px] my-[3px] overflow-hidden rounded-control border border-ice bg-raised p-2 shadow-row"
+            className="relative mx-[10px] my-[3px] overflow-hidden rounded-control border border-ice bg-raised p-[8px] shadow-row"
           >
             <div className="flex items-center gap-[10px]">
               <span aria-hidden="true" className="h-[26px] w-[44px] flex-none rounded-chip bg-hover" />
-              <span className="min-w-0">
+              <span className="min-w-[0px]">
                 <span className="block text-body font-medium text-fg">Opening…</span>
-                <span className="mt-0.5 block text-meta text-fg-dim">Preparing</span>
+                <span className="mt-[2px] block text-meta leading-[normal] text-fg-dim">Preparing</span>
               </span>
             </div>
-            <span aria-hidden="true" className="absolute bottom-0 left-0 h-[2px] w-1/3 animate-pulse bg-ice" />
+            <span aria-hidden="true" className="absolute bottom-[0px] left-[0px] h-[2px] w-1/3 animate-pulse bg-ice" />
           </div>
         )}
         {v.rows.open
@@ -142,13 +142,13 @@ export default function VideosPanel() {
             <Row key={r.id} row={r} onOpen={() => v.select(r.id)} onDone={() => v.doneVideo(r)} />
           ))}
         {v.filtered && v.rows.open.length + doneCount === 0 && (
-          <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">No video matches.</p>
+          <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">No video matches.</p>
         )}
 
         {v.undo && (
-          <div role="status" className="flex items-center gap-[6px] px-[14px] pt-2 text-meta text-fg-dim">
+          <div role="status" className="flex items-center gap-[6px] px-[14px] pt-[8px] text-meta text-fg-dim">
             Moved “{v.undo.title}” to Done ·
-            <button type="button" onClick={v.undoDone} className="h-8 text-meta text-ice">
+            <button type="button" onClick={v.undoDone} className="h-[32px] text-meta text-ice">
               Undo
             </button>
           </div>
@@ -159,7 +159,7 @@ export default function VideosPanel() {
             type="button"
             aria-expanded={v.doneOpen}
             onClick={v.toggleDone}
-            className="mx-[10px] mt-[6px] flex h-8 w-[calc(100%-20px)] items-center justify-between px-1 text-meta text-fg-dim hover:text-fg"
+            className="mx-[10px] mt-[6px] flex h-[32px] w-[calc(100%-20px)] items-center justify-between px-[4px] text-meta text-fg-dim hover:text-fg"
           >
             Done · {doneCount}
             <span className={"inline-flex " + (v.doneOpen ? "rotate-180" : "")}>

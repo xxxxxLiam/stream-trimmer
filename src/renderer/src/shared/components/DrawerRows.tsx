@@ -34,7 +34,7 @@ export function DrawerHeader({ title, back, onBack, onClose, closeName }: { titl
 }
 
 export function SectionLabel({ children, first }: { children: ReactNode; first?: boolean }) {
-  return <span className={`pb-1 text-meta text-fg-dim ${first ? "pt-2" : "pt-4"}`}>{children}</span>;
+  return <span className={`pb-[4px] text-meta text-fg-dim ${first ? "pt-[8px]" : "pt-[16px]"}`}>{children}</span>;
 }
 
 export function ChevronRow({ label, value, onOpen, divider, listItem }: { label: string; value: string; onOpen: () => void; divider?: boolean; /** Marks the row for arrow-key movement inside a list. */ listItem?: boolean }) {
@@ -44,7 +44,7 @@ export function ChevronRow({ label, value, onOpen, divider, listItem }: { label:
       aria-label={value ? `${label}: ${value}` : label}
       data-help-item={listItem || undefined}
       onClick={onOpen}
-      className={`flex h-target items-center gap-2 bg-transparent text-left text-body text-fg ${divider ? "border-b border-hairline" : ""}`}
+      className={`flex items-center gap-[8px] bg-transparent text-left text-body leading-[normal] text-fg ${divider ? "h-target border-b border-hairline" : "h-target"}`}
     >
       <span className="flex-1">{label}</span>
       {value && <span className="text-meta text-fg-dim">{value}</span>}
@@ -61,17 +61,19 @@ export function SwitchRow({ label, on, onFlip, divider }: { label: string; on: b
       aria-checked={on}
       aria-label={label}
       onClick={onFlip}
-      className={`flex h-target items-center gap-2 bg-transparent text-left text-body text-fg ${divider ? "border-b border-hairline" : ""}`}
+      className={`flex items-center gap-[8px] bg-transparent text-left text-body leading-[normal] text-fg ${divider ? "h-target border-b border-hairline" : "h-target"}`}
     >
       <span className="flex-1">{label}</span>
-      <span aria-hidden="true" className={`inline-flex h-5 w-9 flex-none rounded-[10px] p-0.5 ${on ? "justify-end bg-ice" : "justify-start bg-hover"}`}>
-        <span className="h-4 w-4 rounded-full bg-bg" />
+      <span aria-hidden="true" className={`inline-flex h-[20px] w-[36px] flex-none rounded-[10px] p-[2px] ${on ? "justify-end bg-ice" : "justify-start bg-hover"}`}>
+        <span className="h-[16px] w-[16px] rounded-full bg-bg" />
       </span>
     </button>
   );
 }
 
 export const outlineButton =
-  "h-target rounded-control border border-hairlineStrong bg-raised px-4 text-body text-fg hover:bg-hover";
+  "h-target rounded-control border border-hairlineStrong bg-raised px-[16px] text-body leading-[normal] text-fg hover:bg-hover";
 
-export const drawerBody = "flex flex-col gap-1 px-5 pb-5 pt-3";
+export const drawerBody = "mt-[4px] flex flex-col gap-[4px]";
+/** Text views (an answer, the report form): 12px between blocks. */
+export const drawerBodyRoomy = "mt-[12px] flex flex-col gap-[12px]";
