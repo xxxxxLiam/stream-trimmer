@@ -15,8 +15,8 @@ test("closed when there is no pasted text", () => {
 test("App opens it for pasted rows, and Export asks the host for it", () => {
   const app = readFileSync("src/renderer/src/routes/App.tsx", "utf8");
   assert.match(app, /onMoments: \(text\) => setImportText\(text\)/);
-  const exp = readFileSync("src/renderer/src/features/clips/components/ExportPanel.tsx", "utf8");
-  assert.match(exp, /host\.openImport\(\)/);
+  const group = readFileSync("src/renderer/src/modules/layout/components/PanelGroup.tsx", "utf8");
+  assert.match(group, /host\.openImport\(\)/);
 });
 
 test("Board 04.2.1: opened empty, the drawer shows the drop area, and rows pasted into it open the list", () => {
@@ -26,4 +26,14 @@ test("Board 04.2.1: opened empty, the drawer shows the drop area, and rows paste
   assert.match(src, /onDrop=/);
   assert.match(src, /Pasting anywhere in Clipr works too/);
   assert.match(src, /h-\[190px\]/);
+});
+
+test("Board 04.2: Export's + opens \"Add to Export\" with Import moments and Add a moment, and Export has no inline Import link", () => {
+  const group = readFileSync("src/renderer/src/modules/layout/components/PanelGroup.tsx", "utf8");
+  assert.match(group, /label: "Add to Export"/);
+  assert.match(group, /label: "Import moments"/);
+  assert.match(group, /label: "Add a moment"/);
+  assert.doesNotMatch(group, /label: "Add a moment",[^}]*detail/);
+  const exp = readFileSync("src/renderer/src/features/clips/components/ExportPanel.tsx", "utf8");
+  assert.doesNotMatch(exp, /Import moments/);
 });

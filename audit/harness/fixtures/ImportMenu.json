@@ -1,0 +1,5 @@
+{
+ "_doc": "Export's + menu open (board 04.2.1, Opening it).",
+ "extends": "ChannelData",
+ "steps": [{ "wait": 1500 }, { "click": "button[aria-label=\"Add to Export\"]" }, { "wait": 400 }]
+}

@@ -41,6 +41,8 @@ export type PanelHost = {
   openSymbols: () => void;
   /** Open Import moments (the + menu in Export), empty or with pasted rows. */
   openImport: (text?: string) => void;
+  /** Save the marked part of this video into the bank, waiting (the + menu in Export, "Add a moment"). */
+  addMoment: () => void;
   /** Open Channel data (the Videos menu), with a channel link if one was pasted. Owner builds only. */
   openChannel: (url?: string) => void;
 };
@@ -48,6 +50,11 @@ export type PanelHost = {
 const PanelHostContext = createContext<PanelHost | null>(null);
 
 export const PanelHostProvider = PanelHostContext.Provider;
+
+/** The host when there is one (the tab strip is also rendered by tests without a workspace). */
+export function usePanelHostOptional(): PanelHost | null {
+  return useContext(PanelHostContext);
+}
 
 export function usePanelHost(): PanelHost {
   const host = useContext(PanelHostContext);
