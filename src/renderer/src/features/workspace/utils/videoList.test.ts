@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { matchesVideoQuery, nextOpenId, nextWaitingId, setDone, splitVideos, waitingIn, looksLikeLink, linkKind, linkInText } from "./videoList";
+import { matchesVideoQuery, nextOpenId, nextWaitingId, setDone, splitVideos, waitingIn, looksLikeLink, linkKind, linkInText, resolveLink, NOT_A_LINK, NOT_A_VIDEO } from "./videoList";
 import type { WorkspaceTab } from "../hooks/WorkspaceContext";
 import type { BankData } from "../../../shared/utils/bank";
 
@@ -107,4 +107,18 @@ test("B2-5: the video link inside pasted share text is pulled out", () => {
   assert.equal(linkInText("check (m.youtube.com/watch?v=abc123), wow"), "m.youtube.com/watch?v=abc123");
   assert.equal(linkInText("just some words"), null);
   assert.equal(linkInText("see https://example.com/page"), null);
+});
+
+test("resolveLink: Enter in the top bar field opens a video link, reuses an open one, or says what is wrong", () => {
+  const tabs = [tab("a", { url: "https://youtu.be/dQw4w9WgXcQ" }), tab("b", { url: "https://youtu.be/aaaaaaaaaaa", done: true })];
+  assert.deepEqual(resolveLink("   ", tabs), { kind: "empty" });
+  assert.deepEqual(resolveLink("honest version", tabs), { kind: "error", message: NOT_A_LINK });
+  assert.deepEqual(resolveLink("https://example.com/x", tabs), { kind: "error", message: NOT_A_VIDEO });
+  assert.deepEqual(resolveLink("https://youtu.be/bbbbbbbbbbb", tabs), { kind: "open", target: "https://youtu.be/bbbbbbbbbbb", existingId: null, reopen: false });
+  assert.deepEqual(resolveLink("youtube.com/watch?v=dQw4w9WgXcQ", tabs), { kind: "open", target: "youtube.com/watch?v=dQw4w9WgXcQ", existingId: "a", reopen: false });
+  // A video already in Done comes back out of Done.
+  assert.deepEqual(resolveLink("https://youtu.be/aaaaaaaaaaa", tabs), { kind: "open", target: "https://youtu.be/aaaaaaaaaaa", existingId: "b", reopen: true });
+  // Share text keeps only its link.
+  const shared = resolveLink("Watch this https://youtu.be/bbbbbbbbbbb – wow", tabs);
+  assert.equal(shared.kind === "open" && shared.target, "https://youtu.be/bbbbbbbbbbb");
 });

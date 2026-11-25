@@ -85,6 +85,32 @@ export function linkInText(text: string): string | null {
   return null;
 }
 
+/** What Enter does in the top bar's link field: open a link, or say what is wrong with the text. */
+export type LinkAction =
+  | { kind: "empty" }
+  | { kind: "error"; message: string }
+  | { kind: "open"; target: string; existingId: string | null; reopen: boolean };
+
+export const NOT_A_LINK = "Paste a YouTube link";
+export const NOT_A_VIDEO = "That isn't a YouTube video link";
+
+/**
+ * Decides the top bar field's Enter: share text keeps only its video link (linkInText), a link that is
+ * already open selects that tab (and takes it out of Done), anything else is a new tab.
+ */
+export function resolveLink(raw: string, tabs: readonly WorkspaceTab[]): LinkAction {
+  const value = raw.trim();
+  if (!value) return { kind: "empty" };
+  const inside = /\s/.test(value) ? linkInText(value) : null;
+  const target = inside ?? value;
+  const kind = inside ? "video" : linkKind(value);
+  if (kind === "none") return { kind: "error", message: NOT_A_LINK };
+  if (kind === "bad") return { kind: "error", message: NOT_A_VIDEO };
+  const vid = extractVideoId(target);
+  const same = vid ? tabs.find((t) => t.url && extractVideoId(t.url) === vid) : undefined;
+  return { kind: "open", target, existingId: same?.id ?? null, reopen: !!same?.done };
+}
+
 export function looksLikeLink(text: string): boolean {
   return linkKind(text) !== "none";
 }

@@ -2,7 +2,7 @@
  * File: TopBar.tsx
  * Path: src/renderer/src/modules/layout/components/TopBar.tsx
  * Description: The top bar (board 03.2.1): the campaign chip with "2 of 3 today" and its menu, the
- *   open video's plain title in the middle, and the icon-only Panels | Help | Settings on the right.
+ *   open video's title in the middle (a field that takes a link), and the icon-only Panels | Help | Settings on the right.
  *   A button that is on (its menu or drawer is open) shows its label beside the icon.
  *   On macOS and Windows the bar is the window's title bar: the traffic lights sit at its left (macOS) or
  *   the system window buttons over its right end (Windows), the empty bar drags the window (double-click
@@ -16,6 +16,7 @@ import HelpButton from "../../../features/help/components/HelpButton";
 import UpdatePill from "../../../features/updates/components/UpdatePill";
 import { useToday } from "../../../shared/hooks/useToday";
 import { todayCount } from "../../../shared/utils/campaigns";
+import TopBarLinkField from "../../../features/workspace/components/TopBarLinkField";
 import PanelsMenu from "./PanelsMenu";
 import type { MenuItem } from "./PopoverMenu";
 import { IconSettingsGear } from "./BarIcons";
@@ -52,9 +53,7 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
           {today}
         </span>
       ) : null}
-      <span className="pointer-events-none absolute inset-x-0 truncate px-[192px] text-center text-body font-medium">
-        {info?.title ?? ""}
-      </span>
+      <TopBarLinkField />
       <div className="relative ml-auto flex items-center gap-[2px]">
         <UpdatePill />
         <PanelsMenu extraItems={panelsMenuExtras} />

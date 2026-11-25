@@ -72,3 +72,13 @@ test("F4-1: a failed update download clears the percent; F4-4/List rows: Videos 
   const row = readFileSync(new URL("../shared/components/ActionRow.tsx", import.meta.url), "utf8");
   assert.match(row, /h-\[44px\]/);
 });
+
+test("R2: the top bar's centre is the link field; Enter adds, Esc restores, and Cmd/Ctrl+L stays Loop", () => {
+  const bar = readFileSync(new URL("../modules/layout/components/TopBar.tsx", import.meta.url), "utf8");
+  const hook = readFileSync(new URL("../features/workspace/hooks/useAddVideoController.ts", import.meta.url), "utf8");
+  assert.match(bar, /<TopBarLinkField \/>/);
+  assert.match(hook, /e\.key === "Enter"[\s\S]*submit\(\)/);
+  assert.match(hook, /e\.key === "Escape"[\s\S]*leave\(\)/);
+  assert.match(hook, /ws\.addTab\(action\.target\)/);
+  assert.ok(!/ctrlKey|metaKey/.test(hook), "L belongs to Loop the range");
+});
