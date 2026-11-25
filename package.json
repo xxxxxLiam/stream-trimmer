@@ -11,6 +11,7 @@
     "postinstall": "node scripts/setup.js",
     "setup": "node scripts/setup.js",
     "machine-id": "tsx scripts/machine-id.cjs",
+    "build:mine": "tsx scripts/build-mine.cjs",
     "dev": "concurrently -k -n client,server -c cyan,magenta \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "vite",
     "dev:server": "tsx src/main/features/engine/index.ts",
