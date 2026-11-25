@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  spacePresses,
   SPEEDS,
   clipPosition,
   clipToVideo,
@@ -108,4 +109,17 @@ test("clipToVideo is the way back from clip time", () => {
   assert.equal(clipToVideo(two, 24), 610);
   assert.equal(clipToVideo(two, 99), 620);
   for (const t of [72, 85, 604, 619]) assert.equal(clipToVideo(two, clipPosition(two, t).at), t);
+});
+
+test("Space presses a focused button, switch, link, menu item or field; elsewhere it is play and pause", () => {
+  const el = (tagName: string, role?: string) => ({ tagName, getAttribute: (n: string) => (n === "role" && role ? role : null) });
+  assert.equal(spacePresses(el("BUTTON")), true);
+  assert.equal(spacePresses(el("DIV", "switch")), true);
+  assert.equal(spacePresses(el("A")), true);
+  assert.equal(spacePresses(el("DIV", "menuitemradio")), true);
+  assert.equal(spacePresses(el("INPUT")), true);
+  assert.equal(spacePresses({ tagName: "DIV", isContentEditable: true }), true);
+  assert.equal(spacePresses(el("DIV")), false);
+  assert.equal(spacePresses(el("BODY")), false);
+  assert.equal(spacePresses(null), false);
 });

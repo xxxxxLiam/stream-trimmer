@@ -128,3 +128,15 @@ export function clipToVideo(sections: readonly Range[], at: number): number {
   const last = sections[sections.length - 1];
   return last ? last.end : 0;
 }
+
+const PRESSABLE_TAGS = ["BUTTON", "A", "SUMMARY", "INPUT", "TEXTAREA", "SELECT"];
+const PRESSABLE_ROLES = ["button", "switch", "link", "checkbox", "radio", "tab", "menuitem", "menuitemradio", "menuitemcheckbox", "option", "slider"];
+
+/** Space presses a focused button, switch, link, menu item or field; only elsewhere is it play and pause. */
+export function spacePresses(el: { tagName?: string; isContentEditable?: boolean; getAttribute?: (n: string) => string | null } | null): boolean {
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  if (el.tagName && PRESSABLE_TAGS.includes(el.tagName.toUpperCase())) return true;
+  const role = el.getAttribute?.("role");
+  return !!role && PRESSABLE_ROLES.includes(role);
+}

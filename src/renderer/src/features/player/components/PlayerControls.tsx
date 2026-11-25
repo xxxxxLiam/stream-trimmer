@@ -2,7 +2,8 @@
  * File: PlayerControls.tsx
  * Path: src/renderer/src/features/player/components/PlayerControls.tsx
  * Description: Transport A: loop and speed on the left, back 5, play and forward 5 in the middle,
- *   volume and full screen on the right. Hover labels carry the keys.
+ *   volume and full screen on the right (three grid columns, so the groups never overlap when the
+ *   panel is narrow). Hover labels carry the keys.
  */
 import type { PreviewController } from "../hooks/usePreviewController";
 import { hoverLabel, isMacLike } from "../utils/transport";
@@ -21,8 +22,8 @@ export default function PlayerControls({ c }: { c: PreviewController }) {
   const { player } = c;
   const mac = isMacLike();
   return (
-    <div className="relative flex flex-none items-center justify-between">
-      <span className="flex gap-[10px]">
+    <div className="grid flex-none grid-cols-[1fr_auto_1fr] items-center">
+      <span className="flex gap-[10px] justify-self-start">
         <TransportButton
           label={hoverLabel("loop", mac)}
           name="Loop"
@@ -37,7 +38,7 @@ export default function PlayerControls({ c }: { c: PreviewController }) {
           {player.speed}x
         </TransportButton>
       </span>
-      <span className="absolute left-1/2 flex -translate-x-1/2 items-center gap-[14px]">
+      <span className="flex items-center gap-[14px]">
         <TransportButton look="ghost" label={hoverLabel("back", mac)} name="Back 5 seconds" onClick={() => c.step(-1)}>
           <BackIcon />
         </TransportButton>
@@ -54,7 +55,7 @@ export default function PlayerControls({ c }: { c: PreviewController }) {
           <ForwardIcon />
         </TransportButton>
       </span>
-      <span className="flex gap-[10px]">
+      <span className="flex gap-[10px] justify-self-end">
         <TransportButton label={hoverLabel("volume", mac)} name="Volume" pressed={player.muted} onClick={player.toggleMute}>
           <VolumeIcon muted={player.muted} />
         </TransportButton>

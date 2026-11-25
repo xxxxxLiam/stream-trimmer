@@ -10,7 +10,7 @@ import { PLAY_FROM_EVENT } from "../../../shared/utils/playFrom";
 import type { Range } from "../../../shared/utils/segments";
 import type { YouTubePlayerApi } from "./useYouTubePlayerController";
 import { BAR_HIDE_MS } from "./usePreviewState";
-import { keyAction, loopSeek, stepTarget } from "../utils/transport";
+import { keyAction, loopSeek, spacePresses, stepTarget } from "../utils/transport";
 
 type Args = {
   player: YouTubePlayerApi;
@@ -127,6 +127,8 @@ export function usePreviewEffects(a: Args) {
         e.preventDefault();
         argsRef.current.toggleLoop();
       } else if (act.kind === "toggle") {
+        // A focused button, switch or menu item takes Space itself (it presses); only elsewhere it is play/pause.
+        if (spacePresses(e.target as HTMLElement | null)) return;
         e.preventDefault();
         if (!e.repeat) (p.playing ? p.pause : p.play)();
       } else if (act.kind === "pause") {

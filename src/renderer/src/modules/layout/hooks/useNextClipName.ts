@@ -1,9 +1,10 @@
 /**
  * File: useNextClipName.ts
  * Path: src/renderer/src/modules/layout/hooks/useNextClipName.ts
- * Description: The name the next clip will get ("Honest Version"), published by the timeline and
- *   read by the bottom bar's audio-language menu to list the files the next Clip makes. Null while
- *   there is no name to show.
+ * Description: The name the next clip will get ("Honest Version"), published by the timeline (the name
+ *   typed on the Clips lane, else the suggestion) and read by the bottom bar's audio-language menu and
+ *   by the cut itself (getNextClipName) so the clip, its file and its project share one name. Null
+ *   while there is no name to show.
  */
 import { useSyncExternalStore } from "react";
 

@@ -17,5 +17,5 @@ test("zoom is clamped, Fit resets it and counts, the tool changes", () => {
   assert.deepEqual([getToolStateForTest().zoom, getToolStateForTest().fitRequests], [0, 1]);
   setTool("flag");
   assert.equal(getToolStateForTest().tool, "flag");
-  assert.equal(clampZoom(12.6), 13);
+  assert.equal(clampZoom(12.64), 12.6, "tenths, so Fit can frame a range as the board does");
 });

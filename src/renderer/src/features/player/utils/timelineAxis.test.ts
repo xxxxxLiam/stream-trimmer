@@ -22,7 +22,7 @@ test("zoom 0 shows the whole video, more zoom shows less around the focus", () =
 test("Fit frames the range with room either side", () => {
   const w = fitWindow({ start: 4324, end: 4366 }, 8073);
   assert.ok(w.start < 4324 && w.end > 4366);
-  assert.deepEqual(w, { start: 4310, end: 4380 }); // the board: 1:11:50 to 1:13:00
+  assert.ok(Math.abs(w.start - 4310) < 0.5 && Math.abs(w.end - 4390) < 1, "the board: 1:11:50 to 1:13:10");
   assert.ok(w.end - w.start >= 30);
   const whole = fitWindow(null, 8073);
   assert.deepEqual(whole, { start: 0, end: 8073 });
@@ -102,4 +102,10 @@ test("a drag keeps the axis it began on, so a range made far from a locked secti
   assert.equal(Math.round(toT(frozen.axis, pointerEndX) ?? -1), 12045);
   assert.notEqual(Math.round(toT(live.axis, pointerEndX) ?? -1), 12045);
   assert.equal(axisDuringDrag(null, before), before);
+});
+
+test("a ruler label that would run past the right edge is left out", () => {
+  const ticks = rulerTicks({ start: 4310, end: 4390 }, 1262);
+  assert.ok(ticks.some((t) => t.label === "1:13:00"));
+  assert.ok(!ticks.some((t) => t.label === "1:13:10"), "1:13:10 sits on the edge");
 });

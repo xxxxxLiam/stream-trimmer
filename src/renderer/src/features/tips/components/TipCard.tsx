@@ -2,16 +2,20 @@
  * File: TipCard.tsx
  * Path: src/renderer/src/features/tips/components/TipCard.tsx
  * Description: The first-use pointer card: a dotted Ice ring on the control, and a small card beside
- *   it with one sentence, "1 of 3", Next or Got it, and a "Turn off tips" link on every tip. Esc
- *   closes; Enter and the arrow keys move between steps.
+ *   it with one sentence, "1 of 3", Next or Got it, "Skip step" and Next or Got it, and a "Turn off tips" link on every tip. A step that names a
+ *   key or a control finishes when the person does it. Keys act only while focus is inside the card, so
+ *   Enter on any other button keeps its own job.
  */
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { TipStep } from "../utils/tipRegistry";
+import { clickAdvances, keyAdvances, typingInField } from "../utils/tipAdvance";
 
 export type TipCardProps = {
   step: number;
   total: number;
   text: string;
   target: string;
+  advanceOn?: TipStep["advanceOn"];
   onNext: () => void;
   onBack: () => void;
   onDone: () => void;
@@ -20,7 +24,17 @@ export type TipCardProps = {
 
 type Box = { top: number; left: number; width: number; height: number };
 
-export default function TipCard({ step, total, text, target, onNext, onBack, onDone, onTurnOff }: TipCardProps) {
+export default function TipCard({
+  step,
+  total,
+  text,
+  target,
+  advanceOn,
+  onNext,
+  onBack,
+  onDone,
+  onTurnOff,
+}: TipCardProps) {
   const [box, setBox] = useState<Box | null>(null);
   const last = step + 1 >= total;
 
@@ -32,51 +46,100 @@ export default function TipCard({ step, total, text, target, onNext, onBack, onD
     setBox({ top: r.top, left: r.left, width: r.width, height: r.height });
   }, [target]);
 
+  const next = useRef(onNext);
+  next.current = onNext;
+
+  // The real action finishes the step. The action itself is never cancelled; the card moves on a beat later.
   useEffect(() => {
+    if (!advanceOn) return;
+    const step: TipStep = { target, text, advanceOn };
+    let t: number | undefined;
+    const go = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => next.current(), 150);
+    };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDone();
-      else if (e.key === "Enter" || e.key === "ArrowRight") {
-        e.preventDefault();
-        onNext();
-      } else if (e.key === "ArrowLeft") onBack();
+      if (!typingInField(e.target) && keyAdvances(step, e)) go();
+    };
+    const onClick = (e: MouseEvent) => {
+      if (clickAdvances(step, e.target as Element | null)) go();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onNext, onBack, onDone]);
+    document.addEventListener("click", onClick);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onClick);
+    };
+  }, [advanceOn, target, text]);
+
+  // Only while focus is inside the card. Enter needs no handler: it presses the focused button.
+  const onCardKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onDone();
+    } else if (e.key === "ArrowRight") onNext();
+    else if (e.key === "ArrowLeft") onBack();
+  };
 
   if (!box) return null;
   const below = box.top + box.height + 8;
-  const top = below + 150 > window.innerHeight ? Math.max(8, box.top - 150) : below;
-  const left = Math.min(Math.max(8, box.left), Math.max(8, window.innerWidth - 288));
+  const top =
+    below + 150 > window.innerHeight ? Math.max(8, box.top - 150) : below;
+  const left = Math.min(
+    Math.max(8, box.left),
+    Math.max(8, window.innerWidth - 288),
+  );
   return (
     <>
       <div
         aria-hidden="true"
         className="pointer-events-none fixed z-[60] rounded-control border border-dotted border-ice"
-        style={{ top: box.top - 3, left: box.left - 3, width: box.width + 6, height: box.height + 6 }}
+        style={{
+          top: box.top - 3,
+          left: box.left - 3,
+          width: box.width + 6,
+          height: box.height + 6,
+        }}
       />
       <div
         role="dialog"
         aria-label="Tip"
         className="fixed z-[60] flex w-[280px] flex-col gap-[8px] rounded-panel border border-hairlineStrong bg-raised p-[16px]"
         style={{ top, left }}
+        onKeyDown={onCardKey}
       >
         <span className="text-meta text-fg-dim">
           {step + 1} of {total}
         </span>
         <p className="m-[0px] text-body text-fg">{text}</p>
         <div className="flex items-center justify-between gap-[8px]">
-          <button type="button" className="h-target text-meta text-fg-dim hover:text-fg" onClick={onTurnOff}>
-            Turn off tips
-          </button>
           <button
             type="button"
-            autoFocus
-            className="h-target rounded-control border border-hairlineStrong px-[16px] text-body text-fg hover:bg-hover"
-            onClick={onNext}
+            className="h-target text-meta text-fg-dim hover:text-fg"
+            onClick={onTurnOff}
           >
-            {last ? "Got it" : "Next"}
+            Turn off tips
           </button>
+          <div className="flex items-center gap-[8px]">
+            {!last && (
+              <button
+                type="button"
+                className="h-target text-meta text-fg-dim hover:text-fg"
+                onClick={onNext}
+              >
+                Skip step
+              </button>
+            )}
+            <button
+              type="button"
+              autoFocus
+              className="h-target rounded-control border border-hairlineStrong px-[16px] text-body text-fg hover:bg-hover"
+              onClick={onNext}
+            >
+              {last ? "Got it" : "Next"}
+            </button>
+          </div>
         </div>
       </div>
     </>
