@@ -76,6 +76,7 @@ export async function saveFile(payload: any) {
       logger.log("file", "refused save outside the chosen folders");
       return { ok: false, error: dest.error };
     }
+    if (payload?.data == null) throw Object.assign(new Error("no data"), { code: "NOTHING_TO_SAVE" });
     const buf = Buffer.from(payload.data);
     // "wx": never replace a file that is already there; " 2", " 3" instead.
     const target = await writeWithoutOverwrite(dest.target, buf);

@@ -24,7 +24,13 @@ export type UpdateStatusPayload =
   | { state: "error"; message: string; url?: string };
 
 /** Why a save failed: the disk is full, the folder can't be written, the folder is gone, or something else. */
-export type SaveFailureCode = "DISK_FULL" | "FOLDER_NOT_WRITABLE" | "FOLDER_GONE" | "SAVE_FAILED";
+export type SaveFailureCode =
+  | "DISK_FULL"
+  | "FOLDER_NOT_WRITABLE"
+  | "FOLDER_GONE"
+  | "FILE_NAME_INVALID"
+  | "NOTHING_TO_SAVE"
+  | "SAVE_FAILED";
 
 export interface ElectronAPI {
   isElectron: true;
