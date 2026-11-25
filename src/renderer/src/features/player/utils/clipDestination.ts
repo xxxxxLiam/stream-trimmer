@@ -5,7 +5,7 @@
  *   sticks and nothing is chosen for the user (Save to folder is the baseline). Also the reason
  *   Clip is dimmed, which shows on hover and on focus.
  */
-import type { AfterCutting } from "../../../shared/utils/fcpxml";
+import type { AfterCutting, EditorHandoffSettings } from "../../../shared/utils/fcpxml";
 
 export type ClipDestination = "folder" | "premiere" | "finalcut" | "resolve" | "capcut";
 
@@ -56,4 +56,9 @@ export const sectionsLength = (s: readonly Section[]) => s.reduce((n, x) => n + 
 /** The editor to open with the saved clip, for the editors without a project pipeline. */
 export function openInFor(d: ClipDestination): "premiere" | "resolve" | "capcut" | undefined {
   return d === "premiere" || d === "resolve" || d === "capcut" ? d : undefined;
+}
+
+/** The campaign's handoff settings with the chosen destination applied: what happens after a clip is saved. */
+export function settingsWithDestination(settings: EditorHandoffSettings, d: ClipDestination): EditorHandoffSettings {
+  return { ...settings, afterCutting: toAfterCutting(d), openIn: openInFor(d) };
 }

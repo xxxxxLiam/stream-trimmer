@@ -179,6 +179,20 @@ export function resolveEventName(opts: {
   return name || "Clips";
 }
 
+/**
+ * The Final Cut event a campaign's clips land in: the Event typed in the campaign's settings, or
+ * the campaign's name while that is blank. One event per campaign; each source video is a keyword
+ * collection inside it (see `keywordFor`).
+ */
+export function campaignEventName(mediaEvent: string | undefined, campaignName: string | undefined): string {
+  return resolveEventName({ from: "campaign", campaignName: (mediaEvent ?? "").trim() || campaignName });
+}
+
+/** The keyword (and keyword collection) a source video gets: its title, without the commas that split a keyword list. */
+export function keywordFor(sourceTitle: string | undefined): string {
+  return (sourceTitle ?? "").replace(/[,\u0000-\u001F]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 // ---------------------------------------------------------------------------
 // Rational time
 // ---------------------------------------------------------------------------
@@ -517,6 +531,8 @@ export interface FcpClip {
   sourceUrl?: string;
   /** Exact project name typed for this clip; wins over the campaign pattern. */
   projectName?: string;
+  /** Title of the source video: becomes this clip's keyword and keyword collection in the event. */
+  sourceTitle?: string;
   /** From ffprobe on this exact file. */
   media: MediaInfo;
 }
@@ -710,7 +726,12 @@ export function buildFcpxml(input: FcpxmlInput): string {
       `      <asset-clip ref="${assetId}" name="${name}" start="0s" duration="${duration}" ` +
         `format="${formatId}" tcFormat="NDF">` + (notes ? `
         <note>${xmlEscape(noEmDash(notes))}</note>` : "") + `
-        <keyword start="0s" duration="${duration}" value="Raw"/>
+        <keyword start="0s" duration="${duration}" value="Raw"/>` +
+        (keywordFor(clip.sourceTitle)
+          ? `
+        <keyword start="0s" duration="${duration}" value="${attrText(keywordFor(clip.sourceTitle))}"/>`
+          : "") +
+        `
       </asset-clip>`,
     );
 
@@ -748,8 +769,13 @@ export function buildFcpxml(input: FcpxmlInput): string {
   const mediaEvent = input.eventName;
   const projectEvent = input.project?.eventName ?? "";
   const merged = !!input.project && projectEvent.trim() === mediaEvent.trim();
+  // One keyword collection per source video, so each video's clips are one click away in the event.
+  const collections = [...new Set(input.clips.map((c) => keywordFor(c.sourceTitle)).filter(Boolean))].map(
+    (k) => `      <keyword-collection name="${attrText(k)}"/>`,
+  );
   const events: string[] = [
     `    <event name="${attrText(mediaEvent)}">`,
+    ...collections,
     ...mediaItems,
     ...(merged ? projectItems : []),
     `    </event>`,
@@ -788,8 +814,8 @@ export function buildFcpxml(input: FcpxmlInput): string {
 }
 
 /** A filename for the document: event name made safe, with the extension. */
-export function fcpxmlFilename(eventName: string): string {
-  const safe = noEmDash(eventName)
+export function fcpxmlFilename(eventName: string, clipId?: string): string {
+  const safe = noEmDash(clipId ? `${eventName} ${clipId}` : eventName)
     .replace(/[\\/:*?"<>|\u0000-\u001F]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -811,6 +837,8 @@ export interface SessionClip {
   sourceUrl?: string;
   /** Exact project name for this clip, overriding the campaign pattern. */
   projectName?: string;
+  /** Title of the source video: this clip's keyword collection in the event. */
+  sourceTitle?: string;
 }
 
 export interface SessionResult {
@@ -878,7 +906,8 @@ export async function buildSessionFcpxml(
   }
   return {
     xml: buildFcpxml({ eventName, clips: ready, library: options.library, project: options.project }),
-    filename: fcpxmlFilename(eventName),
+    // One clip per document is named for the clip, so a later send never overwrites an earlier file.
+    filename: fcpxmlFilename(eventName, ready.length === 1 ? ready[0].id : undefined),
     included: ready.length,
     projectNames: options.project ? resolveProjectNames(ready, options.project) : [],
     skipped,
