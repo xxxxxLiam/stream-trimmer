@@ -17,7 +17,7 @@ export interface Look {
   clip: string;
   /** Plain words for what was found, shown in the dialog. */
   found: string[];
-  /** The export's own frame size and rate (e.g. fps "25"), once Engine reads them; the Timeline switch names it. */
+  /** The export's own timeline frame size and rate (fps as a plain number text such as "25" or "29.97"); the Timeline switch names it. Absent when the export does not say. */
   format?: { width: number; height: number; fps: string };
 }
 
@@ -131,6 +131,28 @@ function find(nodes: XmlNode[], name: string): XmlNode | undefined {
  */
 const KEPT_CHILDREN = /^(?:adjust-(?!colorConform$)[\w-]+|audio-channel-source|audio-role-source|filter-video|filter-video-mask|filter-audio)$/;
 
+/** "1/25s" gives "25", "1001/30000s" gives "29.97": the frame rate as plain text, or null. */
+export function fpsText(frameDuration: string | undefined): string | null {
+  const m = /^(\d+)\/(\d+)s$/.exec((frameDuration ?? "").trim());
+  if (!m || Number(m[1]) === 0) return null;
+  const fps = Number(m[2]) / Number(m[1]);
+  for (const ntsc of [23.976, 29.97, 59.94, 119.88]) if (Math.abs(fps - ntsc) < 0.01) return String(ntsc);
+  return Number.isFinite(fps) && fps > 0 ? String(Number(fps.toFixed(3))) : null;
+}
+
+/** The frame size and rate of the first sequence's format, from the export's resources. */
+function sequenceFormat(tree: XmlNode[], source: string): Look["format"] {
+  const seq = find(tree, "sequence");
+  const id = /\sformat="([^"]+)"/.exec(seq?.open ?? "")?.[1];
+  const node = (find(tree, "resources")?.children ?? []).find((n) => n.name === "format" && new RegExp(`\\sid="${(id ?? "\u0000").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`).test(n.open));
+  if (!node) return undefined;
+  const attr = (k: string) => new RegExp(`\\s${k}="([^"]*)"`).exec(node.open)?.[1];
+  const width = Number(attr("width"));
+  const height = Number(attr("height"));
+  const fps = fpsText(attr("frameDuration"));
+  return width > 0 && height > 0 && fps ? { width, height, fps } : undefined;
+}
+
 /** Read the look off the first clip on the first timeline of an exported project. */
 export function parseLook(text: string): Look {
   const source = plainTextOf(text).trim();
@@ -189,5 +211,6 @@ export function parseLook(text: string): Look {
   if (/<adjust-voiceIsolation\b/.test(clip)) found.push("Voice Isolation");
   if (found.length === 0) found.push("Your changes");
 
-  return { version, effects, clip, found };
+  const format = sequenceFormat(tree, source);
+  return { version, effects, clip, found, ...(format ? { format } : {}) };
 }
