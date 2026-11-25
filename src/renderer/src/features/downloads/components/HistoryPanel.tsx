@@ -4,12 +4,13 @@
  * Description: The History panel: every clip already made, grouped by day, with the pill search.
  *   Rows show a thumbnail slot, name, "length · campaign · time" and a ⋯ menu (Show in Finder, In editor, Go to source).
  */
+import { useState } from "react";
 import HandoffRow from "../../clips/components/HandoffRow";
 import { useHandoffNotice } from "../../clips/hooks/useHandoffNotice";
 import { getClipDestination } from "../../player/hooks/useClipDestination";
 import PillSearch from "../../../shared/components/PillSearch";
 import ActionRow from "../../../shared/components/ActionRow";
-import { IconInEditor, IconJumpToSource, IconShowFile } from "../../../shared/components/rowIcons";
+import { IconInEditor, IconJumpToSource, IconRemove, IconShowFile } from "../../../shared/components/rowIcons";
 import { clipTitle } from "../../../shared/utils/downloads";
 import { useHistoryController } from "../hooks/useHistoryController";
 import { cacheNote } from "../utils/cacheText";
@@ -20,6 +21,7 @@ const SHOW_LABEL = IS_MAC ? "Show in Finder" : "Show in File Explorer";
 
 export default function HistoryPanel() {
   const h = useHistoryController();
+  const [confirmClear, setConfirmClear] = useState(false);
   // In editor on a row answers here too, not only on the Export tab (a failure is never silent).
   const handoff = useHandoffNotice(null, true);
 
@@ -58,6 +60,7 @@ export default function HistoryPanel() {
                     { key: "show", label: SHOW_LABEL, icon: <IconShowFile />, onSelect: () => h.show(e), disabled: !e.path || h.missing[e.id] },
                     { key: "editor", label: "In editor", icon: <IconInEditor />, onSelect: () => h.inEditor(e), disabled: !e.path || h.missing[e.id] },
                     { key: "source", label: "Go to source", icon: <IconJumpToSource />, onSelect: () => h.jump(e), disabled: !h.canJump(e) },
+                    { key: "remove", label: "Remove from history", icon: <IconRemove />, onSelect: () => h.remove(e.id), danger: true },
                   ]}
                 >
                   <div
@@ -76,6 +79,32 @@ export default function HistoryPanel() {
               ))}
             </section>
           ))
+        )}
+        {h.total > 0 && (
+          <div className="mx-[6px] my-[8px] flex items-center gap-[8px] px-[8px] text-meta leading-[normal] text-fg-dim">
+            <span className="min-w-0 flex-1">{confirmClear ? "Clear all history? Exported files stay on disk." : "Exported files stay on disk."}</span>
+            {confirmClear ? (
+              <>
+                <button type="button" onClick={() => setConfirmClear(false)} className="h-[44px] shrink-0 rounded-control px-[8px] text-fg hover:bg-hover">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    h.clearAll();
+                    setConfirmClear(false);
+                  }}
+                  className="h-[44px] shrink-0 rounded-control border border-error px-[8px] text-error hover:bg-hover"
+                >
+                  Clear all
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setConfirmClear(true)} className="h-[44px] shrink-0 rounded-control px-[8px] text-fg hover:bg-hover">
+                Clear all history
+              </button>
+            )}
+          </div>
         )}
         {h.cache.bytes > 0 && (
           <div className="mx-[6px] my-[8px] flex items-center gap-[8px] px-[8px] text-meta leading-[normal] text-fg-dim">
