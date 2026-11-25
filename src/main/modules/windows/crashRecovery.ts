@@ -35,3 +35,18 @@ export function crashedUrl(appUrl: string): string {
   u.search = CRASHED_QUERY;
   return u.toString();
 }
+
+/**
+ * What the window loads after its page process died: the app on the crash screen, the static fallback page, or
+ * nothing (a deliberate close). The one place that turns a death into an address, so a test can pin it (E3-2).
+ */
+export function pageAfterDeath(
+  recovery: { onGone(reason: string): "reload" | "fallback" | "leave" },
+  reason: string,
+  appUrl: string,
+  fallbackUrl: () => string,
+): string | null {
+  const what = recovery.onGone(reason);
+  if (what === "leave") return null;
+  return what === "fallback" ? fallbackUrl() : crashedUrl(appUrl);
+}

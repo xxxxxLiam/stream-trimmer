@@ -14,7 +14,7 @@ import { isDev } from "../../shared/utils/env";
 import { rememberUiPort } from "./symbolsWindow";
 import { isAppUrl, isSafeExternalUrl } from "./navigationGuard";
 import os from "node:os";
-import { createCrashRecovery, crashedUrl } from "./crashRecovery";
+import { createCrashRecovery, pageAfterDeath } from "./crashRecovery";
 import { crashFallbackUrl, fallbackAction, isFallbackUrl } from "./crashFallback";
 import { createFallbackController } from "./crashFallbackActions";
 import { readLogScrubbed } from "../../features/diagnostics/services/diagnosticsService";
@@ -199,15 +199,12 @@ export async function createWindow(port: number) {
   // If the page process dies, reload it once with the crashed flag so the app can say so (and offer Send report).
   const recovery = createCrashRecovery();
   mainWindow.webContents.on("render-process-gone", (_e: unknown, details: Electron.RenderProcessGoneDetails) => {
-    const what = recovery.onGone(details?.reason ?? "crashed");
-    if (what === "leave") return;
     // A second death inside a minute gets the static page, which has no script to die again.
-    if (what === "fallback") {
+    const next = pageAfterDeath(recovery, details?.reason ?? "crashed", appUrl, () => {
       fallback.reset();
-      loadInWindow(crashFallbackUrl());
-      return;
-    }
-    loadInWindow(crashedUrl(appUrl));
+      return crashFallbackUrl();
+    });
+    if (next) loadInWindow(next);
   });
 
   if (isDev) {
