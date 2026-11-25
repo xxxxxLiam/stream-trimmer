@@ -46,7 +46,8 @@ export type CampaignInput = Partial<Omit<Campaign, "id" | "usedRanges">> & {
 };
 
 /** A stored length rule end: whole seconds from 1 to 24 hours. */
-const isRuleSec = (v: unknown): v is number => typeof v === "number" && v >= 1 && v <= 86400;
+export const MAX_RULE_SEC = 86400;
+const isRuleSec = (v: unknown): v is number => typeof v === "number" && v >= 1 && v <= MAX_RULE_SEC;
 
 /** Clips a day a campaign starts with, and what an older campaign with none gets. */
 export const DEFAULT_DAILY_QUOTA = 3;
@@ -407,13 +408,17 @@ export function addUsedRanges(
   return { ...c, usedRanges: { ...c.usedRanges, [videoId]: next } };
 }
 
-/** Clips this campaign made today (local day), counting a joined clip once however many ranges it has. */
+/**
+ * Clips this campaign made today (local day), counting a joined clip once however many ranges it has. A clip is its
+ * id and the moment it was made: a Clip-button clip's id is the suggested name (the video title), so three clips cut
+ * from one video share it and must still count three. The ranges of one joined clip share their moment.
+ */
 export function clipsMadeToday(c: Campaign | null | undefined, now: number = Date.now()): number {
   if (!c) return 0;
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const ids = new Set<string>();
   for (const list of Object.values(c.usedRanges)) {
-    for (const u of list) if (u.clipId && typeof u.at === "number" && u.at >= dayStart) ids.add(u.clipId);
+    for (const u of list) if (u.clipId && typeof u.at === "number" && u.at >= dayStart) ids.add(`${u.clipId}|${u.at}`);
   }
   return ids.size;
 }

@@ -106,3 +106,12 @@ test("only the two choices are accepted", () => {
   for (const bad of [undefined, "", "later", "FRESH", 1, {}]) assert.equal(answerStartFresh(bad, s as never, { documentsDir: tmp() }).ok, false);
   assert.equal(s.all()["clipper.bank"].length, 2);
 });
+
+test("an answered prompt is not due again in the same run, so a page reload cannot ask it twice", () => {
+  for (const choice of ["keep", "fresh"] as const) {
+    const { s } = open(OLD);
+    assert.equal(isStartFreshPending(s as never, {}), true);
+    assert.equal(answerStartFresh(choice, s as never, { documentsDir: tmp() }).ok, true);
+    assert.equal(isStartFreshPending(s as never, {}), false, choice);
+  }
+});

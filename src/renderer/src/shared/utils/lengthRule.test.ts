@@ -46,3 +46,15 @@ test("the export bar uses the joined total, keeps Ice only while it fits, and ne
   assert.doesNotMatch(bar, /verdict[^\n]*text-error|text-error[^\n]*verdict/);
   assert.match(readFileSync(new URL("../../features/player/hooks/useTimelineController.ts", import.meta.url), "utf8"), /totalSeconds: total/);
 });
+
+test("V18-F-3: a length above 24 hours is refused with a sentence, so it can never vanish after a relaunch", () => {
+  const src = readFileSync(new URL("../../features/settings/components/SettingsCampaign.tsx", import.meta.url), "utf8");
+  assert.match(src, /parsed > MAX_RULE_SEC/);
+  assert.match(src, /at most 24:00:00/);
+});
+
+test("V18-F-4: typing past the other end swaps the two in one step", () => {
+  const src = readFileSync(new URL("../../features/settings/components/SettingsCampaign.tsx", import.meta.url), "utf8");
+  assert.match(src, /lengthMinSec: end === "min" \? other : next, lengthMaxSec: end === "min" \? next : other/);
+  assert.doesNotMatch(src, /must not be longer than the second/);
+});
