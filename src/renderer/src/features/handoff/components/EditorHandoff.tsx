@@ -36,6 +36,7 @@ import {
 } from "../../../shared/utils/fcpxml";
 import { mergeSessionClips, sessionCampaignKey, writeClipboard } from "../../../shared/utils/handoff";
 import { parseLook } from "../utils/look";
+import LookEditor from "./LookEditor";
 
 type Result = { ok: boolean; error?: string; missing?: string; path?: string };
 
@@ -803,6 +804,15 @@ export default function EditorHandoff({
                   </select>
                 </label>
               </div>
+            </Section>
+            <Section
+              panelId={`${titleId}-look`}
+              title="My look"
+              summary={look.summary}
+              open={section === "look"}
+              onToggle={() => toggle("look")}
+            >
+              <LookEditor settings={settings} onChange={set} />
             </Section>
             <Section
               panelId={`${titleId}-capcut`}

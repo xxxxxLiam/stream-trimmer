@@ -8,10 +8,11 @@
  *   three steps for making the file in place. Logic-free.
  */
 import { useState } from "react";
-import type { SavedLook } from "../../../shared/utils/looks";
+
+export type SavedLookRow = { id: string; name: string };
 
 export type FinalCutLookProps = {
-  saved: SavedLook[];
+  saved: SavedLookRow[];
   currentId: string | null;
   /** Plain words for what the current look carries, e.g. "Scale 120%, Colour Board". */
   found: string;

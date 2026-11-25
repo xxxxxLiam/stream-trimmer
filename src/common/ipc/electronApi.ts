@@ -27,8 +27,6 @@ export interface ElectronAPI {
   settingsSnapshot?: Record<string, unknown>;
   setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean }>;
   pickDirectory: () => Promise<string | null>; pickFcpLibrary?: () => Promise<string | null>;
-  /** Opens a Final Cut export (bundle, .fcpxml, .txt or .xml); gives the text, or a plain reason. */
-  pickFinalCutLook?: () => Promise<unknown>;
   /** Folders to fall back to on a fresh install; null if they could not be made. */
   getDefaultFolders?: () => Promise<{ clipsDir: string; dataDir: string } | null>;
   saveFile: (payload: {

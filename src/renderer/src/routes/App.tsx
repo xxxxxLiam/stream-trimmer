@@ -4,7 +4,7 @@
  * Description: Root layout. Header, three-column workspace (transcript | centre | clips),
  *   footer, and the Phase B mount points. See BUILD-SPEC sections 3 and 12.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "../modules/clipper/hooks/ClipperContext";
@@ -19,7 +19,7 @@ import {
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
-import ChannelExportPanel from "../features/channelExport/components/ChannelExportPanel";
+import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
 import { CHANNEL_DATA_BUILT, useOwnerAccess } from "../shared/utils/ownerGate";
 import EditorHandoff, { runAfterCutting } from "../features/handoff/components/EditorHandoff";
 import {
@@ -47,7 +47,6 @@ import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
-import { looksStore, migrateLooks, withResolvedLook } from "../shared/utils/looks";
 import ImportDrawer from "../features/import/components/ImportDrawer";
 import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
@@ -58,16 +57,14 @@ import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
 import { getClipDestination } from "../features/player/hooks/useClipDestination";
 import { openInFor, toAfterCutting } from "../features/player/utils/clipDestination";
-import { buildCopyBlocksInput } from "../features/handoff/utils/copyBlocksInput";
 // Phase B mount points. Replace the files, never this wiring.
 import CampaignMenu from "../features/campaigns/components/CampaignMenu";
 import HelpDrawer from "../features/help/components/HelpDrawer"; // B6, right drawer
 import { useDayHost } from "../features/workspace/hooks/useDayHost";
-import SymbolPalette from "../features/handoff/components/SymbolPalette"; // B5, overlay
+import SymbolsDialog from "../features/symbols/components/SymbolsDialog"; // browser fallback of the Symbols window
 import CampaignStart from "../features/campaigns/components/CampaignStart";
 import SettingsDrawer from "../features/settings/components/SettingsDrawer";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
-import CopyBlocks from "../features/handoff/components/CopyBlocks"; // B5, overlay
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
 function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
@@ -79,27 +76,17 @@ const EDITOR_KEY = "clipper.editorHandoff";
 
 /** "After cutting" settings, kept per campaign beside the other campaign fields. */
 function useEditorSettings(campaignId: string | null) {
-  const [all, setAll] = useState<Record<string, unknown>>(() => {
-    // The old pasted look moves into the saved-looks list once.
-    const stored = readSetting<Record<string, unknown>>(EDITOR_KEY, {});
-    const m = migrateLooks(looksStore.get(), stored);
-    if (m.changed) {
-      looksStore.set(m.looks);
-      writeSetting(EDITOR_KEY, m.perCampaign);
-    }
-    return m.perCampaign;
-  });
-  const looks = useSyncExternalStore(looksStore.subscribe, looksStore.get, looksStore.get);
-  const settings: EditorHandoffSettings = withResolvedLook(
-    campaignId ? normalizeEditorSettings(all[campaignId]) : DEFAULT_EDITOR_SETTINGS,
-    looks,
+  const [all, setAll] = useState<Record<string, unknown>>(() =>
+    readSetting<Record<string, unknown>>(EDITOR_KEY, {}),
   );
+  const settings: EditorHandoffSettings = campaignId
+    ? normalizeEditorSettings(all[campaignId])
+    : DEFAULT_EDITOR_SETTINGS;
   const setSettings = useCallback(
     (next: EditorHandoffSettings) => {
       if (!campaignId) return;
       setAll((prev) => {
-        // The look's text lives in the saved list, not in each campaign.
-        const merged = { ...prev, [campaignId]: { ...next, lookXml: "", applyLook: false } };
+        const merged = { ...prev, [campaignId]: next };
         writeSetting(EDITOR_KEY, merged);
         return merged;
       });
@@ -172,7 +159,7 @@ function SavedToast() {
   );
 }
 
-const NO_CHANNEL = { exporting: false, channelUrl: "", cancelExport: () => {} };
+const NO_CHANNEL = { exporting: false, channelUrl: "", cancelExport: () => {}, setChannelUrl: (_url: string) => {} };
 
 /**
  * Channel exporter state. CHANNEL_DATA_BUILT is a compile-time constant, so in a
@@ -244,10 +231,10 @@ function Layout({ active }: { active: boolean }) {
   } = useCampaign();
   const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
   const lowQuality = useSignInSignalEffects();
-  const [screen, setScreen] = useState<"workspace" | "channel">("workspace");
+  const [channelOpen, setChannelOpen] = useState(false);
+  const channel = useChannelState();
   const [helpOpen, setHelpOpen] = useState(false);
   const [symbolsOpen, setSymbolsOpen] = useState(false);
-  const [copyOpen, setCopyOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const tips = useTipsController(!!info);
   const [importText, setImportText] = useState<string | null>(null);
@@ -260,26 +247,6 @@ function Layout({ active }: { active: boolean }) {
   // campaign up, and that is a legitimate way to use the app.
   const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
 
-  // Live input for the Copy blocks panel (D-3). The transcript loads on demand, so opening
-  // the panel asks for it rather than showing "No transcript loaded" for a video that has one.
-  useEffect(() => {
-    if (active && copyOpen && videoId) ensureTranscript();
-  }, [active, copyOpen, videoId, ensureTranscript]);
-  const copyInput = useMemo(
-    () =>
-      buildCopyBlocksInput({
-        sourceUrl,
-        videoId,
-        transcript,
-        segments: tabSegments,
-        campaign,
-        nextClipId:
-          campaign && videoId
-            ? nextClipId(videoId, downloads.map((d) => d.label.replace(/\.[^.]+$/, "")))
-            : null,
-      }),
-    [sourceUrl, videoId, transcript, tabSegments, campaign, nextClipId, downloads],
-  );
 
   const ownerAccess = useOwnerAccess();
   const channelAvailable = CHANNEL_DATA_BUILT && ownerAccess;
@@ -309,7 +276,6 @@ function Layout({ active }: { active: boolean }) {
     setHelpStartAt(null);
   }, []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
-  const closeCopy = useCallback(() => setCopyOpen(false), []);
   const closeSettings = useCallback(() => {
     setSettingsOpen(false);
     setSettingsStartAt(null);
@@ -449,10 +415,7 @@ function Layout({ active }: { active: boolean }) {
         setHelpOpen((v) => !v);
       } else if (k === ";" && !e.shiftKey) {
         e.preventDefault();
-        setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; });
-      } else if (k === "c" && e.shiftKey) {
-        e.preventDefault();
-        setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; });
+        setSymbolsOpen((v) => !v);
       } else if (k === "," && !e.shiftKey) {
         e.preventDefault();
         setSettingsOpen((v) => !v);
@@ -481,6 +444,10 @@ function Layout({ active }: { active: boolean }) {
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
+    openChannel: (url) => {
+      if (url) channel.setChannelUrl(url);
+      setChannelOpen(true);
+    },
     editorHandoff: {
       settings: editorSettings,
       onChange: setEditorSettings,
@@ -500,10 +467,8 @@ function Layout({ active }: { active: boolean }) {
 
   // Overlays that are not panels. They stay one key (and one Panels menu row) away.
   const overlayItems: MenuItem[] = [
-    { key: "copy", label: "Copy blocks", onSelect: () => setCopyOpen((v) => { if (!v) setSymbolsOpen(false); return !v; }) },
-    { key: "symbols", label: "Symbols", onSelect: () => setSymbolsOpen((v) => { if (!v) setCopyOpen(false); return !v; }) },
     ...(CHANNEL_DATA_BUILT && channelAvailable
-      ? [{ key: "channel", label: screen === "channel" ? "Back to workspace" : "Channel data", onSelect: () => setScreen(screen === "channel" ? "workspace" : "channel") } as MenuItem]
+      ? [{ key: "channel", label: "Channel data", onSelect: () => setChannelOpen((v) => !v) } as MenuItem]
       : []),
   ];
   // The campaign menu's "<Campaign> settings" row calls this. The Start, Settings and Help build
@@ -518,6 +483,10 @@ function Layout({ active }: { active: boolean }) {
         flushAutoLoad();
       },
       onMoments: (text) => setImportText(text),
+      onChannel: (url) => {
+        channel.setChannelUrl(url);
+        setChannelOpen(true);
+      },
     },
     { isChannelUrl: CHANNEL_DATA_BUILT && channelAvailable ? isLikelyChannelUrl : undefined },
   );
@@ -532,7 +501,7 @@ function Layout({ active }: { active: boolean }) {
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
-        {!info && !(CHANNEL_DATA_BUILT && screen === "channel") ? (
+        {!info ? (
           <ColdStartScreen />
         ) : (
         <>
@@ -552,27 +521,16 @@ function Layout({ active }: { active: boolean }) {
           campaignMenu={<CampaignMenu onOpenSettings={openCampaignSettings} />}
           panelsMenuExtras={overlayItems}
         />
-        {!(CHANNEL_DATA_BUILT && screen === "channel") ? (
-          <PanelHostProvider value={panelHost}>
-            <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
-              <PanelWorkspace />
-              <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
-              {settingsDrawer}
-              <ImportDrawer text={importText} onClose={() => setImportText(null)} />
-              {tips.card && importText === null && !helpOpen && <TipCard {...tips.card} />}
-            </div>
-          </PanelHostProvider>
-        ) : (
+        <PanelHostProvider value={panelHost}>
           <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2">
-              <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
-                {/* Channel exporter: only in a VITE_ENABLE_CHANNEL_DATA build, on an owner machine. */}
-                {channelAvailable && <ChannelExportPanel />}
-              </div>
-            </div>
+            <PanelWorkspace />
             <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
+            {settingsDrawer}
+            <ImportDrawer text={importText} onClose={() => setImportText(null)} />
+            {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}
+            {tips.card && importText === null && !helpOpen && <TipCard {...tips.card} />}
           </div>
-        )}
+        </PanelHostProvider>
         <BottomBar
           clipCount={languagePlans.length}
           tracks={info?.audioTracks}
@@ -597,8 +555,7 @@ function Layout({ active }: { active: boolean }) {
         onClose={() => setCampaignPromptDismissed(true)}
         onChosen={() => setCampaignPromptDismissed(true)}
       />
-      <SymbolPalette open={symbolsOpen} onClose={closeSymbols} />
-      <CopyBlocks open={copyOpen} onClose={closeCopy} input={copyInput} />
+      <SymbolsDialog open={symbolsOpen} onClose={closeSymbols} />
       {active && <SavedToast />}
     </>
   );

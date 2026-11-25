@@ -7,12 +7,12 @@
  */
 import type { ReactNode } from "react";
 
-export function Drawer({ label, children }: { label: string; children: ReactNode }) {
+export function Drawer({ label, children, padClass = "pl-[16px] pr-[17px] pb-[20px] pt-[17px]" }: { label: string; children: ReactNode; /** Inner padding; the boards differ (Channel data pads 20). */ padClass?: string }) {
   return (
     <aside
       role="dialog"
       aria-label={label}
-      className="box-border flex h-full w-[440px] flex-col border-l border-hairlineStrong bg-panel pl-[16px] pr-[17px] pb-[20px] pt-[17px]"
+      className={`box-border flex h-full w-[440px] flex-col border-l border-hairlineStrong bg-panel ${padClass}`}
     >
       {children}
     </aside>

@@ -5,7 +5,7 @@
  *   z-indexes the product actually uses; the live click is verified in the audit harness.
  */
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -42,15 +42,11 @@ test("F-3: the help button is drawn above every other z-index in the app", () =>
   assert.ok(HELP_BUTTON_Z > highest, `help button z ${HELP_BUTTON_Z} must exceed ${highest}`);
 });
 
-test("F-3: Symbols and Copy blocks are the one centred dialog, not two shapes", () => {
-  // They were a right-edge drawer plus two panels pinned under the header, which needed
-  // clearance maths between them to avoid overlapping. One shape removes that whole class
-  // of bug, so the rule worth protecting is that none of them grows its own overlay again.
+test("F-3: Copy blocks and the Symbols palette are gone; Symbols in the browser build uses the shared dialog", () => {
   for (const f of ["features/handoff/components/SymbolPalette.tsx", "features/handoff/components/CopyBlocks.tsx"]) {
-    const src = readFileSync(join(SRC, f), "utf8");
-    assert.match(src, /<CentredDialog\b/, `${f} must render the shared dialog`);
-    assert.doesNotMatch(src, /className="surface-panel fixed/, `${f} must not pin its own panel`);
+    assert.equal(existsSync(join(SRC, f)), false, `${f} was replaced by the Transcript Copy menu and the Symbols window`);
   }
+  assert.match(readFileSync(join(SRC, "features/symbols/components/SymbolsDialog.tsx"), "utf8"), /<CentredDialog\b/);
 });
 
 test("F-3: the dialog layer is above the app and below the spotlight", () => {

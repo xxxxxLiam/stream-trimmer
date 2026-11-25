@@ -75,8 +75,7 @@ test("Languages show only when the open video has dubs", () => {
 });
 
 test("Final Cut library and event appear only when Final Cut is ticked", () => {
-  const h = renderToStaticMarkup(<SettingsCampaign {...campaign} finalCut={{ library: "Acme.fcpbundle", event: "Acme", onChoose: noop, onEvent: noop, look: { saved: [], currentId: null, found: "", problem: "", open: false, guide: false, inputRef: { current: null }, onToggleOpen: noop, onToggleGuide: noop, onChoose: noop, onFile: noop, onPick: noop, onRemove: noop, usedIds: [] } }} />);
-  assert.match(h, /Your look/);
+  const h = renderToStaticMarkup(<SettingsCampaign {...campaign} finalCut={{ library: "Acme.fcpbundle", event: "Acme", onChoose: noop, onEvent: noop }} />);
   assert.match(h, /role="group" aria-label="Final Cut Pro"/);
   assert.match(h, /value="Acme\.fcpbundle"/);
   assert.match(h, /aria-label="Choose the Final Cut library for Acme"/);

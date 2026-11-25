@@ -9,7 +9,10 @@ import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/compone
 import FinalCutLook, { type FinalCutLookProps } from "./FinalCutLook";
 import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
-export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void; look: FinalCutLookProps };
+export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void;
+  /** The "Your look" row; shown when the look files can be read (needs the Engine look reader). */
+  look?: FinalCutLookProps;
+};
 
 export type SettingsCampaignProps = {
   name: string;
@@ -125,7 +128,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           </div>
           <label htmlFor="fcp-event" className="text-meta text-fg-dim">Event</label>
           <input id="fcp-event" type="text" value={p.finalCut.event} onChange={(e) => p.finalCut?.onEvent(e.target.value)} className={fieldInput} />
-          <FinalCutLook {...p.finalCut.look} />
+          {p.finalCut.look && <FinalCutLook {...p.finalCut.look} />}
           <p className="m-[0px] text-meta text-fg-dim">Each video gets its own keyword collection inside the event. Shown only while Final Cut Pro is ticked in the Clip menu.</p>
         </div>
       )}
