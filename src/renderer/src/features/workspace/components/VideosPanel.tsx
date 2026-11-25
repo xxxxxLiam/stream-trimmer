@@ -2,8 +2,7 @@
  * File: VideosPanel.tsx
  * Path: src/renderer/src/features/workspace/components/VideosPanel.tsx
  * Description: The Videos panel (left group). One video is open at a time; the rest wait here.
- *   Pick one to open it, ⋯ on a row opens Mark done, Open on YouTube and Remove video, paste a link to open that
- *   video. Done videos fold away with an 8 s Undo line. Logic lives in useVideosController.
+ *   Pick one to open it, ⋯ on a row opens Mark done, Open on YouTube and Remove video, Done videos fold away with an 8 s Undo line. Logic lives in useVideosController.
  */
 import VideoThumb from "../../../shared/components/VideoThumb";
 import type { KeyboardEvent } from "react";
@@ -117,14 +116,11 @@ export default function VideosPanel() {
         ))}
         <input
           type="text"
-          aria-label="Search videos or paste a link"
+          aria-label="Search your videos"
           value={v.text}
           onChange={(e) => v.setText(e.target.value)}
           onKeyDown={onKey}
-          onPaste={(e) => {
-            if (v.pasteText(e.clipboardData.getData("text"))) e.preventDefault();
-          }}
-          placeholder={v.pills.length ? "" : "Search or paste a link"}
+          placeholder={v.pills.length ? "" : "Search your videos"}
           autoComplete="off"
           spellCheck={false}
           className="min-w-[48px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim"
@@ -135,11 +131,6 @@ export default function VideosPanel() {
           </button>
         )}
       </div>
-      {v.linkError && (
-        <p role="alert" className="m-[0px] -mt-[4px] mb-[6px] px-[24px] text-meta text-error">
-          {v.linkError}
-        </p>
-      )}
 
       <div className="min-h-[0px] flex-1 overflow-y-auto">
         {v.opening && (
