@@ -92,6 +92,11 @@ export interface ElectronAPI {
     audio?: boolean;
     segments?: number;
   }) => Promise<{ ok: boolean; neededMb: number; freeMb: number | null }>;
+  /**
+   * Is the folder clips are saved to usable? `gone` is a missing folder or an unplugged drive; `refused` is a folder
+   * that will not take writes (permission). Asked when Clip is pressed and while a "drive not connected" row waits.
+   */
+  checkFolder?: (payload: { dirPath: string }) => Promise<{ ok: true } | { ok: false; problem: "gone" | "refused" }>;
   startDrag?: (targetPath: string) => void;
   /** Reads the stored cookies.txt and reports whether a session is on disk. */
   probeYouTube?: () => Promise<{

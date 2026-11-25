@@ -13,7 +13,8 @@ import { useMakingClipId, useMakingName } from "../../../shared/utils/clipNameSt
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { isRetryingNote } from "../utils/clipFailure";
 import { UNDO_SECONDS } from "../utils/exportRows";
-import { useExportEffects, useOfflineResume, useRetryKey } from "./useExportEffects";
+import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
+import { useExportEffects, useFolderResume, useOfflineResume, useRetryKey, useSignInRetry } from "./useExportEffects";
 import { useExportMutations } from "./useExportMutations";
 import { useExportQueries } from "./useExportQueries";
 import { useExportState } from "./useExportState";
@@ -29,6 +30,10 @@ export function useExportController() {
   const makingId = useMakingClipId();
   useRetryKey(Boolean(state.failed), actions.retry);
   useOfflineResume(Boolean(state.offline), actions.resume);
+  const connected = useYouTubeConnection().connected;
+  const kind = state.failed?.kind;
+  useFolderResume(kind === "drivegone", actions.folder ?? "", actions.retry);
+  useSignInRetry(kind === "age" || kind === "members" || kind === "signin", connected, actions.retry);
   const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
 
   // Each clip just made, with its own file and its own Undo seconds.
@@ -78,5 +83,6 @@ export function useExportController() {
     failed: state.failed && !downloading ? state.failed : null,
     offline: state.offline && !downloading ? state.offline : null,
     failure,
+    signedIn: connected,
   };
 }

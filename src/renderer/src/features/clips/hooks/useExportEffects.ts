@@ -143,3 +143,29 @@ export function useOfflineResume(waiting: boolean, resume: () => void) {
     };
   }, [waiting, resume]);
 }
+
+/** A "drive not connected" row carries on by itself once the folder can be used again. */
+export function useFolderResume(waiting: boolean, dirPath: string, resume: () => void) {
+  useEffect(() => {
+    if (!waiting || !dirPath) return;
+    let live = true;
+    const id = window.setInterval(() => {
+      void Promise.resolve(window.electronAPI?.checkFolder?.({ dirPath }))
+        .then((answer) => live && answer?.ok === true && resume())
+        .catch(() => undefined);
+    }, 4_000);
+    return () => {
+      live = false;
+      window.clearInterval(id);
+    };
+  }, [waiting, dirPath, resume]);
+}
+
+/** A row that asked for a sign-in tries again by itself the moment one lands. */
+export function useSignInRetry(waiting: boolean, connected: boolean, retry: () => void) {
+  const was = useRef(connected);
+  useEffect(() => {
+    if (waiting && connected && !was.current) retry();
+    was.current = connected;
+  }, [waiting, connected, retry]);
+}

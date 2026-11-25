@@ -4,7 +4,7 @@ import { classifyClipFailure, isRetryingNote, rowFailure, failureActions, failur
 
 test("codes map to the three failure rows", () => {
   assert.equal(classifyClipFailure("disk_full"), "disk");
-  assert.equal(classifyClipFailure("save_folder_gone"), "disk");
+  assert.equal(classifyClipFailure("save_folder_gone"), "drivegone");
   assert.equal(classifyClipFailure("private_video"), "private");
   assert.equal(classifyClipFailure(undefined), "stopped");
   assert.equal(classifyClipFailure("unknown"), "stopped");
@@ -87,7 +87,7 @@ test("B2-2: the engine's cap error says the real reason and offers no Retry", ()
 
 test("C-8 / C2-5: each engine code says its own sentence and offers its own way on", () => {
   assert.equal(classifyClipFailure("network_dropped"), "offline");
-  assert.equal(classifyClipFailure("sign_in_needed"), "signin");
+  assert.equal(classifyClipFailure("sign_in_needed"), "age");
   assert.equal(classifyClipFailure("video_unavailable"), "removed");
   assert.equal(classifyClipFailure("unknown", "YouTube refused the media request for this video"), "refused");
   assert.equal(failureCopy("offline", 1).reason, "No internet connection.");
@@ -144,4 +144,35 @@ test("Free space: a clip refused before it starts says the numbers, and still of
   assert.equal(copy.detail, "It needs about 180 MB and 60 MB is free. It waits here until it has somewhere to go.");
   assert.deepEqual(failureActions("disk", 1), ["changeFolder"]);
   assert.equal(failureCopy("disk", 1).detail, "It waits here until it has somewhere to go.", "a full disk found later keeps its old words");
+});
+
+test("folder rows say which cause it is, with the campaign's name", () => {
+  assert.equal(classifyClipFailure("save_folder_gone", "The folder was renamed, deleted, or is on a drive that is no longer mounted"), "drivegone");
+  assert.equal(classifyClipFailure("save_folder_gone", "Clipr can't write to that folder"), "norights");
+  assert.equal(classifyClipFailure("folder_not_writable"), "norights");
+  assert.deepEqual(failureCopy("drivegone", 1, undefined, false, undefined, "Acme"), {
+    reason: "The drive with Acme’s folder isn’t connected.",
+    detail: "Plug it back in and it carries on by itself, or pick another folder.",
+  });
+  assert.deepEqual(failureCopy("norights", 1, undefined, false, undefined, "Acme"), {
+    reason: "Clipr isn’t allowed to save in Acme’s folder.",
+    detail: "Pick another folder, or give Clipr access to this one.",
+  });
+  assert.deepEqual(failureActions("drivegone", 1), ["changeFolder"]);
+  assert.deepEqual(failureActions("norights", 1), ["changeFolder", "showFolder"]);
+  assert.deepEqual(failureActions("norights", 2), ["changeFolder", "showFolder", "copyDetails"], "Copy details joins only if it stays");
+});
+
+test("age-restricted and members-only rows", () => {
+  assert.equal(classifyClipFailure("private_video", "This video is private or members-only and needs an account"), "members");
+  assert.equal(classifyClipFailure("private_video", "This video is private"), "private");
+  assert.equal(classifyClipFailure("bot_check"), "signin");
+  assert.deepEqual(failureCopy("age", 1), {
+    reason: "YouTube only shows this video to signed-in adults.",
+    detail: "Sign in once and it tries again by itself. Your range is kept.",
+  });
+  assert.deepEqual(failureCopy("members", 1), { reason: "Only members of this channel can download it.", detail: "Your range is kept." });
+  assert.deepEqual(failureActions("age", 1), ["signIn", "saveForLater"]);
+  assert.deepEqual(failureActions("members", 1, false, true), ["showInBrowser", "saveForLater"]);
+  assert.deepEqual(failureActions("members", 1, false, false), ["signIn", "showInBrowser", "saveForLater"], "no sign-in yet offers Sign in first");
 });

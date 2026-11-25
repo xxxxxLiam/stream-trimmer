@@ -9,6 +9,7 @@ import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 import { connectionNow, cookiePayload, isSignedOut, markDisconnected, requestedQuality, useYouTubeConnection, whenSignInSettled } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
+import { FOLDER_FAILURE, folderProblem } from "../../../shared/utils/folderCheck";
 import { ROOM_REASON, roomProblem } from "../../../shared/utils/freeSpace";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
 import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, saveFailure, videoUrlProblem } from "../utils/downloadErrors";
@@ -120,6 +121,17 @@ export function useClipDownloadMutations({
     downloadJobRef.current = jobId;
     let es: EventSource | null = null;
     try {
+      // Before anything is fetched: a missing drive or a folder that refuses writes says which on the clip's row.
+      if (isElectron && saveDir && window.electronAPI?.checkFolder) {
+        let answer: unknown = null;
+        try {
+          answer = await window.electronAPI.checkFolder({ dirPath: saveDir });
+        } catch {
+          /* no answer: the clip goes ahead */
+        }
+        const problem = folderProblem(answer);
+        if (problem) throw new DownloadFailureError(FOLDER_FAILURE[problem].message, FOLDER_FAILURE[problem].code);
+      }
       // Before anything is fetched: a folder that is clearly short of room says so on the clip's row, and the clip waits.
       if (isElectron && saveDir && window.electronAPI?.checkFreeSpace) {
         const seconds = segs.reduce((sum, r) => sum + Math.max(0, r.end - r.start), 0);

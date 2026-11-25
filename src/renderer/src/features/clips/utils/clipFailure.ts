@@ -9,8 +9,8 @@ import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
 import { ROOM_REASON, roomDetail } from "../../../shared/utils/freeSpace";
 
-export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "removed" | "refused" | "ratelimited" | "format" | "tools";
-export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater" | "signIn";
+export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "age" | "members" | "drivegone" | "norights" | "removed" | "refused" | "ratelimited" | "format" | "tools";
+export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater" | "signIn" | "showFolder";
 
 /** What a plain "the network is down" failure looks like in the engine's message (no YouTube error involved). */
 const OFFLINE = /no internet|offline|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENETUNREACH|getaddrinfo|network is unreachable|name resolution|unable to connect|timed out|connection (?:reset|refused|timed out)/i;
@@ -21,11 +21,22 @@ const TOO_LONG = /capped at \d+ seconds|up to 10 minutes/i;
 /** The engine's words for a 403 or a failed fetch of the media itself (it has no code of its own). */
 const REFUSED = /refused the media request|HTTP Error 403|403 Forbidden/i;
 
+/** The engine's words for a folder that refuses writes (permission), as against one that is gone. */
+const NOT_ALLOWED = /can['’]t write|permission|not allowed|read-only/i;
+
+/** A members-only video comes with the private code; its words say which it is. */
+const MEMBERS = /members[- ]only|join this channel|members of this channel|membership/i;
+
 export function classifyClipFailure(code: string | undefined, message?: string): ClipFailureKind {
   if (message && TOO_LONG.test(message)) return "toolong";
-  if (code === "disk_full" || code === "save_folder_gone") return "disk";
-  if (code === "private_video") return "private";
-  if (code === "sign_in_needed" || code === "bot_check") return "signin";
+  if (code === "disk_full") return "disk";
+  // The folder cannot be used: a missing folder or unplugged drive, or one that refuses writes (the engine's words tell them apart).
+  if (code === "folder_not_writable" || (code === "save_folder_gone" && message && NOT_ALLOWED.test(message))) return "norights";
+  if (code === "save_folder_gone") return "drivegone";
+  if (code === "private_video") return message && MEMBERS.test(message) ? "members" : "private";
+  if (code === "sign_in_needed" || code === "age_restricted") return "age";
+  if (code === "members_only") return "members";
+  if (code === "bot_check") return "signin";
   if (code === "video_unavailable" || code === "video_removed") return "removed";
   if (code === "access_refused") return "refused";
   if (code === "rate_limited") return "ratelimited";
@@ -61,6 +72,7 @@ export function failureCopy(
   reasonOverride?: string,
   retrying = false,
   room?: { neededMb: number; freeMb: number },
+  campaign?: string,
 ): { reason: string; detail: string } {
   // The engine's sentence may lack its full stop; the detail follows it on the same line.
   const ov = reasonOverride && !/[.!?]$/.test(reasonOverride.trim()) ? `${reasonOverride.trim()}.` : reasonOverride;
@@ -68,6 +80,11 @@ export function failureCopy(
   if (kind === "disk") {
     return { reason: ov ?? "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
   }
+  const folder = campaign ? `${campaign}’s folder` : "your clips folder";
+  if (kind === "drivegone") return { reason: `The drive with ${folder} isn’t connected.`, detail: "Plug it back in and it carries on by itself, or pick another folder." };
+  if (kind === "norights") return { reason: `Clipr isn’t allowed to save in ${folder}.`, detail: "Pick another folder, or give Clipr access to this one." };
+  if (kind === "age") return { reason: "YouTube only shows this video to signed-in adults.", detail: "Sign in once and it tries again by itself. Your range is kept." };
+  if (kind === "members") return { reason: "Only members of this channel can download it.", detail: "Your range is kept." };
   if (kind === "toolong") return { reason: "Clips can be up to 10 minutes.", detail: "Shorten it and clip again." };
   if (kind === "offline") {
     return { reason: "No internet connection.", detail: attempts < 2 ? "Check your connection, then Retry." : "" };
@@ -87,8 +104,12 @@ export function failureCopy(
 }
 
 /** Retry; after the retry also failed, Copy details joins it. */
-export function failureActions(kind: ClipFailureKind, attempts: number, final = false): FailureAction[] {
-  if (kind === "disk") return ["changeFolder"];
+export function failureActions(kind: ClipFailureKind, attempts: number, final = false, signedIn = true): FailureAction[] {
+  if (kind === "disk" || kind === "drivegone") return ["changeFolder"];
+  // Copy details joins only if the problem stays.
+  if (kind === "norights") return attempts >= 2 ? ["changeFolder", "showFolder", "copyDetails"] : ["changeFolder", "showFolder"];
+  if (kind === "age") return ["signIn", "saveForLater"];
+  if (kind === "members") return signedIn ? ["showInBrowser", "saveForLater"] : ["signIn", "showInBrowser", "saveForLater"];
   if (kind === "private" || kind === "removed") return ["showInBrowser", "saveForLater"];
   if (kind === "toolong") return [];
   if (kind === "signin") return attempts >= 2 ? ["signIn", "retry", "copyDetails"] : ["signIn", "retry"];

@@ -137,6 +137,11 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     if (latest.current.where !== before) latest.current.retry();
   }, [pickSaveDir, pickClipsDir, campaignId]);
 
+  const showFolder = useCallback(() => {
+    const dir = latest.current.where;
+    if (dir) void window.electronAPI?.editor?.reveal?.(dir);
+  }, []);
+
   const { openSignIn } = usePanelHost();
   const signIn = useCallback(() => openSignIn(), [openSignIn]);
 
@@ -158,5 +163,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid],
   );
 
-  return { select, make, stop, undo, remove, retry, resume, changeFolder, showInBrowser, saveForLater, signIn };
+  return { select, make, stop, undo, remove, retry, resume, changeFolder, showFolder, folder: where, showInBrowser, saveForLater, signIn };
 }
