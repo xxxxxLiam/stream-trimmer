@@ -47,7 +47,7 @@ test("the lane listens for the wheel with a non-passive listener", () => {
 });
 
 test("the cursor follows the tool over the whole timeline, not only the Source lane", () => {
-  assert.match(lane, /TOOL_CURSORS\[c\.tool\]/);
+  assert.match(lane, /cursorFor\(c\.tool, alt\)/);
 });
 
 test("the Source outline wraps the filmstrip instead of sitting on it", () => {
@@ -92,4 +92,38 @@ test("V18-T-2: wheel and pinch zoom, and the zoom tool, anchor on the pointer", 
   assert.match(src, /zoomAt\(x, at, getZoom\(\) \+ act\.amount\)/);
   assert.match(src, /tools\.tool === "zoom"\) return zoomAt\(/);
   assert.doesNotMatch(src, /s\.setFocus\(at\);\s*tools\.zoomBy/, "centring on the pointer time drifted away from it");
+});
+
+const tools = readFileSync(new URL("../components/TimelineTools.tsx", import.meta.url), "utf8");
+const clipsLane = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+const rangeState = readFileSync(new URL("../../../modules/clipper/hooks/useClipRangeState.ts", import.meta.url), "utf8");
+
+test("V18-T-3/4: both ends are set at once, in order, and an edge drag keeps the other edge fixed", () => {
+  assert.match(src, /clipper\.setRangeFromSeconds\(from, to\)/);
+  assert.doesNotMatch(src.slice(src.indexOf("const setRange"), src.indexOf("const swallowClick")), /setStartFromSeconds|setEndFromSeconds/);
+  assert.match(rangeState, /orderedRange\(a, b\)/);
+  assert.match(src, /fixed: edge === "start" \? range\.end : range\.start/);
+  assert.match(src, /setRange\(d\.fixed, t\)/);
+});
+
+test("V18-T-7: the other tools work on top of a clip bar, and the bar's own click is swallowed", () => {
+  assert.match(src, /if \(onButton && tools\.tool === "pointer"\) return;/);
+  assert.match(src, /swallowClick\.current = onButton/);
+  assert.match(lane, /onClickCapture=\{c\.onLaneClickCapture\}/);
+});
+
+test("V18-T-5: the clip being built uses free space for its name like made and waiting clips", () => {
+  assert.match(clipsLane, /key: "built"/);
+  assert.match(clipsLane, /outside\("built"/);
+});
+
+test("V18-T-8: the zoom slider drags and has a 44 px hit area", () => {
+  assert.match(tools, /onPointerMove=\{\(e\) => \{\s*if \(e\.buttons !== 1\) return/);
+  assert.match(tools, /setPointerCapture/);
+  assert.match(tools, /h-\[44px\] w-\[96px\]/);
+});
+
+test("V18-T-11/12: Alt shows the zoom-out cursor; tool keys and M stay quiet while a dialog is open", () => {
+  assert.match(lane, /cursorFor\(c\.tool, alt\)/);
+  assert.equal((effects.match(/dialogOpen\(\)/g) ?? []).length, 2);
 });

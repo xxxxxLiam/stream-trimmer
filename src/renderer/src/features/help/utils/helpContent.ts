@@ -255,7 +255,7 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     id: "timeline-zoom",
     question: "How do I zoom the timeline?",
     searchOnly: true,
-    groups: [{ steps: [{ text: "Use − and + at the bottom right to zoom." }, { text: "Press Fit to see the whole video." }] }],
+    groups: [{ steps: [{ text: "Use − and + at the top right of the timeline to zoom, or pinch or hold Ctrl and scroll." }, { text: "Press Fit to see the whole video." }] }],
     labels: [],
     synonyms: ["zoom", "fit", "timeline", "wider", "closer", "bigger", "smaller"],
   },

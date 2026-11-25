@@ -14,6 +14,7 @@ import {
   IconZoomTool,
 } from "../../../modules/layout/components/BarIcons";
 import { TOOL_KEYS, useToolState, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
+import { zoomFromX } from "../utils/laneTools";
 
 const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] = [
   { tool: "pointer", label: "Pointer", icon: IconPointer },
@@ -58,7 +59,7 @@ export default function TimelineTools() {
           aria-valuemax={100}
           aria-valuenow={zoom}
           tabIndex={0}
-          className="relative mx-[6px] h-[3px] w-[96px] rounded-[2px] bg-hover"
+          className="relative mx-[6px] flex h-[44px] w-[96px] cursor-pointer touch-none items-center"
           onKeyDown={(e) => {
             const step = e.shiftKey ? 25 : 10;
             if (e.key === "ArrowRight" || e.key === "ArrowUp") setZoom(zoom + step);
@@ -69,11 +70,19 @@ export default function TimelineTools() {
             e.preventDefault();
           }}
           onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture?.(e.pointerId);
             const r = e.currentTarget.getBoundingClientRect();
-            setZoom(((e.clientX - r.left) / r.width) * 100);
+            setZoom(zoomFromX(e.clientX, r.left, r.width));
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons !== 1) return; // only while pressed: a drag of the thumb zooms
+            const r = e.currentTarget.getBoundingClientRect();
+            setZoom(zoomFromX(e.clientX, r.left, r.width));
           }}
         >
-          <span aria-hidden className="absolute -top-[5px] size-[13px] -translate-x-1/2 rounded-full bg-fg" style={{ left: `${zoom}%` }} />
+          {/* The 44 px slider is the hit area; the track stays the board's 3 px line. */}
+          <span aria-hidden className="h-[3px] w-full rounded-[2px] bg-hover" />
+          <span aria-hidden className="absolute top-1/2 size-[13px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg" style={{ left: `${zoom}%` }} />
         </span>
         <button type="button" aria-label="Zoom in" className={STEP_BUTTON} onClick={() => zoomBy(10)}>
           +

@@ -4,7 +4,7 @@
  * Description: The in/out range: parsed start and end, their validation and the helpers that set them.
  */
 import { useCallback, useEffect, useMemo } from "react";
-import { applyIn, applyOut, formatTimestamp, overCapMessage, parseTimestamp, type VideoInfo } from "../../../shared/utils/clip";
+import { applyIn, applyOut, formatTimestamp, orderedRange, overCapMessage, parseTimestamp, type VideoInfo } from "../../../shared/utils/clip";
 
 export function useClipRangeState({
   url,
@@ -81,6 +81,14 @@ export function useClipRangeState({
     [startText],
   );
 
+  // Both ends at once, in order. Setting them one after the other reads the other end's old text, so a
+  // second click before the first (or an edge pulled past the other) used to wipe the range.
+  const setRangeFromSeconds = useCallback((a: number, b: number) => {
+    const r = orderedRange(a, b);
+    setStartText(formatTimestamp(r.start));
+    setEndText(formatTimestamp(r.end));
+  }, []);
+
   return {
     duration,
     start,
@@ -89,5 +97,6 @@ export function useClipRangeState({
     pasteInto,
     setStartFromSeconds,
     setEndFromSeconds,
+    setRangeFromSeconds,
   };
 }

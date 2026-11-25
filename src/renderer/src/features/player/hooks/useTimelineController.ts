@@ -110,9 +110,19 @@ export function useTimelineController() {
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
     if (hi - lo < 1) return;
+    const from = snap(lo, "start");
+    const to = snap(hi, "end");
+    if (to <= from) return;
     markByHand();
-    clipper.setStartFromSeconds(snap(lo, "start"));
-    clipper.setEndFromSeconds(snap(hi, "end"));
+    clipper.setRangeFromSeconds(from, to); // both at once, in order: neither end reads the other's old text
+  };
+
+  const swallowClick = useRef(false);
+  /** The click that follows a tool press on a button is that tool's, not the button's. */
+  const onLaneClickCapture = (e: { stopPropagation: () => void }) => {
+    if (!swallowClick.current) return;
+    swallowClick.current = false;
+    e.stopPropagation();
   };
 
   /** Zoom to `zoom` keeping time `t`, at lane position `x`, under the same spot (a pinch or click zooms into the point). */
@@ -125,8 +135,14 @@ export function useTimelineController() {
 
   /** Pointer down on the Source lane. What it does depends on the tool. */
   const onLanePointerDown = (e: PointerEvent<HTMLElement>) => {
-    // Buttons and fields inside the area (a clip label, the fold, the name box) keep their own clicks.
-    if ((e.target as HTMLElement).closest("button, input, textarea, [contenteditable='true']")) return;
+    swallowClick.current = false;
+    const target = e.target as HTMLElement;
+    // Fields (the name box) keep their own presses. A button (a clip bar, the fold) keeps its click with the
+    // pointer; every other tool works on top of it too, and its click is then swallowed.
+    if (target.closest("input, textarea, [contenteditable='true']")) return;
+    const onButton = !!target.closest("button");
+    if (onButton && tools.tool === "pointer") return;
+    swallowClick.current = onButton;
     const x = e.clientX - laneLeft(e);
     if (x < 0 || x > s.width) return; // the label column is not the timeline
     const t = timeAt(e);
@@ -155,7 +171,8 @@ export function useTimelineController() {
         const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
         if (edge) {
           frozen.current = shown;
-          return s.setDrag({ kind: "edge", edge });
+          // The other edge stays where it is whatever the pointer does, so pulling past it flips the range.
+          return s.setDrag({ kind: "edge", edge, fixed: edge === "start" ? range.end : range.start });
         }
       }
       frozen.current = shown;
@@ -190,9 +207,8 @@ export function useTimelineController() {
     }
     const t = timeAt(e);
     if (t === null) return;
-    if (d.kind === "edge" && range) {
-      if (d.edge === "start") setRange(t, range.end);
-      else setRange(range.start, t);
+    if (d.kind === "edge") {
+      setRange(d.fixed, t);
     } else if (d.kind === "range" && Math.abs(e.clientX - s.dragOrigin) >= DRAG_START_PX) {
       setRange(d.anchor, t);
     }
@@ -273,6 +289,7 @@ export function useTimelineController() {
     onLanePointerMove,
     onLanePointerUp,
     onLaneWheel,
+    onLaneClickCapture,
     addSection,
     removeSection: (i: number) => store.remove(i),
     seek: (t: number) => clipper.requestSeek(t),

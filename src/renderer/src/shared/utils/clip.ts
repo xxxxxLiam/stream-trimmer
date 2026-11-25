@@ -33,6 +33,11 @@ export function applyOut(value: number, start: number | null): { end: number; cl
   return { end: value, clearStart: start !== null && value <= start };
 }
 
+/** Two times as a range, whichever order they were given in. */
+export function orderedRange(a: number, b: number): { start: number; end: number } {
+  return { start: Math.min(a, b), end: Math.max(a, b) };
+}
+
 export type ClipFormat = "mp4" | "mp3";
 
 export type BitrateMap = Partial<Record<string, number>>; // kbps
