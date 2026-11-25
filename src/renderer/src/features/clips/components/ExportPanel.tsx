@@ -32,6 +32,7 @@ export default function ExportPanel() {
             if (a === "retry") c.retry();
             else if (a === "changeFolder") void c.changeFolder();
             else if (a === "showInBrowser") c.showInBrowser();
+            else if (a === "signIn") c.signIn();
             else c.saveForLater();
           }}
         />

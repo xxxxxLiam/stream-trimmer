@@ -525,6 +525,11 @@ function Layout({ active }: { active: boolean }) {
   };
   const addMomentRef = useRef(addMoment);
   addMomentRef.current = addMoment;
+  const openSignIn = () => {
+    setHelpStartAt("signin");
+    setSettingsOpen(false);
+    setHelpOpen(true);
+  };
   const panelHost: PanelHost = {
     playhead,
     cutSegments: cutMarked,
@@ -532,6 +537,7 @@ function Layout({ active }: { active: boolean }) {
     cutBanked,
     openSymbols: () => setSymbolsOpen(true),
     openImport: (text) => setImportText(text ?? ""),
+    openSignIn,
     addMoment,
     openChannel: (url) => {
       if (url) channel.setChannelUrl(url);
@@ -587,11 +593,6 @@ function Layout({ active }: { active: boolean }) {
   };
 
   // The footer pill and the "Downloaded at 360p" toast both open Help on its sign-in page.
-  const openSignIn = () => {
-    setHelpStartAt("signin");
-    setSettingsOpen(false);
-    setHelpOpen(true);
-  };
 
   return (
     <>

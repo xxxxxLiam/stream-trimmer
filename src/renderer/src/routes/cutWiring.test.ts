@@ -58,3 +58,11 @@ test("C2-8: both cut paths set the making name and the making moment as they sta
   assert.equal((app.match(/setMakingClipId\(null\)/g) ?? []).length, 2);
   assert.match(app, /setMakingClipId\(clip\.id\)/);
 });
+
+test("C2-6: Change folder changes the folder the cut used (the campaign's) and then re-runs the cut", () => {
+  const mut = readFileSync("src/renderer/src/features/clips/hooks/useExportMutations.ts", "utf8");
+  assert.match(mut, /if \(campaignId\) await pickClipsDir\(campaignId\)/);
+  assert.match(mut, /latest\.current\.where !== before\) latest\.current\.retry\(\)/);
+  const eff = readFileSync("src/renderer/src/features/clips/hooks/useExportEffects.ts", "utf8");
+  assert.match(eff, /kind: classified !== "stopped" \? classified : \(fromRow\?\.kind \?\? classified\)/);
+});

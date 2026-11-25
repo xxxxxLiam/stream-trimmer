@@ -64,9 +64,11 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         const classified = classifyClipFailure(failure?.code, failure?.message ?? error);
         s.setFailed({
           ...a,
-          // The engine's row decides, except that a network cause is named as such (no YouTube error).
-          kind: classified === "offline" ? "offline" : (fromRow?.kind ?? classified),
-          attempts: fromRow?.attempts ?? s.failCount.current.count,
+          // The engine's row decides disk and cannot-download; a plain failure is named by its code.
+          kind: classified !== "stopped" ? classified : (fromRow?.kind ?? classified),
+          // The row's count and our own: the second failed Retry shows Copy details either way.
+          attempts: Math.max(fromRow?.attempts ?? 1, s.failCount.current.count),
+          retrying: fromRow?.retrying,
           // A full or unwritable folder says so in the engine's own sentence.
           reason: fromRow?.reason ?? (failure?.code === "disk_full" || failure?.code === "save_folder_gone" ? failure.message : undefined),
           message: error,

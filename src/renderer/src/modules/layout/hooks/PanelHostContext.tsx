@@ -41,6 +41,8 @@ export type PanelHost = {
   onOpenVideo: () => void;
   /** Open the Symbols and phrases window. */
   openSymbols: () => void;
+  /** Open Help at the YouTube sign-in steps (a failed clip that needs one). */
+  openSignIn: () => void;
   /** Open Import moments (the + menu in Export), empty or with pasted rows. */
   openImport: (text?: string) => void;
   /** Save the marked part of this video into the bank, waiting (the + menu in Export, "Add a moment"). */

@@ -26,7 +26,7 @@ import type { useExportQueries } from "./useExportQueries";
 export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
   const { cutBanked, cutAgain } = usePanelHost();
-  const { recordUse, forgetUse } = useCampaign();
+  const { recordUse, forgetUse, folders, pickClipsDir } = useCampaign();
   const { removeDownload, pickSaveDir, saveDir, info, cancelDownload } = useClipperContext();
   const stopped = useRef(false);
   const { campaignId, vid } = q;
@@ -111,14 +111,22 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
 
   // The new folder lands in state after the picker closes, so retry through refs that always hold
   // the latest render, and only when the folder really changed.
-  const latest = useRef({ retry, saveDir });
-  latest.current = { retry, saveDir };
+  // The folder the cut used is the campaign's own when it has one (it overrides the global one), so
+  // that is the one changed; the global picker is only for a campaign-less cut.
+  const where = folders.clipsDir || saveDir;
+  const latest = useRef({ retry, where });
+  latest.current = { retry, where };
   const changeFolder = useCallback(async () => {
-    const before = latest.current.saveDir;
-    await pickSaveDir();
-    await new Promise((r) => window.setTimeout(r, 50));
-    if (latest.current.saveDir !== before) latest.current.retry();
-  }, [pickSaveDir]);
+    const before = latest.current.where;
+    if (campaignId) await pickClipsDir(campaignId);
+    else await pickSaveDir();
+    // The new folder reaches this hook a render later; wait for it (up to half a second), then cut again.
+    for (let i = 0; i < 10 && latest.current.where === before; i++) await new Promise((r) => window.setTimeout(r, 50));
+    if (latest.current.where !== before) latest.current.retry();
+  }, [pickSaveDir, pickClipsDir, campaignId]);
+
+  const { openSignIn } = usePanelHost();
+  const signIn = useCallback(() => openSignIn(), [openSignIn]);
 
   const showInBrowser = useCallback(() => {
     if (vid) window.open(`https://www.youtube.com/watch?v=${vid}`, "_blank", "noopener");
@@ -138,5 +146,5 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
     [campaignId, vid],
   );
 
-  return { select, make, stop, undo, remove, retry, changeFolder, showInBrowser, saveForLater };
+  return { select, make, stop, undo, remove, retry, changeFolder, showInBrowser, saveForLater, signIn };
 }
