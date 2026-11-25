@@ -39,7 +39,8 @@ export async function defaultFolders(app: Electron.App) {
     const clipsDir = path.join(downloads, "Clipr");
     const dataDir = path.join(downloads, "Clipr data");
     await fsp.mkdir(clipsDir, { recursive: true });
-    await fsp.mkdir(dataDir, { recursive: true });
+    // Only the Clips folder is made. The Data folder is the channel exporter's, and whatever writes into it makes it
+    // on the first write (saveFiles does mkdir), so nobody else finds an empty "Clipr data" in Downloads (A2-6).
     return { clipsDir, dataDir };
   } catch {
     // A read-only or missing Downloads folder is not worth failing a launch over;
