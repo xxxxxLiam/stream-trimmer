@@ -42,7 +42,7 @@ import {
   type UsedRange,
 } from "../../../shared/utils/campaigns";
 import { bankStore } from "../../../shared/utils/bank";
-import { KEY_LOOK_MIGRATED, loadLastLookId, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
+import { KEY_LOOK_MIGRATED, KEY_LOOK_UNREAD, loadLastLookId, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 
 export type { Campaign, UsedRange } from "../../../shared/utils/campaigns";
@@ -138,6 +138,7 @@ function loadCampaigns(): Campaign[] {
   if (moved.migrated) {
     saveSavedLooks(moved.looks);
     writeSetting(KEY_CAMPAIGNS, moved.campaigns);
+    if (moved.unread.length) writeSetting(KEY_LOOK_UNREAD, Object.fromEntries(moved.unread.map((id) => [id, true])));
     writeSetting(KEY_LOOK_MIGRATED, true);
   }
   return moved.campaigns;

@@ -21,7 +21,8 @@ function matches(query: string, haystack: string): boolean {
   const raw = haystack.toLowerCase().replace(/[’']/g, "");
   const want = words(query);
   if (want.length === 0) return true;
-  return want.every((w) => have.some((h) => h.startsWith(w)) || raw.includes(w));
+  // A typed word matches the start of a word, or the start of a phrase or file name (cookies.txt), never the middle of one ("lut" is not "resolution").
+  return want.every((w) => have.some((h) => h.startsWith(w)) || new RegExp(`(^|[^a-z0-9])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(raw));
 }
 
 export type HelpResults = { answers: HelpAnswer[]; more: HelpMoreId[] };

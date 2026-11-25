@@ -28,6 +28,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.fcpLastLayout",
   "clipper.fcpLastLookId",
   "clipper.fcpLookMigrated",
+  "clipper.fcpLookUnread",
   "clipper.fcpLooks",
   "clipper.flags",
   "clipper.markerMemory",
