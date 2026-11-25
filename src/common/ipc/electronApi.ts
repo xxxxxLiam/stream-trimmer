@@ -151,6 +151,11 @@ export interface ElectronAPI {
     ) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;
   };
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
+  /**
+   * Sends a crash report (kind "crash": the error) or a Report a problem note (kind "problem": note and error) through the
+   * report relay. main adds the app and system version and the cleaned log. "kept" means it is waiting for a later launch.
+   */
+  sendReport?: (payload: { kind: "crash" | "problem"; note?: string; error: string }) => Promise<{ ok: boolean; status?: "sent" | "kept" }>;
   /** ISO time when this launch restored the settings from the backup copy, else null. */
   settingsRestoredAt?: () => Promise<string | null>;
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
