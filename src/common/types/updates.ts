@@ -24,6 +24,15 @@ export type RestartToUpdateResult =
   | { ok: true; waiting?: boolean }
   | { ok: false; reason: "nothing-ready" | "failed"; error?: string };
 
+/**
+ * Whether this platform can download and restart into an update by itself. The macOS build is not signed or
+ * notarised (and ships only a .dmg), so it cannot: it is told about a new version and opens the download instead.
+ * Takes `process.platform` ("darwin") or `navigator.platform` ("MacIntel"), so main and the page share one rule.
+ */
+export function updatesInPlace(platform: unknown): boolean {
+  return !/^(darwin|mac)/i.test(String(platform ?? ""));
+}
+
 /** The Settings row "Update automatically". On unless the user turned it off. */
 export const AUTO_UPDATE_SETTING = "clipper.autoUpdate";
 

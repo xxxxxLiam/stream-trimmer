@@ -5,6 +5,7 @@
  * place on this platform, and where to send the user when it cannot. Pure (no
  * electron import) so it can be tested.
  */
+import { updatesInPlace } from "../../../common/types/updates";
 
 const OWNER = "xxxxxLiam";
 // Installers are published to the public releases repo, not the source
@@ -38,7 +39,7 @@ const ASSETS: Record<string, string> = {
  * the real thing.
  */
 function canInstallInPlace(platform: unknown) {
-  return platform !== "darwin";
+  return updatesInPlace(platform);
 }
 
 /** The installer filename for a platform, or null if it has no build. */

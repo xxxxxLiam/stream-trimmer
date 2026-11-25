@@ -5,6 +5,7 @@
  *   panel while open and blocks nothing else. Rows with a chevron open a second view, switches flip in
  *   place, Back shows the parent's name, X and Escape close.
  */
+import { updatesInPlace } from "../../../../../common/types/updates";
 import { useEffect, useRef, useState } from "react";
 import { useDrawerFocus } from "../../../shared/hooks/useDrawerFocus";
 import { Drawer } from "../../../shared/components/Drawer";
@@ -214,6 +215,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         clipsFolderLabel={c.clipsFolderLabel}
         app={c.app}
         autoUpdate={c.autoUpdate}
+        autoUpdateAvailable={updatesInPlace(typeof navigator === "undefined" ? "" : navigator.platform)}
         onAutoUpdate={c.setAutoUpdate}
         onPatchApp={c.patchApp}
         onOpenCampaigns={() => c.setView({ kind: "campaigns" })}
