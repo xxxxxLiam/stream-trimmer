@@ -248,8 +248,25 @@ test("a locked section is movable too: it is promoted to the selected range, the
 
 test("a moved range touching another section reads as one and joins only on release; Esc and edge scroll cover the move", () => {
   assert.match(src, /touching\(range, store\.segments, TOUCH_PX \* /);
-  assert.match(src, /else if \(mergeHint\) \{[\s\S]*store\.remove\(i\)[\s\S]*clipper\.setRangeFromSeconds\(mergeHint\.union\.start, mergeHint\.union\.end\)/);
+  assert.match(src, /if \(joinable && mergeHint\) \{[\s\S]*store\.remove\(i\)[\s\S]*clipper\.setRangeFromSeconds\(mergeHint\.union\.start, mergeHint\.union\.end\)/);
   assert.match(src, /dragKind !== "move"\) return;/);
   assert.match(src, /dragKind === "move"/);
   assert.match(sourceLane, /Joins when you let go/);
+});
+
+test("a range drawn with the Range tool, or a resized handle, joins any section it touches on release, like a move does", () => {
+  assert.match(src, /const shaping = movingDrag \|\| s\.drag\?\.kind === "edge" \|\| s\.drag\?\.kind === "range" \? s\.drag : null;/);
+  assert.match(src, /shaping && range && s\.width > 0 \? touching\(range, store\.segments/);
+  assert.match(src, /const joinable = d\?\.kind === "edge" \|\| d\?\.kind === "range" \|\| \(d\?\.kind === "move" && d\.moved\);\s*if \(joinable && mergeHint\) \{[\s\S]*store\.remove\(i\)[\s\S]*clipper\.setRangeFromSeconds\(mergeHint\.union\.start, mergeHint\.union\.end\)/);
+  // While it overlaps, the lanes show the one range, not two with a seam.
+  assert.match(src, /sections: shownSections,/);
+});
+
+test("handles: the Pointer and the Range tool show a hover, and a held handle shows as pressed", () => {
+  assert.match(src, /\(tools\.tool === "pointer" \|\| tools\.tool === "range"\)[\s\S]*grabbedEdge\(x, toX\(axis, r\.start\), toX\(axis, r\.end\)\)/);
+  assert.match(src, /hoverGrip: s\.drag \? null : hoverGrip,/);
+  assert.match(src, /pressedGrip: s\.drag\?\.kind === "edge"/);
+  assert.match(sourceLane, /state === "pressed" \? "w-\[3px\] scale-y-90 bg-ice" : state === "hover" \? "w-\[6px\] bg-frost"/);
+  assert.match(lane, /cursor-ew-resize/);
+  assert.match(lane, /onPointerLeave=\{c\.onLanePointerLeave\}/);
 });

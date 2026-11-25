@@ -6,7 +6,7 @@
  *   data into one view model with its pointer handlers.
  */
 import { useSuggestedName } from "./useSuggestedName";
-import { useEffect, useMemo, useRef, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
@@ -75,8 +75,19 @@ export function useTimelineController() {
   const win = windowFor(duration, tools.zoom, s.focus ?? playhead, padFrac);
   // A range being moved reads as one with any section it touches, and only joins when the mouse is let go.
   const movingDrag = s.drag?.kind === "move" && s.drag.moved ? s.drag : null;
+  // The same goes for a range drawn with the Range tool and for a dragged handle: any drag that leaves the
+  // selected range touching or over another section shows them as one, and joins them on release.
+  const shaping = movingDrag || s.drag?.kind === "edge" || s.drag?.kind === "range" ? s.drag : null;
   const mergeHint =
-    movingDrag && range && s.width > 0 ? touching(range, store.segments, TOUCH_PX * ((win.end - win.start) / s.width)) : null;
+    shaping && range && s.width > 0 ? touching(range, store.segments, TOUCH_PX * ((win.end - win.start) / s.width)) : null;
+  const shownSections = useMemo(
+    () =>
+      mergeHint
+        ? [...store.segments.filter((_, i) => !mergeHint.indices.includes(i)), mergeHint.union].sort((a, b) => a.start - b.start)
+        : sections,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sections, mergeHint?.union.start, mergeHint?.union.end],
+  );
   const liveFold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
   const live = { axis: (liveFold ? liveFold.axis : linearAxis(win, s.width)) as Axis, fold: liveFold?.fold ?? ([] as Fold[]), folded: !!liveFold };
   // The axis the pointer went down on stays for the whole drag: the drag itself creates a range, which
@@ -274,9 +285,26 @@ export function useTimelineController() {
   }, [tabActive, hasRange, dragging]);
 
   const lastScrub = useRef<number | null>(null);
+  // The handle the pointer is over (as its time), so it can show it is clickable. Only the Pointer and the
+  // Range tool work handles, and only over the Source lane.
+  const [hoverGrip, setHoverGrip] = useState<number | null>(null);
+  const hoverAt = (e: PointerEvent<HTMLElement>) => {
+    let found: number | null = null;
+    const x = e.clientX - laneLeft(e);
+    if ((tools.tool === "pointer" || tools.tool === "range") && x >= 0 && x <= s.width && (e.target as HTMLElement).closest('[data-lane="source"]')) {
+      for (const r of shownSections) {
+        const edge = grabbedEdge(x, toX(axis, r.start), toX(axis, r.end));
+        if (edge) {
+          found = edge === "start" ? r.start : r.end;
+          break;
+        }
+      }
+    }
+    setHoverGrip((cur) => (cur === found ? cur : found));
+  };
   const onLanePointerMove = (e: PointerEvent<HTMLElement>) => {
     const d = s.drag;
-    if (!d || e.buttons !== 1) return;
+    if (!d || e.buttons !== 1) return hoverAt(e);
     pointer.current = { clientX: e.clientX, left: laneLeft(e) };
     if (d.kind === "pan") {
       const per = (win.end - win.start) / Math.max(1, s.width);
@@ -353,11 +381,13 @@ export function useTimelineController() {
         }
         clipper.requestSeek(Math.round(d.pressedAt));
       }
-      else if (mergeHint) {
-        // Let go while touching: the sections become one range (the touched ones fold into it).
-        [...mergeHint.indices].sort((a, b) => b - a).forEach((i) => store.remove(i));
-        clipper.setRangeFromSeconds(mergeHint.union.start, mergeHint.union.end);
-      }
+    }
+    // Let go while touching, whichever way the range got there (moved, resized, or drawn): the sections become
+    // one range (the touched ones fold into it).
+    const joinable = d?.kind === "edge" || d?.kind === "range" || (d?.kind === "move" && d.moved);
+    if (joinable && mergeHint) {
+      [...mergeHint.indices].sort((a, b) => b - a).forEach((i) => store.remove(i));
+      clipper.setRangeFromSeconds(mergeHint.union.start, mergeHint.union.end);
     }
     lastScrub.current = null;
     // A range drag that never moved sets nothing; one that moved already made the range.
@@ -394,7 +424,7 @@ export function useTimelineController() {
     duration,
     playhead,
     range,
-    sections,
+    sections: shownSections,
     audioLanes,
     suggestedName,
     joined,
@@ -425,6 +455,10 @@ export function useTimelineController() {
     moving: !!movingDrag,
     /** The one range a moved range and the sections it touches would make if let go now. */
     mergeHint: mergeHint?.union ?? null,
+    /** The handle (its time) the pointer is over, and the one held down while it is dragged. */
+    hoverGrip: s.drag ? null : hoverGrip,
+    pressedGrip: s.drag?.kind === "edge" && range ? (mergeHint ? (s.drag.edge === "start" ? mergeHint.union.start : mergeHint.union.end) : s.drag.edge === "start" ? range.start : range.end) : null,
+    onLanePointerLeave: () => setHoverGrip(null),
     start: clipper.start,
     inText: range ? clockTime(range.start) : startPicked ? clockTime(clipper.start) : dash,
     outText: range ? clockTime(range.end) : endPicked ? clockTime(clipper.end) : dash,

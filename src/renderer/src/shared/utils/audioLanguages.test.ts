@@ -63,16 +63,13 @@ test("a folder is shortened from the left, without the home folder in front", ()
   assert.ok(long.endsWith("Clips/Podcasts"));
 });
 
-test("audioLanesOf gives one lane per ticked language and drops a lane when it is unticked", async () => {
+test("audioLanesOf draws only the Original lane: a ticked dub never gets one (it cannot be heard before download)", async () => {
   const { audioLanesOf } = await import("./audioLanguages");
   const tracks = [
     { language: "en", label: "English", kind: "original" as const },
     { language: "es", label: "Spanish", kind: "auto-dubbed" as const },
   ];
-  assert.deepEqual(audioLanesOf(tracks, ["es"]), [
-    { language: "en", name: "Original" },
-    { language: "es", name: "Spanish dub" },
-  ]);
+  assert.deepEqual(audioLanesOf(tracks, ["es"]), [{ language: "en", name: "Original" }]);
   assert.deepEqual(audioLanesOf(tracks, []), [{ language: "en", name: "Original" }]);
   assert.deepEqual(audioLanesOf([tracks[0]], []), []);
 });

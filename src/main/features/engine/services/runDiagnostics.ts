@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { resolvedFfmpeg, yt, ytDlpVersion } from "./binaries";
+import { resolvedFfmpeg, versionOfResolved, yt } from "./binaries";
 import { jobLogs } from "./jobLogs";
 
 function readAppVersion(): string {
@@ -57,7 +57,7 @@ let cachedYtDlpVersion: string | null | undefined;
  */
 export function buildRunDiagnostics(jobId: string, stderrRaw: string) {
   if (cachedYtDlpVersion === undefined) {
-    cachedYtDlpVersion = yt ? ytDlpVersion(yt.binary) : null;
+    cachedYtDlpVersion = versionOfResolved(yt);
   }
   return {
     jobId,

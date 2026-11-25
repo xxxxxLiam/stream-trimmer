@@ -1,10 +1,10 @@
 /**
  * File: AudioLanes.tsx
  * Path: src/renderer/src/features/player/components/AudioLanes.tsx
- * Description: One 32px "Audio" lane per language ticked in the export bar (Original plus dubs),
- *   under Source. Each bar runs the whole video with its tag and name; the picked range shows
+ * Description: The 32px "Audio" lane (Original only; dubs get no lane, they cannot be heard before download,
+ *   and stay chosen in the export bar's footer), under Source. Each bar runs the whole video with its tag and name; the picked range shows
  *   brighter with a Frost edge on every lane. No audio is edited here and the preview stays on the
- *   original, so a lane only shows which language files the Clip will make.
+ *   original, so the lane only shows the sound the preview plays.
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { toX } from "../utils/timelineAxis";

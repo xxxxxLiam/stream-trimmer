@@ -5,7 +5,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { execSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { execFile, execSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import dargs from "dargs";
 import ffmpegPath from "ffmpeg-static";
 import { isNewer, newestToolFile } from "./toolUpdate";
@@ -88,13 +88,15 @@ interface YtResolved {
   exec: YtExec;
   source: string;
   binary: string;
+  /** Known without running it (the tools file name, or the version file shipped beside the bundled one); null when not. */
+  version: string | null;
 }
 
 // Build a runner around a resolved yt-dlp binary that spawns it directly.
 // This is the authoritative fix for the space-in-path spawn bug: node's
 // `spawn(executable, args)` treats `executable` as an atomic path — no shell
 // interpretation, no split-on-space.
-function makeRunner(binary: string, source: string): YtResolved {
+function makeRunner(binary: string, source: string, version: string | null = null): YtResolved {
   const toArgs = (url: string, opts: Record<string, unknown>): string[] => {
     // dargs turns { dumpSingleJson: true, subLangs: "en" } into
     // ["--dump-single-json", "--sub-langs", "en"]. useEquals:false matches
@@ -155,10 +157,12 @@ function makeRunner(binary: string, source: string): YtResolved {
         }
       });
     });
-  return { run, exec, source, binary };
+  return { run, exec, source, binary, version };
 }
 
-// Read `yt-dlp --version` (e.g. "2026.07.04"). Null when the binary won't run.
+// Read `yt-dlp --version` (e.g. "2026.07.04"). Null when the binary won't run. This RUNS yt-dlp and waits, so it must
+// never be on the start-up path: the first run of a freshly installed unsigned yt-dlp on a Mac is slow (macOS checks it
+// and the one-file build unpacks itself), and the main process, which also serves the window, stands still meanwhile.
 export function ytDlpVersion(binary: string): string | null {
   try {
     const out = execSync(`"${binary}" --version`, {
@@ -171,6 +175,31 @@ export function ytDlpVersion(binary: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** The same question, asked without holding the main process still. */
+export function ytDlpVersionAsync(binary: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    execFile(binary, ["--version"], { timeout: 30_000, windowsHide: true }, (err, stdout) => {
+      resolve(err ? null : String(stdout).trim() || null);
+    });
+  });
+}
+
+/** The version the build recorded beside the bundled yt-dlp (`yt-dlp.version`), or null when it did not. Reads a small file. */
+export function bundledYtDlpVersion(binary: string): string | null {
+  try {
+    const v = fs.readFileSync(path.join(path.dirname(binary), "yt-dlp.version"), "utf8").trim();
+    return /^\d{4}\.\d{2}\.\d{2}(?:\.\d+)?$/.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The version of the yt-dlp in use: what is already known, and only if that is nothing, by running it. */
+export function versionOfResolved(r: YtResolved | null): string | null {
+  if (!r) return null;
+  return r.version ?? ytDlpVersion(r.binary);
 }
 
 function systemYtDlp(): string | null {
@@ -198,7 +227,11 @@ function updatedYtDlp(): { path: string; version: string } | null {
   }
 }
 
-function resolveYtDlp(): YtResolved | null {
+/**
+ * Which yt-dlp to use. `versionOf` answers for a binary: at start-up it only reports what is known without running
+ * the binary, so nothing is spawned while the app opens; settleYtDlp() later asks again with real versions.
+ */
+function resolveYtDlp(versionOf: (binary: string, known: string | null) => string | null = (_b, known) => known): YtResolved | null {
   const packaged = packagedBinary("yt-dlp");
   const devBundled = BIN_DIR
     ? path.join(BIN_DIR, process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp")
@@ -206,32 +239,24 @@ function resolveYtDlp(): YtResolved | null {
   const bundled =
     packaged ?? (devBundled && fs.existsSync(devBundled) ? devBundled : null);
   const system = systemYtDlp();
+  const bv = bundled ? versionOf(bundled, bundledYtDlpVersion(bundled)) : null;
+  const sv = system ? versionOf(system, null) : null;
 
   const updated = updatedYtDlp();
-  if (updated) {
-    const bv = bundled ? ytDlpVersion(bundled) : null;
-    const sv = system ? ytDlpVersion(system) : null;
-    if ((!bv || isNewer(updated.version, bv)) && (!sv || isNewer(updated.version, sv))) {
-      console.log(`[server] using the updated yt-dlp ${updated.version}`);
-      return makeRunner(updated.path, `updated (${updated.path})`);
-    }
+  if (updated && (!bv || isNewer(updated.version, bv)) && (!sv || isNewer(updated.version, sv))) {
+    console.log(`[server] using the updated yt-dlp ${updated.version}`);
+    return makeRunner(updated.path, `updated (${updated.path})`, updated.version);
   }
 
-  if (bundled && system && system !== bundled) {
-    const bv = ytDlpVersion(bundled);
-    const sv = ytDlpVersion(system);
-    if (sv && (!bv || isNewer(sv, bv))) {
-      console.log(
-        `[server] system yt-dlp ${sv} is newer than bundled ${bv ?? "(unknown)"} — using system binary`,
-      );
-      return makeRunner(system, `system (${system})`);
-    }
+  if (bundled && system && system !== bundled && sv && (!bv || isNewer(sv, bv))) {
+    console.log(`[server] system yt-dlp ${sv} is newer than bundled ${bv ?? "(unknown)"} — using system binary`);
+    return makeRunner(system, `system (${system})`, sv);
   }
   if (bundled) {
     const label = packaged ? "packaged" : "bundled";
-    return makeRunner(bundled, `${label} (${bundled})`);
+    return makeRunner(bundled, `${label} (${bundled})`, bv);
   }
-  if (system) return makeRunner(system, `system (${system})`);
+  if (system) return makeRunner(system, `system (${system})`, sv);
   return null;
 }
 
@@ -242,6 +267,25 @@ export function reloadYtDlp(): void {
   const next = resolveYtDlp();
   if (yt && next) Object.assign(yt, next);
 }
+
+/**
+ * Once the window is up: when a different yt-dlp is installed on the computer, ask both for their versions (without
+ * holding the main process still) and switch if the other is newer. When there is no other one, nothing runs.
+ */
+export async function settleYtDlp(): Promise<void> {
+  if (!yt) return;
+  const bundled = packagedBinary("yt-dlp") ?? (BIN_DIR ? path.join(BIN_DIR, process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp") : null);
+  const system = systemYtDlp();
+  if (!system || system === bundled || system === yt.binary) return;
+  const found = new Map<string, string | null>();
+  for (const b of [bundled && fs.existsSync(bundled) ? bundled : null, system]) {
+    if (b) found.set(b, bundledYtDlpVersion(b) ?? (await ytDlpVersionAsync(b)));
+  }
+  const next = resolveYtDlp((binary, known) => found.get(binary) ?? known);
+  if (next && next.binary !== yt.binary) Object.assign(yt, next);
+}
+// A few seconds after start, never during it.
+setTimeout(() => void settleYtDlp().catch(() => {}), 5000).unref?.();
 const packagedFfmpeg = packagedBinary("ffmpeg");
 export const resolvedFfmpeg = packagedFfmpeg || ffmpegPath;
 const ffmpegOk = Boolean(resolvedFfmpeg && fs.existsSync(resolvedFfmpeg));

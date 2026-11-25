@@ -92,14 +92,17 @@ export function shortenPath(path: string, max = 28): string {
   return `…${clean.slice(clean.length - (max - 1))}`;
 }
 
-/** One timeline lane per ticked language: "Original", "Spanish dub". A video with no dubs has none. */
+/**
+ * The timeline's audio lane: "Original" only. A dub gets no lane, because a lane suggests it can be played
+ * and heard, and a dub cannot be heard before it is downloaded; the ticked dubs stay in the footer's choice.
+ * A video with no dubs has none.
+ */
 export function audioLanesOf(
   tracks: readonly AudioTrackInfo[] | undefined,
   selected: readonly string[] | undefined,
 ): { language: string; name: string }[] {
   if (!hasDubTracks(tracks)) return [];
-  return ticked(tracks, selected).map((t) => ({
-    language: t.language,
-    name: t.kind === "original" ? "Original" : `${t.label} dub`,
-  }));
+  return ticked(tracks, selected)
+    .filter((t) => t.kind === "original")
+    .map((t) => ({ language: t.language, name: "Original" }));
 }
