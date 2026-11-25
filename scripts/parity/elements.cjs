@@ -120,6 +120,8 @@ async function appData(o) {
     await a.win.waitForTimeout(300);
     await a.win.waitForSelector(fx.waitFor || "#root *");
     for (const s of fx.steps || []) {
+      if (s.hover) await a.win.hover(s.hover);
+      else
       if (s.click) await a.win.click(s.click);
       else if (s.fill) await a.win.fill(s.fill[0], s.fill[1]);
       else if (s.press) await a.win.keyboard.press(s.press);

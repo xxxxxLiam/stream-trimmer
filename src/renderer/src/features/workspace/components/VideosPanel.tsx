@@ -10,7 +10,7 @@ import { IconChevronDown, IconClose, IconSearch } from "../../../shared/componen
 import { useVideosController, type VideoRow } from "../hooks/useVideosController";
 
 function subline(r: VideoRow): string {
-  const status = r.done ? "all made" : r.waiting === 0 ? "nothing waiting" : `${r.waiting} waiting`;
+  const status = r.waiting > 0 ? `${r.waiting} waiting` : r.done ? "all made" : "nothing waiting";
   return r.campaign ? `${r.campaign} · ${status}` : status;
 }
 
@@ -60,7 +60,7 @@ function Row({
           </button>
           <span
             role="tooltip"
-            className="pointer-events-none absolute -top-[30px] right-[-4px] z-10 whitespace-nowrap rounded-chip border border-hairlineStrong bg-hover px-[8px] py-[4px] text-meta text-fg"
+            className="pointer-events-none absolute -top-[30px] right-[-4px] z-10 whitespace-nowrap rounded-chip border border-hairlineStrong bg-hover px-[8px] py-[4px] text-meta leading-[normal] text-fg"
           >
             Done with this video
           </span>
@@ -146,9 +146,9 @@ export default function VideosPanel() {
         )}
 
         {v.undo && (
-          <div role="status" className="flex items-center gap-[6px] px-[14px] pt-[8px] text-meta text-fg-dim">
-            Moved “{v.undo.title}” to Done ·
-            <button type="button" onClick={v.undoDone} className="h-[32px] text-meta text-ice">
+          <div role="status" className="-mt-[3px] flex items-center gap-[6px] px-[14px] pt-[8px] text-meta leading-[normal] text-fg-dim">
+            Moved "{v.undo.title}" to Done ·
+            <button type="button" onClick={v.undoDone} className="h-[32px] text-meta leading-[normal] text-ice">
               Undo
             </button>
           </div>
@@ -159,7 +159,7 @@ export default function VideosPanel() {
             type="button"
             aria-expanded={v.doneOpen}
             onClick={v.toggleDone}
-            className="mx-[10px] mb-[3px] mt-[9px] flex h-[32px] w-[calc(100%-20px)] items-center justify-between px-[4px] text-meta leading-[normal] text-fg-dim hover:text-fg"
+            className={`mx-[10px] mb-[3px] ${v.undo ? "mt-[6px]" : "mt-[9px]"} flex h-[32px] w-[calc(100%-20px)] items-center justify-between px-[4px] text-meta leading-[normal] text-fg-dim hover:text-fg`}
           >
             Done · {doneCount}
             <span className={"inline-flex " + (v.doneOpen ? "rotate-180" : "")}>
