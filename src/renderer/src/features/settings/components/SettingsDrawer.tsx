@@ -20,6 +20,7 @@ import { useClipDestination } from "../../player/hooks/useClipDestination";
 import { campaignClipsDir, campaignNameProblems, type Campaign } from "../../../shared/utils/campaigns";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
+import { lookForCampaign, loadSavedLooks } from "../../../shared/utils/fcpLooks";
 import { destinationLabel } from "../../player/utils/clipDestination";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import { DEFAULT_DAILY_QUOTA, dropCampaignPrefs, toggleLanguage } from "../utils/settingsPrefs";
@@ -49,8 +50,10 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   const [destination] = useClipDestination();
   const viewId = c.view.kind === "campaign" || c.view.kind === "editor" ? c.view.id : null;
   const activeCampaign = c.campaigns.campaigns.find((x) => x.id === viewId);
-  const look = useFinalCutLook(activeCampaign, c.campaigns);
   const activeFcp = activeCampaign ? editor.settingsFor(activeCampaign.id) : undefined;
+  const look = useFinalCutLook(activeCampaign, c.campaigns, () => {
+    if (activeCampaign && activeFcp) editor.onChange(activeCampaign.id, { ...activeFcp, timelineFormat: { ...activeFcp.timelineFormat, kind: "look" } });
+  });
   const layout = useFinalCutLayout(
     activeCampaign,
     {
@@ -74,6 +77,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   const { view } = c;
   const campaign = view.kind === "campaign" || view.kind === "editor" ? c.campaigns.campaigns.find((x) => x.id === view.id) : undefined;
 
+  const lookFormat = (campaign: Campaign) => lookForCampaign(campaign, loadSavedLooks())?.format ?? null;
   const fcpFields = (campaign: Campaign, fcp: EditorHandoffSettings): FinalCutFields => ({
     library: fcp.fcpLibrary ? (fcp.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
     // Blank means "Export" (shown as the placeholder). Layouts video and day name their own events.
@@ -87,6 +91,12 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
     onEvent: (v) => editor.onChange(campaign.id, { ...fcp, mediaEvent: v }),
     look,
     layout,
+    timeline: {
+      kind: fcp.timelineFormat.kind,
+      lookName: look?.saved.find((l) => l.id === look.currentId)?.name ?? "",
+      lookFormat: lookFormat(campaign),
+      onPick: (kind) => editor.onChange(campaign.id, { ...fcp, timelineFormat: { ...fcp.timelineFormat, kind, fps: kind === "source" ? fcp.timelineFormat.fps : fcp.timelineFormat.fps === "source" ? "30" : fcp.timelineFormat.fps } }),
+    },
   });
 
   let body;
