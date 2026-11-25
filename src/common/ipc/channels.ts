@@ -41,6 +41,8 @@ export const IPC = {
   signInSignal: "signin:signal",
   signInStatus: "signin:status",
   symbolsOpen: "symbols:open",
+  windowChrome: "window:chrome",
+  windowFullScreen: "window:fullScreen",
   systemBrowserOrder: "system:browserOrder",
   systemDefaultBrowser: "system:defaultBrowser",
   systemDefaultFolders: "system:defaultFolders",

@@ -168,3 +168,24 @@ test("F-10: a stored layout can never lose Preview or Timeline", () => {
   }
   assert.ok(l.sizes.left <= SIZE_LIMITS.left.max && l.sizes.right >= SIZE_LIMITS.right.min && l.sizes.timeline >= SIZE_LIMITS.timeline.min);
 });
+
+// ---- Audit run 2: F2-6 ----
+import { PREVIEW_MIN_H, TIMELINE_GAP, fitTimeline, timelineMax } from "./panelLayout";
+
+test("F2-6: a saved 520px timeline cannot crush Preview in a short window", () => {
+  // 900x600 window: the workspace is about 480 tall (top bar and footer take the rest)
+  const short = 480;
+  const t = fitTimeline(520, short);
+  assert.ok(short - t - TIMELINE_GAP >= PREVIEW_MIN_H, `preview ${short - t - TIMELINE_GAP}`);
+  assert.ok(t >= SIZE_LIMITS.timeline.min);
+  // the 1160x760 minimum window: 520 still leaves Preview its minimum
+  const min = 633;
+  assert.ok(min - fitTimeline(520, min) - TIMELINE_GAP >= PREVIEW_MIN_H);
+});
+
+test("F2-6: a timeline that already fits is left alone, and a tiny window keeps the timeline's own minimum", () => {
+  assert.equal(fitTimeline(200, 700), 200);
+  assert.equal(fitTimeline(200, Infinity), 200);
+  assert.equal(timelineMax(100), SIZE_LIMITS.timeline.min);
+  assert.equal(fitTimeline(90, 700), 90, "never raised, only capped");
+});
