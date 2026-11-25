@@ -60,5 +60,5 @@ test("F-10: App mounts the boundary above every provider", () => {
 test("E-2: the app's boundary uses the report-sending crash screen", () => {
   const app = readFileSync(join(process.cwd(), "src", "renderer", "src", "routes", "App.tsx"), "utf8");
   assert.match(app, /<ErrorBoundary fallback=\{\(error\) => <CrashScreenHost error=\{error\} \/>\}>/);
-  assert.match(app, /useFlushPendingReports\(\);/);
+  assert.doesNotMatch(app, /useFlushPendingReports/, "main keeps and retries reports now");
 });

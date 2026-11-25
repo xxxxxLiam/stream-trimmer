@@ -1,22 +1,11 @@
 /**
  * File: useReportMutations.ts
  * Path: src/renderer/src/features/help/hooks/useReportMutations.ts
- * Description: Writes for "Report a problem": send a report (note plus error, versions and cleaned
- *   log) through the relay, keep it on this computer when it cannot go, copy the details, and try the
- *   kept reports again when the app opens.
+ * Description: Writes for "Report a problem": send a report through the main process (it adds the versions and
+ *   the cleaned log, and keeps the report for a later launch when the relay can't be reached), and copy the details.
  */
-import { useCallback, useEffect, useState } from "react";
-import { readSetting, writeSetting } from "../../../shared/utils/persist";
-import {
-  PENDING_REPORTS_KEY,
-  addPending,
-  flushPending,
-  makeReport,
-  normalizePending,
-  reportText,
-  sendToRelay,
-  type PendingReport,
-} from "../utils/reports";
+import { useCallback, useRef, useState } from "react";
+import { makeReport, reportText, sendReport } from "../utils/reports";
 
 export type ReportState = "writing" | "sent" | "kept";
 
@@ -29,36 +18,26 @@ async function readDetails(): Promise<string> {
   }
 }
 
-/** Kept reports (a failed Report a problem, or a crash report) go out on a later launch. Called once by the shell. */
-export function useFlushPendingReports() {
-  useEffect(() => {
-    const pending = normalizePending(readSetting<unknown>(PENDING_REPORTS_KEY, []));
-    if (pending.length === 0) return;
-    void flushPending(pending, sendToRelay).then((left) => {
-      if (left.length !== pending.length) writeSetting(PENDING_REPORTS_KEY, left);
-    });
-  }, []);
-}
-
 export function useReportMutations() {
   const [state, setState] = useState<ReportState>("writing");
   const [copied, setCopied] = useState(false);
 
-  const send = useCallback(async (note: string) => {
-    const report: PendingReport = makeReport(note, await readDetails(), new Date(), `r-${Date.now().toString(36)}`);
-    let ok = false;
-    try {
-      ok = await sendToRelay(report);
-    } catch {
-      ok = false;
-    }
-    if (ok) setState("sent");
-    else {
-      const list = normalizePending(readSetting<unknown>(PENDING_REPORTS_KEY, []));
-      writeSetting(PENDING_REPORTS_KEY, addPending(list, report));
-      setState("kept");
-    }
+  // A second click while the first report is on its way must not file a second one.
+  const sending = useRef(false);
+
+  const sendOnce = useCallback(async (note: string) => {
+    setState(await sendReport("problem", note, "Reported from Help"));
   }, []);
+
+  const send = useCallback(async (note: string) => {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await sendOnce(note);
+    } finally {
+      sending.current = false;
+    }
+  }, [sendOnce]);
 
   const copyDetails = useCallback(async (note: string) => {
     const report = makeReport(note, await readDetails(), new Date(), "copy");
