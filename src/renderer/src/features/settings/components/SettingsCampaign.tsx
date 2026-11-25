@@ -9,7 +9,7 @@ import { useState } from "react";
 import { MAX_RULE_SEC } from "../../../shared/utils/campaigns";
 import { formatClock } from "../../../shared/utils/clock";
 import { parseTimestamp } from "../../../shared/utils/clip";
-import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
+import { DrawerHeader, SectionLabel, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 import { stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
 export type SettingsCampaignProps = {
@@ -183,6 +183,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
       {folderProblem && <span role="alert" className="text-meta text-error">{folderProblem}</span>}
       {folderNote && !folderProblem && <span role="status" className="text-meta text-fg-dim">{folderNote}</span>}
       </div>
+      {p.editor && <SectionLabel>Export settings</SectionLabel>}
       {p.editor && (
         <button type="button" aria-label={`${p.editor.label} settings for ${p.name}`} onClick={p.editor.onOpen} className="mt-[4px] flex min-h-[56px] items-center gap-[12px] rounded-control border border-hairlineStrong bg-raised px-[12px] py-[8px] text-left hover:bg-hover">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-fg-dim" aria-hidden="true">

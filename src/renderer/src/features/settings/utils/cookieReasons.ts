@@ -1,6 +1,6 @@
 /**
  * File: cookieReasons.ts
- * Path: src/renderer/src/features/help/utils/cookieReasons.ts
+ * Path: src/renderer/src/features/settings/utils/cookieReasons.ts
  * Description: The sentences shown under the drop zone when a cookies.txt is refused ("Wrong cookies
  *   file", approved): the reason in error red, then the fix in plain text, one sentence each. The
  *   engine's answer carries both sentences; the table below is only the fallback for an answer that

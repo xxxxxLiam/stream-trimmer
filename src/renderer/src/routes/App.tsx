@@ -85,6 +85,7 @@ import { useDayHost } from "../features/workspace/hooks/useDayHost";
 import SymbolsDialog from "../features/symbols/components/SymbolsDialog"; // browser fallback of the Symbols window
 import CampaignStart from "../features/campaigns/components/CampaignStart";
 import SettingsDrawer from "../features/settings/components/SettingsDrawer";
+import { START_AT_SIGNIN } from "../features/settings/hooks/useSettingsController";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
@@ -296,8 +297,6 @@ function Layout({ active }: { active: boolean }) {
   const [campaignPromptDismissed, setCampaignPromptDismissed] = useState(false);
   const tips = useTipsController(!!info && active && (!!campaign || campaignPromptDismissed));
   const [importText, setImportText] = useState<string | null>(null);
-  // The footer's "Sign in for 1080p" opens Help on its sign-in page.
-  const [helpStartAt, setHelpStartAt] = useState<"signin" | null>(null);
   // "<Campaign> settings" in the campaign menu opens the drawer on that campaign.
   const [settingsStartAt, setSettingsStartAt] = useState<string | null>(null);
   // A tab with no campaign is offered one, once. Dismissing is remembered for this tab so
@@ -330,7 +329,6 @@ function Layout({ active }: { active: boolean }) {
 
   const closeHelp = useCallback(() => {
     setHelpOpen(false);
-    setHelpStartAt(null);
   }, []);
   const closeSymbols = useCallback(() => setSymbolsOpen(false), []);
   const closeSettings = useCallback(() => {
@@ -564,9 +562,10 @@ function Layout({ active }: { active: boolean }) {
   const addMomentRef = useRef(addMoment);
   addMomentRef.current = addMoment;
   const openSignIn = () => {
-    setHelpStartAt("signin");
-    setSettingsOpen(false);
-    setHelpOpen(true);
+    // Sign-in is a setting, so it lives in Settings (Liam, 25 Nov), not in Help.
+    setSettingsStartAt(START_AT_SIGNIN);
+    setHelpOpen(false);
+    setSettingsOpen(true);
   };
   const panelHost: PanelHost = {
     playhead,
@@ -651,7 +650,6 @@ function Layout({ active }: { active: boolean }) {
         <TopBar
           helpOpen={helpOpen}
           onToggleHelp={() => {
-            setHelpStartAt(null);
             setSettingsOpen(false);
             setHelpOpen((v) => !v);
           }}
@@ -671,7 +669,7 @@ function Layout({ active }: { active: boolean }) {
             <PanelWorkspace />
             {active && (
               <>
-                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); }, onShowMe: (steps) => { closeHelp(); tips.startTour(steps); } }} />
+                <HelpDrawer open={helpOpen} onClose={closeHelp} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); }, onShowMe: (steps) => { closeHelp(); tips.startTour(steps); } }} />
                 {settingsDrawer}
                 <ImportDrawer text={importText} onClose={() => setImportText(null)} />
                 {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}

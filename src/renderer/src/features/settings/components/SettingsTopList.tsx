@@ -18,6 +18,8 @@ export type SettingsTopListProps = {
   folderProblem?: string;
   /** The folder page held one control, so it is a flat Change button on the row (Liam, 25 Nov). */
   onChangeFolder: () => void;
+  signedIn?: boolean;
+  onOpenSignIn: () => void;
   onClose: () => void;
 };
 
@@ -38,6 +40,8 @@ export default function SettingsTopList(p: SettingsTopListProps) {
         </button>
       </div>
       {p.folderProblem && <p role="alert" className="m-[0px] text-meta text-error">{p.folderProblem}</p>}
+      <SectionLabel>YouTube</SectionLabel>
+      <ChevronRow label="Sign in for 1080p" value={p.signedIn ? "Signed in" : "Not signed in"} onOpen={p.onOpenSignIn} />
       <SectionLabel>This computer</SectionLabel>
       <SwitchRow label="Tell me when the queue finishes" on={p.app.notifyQueueDone} onFlip={() => p.onPatchApp({ notifyQueueDone: !p.app.notifyQueueDone })} divider />
       <SwitchRow label="Update automatically" on={p.autoUpdate} onFlip={() => p.onAutoUpdate(!p.autoUpdate)} />

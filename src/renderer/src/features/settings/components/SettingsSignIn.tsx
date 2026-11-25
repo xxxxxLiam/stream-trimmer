@@ -1,7 +1,7 @@
 /**
- * File: HelpSignIn.tsx
- * Path: src/renderer/src/features/help/components/HelpSignIn.tsx
- * Description: Help > Sign in for 1080p (late decision, signin-open.png B): the honest line first,
+ * File: SettingsSignIn.tsx
+ * Path: src/renderer/src/features/settings/components/SettingsSignIn.tsx
+ * Description: Settings > Sign in for 1080p (late decision, signin-open.png B; moved out of Help, Liam 25 Nov): the honest line first,
  *   three steps, and a drop zone "Drop cookies.txt, or choose a file". A refused file says why in
  *   error red, then the fix, under the drop zone. No dialog, toast or Try again button.
  */
@@ -9,7 +9,7 @@ import { useState, type DragEvent } from "react";
 import { DrawerHeader, drawerBodyRoomy, outlineButton } from "../../../shared/components/DrawerRows";
 import type { CookieReason } from "../utils/cookieReasons";
 
-export type HelpSignInProps = {
+export type SettingsSignInProps = {
   problem: CookieReason | null;
   done: boolean;
   onFile: (file: File | undefined) => void;
@@ -24,7 +24,7 @@ const STEPS = [
   "Drop the file here.",
 ];
 
-export default function HelpSignIn(p: HelpSignInProps) {
+export default function SettingsSignIn(p: SettingsSignInProps) {
   const [over, setOver] = useState(false);
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export default function HelpSignIn(p: HelpSignInProps) {
   };
   return (
     <>
-      <DrawerHeader title="Sign in for 1080p" back="Help" onBack={p.onBack} closeName="Help" onClose={p.onClose} />
+      <DrawerHeader title="Sign in for 1080p" back="Settings" onBack={p.onBack} closeName="Settings" onClose={p.onClose} />
       <div className={drawerBodyRoomy}>
         <p className="m-[0px] text-body">Clipr only reads your sign-in to download. It never posts, likes or changes anything.</p>
         <ol className="m-[0px] flex list-none flex-col gap-[8px] p-[0px]">

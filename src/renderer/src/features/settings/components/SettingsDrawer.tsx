@@ -12,6 +12,9 @@ import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
 import SettingsCampaigns from "./SettingsCampaigns";
+import SettingsSignIn from "./SettingsSignIn";
+import { useCookieDropMutations } from "../hooks/useCookieDropMutations";
+import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
@@ -47,7 +50,12 @@ export type SettingsDrawerProps = {
 
 export default function SettingsDrawer({ open, onClose, startAt, tracks, editor, videoTitle }: SettingsDrawerProps) {
   const c = useSettingsController({ open, onClose, startAt });
-  const [destination] = useClipDestination();
+  const cookies = useCookieDropMutations();
+  const connection = useYouTubeConnection();
+  const [chosen] = useClipDestination();
+  // Liam, 25 Nov: a campaign's export settings are always here. With no editor chosen yet (or CapCut, which has
+  // nothing to set) the page is Final Cut Pro's, the first editor, so its library, event, layout and look are never out of reach.
+  const destination = hasEditorPage(chosen) ? chosen : "finalcut";
   const viewId = c.view.kind === "campaign" || c.view.kind === "editor" ? c.view.id : null;
   const activeCampaign = c.campaigns.campaigns.find((x) => x.id === viewId);
   const activeFcp = activeCampaign ? editor.settingsFor(activeCampaign.id) : undefined;
@@ -186,6 +194,17 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onClose={onClose}
       />
     );
+  } else if (view.kind === "signin") {
+    body = (
+      <SettingsSignIn
+        problem={cookies.problem}
+        done={cookies.done}
+        onFile={(f) => void cookies.onFile(f)}
+        onChoose={() => void cookies.choose()}
+        onBack={c.back}
+        onClose={onClose}
+      />
+    );
   } else if (view.kind === "campaigns") {
     body = <SettingsCampaigns rows={c.rows} onEdit={(id) => c.setView({ kind: "campaign", id })} onAdd={() => c.setAdding(true)} onBack={c.back} onClose={onClose} />;
   } else {
@@ -199,6 +218,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onPatchApp={c.patchApp}
         onOpenCampaigns={() => c.setView({ kind: "campaigns" })}
         folderProblem={problem}
+        signedIn={connection.connected}
+        onOpenSignIn={() => c.setView({ kind: "signin" })}
         onChangeFolder={() => void c.campaigns.pickParentClipsDir().then((p) => setProblem(p ?? ""))}
         onClose={onClose}
       />

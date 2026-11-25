@@ -3,8 +3,7 @@
  * Path: src/renderer/src/features/help/components/HelpDrawer.tsx
  * Description: The Help drawer (Help.dc.html 04.5): 440px on the right, the same pattern as
  *   Settings, nothing blocked while it is open. Views: Common questions and More, one answer,
- *   Keyboard shortcuts, Report a problem (with its kept-for-later state), About, and the "Sign in for
- *   1080p" page the footer pill opens. Focus starts in the search field; Esc closes Help.
+ *   Keyboard shortcuts, Report a problem (with its kept-for-later state), and About. Sign-in lives in Settings, not here. Focus starts in the search field; Esc closes Help.
  */
 import { useRef } from "react";
 import { Drawer } from "../../../shared/components/Drawer";
@@ -12,7 +11,6 @@ import HelpAbout from "./HelpAbout";
 import HelpAnswer from "./HelpAnswer";
 import HelpReport from "./HelpReport";
 import HelpShortcuts from "./HelpShortcuts";
-import HelpSignIn from "./HelpSignIn";
 import HelpTop from "./HelpTop";
 import { useDrawerFocus } from "../../../shared/hooks/useDrawerFocus";
 import { useHelpController } from "../hooks/useHelpController";
@@ -23,8 +21,6 @@ import type { TipStep } from "../../tips/utils/tipRegistry";
 export type HelpDrawerProps = {
   open: boolean;
   onClose: () => void;
-  /** "signin" opens on the Sign in for 1080p page (the footer pill). */
-  startAt?: "signin" | null;
   /** First-use tips: whether they are on, and replay for the open panel. */
   tips?: { on: boolean; onReplay: () => void; onShowMe: (steps: TipStep[]) => void };
 };
@@ -38,8 +34,8 @@ export function tourOf(a: Answer): TipStep[] {
   );
 }
 
-export default function HelpDrawer({ open, onClose, startAt = null, tips }: HelpDrawerProps) {
-  const c = useHelpController({ open, onClose, startAt });
+export default function HelpDrawer({ open, onClose, tips }: HelpDrawerProps) {
+  const c = useHelpController({ open, onClose });
   const root = useRef<HTMLDivElement>(null);
   // F-4 and F-12: focus stays in the drawer while it is open, returns to the opener on close, and lands on the new view's heading.
   const onKeyDown = useDrawerFocus(root, open, c.view.kind === "answer" ? `answer:${c.view.id}` : c.view.kind, "#ui-help-button");
@@ -61,17 +57,6 @@ export default function HelpDrawer({ open, onClose, startAt = null, tips }: Help
         copied={c.report.copied}
         onSend={() => void c.sendReport()}
         onCopy={() => void c.report.copyDetails(c.note)}
-        onBack={c.top}
-        onClose={onClose}
-      />
-    );
-  } else if (view.kind === "signin") {
-    body = (
-      <HelpSignIn
-        problem={c.cookies.problem}
-        done={c.cookies.done}
-        onFile={(f) => void c.cookies.onFile(f)}
-        onChoose={() => void c.cookies.choose()}
         onBack={c.top}
         onClose={onClose}
       />

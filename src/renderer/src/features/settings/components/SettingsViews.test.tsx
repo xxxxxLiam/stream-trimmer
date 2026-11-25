@@ -14,6 +14,8 @@ import SettingsEditor from "./SettingsEditor";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsTopList from "./SettingsTopList";
+import SettingsSignIn from "./SettingsSignIn";
+import { cookieReason } from "../utils/cookieReasons";
 import { parentOf } from "../hooks/useSettingsController";
 
 const noop = () => {};
@@ -21,8 +23,10 @@ const read = (f: string) => readFileSync(join(process.cwd(), "src/renderer/src",
 
 test("top list: Your work rows, two switches, nothing about editor, quality or crashes", () => {
   const h = renderToStaticMarkup(
-    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onChangeFolder={noop} onClose={noop} />,
+    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onChangeFolder={noop} onOpenSignIn={noop} onClose={noop} />,
   );
+  // Liam, 25 Nov: sign-in is a setting, so the Settings list has its row.
+  assert.match(h, /aria-label="Sign in for 1080p: Not signed in"/);
   assert.match(h, /aria-label="Campaigns: Acme, Nova"/);
   // Liam, 25 Nov: a page with one control is not a page; the Change button sits flat on the row.
   assert.match(h, /Downloads\/Clipr/);
@@ -181,4 +185,35 @@ test("A3-3: Settings keeps focus inside, lands on its heading when it opens and 
   assert.match(drawer, /useDrawerFocus\(root, open, .*"#ui-settings"\)/);
   assert.match(drawer, /ref=\{root\} onKeyDown=\{onKeyDown\}/);
   assert.match(drawer, /querySelector<HTMLElement>\("h3"\)/);
+});
+
+test("sign-in page: honest line, three steps, drop zone; a refusal shows reason then fix", () => {
+  const base = { problem: null, done: false, onFile: noop, onChoose: noop, onBack: noop, onClose: noop };
+  const h = renderToStaticMarkup(<SettingsSignIn {...base} />);
+  assert.match(h, /never posts, likes or changes anything/);
+  assert.match(h, /Drop cookies\.txt, or choose a file/);
+  assert.match(h, /Get cookies\.txt LOCALLY/);
+  assert.doesNotMatch(h, /Try again/);
+  const bad = renderToStaticMarkup(<SettingsSignIn {...base} problem={cookieReason({ ok: false, reason: "wrong-site" })} />);
+  assert.match(bad, /role="alert"/);
+  assert.match(bad, /no YouTube cookies/);
+  assert.match(bad, /text-error/);
+});
+
+test("the engine's own sentences win over the fallback", () => {
+  const r = cookieReason({ ok: false, reason: "signed-out", message: "Signed out when exported.", fix: "Sign in, then export." });
+  assert.deepEqual(r, { reason: "Signed out when exported.", fix: "Sign in, then export." });
+  assert.match(cookieReason({ ok: false }).reason, /isn’t a cookies file/);
+  assert.match(cookieReason({ ok: false, kind: "too_old" }).reason, /ended this session/);
+  assert.match(cookieReason({ ok: false, kind: "wrong_site" }).reason, /no YouTube cookies/);
+  assert.match(cookieReason({ ok: false, kind: "wrong_format" }).reason, /isn’t a cookies file/);
+});
+
+
+test("Liam 25 Nov: a campaign's export settings are always on its page, Final Cut's when no editor is chosen", () => {
+  const withEditor = renderToStaticMarkup(<SettingsCampaign {...campaign} editor={{ label: "Final Cut Pro", summary: "Library · Export", onOpen: noop }} />);
+  assert.match(withEditor, />Export settings</);
+  assert.match(withEditor, /aria-label="Final Cut Pro settings for Acme"/);
+  const drawer = read("features/settings/components/SettingsDrawer.tsx");
+  assert.match(drawer, /const destination = hasEditorPage\(chosen\) \? chosen : "finalcut"/);
 });

@@ -33,7 +33,7 @@ test("useClipperController applies the signed-out quality rule", () => {
   assert.doesNotMatch(app, /campaign\.quality|campaign\.format/);
 });
 
-test("there is no sign-in gate: Help is never withdrawn for one, and the footer pill opens Help instead", () => {
+test("there is no sign-in gate: Help is never withdrawn for one, and the footer pill opens Settings instead", () => {
   const btn = readFileSync(new URL("../../features/help/components/HelpButton.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(btn, /isSignInGateUp|gateUp/);
   const app = readFileSync(new URL("../../routes/App.tsx", import.meta.url), "utf8");

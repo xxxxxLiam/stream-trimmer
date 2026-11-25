@@ -1,6 +1,6 @@
 /**
  * File: useCookieDropMutations.ts
- * Path: src/renderer/src/features/help/hooks/useCookieDropMutations.ts
+ * Path: src/renderer/src/features/settings/hooks/useCookieDropMutations.ts
  * Description: Writes for the sign-in page: adopt a dropped or chosen cookies.txt through the main
  *   process and report the approved reason when it is refused. Dropping a new file replaces the
  *   sentence; success clears it (the footer's "at 360p" and pill go away by themselves).

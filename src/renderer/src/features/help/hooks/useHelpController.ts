@@ -9,25 +9,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { searchHelp } from "../utils/helpSearch";
 import { HELP_ANSWERS, type HelpMoreId } from "../utils/helpContent";
 import { useReportMutations } from "./useReportMutations";
-import { useCookieDropMutations } from "./useCookieDropMutations";
 
-export type HelpView = { kind: "top" } | { kind: "answer"; id: string } | { kind: "shortcuts" } | { kind: "report" } | { kind: "signin" } | { kind: "about" };
+export type HelpView = { kind: "top" } | { kind: "answer"; id: string } | { kind: "shortcuts" } | { kind: "report" } | { kind: "about" };
 
-export function useHelpController({ open, onClose, startAt }: { open: boolean; onClose: () => void; startAt: "signin" | null }) {
+export function useHelpController({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [view, setView] = useState<HelpView>({ kind: "top" });
   const [query, setQuery] = useState("");
   const [note, setNote] = useState("");
   const report = useReportMutations();
-  const cookies = useCookieDropMutations();
   const reportRef = useRef(report);
   reportRef.current = report;
 
   useEffect(() => {
     if (!open) return;
     // A report that finished while Help was closed is shown first, so its result is never lost.
-    setView(startAt === "signin" ? { kind: "signin" } : reportRef.current.unseen && reportRef.current.state !== "writing" ? { kind: "report" } : { kind: "top" });
+    setView(reportRef.current.unseen && reportRef.current.state !== "writing" ? { kind: "report" } : { kind: "top" });
     setQuery("");
-  }, [open, startAt]);
+  }, [open]);
 
   // Looking at the result is seeing it.
   useEffect(() => {
@@ -81,6 +79,5 @@ export function useHelpController({ open, onClose, startAt }: { open: boolean; o
     note,
     setNote,
     report,
-    cookies,
   };
 }

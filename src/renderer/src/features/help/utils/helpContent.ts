@@ -166,7 +166,7 @@ export const HELP_ANSWERS: HelpAnswer[] = [
       {
         steps: [
           { text: "Sign in to YouTube in Chrome, Edge, Firefox or Brave. Clipr looks for it when it opens." },
-          { text: "If it can’t find one, press Sign in for 1080p at the bottom of the window." },
+          { text: "If it can’t find one, press Sign in for 1080p at the bottom of the window, or open Settings and choose Sign in for 1080p.", show: { target: "#ui-settings", advance: "click" } },
           { text: "Export your cookies.txt as that page says, then drop it there or choose the file." },
         ],
       },
