@@ -487,7 +487,17 @@ export interface FailureContext {
   partialBytes?: number;
   neededMb?: number;
   freeMb?: number;
+  /**
+   * The JavaScript runtime (deno) that yt-dlp needs to read YouTube's player is missing or won't start. Without it
+   * YouTube shows only picture-sized formats, and yt-dlp then says "Requested format is not available" for every
+   * quality, which no other quality can fix.
+   */
+  jsRuntimeMissing?: boolean;
 }
+
+/** The sentence for a missing JavaScript runtime. Shared by the clip row and the "open a video" failure. */
+export const JS_RUNTIME_SENTENCE =
+  "A part of Clipr that YouTube needs is missing on this computer, so YouTube shows no video to download";
 
 const PATTERNS = {
   private:
@@ -557,6 +567,15 @@ export function classifyFailure(
   }
   if (reason?.kind === "refused") return PATTERNS.rateLimited.test(text) ? rateLimitedFailure() : refusedFailure("");
   if (PATTERNS.rateLimited.test(text)) return rateLimitedFailure();
+  if (PATTERNS.formatGone.test(text) && ctx.jsRuntimeMissing) {
+    return failure(
+      "tools_missing",
+      500,
+      JS_RUNTIME_SENTENCE,
+      { id: "retry", label: "Reinstall Clipr" },
+      kept(),
+    );
+  }
   if (PATTERNS.formatGone.test(text)) {
     return failure(
       "format_unavailable",

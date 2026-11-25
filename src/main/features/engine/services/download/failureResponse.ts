@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { classifyFailure, estimateNeededMb, joinFailure, refusedFailure, pruneWorkDir, type ClipFailure } from "../segments";
 import { partialBytes } from "../resumeCache";
+import { jsRuntimeProblem } from "../toolStatus";
 import { CancelledError } from "../downloadJobs";
 import { publishProgress } from "../progressChannel";
 import { buildRunDiagnostics } from "../runDiagnostics";
@@ -52,7 +53,7 @@ export function handleFailure(ctx: DownloadCtx, ws: Workspace, runner: Runner, e
     if ((e as { joinFailed?: boolean } | null)?.joinFailed) {
       failure = joinFailure(tail);
     } else {
-      const failCtx = { percent: ctx.lastReported, partialBytes: partial };
+      const failCtx = { percent: ctx.lastReported, partialBytes: partial, jsRuntimeMissing: jsRuntimeProblem() };
       failure = classifyFailure(raw, failCtx);
       if (failure.code === "disk_full") {
         let freeMb: number | undefined;

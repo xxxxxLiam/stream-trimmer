@@ -5,6 +5,7 @@
  */
 import { STAGE_FOUND, classifyFailure, outPointFailure } from "../segments";
 import { yt } from "../binaries";
+import { jsRuntimeProblem } from "../toolStatus";
 import { withRunCookies } from "../cookies";
 import { CancelledError } from "../downloadJobs";
 import { publishProgress } from "../progressChannel";
@@ -69,7 +70,7 @@ export async function probeSource(ctx: DownloadCtx): Promise<boolean> {
     }
     logYtError("/api/download probe", url, ctx.probeOptions, e);
     const raw = fullErrMessage(e);
-    sendFailure(res, classifyFailure(raw), diag(raw));
+    sendFailure(res, classifyFailure(raw, { jsRuntimeMissing: jsRuntimeProblem() }), diag(raw));
     return true;
   }
   publishProgress(jobId, {
