@@ -15,10 +15,14 @@ export type UpdateReady =
   | { version: string; mode: "restart" }
   | { version: string; mode: "download"; url: string };
 
-/** Answer to "restart to update now". `busy` means a clip is being made: the pill stays and waits. */
+/**
+ * Answer to "restart to update now". `{ ok: true }` means Clipr is restarting. `{ ok: true, waiting: true }` means a
+ * clip is being made: Clipr restarts by itself when the clips finish, and the pill reads "Restarts after <video>"
+ * until it restarts or `cancelRestartToUpdate` ends the wait.
+ */
 export type RestartToUpdateResult =
-  | { ok: true }
-  | { ok: false; reason: "busy" | "nothing-ready" | "failed"; error?: string };
+  | { ok: true; waiting?: boolean }
+  | { ok: false; reason: "nothing-ready" | "failed"; error?: string };
 
 /** The Settings row "Update automatically". On unless the user turned it off. */
 export const AUTO_UPDATE_SETTING = "clipper.autoUpdate";

@@ -4,7 +4,7 @@
  * Description: What the top bar's update pill says for the main process's UpdateReady. "Restart to
  *   update" (mode restart), or on the unsigned Mac build "Get version <x>" that opens the installer
  *   download (mode download). Whether a clip is being made is the main process's call: a restart it
- *   refuses as "busy" leaves the pill up, with the reason shown, and a later click retries.
+ *   during a clip answers { ok: true, waiting: true } and Clipr restarts by itself when the clips finish.
  */
 import type { RestartToUpdateResult, UpdateReady } from "../../../../../common/types/updates";
 
@@ -21,7 +21,6 @@ export function updatePillFor(ready: UpdateReady | null): UpdatePill | null {
 /** The sentence under a refused restart, or null when it worked. */
 export function restartRefusal(result: RestartToUpdateResult): string | null {
   if (result.ok) return null;
-  if (result.reason === "busy") return "A clip is being made. Try again when it finishes; the update also installs when you quit.";
   if (result.reason === "nothing-ready") return null;
   return "The update could not restart the app. It will install when you quit.";
 }

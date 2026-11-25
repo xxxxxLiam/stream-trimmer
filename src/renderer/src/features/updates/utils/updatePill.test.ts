@@ -21,7 +21,7 @@ test("the unsigned Mac build gets Get version x with the installer link", () => 
 
 test("a restart refused while a clip is made explains itself; success says nothing", () => {
   assert.equal(restartRefusal({ ok: true }), null);
-  assert.match(restartRefusal({ ok: false, reason: "busy" }) ?? "", /clip is being made/);
+  assert.equal(restartRefusal({ ok: true, waiting: true }), null);
   assert.equal(restartRefusal({ ok: false, reason: "nothing-ready" }), null);
   assert.ok(restartRefusal({ ok: false, reason: "failed" }));
 });
