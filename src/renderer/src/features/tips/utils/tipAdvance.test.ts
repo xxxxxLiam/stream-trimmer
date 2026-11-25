@@ -52,5 +52,5 @@ test("F-2: the card handles keys only from inside itself, and Enter is left to t
 
 test("F-2: Turn off tips is one switch in the one controller, saved for every video", () => {
   const c = read("hooks/useTipsController.ts");
-  assert.match(c, /writeSetting\(TIPS_ON_KEY, false\)/);
+  assert.match(c, /setTipsOn\(false\)/);
 });
