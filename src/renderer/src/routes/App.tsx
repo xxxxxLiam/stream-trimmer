@@ -62,6 +62,7 @@ import ExportBar from "../features/player/components/ExportBar";
 import { TimelineControllerProvider } from "../features/player/hooks/TimelineControllerContext";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import SettingsRestoredNote from "../features/settings/components/SettingsRestoredNote";
+import StartFreshPrompt from "../features/start/components/StartFreshPrompt";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
 import ImportDrawer from "../features/import/components/ImportDrawer";
@@ -605,6 +606,8 @@ function Layout({ active }: { active: boolean }) {
   return (
     <>
       <SettingsRestoredNote />
+      <StartFreshPrompt />
+      
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
