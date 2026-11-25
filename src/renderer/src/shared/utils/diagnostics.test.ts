@@ -233,6 +233,8 @@ test("mutation: disabling any single rule makes the fixture leak", () => {
     "po-token": [],
     "home-dir": ["/Users/samantha"],
     email: ["samantha@example.com"],
+    "cookie-json": [], // proven on its own input in common/utils/redact.test.ts (E-10)
+    "lan-ip": [], // likewise
   };
   assert.deepEqual(
     REDACTION_RULES.map((r) => r.id).sort(),

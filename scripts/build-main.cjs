@@ -16,7 +16,20 @@ const outRoot = process.env.BUILD_MAIN_OUT
   ? path.resolve(process.env.BUILD_MAIN_OUT)
   : path.join(root, "out");
 
+// The channel exporter's save code is part of the main process too. A public build aliases it to a stub
+// (like build-server.cjs does for the routes), so "ytchan-" and the export writer are not in the file.
+const channelData = /^(1|true|yes|on)$/i.test(String(process.env.VITE_ENABLE_CHANNEL_DATA || "").trim());
+const exporterStub = {
+  name: "export-service-stub",
+  setup(build) {
+    build.onResolve({ filter: /(^|\/)exportService$/ }, () => ({
+      path: path.resolve(__dirname, "..", "src", "main", "features", "exports", "services", "exportService.stub.ts"),
+    }));
+  },
+};
+
 const common = {
+  plugins: channelData ? [] : [exporterStub],
   bundle: true,
   platform: "node",
   format: "cjs",

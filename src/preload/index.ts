@@ -39,6 +39,8 @@ try {
       }
     })(),
     setSetting: (key: unknown, value: unknown) => ipcRenderer.invoke(IPC.settingsSet, key, value),
+    // ISO time of the copy this launch restored the settings from, or null.
+    settingsRestoredAt: () => ipcRenderer.invoke(IPC.settingsRestoredAt),
     pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.

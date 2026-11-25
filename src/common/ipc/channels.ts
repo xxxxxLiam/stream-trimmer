@@ -32,6 +32,7 @@ export const IPC = {
   fileUndoClip: "file:undoClip",
   ownerCheck: "owner:check",
   settingsAll: "settings:all",
+  settingsRestoredAt: "settings:restoredAt",
   settingsSet: "settings:set",
   shellOpenYouTubeSignIn: "shell:openYouTubeSignIn",
   signInReportBrowser: "signin:reportBrowser",
