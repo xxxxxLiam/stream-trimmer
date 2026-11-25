@@ -55,3 +55,15 @@ export const IconMake = () => (
     <path d="M4 3.5v9l8-4.5z" />
   </Row14>
 );
+
+export const IconCopy = () => (
+  <Row14>
+    <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+    <path d="M10.5 5.5V4A1.5 1.5 0 009 2.5H4A1.5 1.5 0 002.5 4v5A1.5 1.5 0 004 10.5h1.5" />
+  </Row14>
+);
+export const IconSaveFile = () => (
+  <Row14>
+    <path d="M8 2.5v7M5 6.8L8 9.8l3-3M3 12.5h10" />
+  </Row14>
+);

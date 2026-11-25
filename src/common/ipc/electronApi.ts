@@ -37,6 +37,8 @@ export interface ElectronAPI {
   settingsSnapshot?: Record<string, unknown>;
   /** `reason` says why a write was refused: too large, a key the page may not write, or the disk write failed. */
   setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean; reason?: "too-large" | "not-allowed" | "write-failed" }>;
+  /** Save a clip list as a .txt the person places in the native save dialog. */
+  saveTextFile?: (payload: { name: string; text: string }) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
   pickDirectory: () => Promise<string | null>; pickFcpLibrary?: () => Promise<string | null>;
   /** Folders to fall back to on a fresh install; null if they could not be made. */
   getDefaultFolders?: () => Promise<{ clipsDir: string; dataDir: string } | null>;
@@ -165,6 +167,13 @@ export interface ElectronAPI {
   sendReport?: (payload: { kind: "crash" | "problem"; note?: string; error: string }) => Promise<{ ok: boolean; status?: "sent" | "kept" }>;
   /** ISO time when this launch restored the settings from the backup copy, else null. */
   settingsRestoredAt?: () => Promise<string | null>;
+  /** True on the first launch after updating from an earlier version (and until answered). Never on a fresh install. */
+  startFreshPending?: () => Promise<boolean>;
+  /**
+   * "fresh": backs campaigns, bank, history and settings up to Documents/Clipr backups/<date>, clears them and records the answer;
+   * the page then reloads into the cold start. "keep": changes nothing. A failed backup clears nothing and answers ok:false with a sentence.
+   */
+  startFreshAnswer?: (choice: "fresh" | "keep") => Promise<{ ok: true; backupDir?: string } | { ok: false; error: string }>;
   /** Why this launch started with nothing although the person had data: "unreadable" or "missing". Null when nothing was lost. */
   settingsLost?: () => Promise<"unreadable" | "missing" | null>;
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
