@@ -5,6 +5,7 @@
  *   memory, only ~40 lines are drawn. Click a line to seek, drag across lines to set a range
  *   snapped to whole caption lines, used ranges render hatched with a "used" tag.
  */
+import TranscriptWait from "./TranscriptWait";
 import {
   useCallback,
   useEffect,
@@ -381,7 +382,7 @@ export default function TranscriptColumn({
         className="relative min-h-[0px] flex-1 overflow-y-auto outline-none"
       >
         {loadingTranscript ? (
-          <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">Loading transcript…</p>
+          <TranscriptWait />
         ) : !hasTranscript ? (
           <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">
             {transcript && transcript.length === 0
