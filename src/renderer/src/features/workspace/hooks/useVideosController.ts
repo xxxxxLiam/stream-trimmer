@@ -17,6 +17,8 @@ import { linkInText, linkKind, matchesVideoQuery, splitVideos, waitingIn } from 
 
 export type VideoRow = {
   id: string;
+  /** The YouTube id, for the thumbnail. */
+  videoId: string | null;
   title: string;
   campaign: string;
   waiting: number;
@@ -44,6 +46,7 @@ export function useVideosController() {
       const campaign = campaigns.find((c) => c.id === t.campaignId);
       return {
         id: t.id,
+        videoId: t.url ? extractVideoId(t.url) : null,
         title: ws.labelFor(t.id),
         campaign: campaign?.name ?? "",
         waiting: waitingIn(bank, t.campaignId, t.url ? extractVideoId(t.url) : null, makingId),
