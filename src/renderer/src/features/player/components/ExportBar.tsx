@@ -3,24 +3,12 @@
  * Path: src/renderer/src/features/player/components/ExportBar.tsx
  * Description: The one export bar, fixed full-bleed at the very bottom of the window (60px, panel fill, a
  *   strong hairline on top, no margin, no radius). Left: In, Out, the clip length and one chip per section.
- *   Centre: the sentence that says what the next Clip makes ("Makes 2 clips [Original + ES] to [folder]").
+ *   Centre: only the "at 360p · Sign in for 1080p" notice. Where clips go and Audio live in the Clip arrow's menu.
  *   Right: + section and the split Clip button. It is not a panel and nothing in it moves.
  */
-import { useState } from "react";
-import PopoverMenu, { type MenuItem } from "../../../modules/layout/components/PopoverMenu";
-import { IconChevronSmall } from "../../../modules/layout/components/BarIcons";
 import { X } from "react-bootstrap-icons";
-import { useNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { findOverlaps } from "../../../shared/utils/segments";
-import {
-  audioButtonLabel,
-  makesText,
-  nameForLanguage,
-  planLanguages,
-  shortenPath,
-  toggleLanguage,
-  type AudioTrackInfo,
-} from "../../../shared/utils/audioLanguages";
+import type { AudioTrackInfo } from "../../../shared/utils/audioLanguages";
 import { lengthLabel } from "../hooks/useTimelineController";
 import { useTimelineView } from "../hooks/TimelineControllerContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
@@ -29,12 +17,8 @@ import ClipButton from "./ClipButton";
 import InOutFields from "./InOutFields";
 
 const VALUE_BUTTON = "inline-flex h-[44px] items-center";
-const VALUE_FACE =
-  "inline-flex h-[30px] items-center gap-[6px] rounded-control border border-hairlineStrong bg-raised px-[10px] text-meta text-fg";
 
 export type ExportBarProps = {
-  /** How many clips the next Clip makes (one per ticked language). */
-  clipCount: number;
   /** The video's audio tracks. The Audio button shows only when there is a dub besides the original. */
   tracks?: AudioTrackInfo[];
   /** Ticked languages, as stored. */
@@ -58,7 +42,6 @@ function CrossIcon() {
 }
 
 export default function ExportBar({
-  clipCount,
   tracks,
   selectedLanguages,
   onSelectLanguages,
@@ -73,31 +56,6 @@ export default function ExportBar({
   const verdict = lengthVerdict(c.totalSeconds, ruleOf(active), active?.name ?? "");
   const chips = c.segments;
   const overlap = c.range ? findOverlaps(c.range, c.used).length > 0 : false;
-  const hasDubs = !!tracks && tracks.some((t) => t.kind !== "original");
-  const [problem, setProblem] = useState("");
-
-  const clipName = useNextClipName();
-  const plans = planLanguages(tracks, selectedLanguages);
-  const audioItems: MenuItem[] = [
-    ...(tracks ?? []).map<MenuItem>((t) => {
-      const ticked = t.kind === "original" ? !(selectedLanguages ?? []).includes(`-${t.language}`) : (selectedLanguages ?? []).includes(t.language);
-      return {
-        key: t.language,
-        label: t.kind === "original" ? "Original" : t.label,
-        detail: t.kind === "original" ? t.label : t.kind === "auto-dubbed" ? "Auto-dubbed" : "Creator dub",
-        checked: ticked,
-        keepOpen: true,
-        onSelect: () => onSelectLanguages(toggleLanguage(tracks ?? [], selectedLanguages, t.language)),
-      };
-    }),
-    ...(clipName
-      ? ([
-          { kind: "separator", key: "sep-note" },
-          { kind: "note", key: "note", label: `${makesText(plans.length)}: ${plans.map((p) => nameForLanguage(clipName, p)).join(", ")}` },
-        ] as MenuItem[])
-      : []),
-  ];
-
   return (
     <div id="ui-export-bar" className="flex h-[60px] shrink-0 items-center gap-[16px] border-t border-hairlineStrong bg-panel px-[16px] text-meta text-fg-dim">
       <div className="flex min-w-0 flex-1 items-center gap-[16px] overflow-hidden whitespace-nowrap text-fg">
@@ -140,44 +98,6 @@ export default function ExportBar({
       </div>
 
       <div className="flex shrink-0 items-center gap-[8px] whitespace-nowrap" id="ui-export-sentence">
-        <span>{makesText(clipCount)}</span>
-        {hasDubs ? (
-          <PopoverMenu
-            label={`Audio: ${audioButtonLabel(tracks!, selectedLanguages)}`}
-            items={audioItems}
-            side="above"
-            align="center"
-            menuWidth={290}
-            boxes
-            triggerClassName={VALUE_BUTTON}
-            pressedWhenOpen={false}
-            heading="Audio languages"
-          >
-            <span className={VALUE_FACE}>
-              {audioButtonLabel(tracks!, selectedLanguages)}
-              <IconChevronSmall />
-            </span>
-          </PopoverMenu>
-        ) : null}
-        <span>to</span>
-        <button
-          type="button"
-          id="ui-footer-clips"
-          className={VALUE_BUTTON}
-          aria-label={`Clips folder: ${folder || "not set"}`}
-          title={onPickFolder ? folder || "Choose a folder" : "Browser downloads go to your Downloads folder. Use the desktop app to choose a folder."}
-          aria-disabled={!onPickFolder}
-          onClick={async () => {
-            if (!onPickFolder) return;
-            const r = await onPickFolder();
-            setProblem(typeof r === "string" ? r : "");
-          }}
-        >
-          <span className={`${VALUE_FACE} ${onPickFolder ? "" : "text-disabled"}`}>
-            {folder ? shortenPath(folder) : "Choose a folder"}
-            <IconChevronSmall />
-          </span>
-        </button>
         {at360 ? <span className="text-error">at 360p</span> : null}
         {showSignInPill ? (
           <button type="button" id="ui-sign-in-pill" aria-label="Sign in for 1080p: opens Settings" className={`${VALUE_BUTTON} group`} onClick={onSignIn}>
@@ -185,11 +105,6 @@ export default function ExportBar({
               Sign in for 1080p
             </span>
           </button>
-        ) : null}
-        {problem ? (
-          <span role="alert" className="text-error">
-            {problem}
-          </span>
         ) : null}
       </div>
 
@@ -203,7 +118,7 @@ export default function ExportBar({
         >
           + section
         </button>
-        <ClipButton listenForKey openUp />
+        <ClipButton listenForKey openUp options={{ folder, onPickFolder, tracks, selectedLanguages, onSelectLanguages }} />
       </span>
     </div>
   );

@@ -733,7 +733,6 @@ function Layout({ active }: { active: boolean }) {
           </div>
         {active && (
         <ExportBar
-          clipCount={languagePlans.length}
           tracks={info?.audioTracks}
           selectedLanguages={audioSel}
           onSelectLanguages={setAudioSel}
