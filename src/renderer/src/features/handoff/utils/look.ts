@@ -19,12 +19,12 @@ export interface Look {
 }
 
 const NOT_AN_EXPORT =
-  "That does not look like a Final Cut XML export. In Final Cut choose File, then Export XML, and paste the text of the file here.";
+  "That does not look like a Final Cut XML export. In Final Cut choose File, then Export XML, and choose the file you saved (Info.fcpxml inside it).";
 
 /** Read the look off the first clip on the first timeline of an exported project. */
 export function parseLook(text: string): Look {
   const source = text.trim();
-  if (!source) throw new Error("Paste the text of your Final Cut export first.");
+  if (!source) throw new Error("Choose your Final Cut export first.");
 
   const version = /<fcpxml\b[^>]*\sversion="(\d+\.\d+)"/.exec(source)?.[1];
   const spine = source.indexOf("<spine");

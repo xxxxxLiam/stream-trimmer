@@ -5,7 +5,11 @@
  *   panel while open and blocks nothing else. Rows with a chevron open a second view, switches flip in
  *   place, Back shows the parent's name, X and Escape close.
  */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { looksStore, type SavedLook } from "../../../shared/utils/looks";
+import { readSetting } from "../../../shared/utils/persist";
+import { parseLook } from "../../handoff/utils/look";
+import { useLookMutations } from "../hooks/useLookMutations";
 import { Drawer } from "../../../shared/components/Drawer";
 import CampaignWizard from "../../campaigns/components/CampaignWizard";
 import SettingsCampaign from "./SettingsCampaign";
@@ -13,6 +17,7 @@ import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
+import { useClipDestination } from "../../player/hooks/useClipDestination";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { DEFAULT_DAILY_QUOTA, toggleLanguage } from "../utils/settingsPrefs";
 import type { AudioTrack } from "../../../shared/utils/clip";
@@ -29,8 +34,27 @@ export type SettingsDrawerProps = {
   editor: { campaignId: string | null; settings: EditorHandoffSettings; onChange: (s: EditorHandoffSettings) => void };
 };
 
+/** What a saved look carries, in plain words; empty when it cannot be read. */
+function foundIn(look: SavedLook | undefined): string {
+  if (!look) return "";
+  try {
+    return parseLook(look.xml).found.join(", ");
+  } catch {
+    return "";
+  }
+}
+
+/** Looks some campaign uses; those cannot be deleted. */
+function usedLookIds(current: string | null | undefined): string[] {
+  const stored = readSetting<Record<string, { lookId?: string | null }>>("clipper.editorHandoff", {});
+  return [...Object.values(stored).map((s) => s?.lookId), current].filter((x): x is string => !!x);
+}
+
 export default function SettingsDrawer({ open, onClose, startAt, tracks, editor }: SettingsDrawerProps) {
   const c = useSettingsController({ open, onClose, startAt });
+  const [destination] = useClipDestination();
+  const looks = useSyncExternalStore(looksStore.subscribe, looksStore.get, looksStore.get);
+  const lookOps = useLookMutations(editor, looks);
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
   if (!open) return null;
@@ -47,9 +71,9 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
         dubs={(tracks ?? []).filter((t) => t.kind !== "original").map((t) => ({ code: t.language, label: t.label }))}
         quota={campaign.dailyQuota ?? DEFAULT_DAILY_QUOTA}
         onQuota={(n) => c.campaigns.update(campaign.id, { dailyQuota: n })}
-        folderLabel={folderChipLabel(campaign.clipsDir)}
+        folderLabel={folderChipLabel(campaign.clipsDir, 3)}
         finalCut={
-          isActive && editor.settings.afterCutting === "finalcut"
+          isActive && destination === "finalcut"
             ? {
                 library: editor.settings.fcpLibrary ? (editor.settings.fcpLibrary.split(/[\\/]/).pop() ?? "") : "",
                 event: editor.settings.mediaEvent,
@@ -59,6 +83,22 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor 
                   });
                 },
                 onEvent: (v) => editor.onChange({ ...editor.settings, mediaEvent: v }),
+                look: {
+                  saved: looks,
+                  currentId: editor.settings.lookId ?? null,
+                  found: foundIn(looks.find((l) => l.id === editor.settings.lookId)),
+                  problem: lookOps.problem,
+                  open: lookOps.open,
+                  guide: lookOps.guide,
+                  inputRef: lookOps.inputRef,
+                  onToggleOpen: lookOps.toggleOpen,
+                  onToggleGuide: lookOps.toggleGuide,
+                  onChoose: () => void lookOps.choose(),
+                  onFile: (f) => void lookOps.readFile(f),
+                  onPick: lookOps.pickSaved,
+                  onRemove: lookOps.remove,
+                  usedIds: usedLookIds(editor.settings.lookId),
+                },
               }
             : null
         }

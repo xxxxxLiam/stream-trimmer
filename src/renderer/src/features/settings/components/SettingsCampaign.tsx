@@ -6,9 +6,10 @@
  *   Delete campaign. No clip id fields, no format or quality.
  */
 import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
+import FinalCutLook, { type FinalCutLookProps } from "./FinalCutLook";
 import { EXTRA_SECONDS_CHOICES, stepClipsPerDay, type CampaignPrefs } from "../utils/settingsPrefs";
 
-export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void };
+export type FinalCutFields = { library: string; event: string; onChoose: () => void; onEvent: (v: string) => void; look: FinalCutLookProps };
 
 export type SettingsCampaignProps = {
   name: string;
@@ -32,7 +33,7 @@ export type SettingsCampaignProps = {
 };
 
 const stepButton = "h-target w-target rounded-control border border-hairlineStrong bg-raised text-section text-fg hover:bg-hover disabled:text-disabled";
-const fieldInput = "h-target min-w-0 rounded-control border border-hairlineStrong bg-panel px-3 text-body text-fg outline-none focus:border-ice-tint-50";
+const fieldInput = "h-target min-w-0 rounded-control border border-hairlineStrong bg-panel px-[12px] text-body leading-[normal] text-fg outline-none focus:border-ice-tint-50";
 
 export default function SettingsCampaign(p: SettingsCampaignProps) {
   const { prefs } = p;
@@ -40,15 +41,15 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
     <>
       <DrawerHeader closeName="Settings" title={p.name} back="Campaigns" onBack={p.onBack} onClose={p.onClose} />
       <div className={drawerBody}>
-      <div className="flex h-[52px] items-center gap-2 border-b border-hairline">
-        <span className="flex-1 text-body">Clips a day</span>
+      <div className="flex h-[53px] items-center gap-[8px] border-b border-hairline">
+        <span className="flex-1 text-body leading-[normal]">Clips a day</span>
         <button type="button" aria-label="One fewer clip a day" disabled={p.quota <= 1} onClick={() => p.onQuota(stepClipsPerDay(p.quota, -1))} className={stepButton}>−</button>
-        <span aria-live="polite" className="w-6 text-center text-body [font-variant-numeric:tabular-nums]">{p.quota}</span>
+        <span aria-live="polite" className="w-[24px] text-center text-body leading-[normal] [font-variant-numeric:tabular-nums]">{p.quota}</span>
         <button type="button" aria-label="One more clip a day" onClick={() => p.onQuota(stepClipsPerDay(p.quota, 1))} className={stepButton}>+</button>
       </div>
-      <div className="flex flex-col gap-2 border-b border-hairline py-3">
-        <span className="text-body">Extra seconds at both ends</span>
-        <div role="radiogroup" aria-label="Extra seconds at both ends" className="flex gap-2">
+      <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
+        <span className="text-body leading-[normal]">Extra seconds at both ends</span>
+        <div role="radiogroup" aria-label="Extra seconds at both ends" className="flex gap-[8px]">
           {EXTRA_SECONDS_CHOICES.map((n) => {
             const on = prefs.extraSeconds === n;
             return (
@@ -59,7 +60,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
                 aria-checked={on}
                 aria-label={`${n} seconds`}
                 onClick={() => p.onPatch({ extraSeconds: n })}
-                className={`h-target min-w-[44px] rounded-[22px] px-3 text-body ${on ? "bg-ice text-bg" : "border border-hairlineStrong bg-raised text-fg"}`}
+                className={`h-target min-w-[44px] rounded-[22px] px-[12px] text-body leading-[normal] ${on ? "bg-ice text-bg" : "border border-hairlineStrong bg-raised text-fg"}`}
               >
                 {n}s
               </button>
@@ -68,12 +69,12 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
         </div>
       </div>
       {p.dubs.length > 0 && (
-      <div className="flex flex-col gap-2 border-b border-hairline py-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-body">Languages</span>
+      <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
+        <div className="flex flex-col gap-[2px]">
+          <span className="text-body leading-[normal]">Languages</span>
           <span className="text-meta text-fg-dim">Shown only when the video has dubs</span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-[8px]">
           {[{ code: "original", label: "Original" }, ...p.dubs].map((l) => {
             const on = prefs.languages.includes(l.code);
             return (
@@ -83,7 +84,7 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
                 aria-pressed={on}
                 aria-label={`${l.label} audio, ${on ? "ticked" : "not ticked"}`}
                 onClick={() => p.onToggleLanguage(l.code)}
-                className={`inline-flex h-target items-center gap-1.5 rounded-[22px] px-4 text-body ${on ? "bg-ice text-bg" : "border border-hairlineStrong bg-raised text-fg"}`}
+                className={`inline-flex h-target items-center gap-[6px] rounded-[22px] px-[16px] text-body leading-[normal] ${on ? "bg-ice text-bg" : "border border-hairlineStrong bg-raised text-fg"}`}
               >
                 {on && (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -97,9 +98,9 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
         </div>
       </div>
       )}
-      <div className="flex items-center gap-3 py-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-body">Folder</span>
+      <div className="flex items-center gap-[12px] py-[12px]">
+        <div className="flex min-w-[0px] flex-1 flex-col gap-[2px]">
+          <span className="text-body leading-[normal]">Folder</span>
           <span className="truncate text-meta text-fg-dim">{p.folderLabel}</span>
         </div>
         <button type="button" aria-label={`Open the ${p.name} folder`} onClick={p.onOpenFolder} className={outlineButton}>
@@ -107,21 +108,28 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
         </button>
       </div>
       {p.finalCut && (
-        <div role="group" aria-label="Final Cut Pro" className="flex flex-col gap-2 rounded-control border border-hairlineStrong bg-raised p-3">
-          <span className="text-body font-medium">Final Cut Pro</span>
+        <div role="group" aria-label="Final Cut Pro" className="flex flex-col gap-[8px] rounded-control border border-hairlineStrong bg-raised p-[12px]">
+          <span className="flex items-center gap-[8px] text-body leading-[normal] font-medium">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="text-fg-dim" aria-hidden="true">
+              <rect x="4" y="4" width="16" height="16" rx="3" />
+              <path d="m9 15 6-6M9 9h6v6" />
+            </svg>
+            Final Cut Pro
+          </span>
           <label htmlFor="fcp-lib" className="text-meta text-fg-dim">Library</label>
-          <div className="flex gap-2">
+          <div className="flex gap-[8px]">
             <input id="fcp-lib" type="text" readOnly value={p.finalCut.library} className={`${fieldInput} flex-1`} />
-            <button type="button" aria-label={`Choose the Final Cut library for ${p.name}`} onClick={p.finalCut.onChoose} className="h-target rounded-control border border-hairlineStrong bg-hover px-4 text-body text-fg">
+            <button type="button" aria-label={`Choose the Final Cut library for ${p.name}`} onClick={p.finalCut.onChoose} className="h-target rounded-control border border-hairlineStrong bg-hover px-[16px] text-body leading-[normal] text-fg">
               Choose
             </button>
           </div>
           <label htmlFor="fcp-event" className="text-meta text-fg-dim">Event</label>
           <input id="fcp-event" type="text" value={p.finalCut.event} onChange={(e) => p.finalCut?.onEvent(e.target.value)} className={fieldInput} />
-          <p className="m-0 text-meta text-fg-dim">Each video gets its own keyword collection inside the event. Shown only while Final Cut Pro is ticked in the Clip menu.</p>
+          <FinalCutLook {...p.finalCut.look} />
+          <p className="m-[0px] text-meta text-fg-dim">Each video gets its own keyword collection inside the event. Shown only while Final Cut Pro is ticked in the Clip menu.</p>
         </div>
       )}
-      <button type="button" aria-label={`Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-2 h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
+      <button type="button" aria-label={`Delete campaign ${p.name}`} onClick={p.onDelete} className="mt-[8px] h-target self-start bg-transparent text-meta text-fg-dim underline underline-offset-[3px]">
         {p.confirmingDelete ? `Click again to delete ${p.name}` : "Delete campaign"}
       </button>
       </div>

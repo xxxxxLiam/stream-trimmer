@@ -4,7 +4,7 @@
  * Description: Root layout. Header, three-column workspace (transcript | centre | clips),
  *   footer, and the Phase B mount points. See BUILD-SPEC sections 3 and 12.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "../modules/clipper/hooks/ClipperContext";
@@ -47,6 +47,7 @@ import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
+import { looksStore, migrateLooks, withResolvedLook } from "../shared/utils/looks";
 import ImportDrawer from "../features/import/components/ImportDrawer";
 import { usePasteRoutingEffects } from "../modules/layout/hooks/usePasteRoutingEffects";
 import { isLikelyChannelUrl } from "../features/channelExport/utils/channel";
@@ -78,17 +79,27 @@ const EDITOR_KEY = "clipper.editorHandoff";
 
 /** "After cutting" settings, kept per campaign beside the other campaign fields. */
 function useEditorSettings(campaignId: string | null) {
-  const [all, setAll] = useState<Record<string, unknown>>(() =>
-    readSetting<Record<string, unknown>>(EDITOR_KEY, {}),
+  const [all, setAll] = useState<Record<string, unknown>>(() => {
+    // The old pasted look moves into the saved-looks list once.
+    const stored = readSetting<Record<string, unknown>>(EDITOR_KEY, {});
+    const m = migrateLooks(looksStore.get(), stored);
+    if (m.changed) {
+      looksStore.set(m.looks);
+      writeSetting(EDITOR_KEY, m.perCampaign);
+    }
+    return m.perCampaign;
+  });
+  const looks = useSyncExternalStore(looksStore.subscribe, looksStore.get, looksStore.get);
+  const settings: EditorHandoffSettings = withResolvedLook(
+    campaignId ? normalizeEditorSettings(all[campaignId]) : DEFAULT_EDITOR_SETTINGS,
+    looks,
   );
-  const settings: EditorHandoffSettings = campaignId
-    ? normalizeEditorSettings(all[campaignId])
-    : DEFAULT_EDITOR_SETTINGS;
   const setSettings = useCallback(
     (next: EditorHandoffSettings) => {
       if (!campaignId) return;
       setAll((prev) => {
-        const merged = { ...prev, [campaignId]: next };
+        // The look's text lives in the saved list, not in each campaign.
+        const merged = { ...prev, [campaignId]: { ...next, lookXml: "", applyLook: false } };
         writeSetting(EDITOR_KEY, merged);
         return merged;
       });

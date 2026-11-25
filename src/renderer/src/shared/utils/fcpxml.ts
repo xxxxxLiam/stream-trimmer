@@ -102,6 +102,8 @@ export interface EditorHandoffSettings {
   applyLook?: boolean;
   /** Text of a Final Cut XML export of one clip that already has the look on it. */
   lookXml?: string;
+  /** The saved look this campaign uses (see looks.ts); null means no look. */
+  lookId?: string | null;
   /** Tokens: {clipId} {label} {campaign} {source}. */
   projectNamePattern: string;
   timelineFormat: TimelineFormat;
@@ -118,6 +120,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorHandoffSettings = {
   createProject: false,
   applyLook: false,
   lookXml: "",
+  lookId: null,
   projectNamePattern: DEFAULT_PROJECT_PATTERN,
   timelineFormat: DEFAULT_TIMELINE,
 };
@@ -160,6 +163,7 @@ export function normalizeEditorSettings(raw: unknown): EditorHandoffSettings {
     createProject: r.createProject === true,
     applyLook: r.applyLook === true,
     lookXml: typeof r.lookXml === "string" ? r.lookXml : "",
+    lookId: typeof r.lookId === "string" ? r.lookId : null,
     // A blank pattern is kept as typed (so the field can be edited); naming falls back to the default.
     projectNamePattern:
       typeof r.projectNamePattern === "string" ? r.projectNamePattern : DEFAULT_PROJECT_PATTERN,

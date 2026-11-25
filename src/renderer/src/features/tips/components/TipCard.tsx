@@ -58,21 +58,21 @@ export default function TipCard({ step, total, text, target, onNext, onBack, onD
       <div
         role="dialog"
         aria-label="Tip"
-        className="fixed z-[60] flex w-[280px] flex-col gap-2 rounded-panel border border-hairlineStrong bg-raised p-4"
+        className="fixed z-[60] flex w-[280px] flex-col gap-[8px] rounded-panel border border-hairlineStrong bg-raised p-[16px]"
         style={{ top, left }}
       >
         <span className="text-meta text-fg-dim">
           {step + 1} of {total}
         </span>
-        <p className="m-0 text-body text-fg">{text}</p>
-        <div className="flex items-center justify-between gap-2">
+        <p className="m-[0px] text-body text-fg">{text}</p>
+        <div className="flex items-center justify-between gap-[8px]">
           <button type="button" className="h-target text-meta text-fg-dim hover:text-fg" onClick={onTurnOff}>
             Turn off tips
           </button>
           <button
             type="button"
             autoFocus
-            className="h-target rounded-control border border-hairlineStrong px-4 text-body text-fg hover:bg-hover"
+            className="h-target rounded-control border border-hairlineStrong px-[16px] text-body text-fg hover:bg-hover"
             onClick={onNext}
           >
             {last ? "Got it" : "Next"}
