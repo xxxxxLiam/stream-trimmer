@@ -7,13 +7,15 @@
  *   dashed "skipped" stretch between. Names sit exactly as wide as their range, with an ellipsis
  *   and a tooltip.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { setNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { playFrom } from "../../../shared/utils/playFrom";
 import type { TimelineController } from "../hooks/useTimelineController";
 import { lengthLabel } from "../hooks/useTimelineController";
 import { toX } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
+import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
+import ClipNameField from "./ClipNameField";
 import LaneLabel from "./LaneLabel";
 
 const BAR = "absolute top-[5px] h-[24px] overflow-hidden text-ellipsis whitespace-nowrap px-[8px] text-meta leading-[22px]";
@@ -36,21 +38,29 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
   };
   // Drawn left to right as they sit in the video; the clip itself plays them in the order locked.
   // A section that is exactly a banked moment carries that moment's name; otherwise the suggestion.
+  const sections = [...c.sections].sort((a, b) => a.start - b.start);
+  // A name typed on the lane belongs to the clip being built (its sections); it is the clip's name, its
+  // file's name and its project's name. A different clip starts from its own suggestion again.
+  const sectionsKey = sections.map((s) => `${s.start}-${s.end}`).join(",");
+  const [typed, setTyped] = useState<{ key: string; name: string } | null>(null);
   const building = (start: number) => {
+    if (typed && typed.key === sectionsKey) return typed.name;
     const banked = c.sections.length === 1 ? c.waiting.find((b) => b.start === c.sections[0].start && b.end === c.sections[0].end) : undefined;
     return banked?.label ?? c.suggestedName ?? timeName(start);
   };
-  const sections = [...c.sections].sort((a, b) => a.start - b.start);
-  // The bottom bar's audio-language menu lists the files the next Clip makes by this name.
+  // The bottom bar's audio-language menu lists the files the next Clip makes by this name, and the cut
+  // reads it too. Only the open tab publishes it.
+  const tabActive = useIsTabActive();
   const nextName = sections.length ? building(sections[0].start) : null;
   useEffect(() => {
-    setNextClipName(nextName);
-  }, [nextName]);
+    if (tabActive) setNextClipName(nextName);
+  }, [nextName, tabActive]);
   useEffect(() => () => setNextClipName(null), []);
+  const rename = (name: string) => setTyped({ key: sectionsKey, name });
   return (
     <div className="flex h-[34px] items-center">
       <LaneLabel>Clips</LaneLabel>
-      <div className="relative h-full flex-1 overflow-hidden">
+      <div className="relative h-full flex-1 overflow-x-clip overflow-y-visible">
         {c.opening
           ? null
           : (
@@ -88,13 +98,12 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 ) : null,
               )}
               {sections.length === 1 ? (
-                <span
+                <ClipNameField
+                  name={building(sections[0].start)}
+                  onRename={rename}
                   className={`${BAR} rounded-chip border border-frost text-center font-medium text-fg`}
                   style={span(sections[0].start, sections[0].end)}
-                  title={building(sections[0].start)}
-                >
-                  {building(sections[0].start)}
-                </span>
+                />
               ) : null}
               {sections.length > 1
                 ? sections.map((s, i) => {
@@ -111,13 +120,21 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                             {skippedLabel(s.start - prev.end)}
                           </span>
                         ) : null}
-                        <span
-                          className={`${BAR} border border-frost ${first ? "rounded-l-chip font-medium text-fg" : ""} ${last ? "rounded-r-chip text-fg-dim" : ""}`}
-                          style={span(s.start, s.end)}
-                          title={first ? building(s.start) : undefined}
-                        >
-                          {first ? building(s.start) : last ? `${lengthLabel(c.total)} total` : ""}
-                        </span>
+                        {first ? (
+                          <ClipNameField
+                            name={building(s.start)}
+                            onRename={rename}
+                            className={`${BAR} rounded-l-chip border border-frost font-medium text-fg`}
+                            style={span(s.start, s.end)}
+                          />
+                        ) : (
+                          <span
+                            className={`${BAR} border border-frost ${last ? "rounded-r-chip text-fg-dim" : ""}`}
+                            style={span(s.start, s.end)}
+                          >
+                            {last ? `${lengthLabel(c.total)} total` : ""}
+                          </span>
+                        )}
                       </span>
                     );
                   })

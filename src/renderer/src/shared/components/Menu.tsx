@@ -5,19 +5,23 @@
  *   surface, strong hairline, 14px radius; items are 44px rows, the selected one sits on hover.
  *   Arrow-key movement belongs to the screen that owns the menu.
  */
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from "react";
 import { cx } from "../utils/cx";
 
-export function Menu({ label, className, ...rest }: HTMLAttributes<HTMLDivElement> & { label: string }) {
+export const Menu = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { label: string }>(function Menu(
+  { label, className, ...rest },
+  ref,
+) {
   return (
     <div
+      ref={ref}
       role="menu"
       aria-label={label}
       className={cx("box-border w-[300px] rounded-panel border border-hairlineStrong bg-raised p-1.5", className)}
       {...rest}
     />
   );
-}
+});
 
 export function MenuLabel({ children }: { children: ReactNode }) {
   return <div className="px-2.5 pb-1 pt-1.5 text-meta text-fg-dim">{children}</div>;
