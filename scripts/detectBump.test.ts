@@ -6,6 +6,8 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import path from "node:path";
 import test from "node:test";
@@ -117,8 +119,37 @@ test("the previous Release commit is the boundary when there are no tags", () =>
   assert.equal(range, "bbb2222..HEAD");
 });
 
-test("a tag still wins when one exists", () => {
-  assert.equal(rangeFrom({ tag: "v1.2.3", logLines: ["aaa1111 Release v1.0.0"] }), "v1.2.3..HEAD");
+test("the previous Release commit wins over a stale tag", () => {
+  assert.equal(rangeFrom({ tag: "v3.3.0", logLines: ["aaa1111 fix: a", "bbb2222 Release v19.0.0"] }), "bbb2222..HEAD");
+});
+
+test("a tag is only the fallback when no Release commit exists", () => {
+  assert.equal(rangeFrom({ tag: "v1.2.3", logLines: ["aaa1111 fix: a"] }), "v1.2.3..HEAD");
+});
+
+// The real runaway, rebuilt: an old v3.3.0 tag with a BREAKING CHANGE footer behind it, a
+// `Release v19.0.0` commit, then new work. The workflow ran `npm version <bump>` on this.
+test("a stale tag with an old BREAKING CHANGE does not make the next release major", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "bump-"));
+  const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, encoding: "utf8" }).trim();
+  const next = (b: string) => {
+    writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "x", version: "19.0.0" }));
+    return execFileSync("npm", ["version", b, "--no-git-tag-version"], { cwd: dir, encoding: "utf8" }).trim();
+  };
+  const bumpHere = () =>
+    execFileSync("node", [path.join(path.dirname(fileURLToPath(import.meta.url)), "detectBump.cjs")], { cwd: dir, encoding: "utf8" }).trim();
+  const commit = (msg: string) => git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-qm", msg);
+  git("init", "-q");
+  commit("first");
+  git("tag", "v3.3.0");
+  commit("old work\n\nBREAKING CHANGE: v2 settings are gone");
+  commit("Release v19.0.0");
+  commit("Fix a clip row");
+  commit("Merge PR 1");
+  assert.equal(next(bumpHere()), "v19.0.1");
+  commit("Release fixes, downloading pill [minor]");
+  assert.equal(next(bumpHere()), "v19.1.0");
+  rmSync(dir, { recursive: true, force: true });
 });
 
 test("only a real Release commit is a boundary, not a commit that mentions one", () => {
