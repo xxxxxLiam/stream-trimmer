@@ -242,15 +242,17 @@ export function useClipDownloadMutations({
           throw folder.code ? new DownloadFailureError(folder.reason ?? result.error ?? "", folder.code) : new Error(result.error);
         }
         setLastSavedPath(result.path ?? null);
+        // The name the file really got: a taken name is saved as "... 2".
+        const savedName = result.fileName ?? filename;
         setSavedNotice({
           kind: "clip",
           path: result.path ?? "",
-          label: filename,
+          label: savedName,
           detail,
         });
         addDownload({
           kind: "clip",
-          label: filename,
+          label: savedName,
           path: result.path ?? "",
           dir: saveDir,
           detail:
