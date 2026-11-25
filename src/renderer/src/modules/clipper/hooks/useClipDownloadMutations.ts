@@ -10,7 +10,7 @@ import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 import { cookiePayload, markDisconnected, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
-import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, videoUrlProblem } from "../utils/downloadErrors";
+import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, saveFailure, videoUrlProblem } from "../utils/downloadErrors";
 import { type SavedFiles } from "./useSavedFilesState";
 
 export function useClipDownloadMutations({
@@ -236,7 +236,11 @@ export function useClipDownloadMutations({
               filename,
               data: await blob!.arrayBuffer(),
             });
-        if (!result.ok) throw new Error(result.error);
+        if (!result.ok) {
+          // A full or unwritable folder is its own failure (Change folder), not "YouTube stopped it".
+          const folder = saveFailure(result);
+          throw folder.code ? new DownloadFailureError(folder.reason ?? result.error ?? "", folder.code) : new Error(result.error);
+        }
         setLastSavedPath(result.path ?? null);
         setSavedNotice({
           kind: "clip",

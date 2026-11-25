@@ -3,6 +3,7 @@
  * Path: src/main/features/engine/services/download/ytdlpOptions.ts
  * Description: Builds the yt-dlp option sets: the format ladder, the player-client lists, the sectioned attempt and the whole-file fallback.
  */
+import { BEST_HEIGHT_CAP } from "../../utils/quality";
 import { sectionArg, type Segment } from "../segments";
 import { resolvedFfmpeg } from "../binaries";
 import { audioSelector } from "../../utils/audioTracks";
@@ -65,11 +66,13 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
   const ladder =
     quality === "best"
       ? [
-          `bestvideo[ext=mp4][vcodec^=avc1]+${aM4a}`,
-          `bestvideo+${aAny}`,
+          // "best" stops at 1080p: a 4K source is not downloaded at 2160p.
+          `bestvideo[height<=${BEST_HEIGHT_CAP}][ext=mp4][vcodec^=avc1]+${aM4a}`,
+          `bestvideo[height<=${BEST_HEIGHT_CAP}]+${aAny}`,
           // Pre-merged renditions, itag 18 among them, only once no separate
           // video+audio pair exists at all.
-          "best[ext=mp4]",
+          `best[height<=${BEST_HEIGHT_CAP}][ext=mp4]`,
+          // Last resort for a video whose heights are unlisted: whatever there is.
           "best",
         ]
       : [

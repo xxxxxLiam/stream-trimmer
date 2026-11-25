@@ -7,6 +7,7 @@
  */
 import { extractVideoId } from "./clip";
 import { parseBankImport } from "./bankImport";
+import { parseMoments } from "../../features/import/utils/momentRows";
 
 export type PasteKind = "video" | "moments" | "channel" | "none";
 
@@ -20,7 +21,12 @@ export function classifyPaste(text: string, rules: PasteRules = {}): PasteKind {
   if (!t) return "none";
   const oneLine = !/\r|\n/.test(t);
   if (oneLine && rules.isChannelUrl?.(t)) return "channel";
-  if (oneLine && extractVideoId(t)) return "video";
+  if (oneLine && !t.includes("\t") && extractVideoId(t)) return "video";
+  // The sheet "Copy format" asks for (tab-separated, with or without its header, each row led by a
+  // video link): Import's own reader decides, so a paste it can read opens it.
+  if (!oneLine || t.includes("\t")) {
+    if (parseMoments(t, { openVideoId: null }).some((r) => r.videoId)) return "moments";
+  }
   // Rows with times: at least one parsed moment, and not just a link that failed above.
   if (!/^https?:\/\//i.test(t) && parseBankImport(t).clipCount > 0) return "moments";
   return "none";
