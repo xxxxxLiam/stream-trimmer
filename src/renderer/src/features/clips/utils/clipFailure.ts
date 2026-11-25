@@ -7,6 +7,7 @@
  */
 import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
+import { ROOM_REASON, roomDetail } from "../../../shared/utils/freeSpace";
 
 export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "removed" | "refused" | "ratelimited" | "format" | "tools";
 export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater" | "signIn";
@@ -59,9 +60,11 @@ export function failureCopy(
   attempts: number,
   reasonOverride?: string,
   retrying = false,
+  room?: { neededMb: number; freeMb: number },
 ): { reason: string; detail: string } {
   // The engine's sentence may lack its full stop; the detail follows it on the same line.
   const ov = reasonOverride && !/[.!?]$/.test(reasonOverride.trim()) ? `${reasonOverride.trim()}.` : reasonOverride;
+  if (kind === "disk" && room) return { reason: ov ?? ROOM_REASON, detail: roomDetail(room) };
   if (kind === "disk") {
     return { reason: ov ?? "There isn’t enough space to save it.", detail: "It waits here until it has somewhere to go." };
   }
@@ -101,4 +104,13 @@ export function isRetryKey(e: { key: string; metaKey: boolean; ctrlKey: boolean;
   const t = e.target as { tagName?: string; isContentEditable?: boolean } | null;
   const tag = t?.tagName?.toUpperCase();
   return !(tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable);
+}
+
+/**
+ * A cut that stopped because the connection went has its own quiet row and carries on when it is back. After
+ * three tries in a row the machine still says it is online, so something else is wrong and the failure row with
+ * Retry is the honest one.
+ */
+export function isWaitingForConnection(kind: ClipFailureKind, failuresInARow: number, onLine: boolean): boolean {
+  return kind === "offline" && !(failuresInARow >= 3 && onLine);
 }

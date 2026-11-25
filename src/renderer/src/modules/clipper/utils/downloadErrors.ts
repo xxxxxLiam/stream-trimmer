@@ -13,6 +13,8 @@ export class DownloadFailureError extends Error {
   diagnostics?: FailureDiagnostics;
   /** What the clip's Export row says, decided in main (see common/types/clipRowState.ts). */
   row?: ClipRowState;
+  /** The numbers behind a "not enough space" refusal made before the clip started. */
+  room?: { neededMb: number; freeMb: number };
   constructor(message: string, code?: string, diagnostics?: FailureDiagnostics, row?: ClipRowState) {
     super(message);
     this.code = code;

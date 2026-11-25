@@ -16,7 +16,7 @@ export type FinishedClip = { entryId: string; name: string; endsAt: number };
 
 /** What was being made, kept so a failure can name it and Retry can make it again. */
 export type ClipAttempt = { name: string; segments: Segment[]; bankId?: string };
-export type FailedClip = ClipAttempt & { kind: ClipFailureKind; attempts: number; message: string; code?: string; reason?: string; retrying?: boolean; final?: boolean };
+export type FailedClip = ClipAttempt & { kind: ClipFailureKind; attempts: number; message: string; code?: string; reason?: string; retrying?: boolean; final?: boolean; room?: { neededMb: number; freeMb: number } };
 
 export function useExportState() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -25,6 +25,8 @@ export function useExportState() {
   const [finished, setFinished] = useState<FinishedClip[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [failed, setFailed] = useState<FailedClip | null>(null);
+  // A cut that stopped because the connection went: its own row, where it stopped; it carries on when back.
+  const [offline, setOffline] = useState<(ClipAttempt & { percent: number }) | null>(null);
   const attempt = useRef<ClipAttempt | null>(null);
   const failCount = useRef({ key: "", count: 0 });
   return {
@@ -32,7 +34,7 @@ export function useExportState() {
     notice, setNotice,
     finished, setFinished,
     now, setNow,
-    failed, setFailed, attempt, failCount,
+    failed, setFailed, offline, setOffline, attempt, failCount,
   };
 }
 

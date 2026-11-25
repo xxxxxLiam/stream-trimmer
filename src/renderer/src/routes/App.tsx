@@ -18,7 +18,7 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
-import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
+import { consumeCrashFlag } from "../shared/utils/crashNoteStore";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
@@ -726,8 +726,9 @@ function Shell() {
 }
 
 export default function App() {
-  // The window was reloaded by the main process after its page process died: show the crash screen.
-  if (wasCrashed(window.location.search)) return <CrashScreenHost error={new Error(CRASHED_ERROR)} />;
+  // The window was reloaded by the main process after its page process died: the app opens where it was
+  // and Export says so at the top (the note reads the flag once and clears it from the address).
+  consumeCrashFlag(window.location.search, (clean) => window.history.replaceState(null, "", `${window.location.pathname}${clean}${window.location.hash}`));
   return (
     <ErrorBoundary fallback={(error) => <CrashScreenHost error={error} />}>
       <WorkspaceProvider>
