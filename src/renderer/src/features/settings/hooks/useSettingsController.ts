@@ -10,6 +10,7 @@ import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { DEFAULT_DAILY_QUOTA, campaignSummary, languagesLine } from "../utils/settingsPrefs";
 import { useSettingsState } from "./useSettingsState";
+import { editorStartCampaign } from "../utils/editorSetup";
 
 export type SettingsView = { kind: "top" } | { kind: "campaigns" } | { kind: "campaign"; id: string } | { kind: "editor"; id: string } | { kind: "signin" };
 
@@ -39,8 +40,15 @@ export function useSettingsController({
   const [view, setView] = useState<SettingsView>({ kind: "top" });
   const [adding, setAdding] = useState(false);
 
+  // True while the editor page was opened by picking an editor in the Clip menu: it then offers "Skip for now".
+  const [fromPick, setFromPick] = useState(false);
   useEffect(() => {
-    if (open) setView(startAt === START_AT_SIGNIN ? { kind: "signin" } : startAt ? { kind: "campaign", id: startAt } : { kind: "top" });
+    if (!open) return;
+    const pickedFor = editorStartCampaign(startAt);
+    setFromPick(pickedFor !== null);
+    setView(
+      startAt === START_AT_SIGNIN ? { kind: "signin" } : pickedFor ? { kind: "editor", id: pickedFor } : startAt ? { kind: "campaign", id: startAt } : { kind: "top" },
+    );
   }, [open, startAt]);
 
   useEffect(() => {
@@ -72,11 +80,13 @@ export function useSettingsController({
 
   const back = useCallback(() => {
     const p = parentOf(view);
+    setFromPick(false);
     if (p) setView(p.view);
   }, [view]);
 
   return {
     view,
+    fromPick,
     setView,
     back,
     parent: parentOf(view),

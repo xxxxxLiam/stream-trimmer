@@ -13,6 +13,7 @@ import { availableDestinations, clipReason, clipSections, sectionsLength } from 
 import { dialogOpen } from "../../../shared/utils/dialogOpen";
 import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
+import { requestEditorSetup } from "../../../shared/utils/editorSetupRequest";
 
 export function useClipController(opts: { listenForKey?: boolean } = {}) {
   const range = usePickedRange();
@@ -86,6 +87,8 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     setDestination: (d: Parameters<typeof setDestination>[0]) => {
       setDestination(d);
       setMenuOpen(false);
+      // The editor cannot be configured properly without its setup, so the app opens it when it is not set up yet.
+      requestEditorSetup(d);
     },
     destinations: availableDestinations(offered),
     menuOpen,
