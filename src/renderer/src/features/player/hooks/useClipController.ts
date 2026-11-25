@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
+import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { availableDestinations, clipReason, clipSections, sectionsLength } from "../utils/clipDestination";
 import { dialogOpen } from "../../../shared/utils/dialogOpen";
@@ -19,6 +20,7 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
   const host = usePanelHost();
   const { segments } = useSegmentsState();
   const tabActive = useIsTabActive();
+  const { active: activeCampaign } = useCampaign();
   const [destination, setDestination] = useClipDestination();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -43,6 +45,7 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     totalSeconds: sectionsLength(toCut),
     startSet: startText.trim() !== "",
     endSet: endText.trim() !== "",
+    noCampaign: !activeCampaign,
   });
 
   // B2-9: Ctrl+Enter while Clip is blocked shows the same line the dimmed button shows on hover.

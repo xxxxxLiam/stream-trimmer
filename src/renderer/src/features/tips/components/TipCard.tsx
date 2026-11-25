@@ -118,6 +118,7 @@ export default function TipCard({
       />
       <div
         role="dialog"
+        data-nonblocking=""
         aria-label="Tip"
         className="fixed z-[60] flex w-[280px] flex-col gap-[8px] rounded-panel border border-hairlineStrong bg-raised p-[16px]"
         style={{ top, left }}
