@@ -5,6 +5,9 @@
  *   remembers which they are. Nothing else holds a reference to either.
  */
 import { isZoomInChord, maxZoomFactor, zoomInBlocked } from "./zoomLimit";
+import { appMenuTemplate } from "./appMenu";
+import { titleBarOptions } from "./windowChrome";
+import { IPC } from "../../../common/ipc/channels";
 import path from "node:path";
 import electron from "electron";
 import { isDev } from "../../shared/utils/env";
@@ -12,7 +15,7 @@ import { rememberUiPort } from "./symbolsWindow";
 import { isAppUrl, isSafeExternalUrl } from "./navigationGuard";
 import { createCrashRecovery, crashedUrl } from "./crashRecovery";
 
-const { BrowserWindow, shell } = electron;
+const { BrowserWindow, Menu, shell } = electron;
 
 let mainWindow: Electron.BrowserWindow | null = null;
 let splashWindow: Electron.BrowserWindow | null = null;
@@ -65,6 +68,8 @@ export async function createWindow(port: number) {
     minHeight: 760,
     backgroundColor: "#0A0D0F",
     autoHideMenuBar: true,
+    // macOS: the app's own top bar is the title bar (Windows and Linux keep the native frame).
+    ...titleBarOptions(process.platform),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "index.cjs"),
@@ -74,6 +79,13 @@ export async function createWindow(port: number) {
       additionalArguments: [`--api-base=http://127.0.0.1:${port}`],
     },
   });
+
+  // The top bar drops its room for the traffic lights in full screen (the dots go away there).
+  const tellFullScreen = (on: boolean) => () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.windowFullScreen, on);
+  };
+  mainWindow.on("enter-full-screen", tellFullScreen(true));
+  mainWindow.on("leave-full-screen", tellFullScreen(false));
 
   mainWindow.once("ready-to-show", () => {
     closeSplash();
@@ -122,6 +134,21 @@ export async function createWindow(port: number) {
   mainWindow.webContents.on("zoom-changed", (_e: Electron.Event) => setTimeout(clampZoom, 0));
   mainWindow.on("resize", clampZoom);
   mainWindow.webContents.on("did-finish-load", clampZoom);
+
+  // The View menu's Zoom In must obey the same cap as the key chord, so the menu is ours (see appMenu.ts).
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      appMenuTemplate(process.platform, () => {
+        const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+        if (!win || win.isDestroyed()) return null;
+        return {
+          getZoomLevel: () => win.webContents.getZoomLevel(),
+          setZoomLevel: (l: number) => win.webContents.setZoomLevel(l),
+          contentWidth: () => win.getContentSize()[0],
+        };
+      }) as Electron.MenuItemConstructorOptions[],
+    ),
+  );
 
   const appUrl = isDev ? "http://localhost:8080/" : `http://127.0.0.1:${port}/`;
   const appOrigins = [new URL(appUrl).origin];

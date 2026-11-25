@@ -8,7 +8,7 @@ import { createElement, useEffect, useLayoutEffect, useRef, useState, type CSSPr
 import PanelGroup from "./PanelGroup";
 import PanelResizeHandle from "./PanelResizeHandle";
 import { usePanelLayoutState } from "../hooks/usePanelLayoutState";
-import { DEFAULT_SIZES, SIZE_LIMITS, CENTRE_MIN_W, fitSides } from "../utils/panelLayout";
+import { DEFAULT_SIZES, SIZE_LIMITS, CENTRE_MIN_W, fitSides, fitTimeline, timelineMax } from "../utils/panelLayout";
 import { getPanel } from "../utils/panelRegistry";
 import { panelBodyDomId } from "./PanelTabStrip";
 import "../utils/panelRegistrations";
@@ -22,11 +22,15 @@ export default function PanelWorkspace() {
   const { layout, resize } = usePanelLayoutState();
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const [height, setHeight] = useState(0);
 
   useIsoLayoutEffect(() => {
     const el = host.current;
     if (!el) return;
-    const measure = () => setWidth(el.clientWidth);
+    const measure = () => {
+      setWidth(el.clientWidth);
+      setHeight(el.clientHeight);
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
@@ -36,6 +40,9 @@ export default function PanelWorkspace() {
 
   const { left, right, centre } = layout.groups;
   const containerWidth = width || Infinity;
+  const containerHeight = height || Infinity;
+  // A saved timeline height from a taller window must not crush Preview in a shorter one.
+  const timelineHeight = fitTimeline(layout.sizes.timeline, containerHeight);
   // Saved widths can come from a bigger screen or a zoomed window; fit them so Preview keeps its minimum.
   const fitted = fitSides(layout.sizes, containerWidth, { left: left.tabs.length > 0, right: right.tabs.length > 0 });
   const sideMax = (key: "left" | "right") =>
@@ -102,9 +109,9 @@ export default function PanelWorkspace() {
           <PanelResizeHandle
             orientation="horizontal"
             label="Resize timeline"
-            value={layout.sizes.timeline}
-            min={SIZE_LIMITS.timeline.min}
-            max={SIZE_LIMITS.timeline.max}
+            value={timelineHeight}
+            min={Math.min(SIZE_LIMITS.timeline.min, timelineHeight)}
+            max={timelineMax(containerHeight)}
             grows="against-pointer"
             onChange={(px, persist) => resize("timeline", px, containerWidth, persist)}
             onReset={() => resize("timeline", DEFAULT_SIZES.timeline)}
@@ -113,7 +120,7 @@ export default function PanelWorkspace() {
             id={panelBodyDomId(timeline.id)}
             aria-label={timeline.title}
             className="flex min-h-0 min-w-0 shrink-0 flex-col"
-            style={{ height: layout.sizes.timeline }}
+            style={{ height: timelineHeight }}
           >
             {createElement(timeline.component)}
           </section>

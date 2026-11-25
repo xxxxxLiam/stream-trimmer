@@ -4,7 +4,9 @@
  * Description: The top bar (board 03.2.1): the campaign chip with "2 of 3 today" and its menu, the
  *   open video's plain title in the middle, and the icon-only Panels | Help | Settings on the right.
  *   A button that is on (its menu or drawer is open) shows its label beside the icon.
- *   The board's window dots are the mock-up of an OS window; the real window keeps its own frame.
+ *   On macOS and Windows the bar is the window's title bar: the traffic lights sit at its left (macOS) or
+ *   the system window buttons over its right end (Windows), the empty bar drags the window (double-click
+ *   zooms) and every control is no-drag. On Linux the real window keeps its own frame.
  */
 import type { ReactNode } from "react";
 import { useClipperContext } from "../../clipper/hooks/ClipperContext";
@@ -17,6 +19,8 @@ import { todayCount } from "../../../shared/utils/campaigns";
 import PanelsMenu from "./PanelsMenu";
 import type { MenuItem } from "./PopoverMenu";
 import { IconSettingsGear } from "./BarIcons";
+import { useWindowChrome } from "../hooks/useWindowChrome";
+import { barIsTitleBar, lightsShowing, topBarPaddingLeft, topBarPaddingRight } from "../utils/topBarInset";
 
 export type TopBarProps = {
   helpOpen: boolean;
@@ -34,9 +38,14 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
   const { active } = useCampaign();
   const now = useToday();
   const today = todayCount(active, now);
+  const chrome = useWindowChrome();
 
   return (
-    <header className="topbar relative flex h-[53px] shrink-0 items-center gap-[12px] border-b border-hairline pl-[16px] pr-[12px]">
+    <header
+      className={`topbar relative flex h-[53px] shrink-0 items-center gap-[12px] border-b border-hairline ${barIsTitleBar(chrome) ? "topbar-drag" : ""}`}
+      style={{ paddingLeft: topBarPaddingLeft(chrome), paddingRight: topBarPaddingRight(chrome) }}
+      data-lights={lightsShowing(chrome) || undefined}
+    >
       {active ? <CampaignChip menu={campaignMenu} /> : null}
       {today ? (
         <span id="ui-today-count" className="text-meta text-fg-dim">

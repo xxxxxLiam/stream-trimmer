@@ -157,6 +157,22 @@ export function fitSides(
   return { left, right: room - left };
 }
 
+/** The least height Preview keeps above the timeline (its title row, a video well and its controls). */
+export const PREVIEW_MIN_H = 240;
+/** The room the timeline's resize handle takes between Preview and the timeline. */
+export const TIMELINE_GAP = 8;
+
+/** The tallest the timeline may be in a workspace `containerHeight` tall, so Preview keeps PREVIEW_MIN_H. */
+export function timelineMax(containerHeight: number): number {
+  if (!Number.isFinite(containerHeight) || containerHeight <= 0) return SIZE_LIMITS.timeline.max;
+  return Math.max(SIZE_LIMITS.timeline.min, Math.min(SIZE_LIMITS.timeline.max, containerHeight - PREVIEW_MIN_H - TIMELINE_GAP));
+}
+
+/** A saved timeline height fitted to the workspace: never over what leaves Preview its minimum, never under its own. */
+export function fitTimeline(height: number, containerHeight: number): number {
+  return Math.min(height, timelineMax(containerHeight));
+}
+
 /** Set one size, clamped to its limit and, for the sides, to what leaves the centre its minimum. */
 export function resizeGroup(
   layout: PanelLayout,
