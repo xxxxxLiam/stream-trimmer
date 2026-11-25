@@ -41,6 +41,16 @@ test("top list: campaigns listed here, sign-in, two switches; no Campaigns page,
   assert.throws(() => read("features/settings/components/SettingsCampaigns.tsx"));
 });
 
+test("top list on a Mac: no Update automatically switch (the build is unsigned and cannot update itself), the other switch stays", () => {
+  const props = { rows: [], onEdit: noop, onAdd: noop, app: { notifyQueueDone: true }, autoUpdate: true, onAutoUpdate: noop, onPatchApp: noop, onOpenSignIn: noop, onClose: noop };
+  const mac = renderToStaticMarkup(<SettingsTopList {...props} autoUpdateAvailable={false} />);
+  assert.doesNotMatch(mac, /Update automatically/);
+  assert.match(mac, /aria-label="Tell me when the queue finishes"/);
+  const other = renderToStaticMarkup(<SettingsTopList {...props} />);
+  assert.match(other, /aria-label="Update automatically"/);
+  assert.match(read("features/settings/components/SettingsDrawer.tsx"), /autoUpdateAvailable=\{updatesInPlace\(/);
+});
+
 test("Liam 25 Nov: the drawer panel grows with its content, so scrolling never shows the timeline behind it", () => {
   assert.match(read("shared/components/Drawer.tsx"), /flex min-h-full w-\[440px\]/);
   assert.doesNotMatch(read("shared/components/Drawer.tsx"), /flex h-full w-\[440px\]/);

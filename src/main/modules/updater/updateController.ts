@@ -119,6 +119,8 @@ export function createUpdateController(d: UpdateControllerDeps) {
       d.sendStatus({ state: "downloading", percent: Math.round(p?.percent ?? 0) }),
     );
     updater.on("update-downloaded", (info: any) => {
+      // A build that cannot install (macOS, unsigned) never offers Restart to update, even if a download slipped through.
+      if (!d.canInstall) return;
       const version = String(info?.version ?? "");
       d.sendStatus({ state: "ready", version });
       markReady({ version, mode: "restart" });

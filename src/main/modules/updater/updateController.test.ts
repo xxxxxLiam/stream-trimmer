@@ -176,6 +176,18 @@ test("unsigned Mac: the pill gets mode download with the installer url, nothing 
   assert.deepEqual(t.c.restartToUpdate(), { ok: false, reason: "nothing-ready" });
 });
 
+test("unsigned Mac: even with the switch on, nothing downloads or installs, and no Restart to update is ever offered", () => {
+  const t = setup({ canInstall: false, auto: true });
+  t.c.onAutoUpdateChanged();
+  t.c.applyPolicy();
+  assert.equal(t.updater.autoDownload, false);
+  assert.equal(t.updater.autoInstallOnAppQuit, false);
+  t.em.emit("update-downloaded", { version: "1.4.0" });
+  assert.deepEqual(t.ready, []);
+  assert.deepEqual(t.c.restartToUpdate(), { ok: false, reason: "nothing-ready" });
+  assert.equal(t.calls.quit, 0);
+});
+
 test("no dialog and no OS notification anywhere in the updater", () => {
   for (const f of ["autoUpdater.ts", "updateController.ts", "../../features/updates/services/updatesService.ts"]) {
     const src = fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
