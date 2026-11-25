@@ -108,7 +108,7 @@ async function renderBoard(screen, opts = {}) {
     await page.goto("file://" + path.join(snapshotDir(), file));
     await page.waitForSelector("html[data-board-ready]");
     await page.evaluate(() => document.fonts && document.fonts.ready);
-    const pick = opts.window !== undefined ? { n: opts.window, w: 900, h: 500 } : opts.el !== undefined ? { n: opts.el, w: 300, h: 400 } : null;
+    const pick = opts.window !== undefined ? { n: opts.window, w: 900, h: 500 } : opts.el !== undefined ? { n: opts.el, w: 300, h: Number(process.env.PARITY_EL_MIN_H) || 400 } : null;
     if (pick) {
       const handles = await page.evaluateHandle(([minW, minH]) =>
         [...document.querySelectorAll("x-dc *")].filter((e) => {
@@ -148,4 +148,4 @@ async function renderBoard(screen, opts = {}) {
   }
 }
 
-module.exports = { renderBoard, boardFrame, get SNAPSHOT() { return snapshotDir(); } };
+module.exports = { renderBoard, boardFrame, SHIM, snapshotDir, get SNAPSHOT() { return snapshotDir(); } };

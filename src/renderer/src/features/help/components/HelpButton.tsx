@@ -26,7 +26,7 @@ function sameSlot(a: Slot | null, b: Slot): boolean {
 
 /** The label an "on" top bar button shows beside its icon. */
 function HelpOnLabel() {
-  return <span className="icon-label ml-2 text-body">Help</span>;
+  return <span className="icon-label ml-[8px] text-body">Help</span>;
 }
 
 export default function HelpButton({

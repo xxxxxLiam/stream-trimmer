@@ -12,12 +12,13 @@ export default function UpdatePill() {
   const [refusal, setRefusal] = useState<string | null>(null);
   const pill = updatePillFor(ready);
   if (!pill) return null;
-  const cls =
-    "mr-1 inline-flex h-8 items-center rounded-control border border-ice px-3 text-meta text-fg hover:bg-ice-tint-12";
+  const outer = "mr-[8px] inline-flex h-[44px] items-center group";
+  const face =
+    "inline-flex h-[32px] items-center whitespace-nowrap rounded-[16px] border border-ice px-[14px] text-body font-medium text-ice group-hover:bg-ice-tint-12";
   if (pill.kind === "download") {
     return (
-      <a id="ui-update-pill" className={cls} href={pill.url} target="_blank" rel="noreferrer">
-        {pill.label}
+      <a id="ui-update-pill" className={outer} href={pill.url} target="_blank" rel="noreferrer" aria-label={pill.label}>
+        <span className={face}>{pill.label}</span>
       </a>
     );
   }
@@ -25,14 +26,15 @@ export default function UpdatePill() {
     <button
       type="button"
       id="ui-update-pill"
-      className={cls}
+      className={outer}
+      aria-label={pill.label}
       title={refusal ?? undefined}
       onClick={async () => {
         const r = await window.electronAPI?.restartToUpdate();
         setRefusal(r ? restartRefusal(r) : null);
       }}
     >
-      {pill.label}
+      <span className={face}>{pill.label}</span>
     </button>
   );
 }

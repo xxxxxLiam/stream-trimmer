@@ -82,7 +82,7 @@ export default function SymbolsWindow() {
         </div>
       </div>
 
-      <label className="mx-[10px] mb-[6px] mt-[10px] flex h-target flex-none items-center gap-2 rounded-[22px] bg-raised px-[14px] text-fg-dim">
+      <label className="mx-[10px] mb-[6px] mt-[10px] flex h-target flex-none items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-fg-dim">
         <span className="sr-only">Search</span>
         <IconSearch />
         <input
@@ -92,18 +92,18 @@ export default function SymbolsWindow() {
           placeholder="Search"
           autoComplete="off"
           spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim"
+          className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim"
         />
       </label>
 
-      {error && <p className="m-0 px-[14px] pb-1 text-meta text-error">{error}</p>}
+      {error && <p className="m-[0px] px-[14px] pb-[4px] text-meta text-error">{error}</p>}
 
       <div
         id="ui-symbol-list"
         tabIndex={0}
         aria-label="Entries"
         className={
-          "min-h-0 flex-1 overflow-y-auto px-[10px] pb-[10px] outline-none " +
+          "min-h-[0px] flex-1 overflow-y-auto px-[10px] pb-[10px] outline-none " +
           (phrases ? "flex flex-col gap-[6px]" : "grid grid-cols-6 content-start gap-[6px]")
         }
       >
@@ -115,7 +115,7 @@ export default function SymbolsWindow() {
             onClick={() => void copy(e)}
             className={
               "min-h-target rounded-control bg-raised text-body text-fg hover:bg-hover " +
-              (phrases ? "px-[10px] py-2 text-left" : "px-1") +
+              (phrases ? "px-[10px] py-[8px] text-left" : "px-[4px]") +
               (e.arabic ? " font-arabic" : "")
             }
           >
@@ -123,7 +123,7 @@ export default function SymbolsWindow() {
             {phrases && copied !== e.id && <span className="block text-meta text-fg-dim">{e.name}</span>}
           </button>
         ))}
-        {entries.length === 0 && <p className="m-0 px-1 py-2 text-meta text-fg-dim">Nothing matches.</p>}
+        {entries.length === 0 && <p className="m-[0px] px-[4px] py-[8px] text-meta text-fg-dim">Nothing matches.</p>}
       </div>
     </div>
   );

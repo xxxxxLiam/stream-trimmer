@@ -30,7 +30,9 @@ export default function CampaignChip({ menu }: { menu?: ReactNode }) {
       <button
         type="button"
         id="ui-campaign-chip"
-        className="inline-flex h-11 max-w-[260px] items-center gap-2 rounded-control border border-hairline bg-raised pl-3 pr-2.5 text-body font-medium text-fg hover:bg-hover"
+        className={`inline-flex h-[44px] max-w-[260px] items-center gap-[8px] rounded-control border bg-raised pl-[12px] pr-[10px] text-body font-medium text-fg hover:bg-hover ${
+          open ? "border-ice shadow-[0_0_0_3px_var(--ice-tint-18)]" : "border-hairline"
+        }`}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -40,10 +42,14 @@ export default function CampaignChip({ menu }: { menu?: ReactNode }) {
         <IconChevronDown className="shrink-0 text-fg-dim" />
       </button>
       {open && (
+        // The scrim dims everything under the top bar while the menu is open (board 03.2.7).
+        <div aria-hidden className="fixed inset-x-0 bottom-0 top-[53px] z-30 bg-bg/55" />
+      )}
+      {open && (
         <div
           role="dialog"
           aria-label="Campaign"
-          className="popover absolute left-0 top-full z-40 mt-1 w-[min(360px,calc(100vw-24px))]"
+          className="absolute left-0 top-full z-40 w-[300px] rounded-panel border border-hairlineStrong bg-raised p-[6px]"
         >
           {isValidElement(menu) ? (
             // The menu closes the popover itself after a switch or save.

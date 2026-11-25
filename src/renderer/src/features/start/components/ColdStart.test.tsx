@@ -71,7 +71,7 @@ test("a link that is not a video shows its sentence", () => {
 
 test("App shows the cold start while no video is open", () => {
   const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
-  assert.match(app, /!info && !\(CHANNEL_DATA_BUILT && screen === "channel"\) \? \(\s*<ColdStartScreen \/>/);
+  assert.match(app, /!info \? \(\s*<ColdStartScreen \/>/);
 });
 
 test("the new-campaign offer waits for a video, so nothing covers the cold start", () => {

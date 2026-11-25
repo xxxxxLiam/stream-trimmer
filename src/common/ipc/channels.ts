@@ -22,6 +22,8 @@ export const IPC = {
   editorReveal: "editor:reveal",
   editorWriteFcpxml: "editor:writeFcpxml",
   exportSave: "export:save",
+  fcpLookPick: "fcpLook:pick",
+  fcpLookRead: "fcpLook:read",
   fileExists: "file:exists",
   fileSave: "file:save",
   fileSaveFiles: "file:saveFiles",

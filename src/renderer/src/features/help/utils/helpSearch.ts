@@ -28,7 +28,7 @@ export type HelpResults = { answers: HelpAnswer[]; more: HelpMoreId[] };
 
 export function searchHelp(query: string): HelpResults {
   const q = query.trim();
-  if (!q) return { answers: HELP_ANSWERS, more: HELP_MORE.map((m) => m.id) };
+  if (!q) return { answers: HELP_ANSWERS.filter((a) => !a.searchOnly), more: HELP_MORE.map((m) => m.id) };
   const answers = HELP_ANSWERS.filter((a) => matches(q, [a.question, ...a.paras, ...a.synonyms].join(" ")));
   const shortcutText = SHORTCUTS.map((s) => s.does).join(" ");
   const more = HELP_MORE.filter((m) =>

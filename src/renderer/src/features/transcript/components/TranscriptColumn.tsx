@@ -305,11 +305,11 @@ export default function TranscriptColumn({
   const noMatches = w.query.trim() !== "" && w.matches.length === 0;
 
   return (
-    <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ""}`}>
-      <div className="mx-[10px] mb-[6px] mt-[10px] flex flex-none items-center gap-1">
+    <div className={`flex min-h-[0px] min-w-[0px] flex-1 flex-col ${className ?? ""}`}>
+      <div className="mx-[10px] mb-[6px] mt-[10px] flex flex-none items-center gap-[4px]">
         <label
           htmlFor="ui-transcript-search"
-          className="flex h-target min-w-0 flex-1 items-center gap-2 rounded-[22px] bg-raised px-[14px] text-fg-dim"
+          className="flex h-target min-w-[0px] flex-1 items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-fg-dim"
         >
           <span className="sr-only">Search the transcript</span>
           <IconSearch />
@@ -324,7 +324,7 @@ export default function TranscriptColumn({
             placeholder="Search, or click a line"
             autoComplete="off"
             spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim disabled:text-disabled disabled:placeholder:text-disabled"
+            className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim disabled:text-disabled disabled:placeholder:text-disabled"
           />
           {w.counter && (
             <span className="flex-none text-meta text-fg-dim" aria-live="polite" aria-label={`Match ${w.counter}`}>
@@ -351,12 +351,12 @@ export default function TranscriptColumn({
         tabIndex={0}
         aria-label="Transcript lines"
         onWheel={() => setFollow(false)}
-        className="relative min-h-0 flex-1 overflow-y-auto outline-none"
+        className="relative min-h-[0px] flex-1 overflow-y-auto outline-none"
       >
         {loadingTranscript ? (
-          <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">Loading transcript…</p>
+          <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">Loading transcript…</p>
         ) : !hasTranscript ? (
-          <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">
+          <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">
             {transcript && transcript.length === 0
               ? "No transcript available for this video."
               : info
@@ -366,18 +366,18 @@ export default function TranscriptColumn({
         ) : (
           <>
             {w.hasEarlier && (
-              <button type="button" className="mx-[10px] mb-1 h-8 w-[calc(100%-20px)] text-meta text-fg-dim hover:text-fg" onClick={loadEarlier}>
+              <button type="button" className="mx-[10px] mb-[4px] h-[32px] w-[calc(100%-20px)] text-meta text-fg-dim hover:text-fg" onClick={loadEarlier}>
                 Earlier in the video
               </button>
             )}
 
             {noMatches && (
-              <p className="m-0 px-[14px] pb-2 text-meta text-fg-dim">
+              <p className="m-[0px] px-[14px] pb-[8px] text-meta text-fg-dim">
                 No lines match “{w.query.trim()}” anywhere in the transcript.
               </p>
             )}
 
-            <ul className="m-0 list-none p-0">
+            <ul className="m-[0px] list-none p-[0px]">
               {w.visible.map((line, k) => {
                 const i = w.win.from + k;
                 const isUsed = isLineUsed(line, used);
@@ -387,7 +387,7 @@ export default function TranscriptColumn({
                   activeMatch !== null && i >= activeMatch.line && i <= activeMatch.endLine;
                 const inRange = inDrag || (!isUsed && isInMarkedRange(line, marked));
                 return (
-                  <li key={i} className="m-0 p-0">
+                  <li key={i} className="m-[0px] p-[0px]">
                     <button
                       type="button"
                       data-line={i}
@@ -396,20 +396,20 @@ export default function TranscriptColumn({
                       onPointerEnter={() => onRowPointerEnter(i)}
                       onClick={(e) => onRowClick(e, i)}
                       className={
-                        "mx-[10px] my-[3px] flex min-h-target w-[calc(100%-20px)] select-none items-baseline gap-2 rounded-control px-[10px] py-2 text-left text-body text-fg " +
+                        "mx-[10px] my-[3px] flex min-h-target w-[calc(100%-20px)] select-none items-baseline gap-[8px] rounded-control px-[10px] py-[8px] text-left text-body leading-[1.35] text-fg " +
                         (inRange ? "bg-ice-tint-10" : "bg-raised") +
                         (isCurrent ? " shadow-[inset_2px_0_0_var(--frost)]" : "") +
                         (isActiveMatch ? " ring-1 ring-inset ring-ice" : "")
                       }
                     >
-                      <span className="flex-none text-meta tabular-nums text-fg-dim">
+                      <span className="flex-none text-meta leading-[1.35] text-fg-dim">
                         {formatClock(line.start)}
                       </span>
-                      <span className={"min-w-0 flex-1 " + (isUsed ? "text-fg-dim" : "")}>
+                      <span className={"min-w-[0px] flex-1 " + (isUsed ? "text-fg-dim" : "")}>
                         {matchLines.has(i) ? highlight(line.text, w.query) : line.text}
                       </span>
                       {isUsed && (
-                        <span className="flex-none rounded-chip border border-hairlineStrong px-1.5 text-meta text-fg-dim">
+                        <span className="flex-none rounded-chip border border-hairlineStrong px-[6px] text-meta text-fg-dim">
                           used
                         </span>
                       )}
@@ -420,13 +420,13 @@ export default function TranscriptColumn({
             </ul>
 
             {w.hasLater ? (
-              <div ref={sentinelRef} className="mt-2">
-                <button type="button" className="mx-[10px] h-8 w-[calc(100%-20px)] text-meta text-fg-dim hover:text-fg" onClick={loadLater}>
+              <div ref={sentinelRef} className="mt-[8px]">
+                <button type="button" className="mx-[10px] h-[32px] w-[calc(100%-20px)] text-meta text-fg-dim hover:text-fg" onClick={loadLater}>
                   Later in the video
                 </button>
               </div>
             ) : (
-              <p className="m-0 px-[14px] py-2 text-meta text-fg-dim">
+              <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">
                 End of the transcript. Auto-generated by YouTube, may contain errors.
               </p>
             )}

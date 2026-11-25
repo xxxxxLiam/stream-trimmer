@@ -259,8 +259,18 @@
   }
   .icon-btn[aria-pressed="true"],
   .icon-btn[aria-expanded="true"] {
-    border-color: var(--accent);
+    background: var(--c-raised);
+    border-color: var(--c-hairline-strong);
     color: var(--c-fg);
+  }
+
+  /* The top bar's buttons are the 44px target the board draws (the shared icon button is 32px). */
+  .topbar .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .topbar .icon-btn:has(> .icon-label) {
+    width: auto;
   }
 
   .chip {

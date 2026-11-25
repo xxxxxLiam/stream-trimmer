@@ -15,10 +15,10 @@ import {
   DEFAULT_PATTERN,
   describeCampaignProblem,
   reconcileDataDir,
+  todayCount,
   validateCampaign,
   type Campaign,
 } from "../../../shared/utils/campaigns";
-import { formatLength } from "../../../shared/utils/segments";
 
 type Draft = {
   name: string;
@@ -209,11 +209,10 @@ export default function CampaignMenu({
    */
   onOpenSettings?: (campaignId: string) => void;
 }) {
-  const { campaigns, activeId, setActiveId, remove } = useCampaign();
+  const { campaigns, activeId, setActiveId } = useCampaign();
   const [mode, setMode] = useState<{ kind: "list" } | { kind: "form"; id: string | null }>({
     kind: "list",
   });
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [wizard, setWizard] = useState(false);
 
   if (mode.kind === "form") {
@@ -230,89 +229,75 @@ export default function CampaignMenu({
   }
 
   const current = campaigns.find((c) => c.id === activeId);
+  const ROW =
+    "flex h-[44px] w-full items-center gap-[10px] rounded-control px-[10px] text-left text-body text-fg hover:bg-hover";
+  const openSettings = (id: string) => {
+    if (onOpenSettings) {
+      onOpenSettings(id);
+      onClose?.();
+    } else setMode({ kind: "form", id });
+  };
   return (
-    <div className="flex flex-col gap-2">
-      {current ? (
-        <button
-          type="button"
-          id="ui-campaign-settings"
-          className="btn justify-start"
-          onClick={() => {
-            if (onOpenSettings) {
-              onOpenSettings(current.id);
-              onClose?.();
-            } else setMode({ kind: "form", id: current.id });
-          }}
-        >
-          {current.name} settings
-        </button>
-      ) : null}
+    <div role="menu" aria-label="Campaigns" className="flex flex-col">
+      <div className="px-[10px] pb-[4px] pt-[6px] text-meta text-fg-dim">Campaigns</div>
       {campaigns.length === 0 ? (
-        <p className="m-0 text-meta text-fg-dim">
+        <p className="m-0 px-[10px] py-[8px] text-meta text-fg-dim">
           No campaigns yet. A campaign remembers, for one client, how long clips should be, how
-          they are named, the format, and the folder they are saved in.
+          they are named, and the folder they are saved in.
         </p>
       ) : (
-        <ul id="ui-campaign-list" className="m-0 flex list-none flex-col gap-1 p-0" role="listbox" aria-label="Campaigns">
+        <ul id="ui-campaign-list" className="m-0 flex list-none flex-col p-0">
           {campaigns.map((c) => {
             const selected = c.id === activeId;
             return (
-              <li key={c.id} className="flex items-center gap-1">
+              <li key={c.id}>
                 <button
                   type="button"
-                  role="option"
-                  aria-selected={selected}
-                  className={`btn min-w-0 flex-1 justify-start text-left ${selected ? "border-accent" : ""}`}
+                  role="menuitem"
+                  aria-current={selected}
+                  className={`${ROW} ${selected ? "bg-hover" : ""}`}
                   onClick={() => {
                     setActiveId(c.id);
                     onClose?.();
                   }}
                 >
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  <span className="shrink-0 font-mono text-meta text-fg-dim">
-                    {formatLength(c.targetMinSec)} to {formatLength(c.targetMaxSec)}
+                  <span className="flex w-[12px] shrink-0 justify-center">
+                    {selected ? (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--ice)" strokeWidth="1.8" aria-hidden="true">
+                        <path d="M2 6.5l2.5 2.5L10 3.5" />
+                      </svg>
+                    ) : null}
                   </span>
-                </button>
-                <button
-                  type="button"
-                  className="btn shrink-0"
-                  onClick={() => {
-                    if (onOpenSettings) {
-                      onOpenSettings(c.id);
-                      onClose?.();
-                    } else setMode({ kind: "form", id: c.id });
-                  }}
-                  aria-label={onOpenSettings ? `${c.name} settings` : `Edit ${c.name}`}
-                >
-                  {onOpenSettings ? "Settings" : "Edit"}
-                </button>
-                <button
-                  type="button"
-                  className="btn shrink-0"
-                  onClick={() => {
-                    if (confirmRemove === c.id) {
-                      remove(c.id);
-                      setConfirmRemove(null);
-                    } else setConfirmRemove(c.id);
-                  }}
-                  aria-label={`Remove ${c.name}`}
-                  title="Removes the campaign and its used-ranges record. Cut clips stay in their folder."
-                >
-                  {confirmRemove === c.id ? "Confirm" : "Remove"}
+                  <span className="min-w-0 truncate">{c.name}</span>
+                  <span className="ml-auto shrink-0 text-meta text-fg-dim">{todayCount(c) ?? ""}</span>
                 </button>
               </li>
             );
           })}
         </ul>
       )}
-      <button type="button" className="btn" onClick={() => setWizard(true)}>
+      <div role="separator" className="mx-[4px] my-[6px] h-px bg-hairline" />
+      {current ? (
+        <button type="button" id="ui-campaign-settings" role="menuitem" className={ROW} onClick={() => openSettings(current.id)}>
+          <span className="inline-flex text-fg-dim">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="8" cy="8" r="2.2" />
+              <path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1" />
+            </svg>
+          </span>
+          <span className="min-w-0 truncate">{current.name} settings</span>
+          <span className="ml-auto inline-flex text-fg-dim">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M3.5 2l3 3-3 3" />
+            </svg>
+          </span>
+        </button>
+      ) : null}
+      <button type="button" role="menuitem" className={ROW} onClick={() => setWizard(true)}>
+        <span className="w-[16px] text-center text-fg-dim">+</span>
         New campaign
       </button>
-      <CampaignWizard
-        open={wizard}
-        onClose={() => setWizard(false)}
-        onCreated={() => onClose?.()}
-      />
+      <CampaignWizard open={wizard} onClose={() => setWizard(false)} onCreated={() => onClose?.()} />
     </div>
   );
 }

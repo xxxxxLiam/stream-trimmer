@@ -1,5 +1,5 @@
 /**
- * File: ChannelExportPanel.test.tsx
+ * File: ChannelDataDrawer.test.tsx
  * Description: Item 8 (same omission as F-7) — the export's failure line is redacted. Nine planted
  *   marker secrets; none may reach the rendered markup. Secrets are synthetic.
  */
@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ExportErrorAlert } from "./ChannelExportPanel";
+import { ExportErrorAlert } from "./ChannelDataDrawer";
 
 // Nine markers, in the shapes the audit planted. `needle` is the part that must never appear.
 const MARKERS: Record<string, { line: string; needle: string }> = {
@@ -48,9 +48,16 @@ test("a plain message passes through unchanged", () => {
   assert.match(html, /That channel has no public videos\./);
 });
 
-test("the panel renders its error only through that alert, never raw", async () => {
+test("the sidebar renders its error only through that alert, never raw", async () => {
   const { readFileSync } = await import("node:fs");
-  const src = readFileSync(new URL("./ChannelExportPanel.tsx", import.meta.url), "utf8");
-  assert.match(src, /<ExportErrorAlert error=\{error\} \/>/);
+  const src = readFileSync(new URL("./ChannelDataDrawer.tsx", import.meta.url), "utf8");
+  assert.match(src, /<ExportErrorAlert error=\{c\.problem\} \/>/);
   assert.doesNotMatch(src, /\{error\}\s*<\/div>/);
+});
+
+test("a pasted channel link opens the sidebar, and only an owner build can reach it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const app = readFileSync("src/renderer/src/routes/App.tsx", "utf8");
+  assert.match(app, /onChannel: \(url\) => \{\s*channel\.setChannelUrl\(url\);\s*setChannelOpen\(true\);/);
+  assert.match(app, /CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer/);
 });

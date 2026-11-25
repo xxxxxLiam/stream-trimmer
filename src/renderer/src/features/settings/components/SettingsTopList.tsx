@@ -30,7 +30,7 @@ export default function SettingsTopList(p: SettingsTopListProps) {
       <SectionLabel>This computer</SectionLabel>
       <SwitchRow label="Tell me when the queue finishes" on={p.app.notifyQueueDone} onFlip={() => p.onPatchApp({ notifyQueueDone: !p.app.notifyQueueDone })} divider />
       <SwitchRow label="Update automatically" on={p.autoUpdate} onFlip={() => p.onAutoUpdate(!p.autoUpdate)} />
-      <p className="m-0 mt-3 text-meta text-fg-dim">Pick a row to change it. A back arrow returns to this list.</p>
+      <p className="m-[0px] mt-[12px] text-meta text-fg-dim">Pick a row to change it. A back arrow returns to this list.</p>
       </div>
     </>
   );
