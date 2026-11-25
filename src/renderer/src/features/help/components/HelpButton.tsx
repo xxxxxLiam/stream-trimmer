@@ -4,14 +4,17 @@
  * Description: The "?" button. ALWAYS the last item top right of the header, on
  *   every screen (BUILD-SPEC section 7). Toggles the help drawer; shortcut ⌘/.
  *
- * Why the real button is portalled (F-3): the header is its own stacking context (z-30), so
+ * F-1: the button sits in the top bar's own tab order. Only while a layer covers the app (a dialog or the
+ * restoring overlay, marked data-covers-app) is it drawn on document.body instead, so "?" stays reachable.
+ *
+ * Why it is portalled while covered (F-3): the header is its own stacking context (z-30), so
  * nothing inside it can rise above the z-50 layers that are drawn over the app: the Copy blocks
  * and Symbols panels, the first-run sign-in modal and the restoring overlay. The "?" was
  * unreachable in exactly the moments a new user reaches for it. A placeholder keeps the slot in
  * the header's layout; the live button is drawn on document.body over the placeholder, above those
  * layers and below nothing.
  */
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { IconHelp } from "../../../shared/components/icons";
 
@@ -38,6 +41,7 @@ export default function HelpButton({
 }) {
   const holder = useRef<HTMLSpanElement>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
+  const [covered, setCovered] = useState(false);
 
   useLayoutEffect(() => {
     const el = holder.current;
@@ -45,6 +49,7 @@ export default function HelpButton({
     let frame = 0;
     const measure = () => {
       frame = 0;
+      setCovered(!!document.querySelector("[data-covers-app]"));
       const r = el.getBoundingClientRect();
       const next = { top: r.top, left: r.left, width: r.width, height: r.height };
       setSlot((prev) => (sameSlot(prev, next) ? prev : next));
@@ -70,34 +75,31 @@ export default function HelpButton({
     };
   }, []);
 
+  const button = (style?: CSSProperties) => (
+    <button
+      type="button"
+      id="ui-help-button"
+      className="icon-btn"
+      onClick={onToggle}
+      aria-label="Help"
+      aria-expanded={open}
+      aria-controls="ui-help-drawer"
+      title="Help (⌘/)"
+      style={style}
+    >
+      <IconHelp />
+      {open ? <HelpOnLabel /> : null}
+    </button>
+  );
+
   return (
     <>
-      <span ref={holder} aria-hidden="true" className="icon-btn pointer-events-none invisible">
-        {open ? <HelpOnLabel /> : null}
+      <span ref={holder} className={covered ? "icon-btn pointer-events-none invisible" : "contents"} aria-hidden={covered ? "true" : undefined}>
+        {covered ? (open ? <HelpOnLabel /> : null) : button()}
       </span>
-      {slot && typeof document !== "undefined"
+      {covered && slot && typeof document !== "undefined"
         ? createPortal(
-            <button
-              type="button"
-              id="ui-help-button"
-              className="icon-btn"
-              onClick={onToggle}
-              aria-label="Help"
-              aria-expanded={open}
-              aria-controls="ui-help-drawer"
-              title="Help (⌘/)"
-              style={{
-                position: "fixed",
-                top: slot.top,
-                left: slot.left,
-                width: slot.width,
-                height: slot.height,
-                zIndex: HELP_BUTTON_Z,
-              }}
-            >
-              <IconHelp />
-              {open ? <HelpOnLabel /> : null}
-            </button>,
+            button({ position: "fixed", top: slot.top, left: slot.left, width: slot.width, height: slot.height, zIndex: HELP_BUTTON_Z }),
             document.body,
           )
         : null}
