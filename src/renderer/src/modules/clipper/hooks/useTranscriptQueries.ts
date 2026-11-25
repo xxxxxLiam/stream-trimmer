@@ -3,6 +3,7 @@
  * Path: src/renderer/src/modules/clipper/hooks/useTranscriptQueries.ts
  * Description: The transcript: on-demand load, search, the range view, copy and click-to-set-range.
  */
+import { isStreamSource } from "../../../shared/utils/videoSource";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatTimestamp, normalizeYouTubeUrl, parseJson, apiUrl, type TranscriptLine, type TranscriptResponse } from "../../../shared/utils/clip";
 import { transcriptOutcome } from "../../../shared/utils/transcriptOutcome";
@@ -50,6 +51,12 @@ export function useTranscriptQueries({
 
   const loadTranscript = useCallback(async () => {
     if (!url) return;
+    // Twitch and Kick have no captions to fetch: the transcript says there is none, with no request.
+    if (isStreamSource(videoId)) {
+      setTranscript([]);
+      setTranscriptError(null);
+      return;
+    }
     setLoadingTranscript(true);
     try {
       const res = await fetch(apiUrl("/api/transcript"), {
@@ -60,7 +67,7 @@ export function useTranscriptQueries({
         // you're not a bot" and the app looks signed out when it isn't.
         body: JSON.stringify({
           url: normalizeYouTubeUrl(url),
-          ...cookiePayload(),
+          ...cookiePayload(url),
         }),
       });
       const data = await parseJson<TranscriptResponse>(res);

@@ -3,6 +3,8 @@
  * Path: src/renderer/src/shared/utils/clip.ts
  * Description: Shared client-side helpers and API types for the clipper.
  */
+import { isStreamSource, sourceLinkFor, streamVideoId } from "./videoSource";
+
 export const MAX_CLIP_SECONDS = 600;
 
 function lengthWords(seconds: number): string {
@@ -283,6 +285,8 @@ export function extractVideoId(raw: string): string | null {
   // Two links pasted together (from a chat or a note): the first one is the one that opens.
   const text = raw.trim().split(/\s+/)[0] ?? "";
   if (!text) return null;
+  const stream = streamVideoId(text);
+  if (stream) return stream;
   let u: URL;
   try {
     u = new URL(text);
@@ -313,6 +317,8 @@ export function extractVideoId(raw: string): string | null {
 export function normalizeYouTubeUrl(url: string): string {
   const id = extractVideoId(url);
   if (!id) return url;
+  // Twitch and Kick links go to the engine in their canonical form, never rewritten as YouTube.
+  if (isStreamSource(id)) return sourceLinkFor(id);
   try {
     const u = new URL(url.trim().split(/\s+/)[0]);
     const t = u.searchParams.get("t") || u.searchParams.get("start");

@@ -14,6 +14,7 @@ import { useTimelineView } from "../hooks/useTimelineView";
 import { usePreviewController } from "../hooks/usePreviewController";
 import { formatLength } from "../../../shared/utils/segments";
 import { clipPosition, clockTime } from "../utils/transport";
+import { siteName, sourceLinkFor, streamSiteOf } from "../../../shared/utils/videoSource";
 import EndCard from "./EndCard";
 import FullScreenBar from "./FullScreenBar";
 import PreparingLine from "./PreparingLine";
@@ -23,7 +24,7 @@ import Scrubber from "./Scrubber";
 // Electron's window-open handler routes this to the system browser; in a normal browser it opens
 // a new tab.
 function openExternal(id: string) {
-  window.open(`https://www.youtube.com/watch?v=${id}`, "_blank", "noopener");
+  window.open(sourceLinkFor(id), "_blank", "noopener");
 }
 
 export default function PreviewPanel() {
@@ -33,7 +34,10 @@ export default function PreviewPanel() {
   const { flags } = useFlagsState(videoId);
   const view = useTimelineView();
   const opening = !!videoId && !info && c.loadingInfo;
-  const blocked = player.blocked;
+  // A Twitch or Kick video has no player here (Liam, 25 Nov): its thumbnail and a link to the site stand in, and
+  // the part is picked by typing In and Out. Cutting works as for any link.
+  const site = streamSiteOf(videoId);
+  const blocked = player.blocked && !site;
   // A joined clip is counted in clip time (0:09 of 0:34); anything else in video time.
   const clipPos = c.sections.length >= 2 ? clipPosition(c.sections, player.currentTime) : null;
   const showEnd = !!videoId && !blocked && player.ended;
@@ -57,7 +61,20 @@ export default function PreviewPanel() {
         </div>
 
         <div ref={c.frameRef} className="relative min-h-[0px] flex-1 overflow-hidden rounded-control bg-raised">
-          {videoId && !blocked && <div ref={player.containerRef} className="absolute inset-[0px]" />}
+          {videoId && !blocked && !site && <div ref={player.containerRef} className="absolute inset-[0px]" />}
+          {videoId && site && (
+            <div className="absolute inset-[0px]">
+              {info?.thumbnail ? <img src={info.thumbnail} alt={info.title ? `Thumbnail for ${info.title}` : "Source thumbnail"} referrerPolicy="no-referrer" className="h-full w-full object-cover opacity-40" /> : null}
+              <div className="absolute inset-[0px] flex flex-col items-center justify-center gap-[8px] px-[24px] text-center">
+                <span className="text-body text-fg">{siteName(site)} plays on its own page</span>
+                <span className="max-w-sm text-meta text-fg-dim">Watch it there, then type the In and Out times below. Cutting works as usual.</span>
+                <button type="button" onClick={() => openExternal(videoId)} className="btn mt-[4px]">
+                  <BoxArrowUpRight size={12} />
+                  <span>Watch on {siteName(site)}</span>
+                </button>
+              </div>
+            </div>
+          )}
           {videoId && blocked && (
             <div className="absolute inset-[0px]">
               <img
@@ -106,7 +123,7 @@ export default function PreviewPanel() {
         </div>
 
         {opening ? <PreparingLine /> : null}
-        {videoId && !blocked ? (
+        {videoId && !blocked && !site ? (
           <>
             <Scrubber
               duration={c.duration}
