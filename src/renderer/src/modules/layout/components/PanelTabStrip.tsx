@@ -97,7 +97,7 @@ export default function PanelTabStrip({
     : [{ key: "none", label: "Every panel is open", disabled: true, onSelect: () => {} }];
 
   return (
-    <div className="flex h-[44px] shrink-0 items-stretch gap-[4px] border-b border-hairline pl-[14px] pr-[4px]">
+    <div className="flex h-[45px] shrink-0 items-stretch gap-[4px] border-b border-hairline pl-[14px] pr-[4px]">
       <div className="relative min-w-0 flex-1">
         <div
           ref={scroller}
