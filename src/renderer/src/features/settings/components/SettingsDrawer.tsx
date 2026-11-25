@@ -5,9 +5,9 @@
  *   panel while open and blocks nothing else. Rows with a chevron open a second view, switches flip in
  *   place, Back shows the parent's name, X and Escape close.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Drawer } from "../../../shared/components/Drawer";
-import CampaignWizard from "../../campaigns/components/CampaignWizard";
+import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsFolder from "./SettingsFolder";
@@ -16,10 +16,14 @@ import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
 import { useFinalCutLook } from "../hooks/useFinalCutLook";
 import { useClipDestination } from "../../player/hooks/useClipDestination";
+import { campaignClipsDir } from "../../../shared/utils/campaigns";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { DEFAULT_DAILY_QUOTA, toggleLanguage } from "../utils/settingsPrefs";
 import type { AudioTrack } from "../../../shared/utils/clip";
 import type { EditorHandoffSettings } from "../../../shared/utils/fcpxml";
+
+/** How long "Click again to delete" stays armed. */
+export const DELETE_ARM_MS = 5000;
 
 export type SettingsDrawerProps = {
   open: boolean;
@@ -51,6 +55,14 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   );
   const [problem, setProblem] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
+  // A-7: the first click on Delete arms it for a few seconds only; leaving the view or closing the drawer disarms it.
+  const viewKey = c.view.kind === "campaign" ? c.view.id : c.view.kind;
+  useEffect(() => {
+    if (!confirming) return;
+    const t = window.setTimeout(() => setConfirming(null), DELETE_ARM_MS);
+    return () => window.clearTimeout(t);
+  }, [confirming]);
+  useEffect(() => setConfirming(null), [viewKey, open]);
   if (!open) return null;
   const { view } = c;
   const campaign = view.kind === "campaign" ? c.campaigns.campaigns.find((x) => x.id === view.id) : undefined;
@@ -65,7 +77,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         dubs={(tracks ?? []).filter((t) => t.kind !== "original").map((t) => ({ code: t.language, label: t.label }))}
         quota={campaign.dailyQuota ?? DEFAULT_DAILY_QUOTA}
         onQuota={(n) => c.campaigns.update(campaign.id, { dailyQuota: n })}
-        folderLabel={folderChipLabel(campaign.clipsDir, 3)}
+        folderLabel={folderChipLabel(campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir), 3)}
         finalCut={
           destination === "finalcut"
             ? {
@@ -86,7 +98,10 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         }
         onPatch={(patch) => c.patchCampaign(campaign.id, patch)}
         onToggleLanguage={(code) => c.patchCampaign(campaign.id, { languages: toggleLanguage(c.prefsFor(campaign.id).languages, code) })}
-        onOpenFolder={() => campaign.clipsDir && void window.electronAPI?.showInFolder(campaign.clipsDir)}
+        onOpenFolder={() => {
+          const dir = campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir);
+          if (dir) void window.electronAPI?.showInFolder(dir);
+        }}
         confirmingDelete={confirming === campaign.id}
         onDelete={() => {
           if (confirming === campaign.id) {
@@ -105,7 +120,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
       <SettingsFolder
         label={c.clipsFolderLabel}
         problem={problem}
-        onChange={() => void c.campaigns.pickClipsDir().then((p) => setProblem(p ?? ""))}
+        onChange={() => void c.campaigns.pickParentClipsDir().then((p) => setProblem(p ?? ""))}
         onBack={c.back}
         onClose={onClose}
       />
@@ -129,12 +144,11 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   return (
     <div id="ui-settings-drawer" className="absolute inset-y-0 right-0 z-30 max-w-full overflow-y-auto">
       <Drawer label="Settings">{body}</Drawer>
-      <CampaignWizard
+      <CampaignForm
         open={c.adding}
         onClose={() => c.setAdding(false)}
         onCreated={(made) => {
           c.setAdding(false);
-          c.campaigns.update(made.id, { dailyQuota: DEFAULT_DAILY_QUOTA });
           c.setView({ kind: "campaign", id: made.id });
         }}
       />

@@ -132,27 +132,14 @@ export function lowQualityExplanation(
 }
 
 /**
- * AF2-2. The engine refuses an MP4 request above 360p when there is no sign-in, so "Continue
- * without signing in (360p)" only works if the quality the app asks for is 360p. A fresh install
- * defaults to Best, which made a skipped user's first Cut fail. While signed out the quality is
- * held at 360p and the user's own choice is remembered, then put back on sign-in. Pure so the
- * rule is testable; useClipperController owns the state it is applied to.
+ * Which quality a request asks for. No format or quality choice exists anywhere (decisions: MP4 at 1080p, or the
+ * highest the video has below that), so nothing is stored per campaign. The engine refuses an MP4 above 360p
+ * without a sign-in, so signed out the request goes out at 360p; signed in it asks for 1080p. Audio is unchanged.
+ * Pure so the rule is testable; the clipper's quality state is only ever set from it.
  */
-export function signedOutQuality(input: {
-  signedOut: boolean;
-  format: string;
-  quality: string;
-  /** What the user had chosen before it was held down, if anything. */
-  held: string | null;
-}): { quality: string; held: string | null } {
-  const { signedOut, format, quality, held } = input;
-  if (format !== "mp4") return { quality, held };
-  if (signedOut) {
-    const above = quality === "best" || Number(quality) > 360;
-    return above ? { quality: "360", held: quality } : { quality, held };
-  }
-  if (held !== null) return { quality: quality === "360" ? held : quality, held: null };
-  return { quality, held };
+export function requestedQuality(input: { signedOut: boolean; format: string; quality: string }): string {
+  if (input.format !== "mp4") return input.quality;
+  return input.signedOut ? "360" : "1080";
 }
 
 /** No session and none being restored: every request goes out signed out. */
