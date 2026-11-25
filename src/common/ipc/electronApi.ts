@@ -183,6 +183,13 @@ export interface ElectronAPI {
   onSignInSignal: (cb: (signal: SignInSignal) => void) => () => void;
   /** The silent browser sweep's result: true when one browser's YouTube sign-in was usable. */
   reportBrowserSignIn: (usable: boolean) => Promise<{ ok: boolean }>;
+  /**
+   * The main window's frame: whether the top bar carries the macOS traffic lights (macInset) or the
+   * Windows minimise, maximise and close buttons (winOverlay), and whether the window is full screen.
+   */
+  getWindowChrome: () => Promise<{ macInset: boolean; winOverlay: boolean; fullScreen: boolean }>;
+  /** Fires with true or false when the window enters or leaves full screen. */
+  onFullScreen: (cb: (fullScreen: boolean) => void) => () => void;
   /** Opens the small always-on-top Symbols and phrases window (one instance). Esc closes it. */
   openSymbols: () => Promise<{ ok: boolean }>;
   checkForUpdates: () => Promise<{

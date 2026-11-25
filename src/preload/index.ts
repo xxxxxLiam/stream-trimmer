@@ -101,6 +101,12 @@ try {
     // be pointed at that browser's cookie store instead of an imported file.
     openYouTubeSignIn: () => ipcRenderer.invoke(IPC.shellOpenYouTubeSignIn),
     openSymbols: () => ipcRenderer.invoke(IPC.symbolsOpen),
+    getWindowChrome: () => ipcRenderer.invoke(IPC.windowChrome),
+    onFullScreen: (cb: (fullScreen: boolean) => void) => {
+      const listener = (_e: unknown, on: unknown) => cb(!!on);
+      ipcRenderer.on(IPC.windowFullScreen, listener);
+      return () => ipcRenderer.removeListener(IPC.windowFullScreen, listener);
+    },
     getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
     getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 

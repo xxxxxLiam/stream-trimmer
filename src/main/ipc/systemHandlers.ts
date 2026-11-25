@@ -14,6 +14,8 @@ import {
 
 import { rememberPickedDir } from "../features/files/services/saveRoots";
 import { openSymbolsWindow } from "../modules/windows/symbolsWindow";
+import { getMainWindow } from "../modules/windows/windows";
+import { windowChrome } from "../modules/windows/windowChrome";
 
 const { app, ipcMain } = electron;
 
@@ -29,5 +31,9 @@ export function registerSystemHandlers() {
     return folders;
   });
   ipcMain.handle(IPC.symbolsOpen, () => openSymbolsWindow());
+  ipcMain.handle(IPC.windowChrome, () => {
+    const win = getMainWindow();
+    return windowChrome(process.platform, !!win && !win.isDestroyed() && win.isFullScreen());
+  });
   ipcMain.handle(IPC.systemBrowserOrder, (_e: unknown, saved: unknown) => browserOrder(app, saved));
 }

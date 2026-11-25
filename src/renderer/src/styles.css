@@ -265,6 +265,14 @@
     color: var(--c-fg);
   }
 
+  /* macOS: the top bar is the title bar. The empty bar drags the window; anything you can press does not. */
+  .topbar-drag {
+    -webkit-app-region: drag;
+  }
+  .topbar-drag :is(button, a, input, select, textarea, [role="button"], [role="menu"], [role="dialog"], [role="tooltip"]) {
+    -webkit-app-region: no-drag;
+  }
+
   /* The top bar's buttons are the 44px target the board draws (the shared icon button is 32px). */
   .topbar .icon-btn {
     width: 44px;

@@ -6,6 +6,8 @@
  */
 import { isZoomInChord, maxZoomFactor, zoomInBlocked } from "./zoomLimit";
 import { appMenuTemplate } from "./appMenu";
+import { titleBarOptions } from "./windowChrome";
+import { IPC } from "../../../common/ipc/channels";
 import path from "node:path";
 import electron from "electron";
 import { isDev } from "../../shared/utils/env";
@@ -66,6 +68,8 @@ export async function createWindow(port: number) {
     minHeight: 760,
     backgroundColor: "#0A0D0F",
     autoHideMenuBar: true,
+    // macOS: the app's own top bar is the title bar (Windows and Linux keep the native frame).
+    ...titleBarOptions(process.platform),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "index.cjs"),
@@ -75,6 +79,13 @@ export async function createWindow(port: number) {
       additionalArguments: [`--api-base=http://127.0.0.1:${port}`],
     },
   });
+
+  // The top bar drops its room for the traffic lights in full screen (the dots go away there).
+  const tellFullScreen = (on: boolean) => () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.windowFullScreen, on);
+  };
+  mainWindow.on("enter-full-screen", tellFullScreen(true));
+  mainWindow.on("leave-full-screen", tellFullScreen(false));
 
   mainWindow.once("ready-to-show", () => {
     closeSplash();
