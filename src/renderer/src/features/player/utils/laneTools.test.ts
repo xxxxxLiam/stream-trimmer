@@ -126,10 +126,10 @@ test("V18-T-6: bars that overlap stack into rows; a lone bar stays full height",
     { left: 20, width: 18 },
     { left: 200, width: 18 },
   ]);
-  assert.deepEqual(slots[0], { row: 0, rows: 2 });
-  assert.deepEqual(slots[1], { row: 1, rows: 2 });
-  assert.deepEqual(slots[2], { row: 0, rows: 2 }); // fits after the first ended at 18
-  assert.deepEqual(slots[3], { row: 0, rows: 1 });
+  assert.deepEqual(slots[0], { row: 0, rows: 2, from: 0, to: 38 });
+  assert.deepEqual(slots[1], { row: 1, rows: 2, from: 0, to: 38 });
+  assert.deepEqual(slots[2], { row: 0, rows: 2, from: 0, to: 38 }); // fits after the first ended at 18
+  assert.deepEqual(slots[3], { row: 0, rows: 1, from: 200, to: 218 });
   assert.equal(new Set(slots.slice(0, 3).map((s) => `${s.row}`)).size, 2);
 });
 

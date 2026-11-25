@@ -164,3 +164,19 @@ test("V18-T-6: overlapping clip bars are stacked into rows without text", () => 
   assert.match(clipsLane, /packRows\(/);
   assert.match(clipsLane, /!stacked\(/);
 });
+
+test("B4-1: a stacked bar keeps a readable name beside the stack, for made, waiting and built clips", () => {
+  assert.equal((clipsLane.match(/\{stackedLabel\(/g) ?? []).length, 3);
+  assert.match(clipsLane, /text-fg-dim"\s*\n\s*style=\{style\}/);
+  assert.match(clipsLane, /laneRows > 1 \? 10 \+ laneRows \* ROW_H : 34/);
+});
+
+test("V18-T-6: packing sees the width a bar is drawn at (18 px: padding and border)", () => {
+  assert.match(clipsLane, /const MIN_BAR = 18;/);
+  assert.match(clipsLane, /Math\.max\(MIN_BAR, toX\(c\.axis, end\) - x\)/);
+});
+
+test("B4-2: with no transcript the search box is read-only, not disabled, so Ctrl+F can focus it", () => {
+  assert.match(transcriptCol, /readOnly=\{!hasTranscript\}/);
+  assert.doesNotMatch(transcriptCol, /\sdisabled=\{!hasTranscript\}/);
+});
