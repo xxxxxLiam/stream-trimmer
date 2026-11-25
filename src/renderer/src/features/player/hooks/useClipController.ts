@@ -88,6 +88,7 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     hasRange,
     destination,
     setDestination: (d: Parameters<typeof setDestination>[0]) => {
+      if (availableDestinations(offered).find((x) => x.id === d)?.soon) return; // coming soon: not selectable, opens no setup
       setDestination(d);
       setMenuOpen(false);
       // The editor cannot be configured properly without its setup, so the app opens it when it is not set up yet.
