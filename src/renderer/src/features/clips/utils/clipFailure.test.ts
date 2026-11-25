@@ -164,7 +164,8 @@ test("folder rows say which cause it is, with the campaign's name", () => {
 });
 
 test("age-restricted and members-only rows", () => {
-  assert.equal(classifyClipFailure("private_video", "This video is private or members-only and needs an account"), "members");
+  assert.equal(classifyClipFailure("private_video", "This video is private or members-only and needs an account that can see it"), "private", "the engine's sentence names both, so the code decides");
+  assert.equal(classifyClipFailure("members_only"), "members");
   assert.equal(classifyClipFailure("private_video", "This video is private"), "private");
   assert.equal(classifyClipFailure("bot_check"), "signin");
   assert.deepEqual(failureCopy("age", 1), {
@@ -175,4 +176,11 @@ test("age-restricted and members-only rows", () => {
   assert.deepEqual(failureActions("age", 1), ["signIn", "saveForLater"]);
   assert.deepEqual(failureActions("members", 1, false, true), ["showInBrowser", "saveForLater"]);
   assert.deepEqual(failureActions("members", 1, false, false), ["signIn", "showInBrowser", "saveForLater"], "no sign-in yet offers Sign in first");
+});
+
+test("a rejected saved sign-in gets its own row with Sign in", () => {
+  assert.equal(classifyClipFailure("YOUTUBE_AUTH_REQUIRED", "YouTube serves higher formats to signed-in requests and the saved session expired"), "expired");
+  assert.equal(classifyClipFailure("stale_session"), "expired");
+  assert.deepEqual(failureCopy("expired", 1), { reason: "YouTube ended your sign-in.", detail: "Sign in again, then Retry. Your range is kept." });
+  assert.deepEqual(failureActions("expired", 1), ["signIn", "retry"]);
 });

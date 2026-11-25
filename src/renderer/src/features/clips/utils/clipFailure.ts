@@ -9,7 +9,7 @@ import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
 import { ROOM_REASON, roomDetail } from "../../../shared/utils/freeSpace";
 
-export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "age" | "members" | "drivegone" | "norights" | "removed" | "refused" | "ratelimited" | "format" | "tools";
+export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "expired" | "age" | "members" | "drivegone" | "norights" | "removed" | "refused" | "ratelimited" | "format" | "tools";
 export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater" | "signIn" | "showFolder";
 
 /** What a plain "the network is down" failure looks like in the engine's message (no YouTube error involved). */
@@ -24,19 +24,18 @@ const REFUSED = /refused the media request|HTTP Error 403|403 Forbidden/i;
 /** The engine's words for a folder that refuses writes (permission), as against one that is gone. */
 const NOT_ALLOWED = /can['’]t write|permission|not allowed|read-only/i;
 
-/** A members-only video comes with the private code; its words say which it is. */
-const MEMBERS = /members[- ]only|join this channel|members of this channel|membership/i;
-
 export function classifyClipFailure(code: string | undefined, message?: string): ClipFailureKind {
   if (message && TOO_LONG.test(message)) return "toolong";
   if (code === "disk_full") return "disk";
   // The folder cannot be used: a missing folder or unplugged drive, or one that refuses writes (the engine's words tell them apart).
   if (code === "folder_not_writable" || (code === "save_folder_gone" && message && NOT_ALLOWED.test(message))) return "norights";
   if (code === "save_folder_gone") return "drivegone";
-  if (code === "private_video") return message && MEMBERS.test(message) ? "members" : "private";
+  if (code === "private_video") return "private"; // the code decides: the engine's one sentence says "private or members-only", so words cannot tell them apart
   if (code === "sign_in_needed" || code === "age_restricted") return "age";
   if (code === "members_only") return "members";
   if (code === "bot_check") return "signin";
+  // YouTube rejected the saved sign-in (the engine sends the stale-session row, or its pre-flight twin).
+  if (code === "stale_session" || code === "YOUTUBE_AUTH_REQUIRED") return "expired";
   if (code === "video_unavailable" || code === "video_removed") return "removed";
   if (code === "access_refused") return "refused";
   if (code === "rate_limited") return "ratelimited";
@@ -92,6 +91,7 @@ export function failureCopy(
   if (kind === "private") {
     return { reason: ov ?? "This video is private, so it can’t be downloaded.", detail: "Your range is kept." };
   }
+  if (kind === "expired") return { reason: "YouTube ended your sign-in.", detail: "Sign in again, then Retry. Your range is kept." };
   if (kind === "signin") return { reason: "YouTube wants you signed in for this video.", detail: "Sign in, then Retry. Your range is kept." };
   if (kind === "removed") return { reason: "This video was removed or isn’t available.", detail: "Your range is kept." };
   if (kind === "refused") return { reason: ov ?? "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
@@ -112,7 +112,7 @@ export function failureActions(kind: ClipFailureKind, attempts: number, final = 
   if (kind === "members") return signedIn ? ["showInBrowser", "saveForLater"] : ["signIn", "showInBrowser", "saveForLater"];
   if (kind === "private" || kind === "removed") return ["showInBrowser", "saveForLater"];
   if (kind === "toolong") return [];
-  if (kind === "signin") return attempts >= 2 ? ["signIn", "retry", "copyDetails"] : ["signIn", "retry"];
+  if (kind === "signin" || kind === "expired") return attempts >= 2 ? ["signIn", "retry", "copyDetails"] : ["signIn", "retry"];
   // The rest get Retry (no engine retry is promised), with Copy details once the Retry also failed. A kind with
   // no sentence of its own (the engine's words stand in) has Copy details at once when the engine says final.
   const generic = kind === "stopped" || kind === "refused" || kind === "ratelimited" || kind === "format" || kind === "tools";
