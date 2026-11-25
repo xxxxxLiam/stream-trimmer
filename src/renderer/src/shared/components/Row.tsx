@@ -15,7 +15,7 @@ export type RowState = "idle" | "open" | "dimmed" | "cutting" | "made" | "queued
 const states: Record<RowState, string> = {
   idle: "border-transparent",
   open: "border-ice shadow-open",
-  dimmed: "border-transparent opacity-55",
+  dimmed: "border-transparent text-disabled",
   cutting: "border-ice shadow-row",
   made: "border-frost-tint-45 shadow-made",
   queued: "border-ice-tint-50 bg-ice-tint-06",
