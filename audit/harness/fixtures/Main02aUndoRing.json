@@ -1,5 +1,5 @@
 {
- "_doc": "Board 03.2.2: MainBase, Honest Version made, Undo ring running.",
+ "_doc": "Board 03.2.2: MainBase, Honest Version made, Undo ring running. The saved toast (the stub's fixture clip is 360p, so it offers the sign-in) is dismissed: the board is the signed-in state.",
  "extends": "MainBase",
  "seed": {
   "clipper.bank": {
@@ -72,6 +72,12 @@
   },
   {
    "wait": 2600
+  },
+  {
+   "eval": "document.querySelector('button[aria-label=\"Dismiss\"]')?.click()"
+  },
+  {
+   "wait": 200
   }
  ]
 }

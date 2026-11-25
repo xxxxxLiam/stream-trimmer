@@ -248,7 +248,34 @@
   "clipper.tips.on": false
  },
  "stub": {
-  "vttFile": "podcast214-timeline.vtt"
+  "vttFile": "podcast214-timeline.vtt",
+  "info": {
+   "id": "podcast214",
+   "title": "Podcast #214, the long talk",
+   "duration": 8073,
+   "uploader": "The Long Talk",
+   "formats": [
+    {
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "en",
+     "format_note": "English (original) (default)"
+    },
+    {
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "es",
+     "format_note": "Spanish (dubbed-auto)"
+    },
+    {
+     "format_id": "22",
+     "ext": "mp4",
+     "height": 1080,
+     "vcodec": "avc1",
+     "acodec": "mp4a"
+    }
+   ]
+  }
  },
  "steps": [
   {
