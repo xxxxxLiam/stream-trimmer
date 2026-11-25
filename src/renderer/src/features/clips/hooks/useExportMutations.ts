@@ -18,6 +18,7 @@ import { suggestProjectName } from "../utils/projectName";
 import { clipGroup, undoClip } from "../utils/undoClip";
 import { UNDO_SECONDS } from "../utils/exportRows";
 import { clipNameFor } from "../utils/cutNaming";
+import { createSerialQueue } from "../utils/serialQueue";
 import type { ExportState } from "./useExportState";
 import type { useExportQueries } from "./useExportQueries";
 
@@ -39,7 +40,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
 
   // Clips are made one after another: "Make this clip" while another is making joins the queue, and
   // each one's name, Making row and Undo belong to it from the moment it starts.
-  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const queue = useRef(createSerialQueue());
   const make = useCallback(
     (clip: BankedClip): Promise<void> => {
       if (!campaignId || !vid) return Promise.resolve();
@@ -70,9 +71,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
           s.setNotice(`${name} was not made. It is still waiting.`);
         }
       };
-      const next = queue.current.then(run, run);
-      queue.current = next.catch(() => {});
-      return next;
+      return queue.current.enqueue(run);
     },
     [campaignId, vid, cutBanked, recordUse, s, info?.title],
   );
