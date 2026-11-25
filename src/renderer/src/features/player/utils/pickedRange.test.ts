@@ -22,8 +22,29 @@ test("other invalid ranges are still no range", () => {
 
 test("Clip says the real reason for an over-cap range", () => {
   assert.equal(
-    clipReason({ hasRange: true, segments: 0, rangeSeconds: 1000 }),
+    clipReason({ hasRange: true, segments: 0, totalSeconds: 1000 }),
     "Clips can be up to 10 minutes. This one is 16:40.",
   );
-  assert.equal(clipReason({ hasRange: true, segments: 0, rangeSeconds: 42 }), null);
+  assert.equal(clipReason({ hasRange: true, segments: 0, totalSeconds: 42 }), null);
+});
+
+test("an In with no Out, or an Out with no In, is no range", () => {
+  assert.equal(pickedRangeOf({ ...over, endText: "", validationError: "" }), null);
+  assert.equal(pickedRangeOf({ ...over, startText: "", validationError: "" }), null);
+});
+
+test("the cap applies to the joined total, not the last range", () => {
+  // 5:30 locked + 5:30 marked: each fine alone, 11:00 together
+  assert.equal(
+    clipReason({ hasRange: true, segments: 1, totalSeconds: 660 }),
+    "Clips can be up to 10 minutes. This one is 11:00.",
+  );
+  assert.equal(clipReason({ hasRange: false, segments: 1, totalSeconds: 660 }), "Clips can be up to 10 minutes. This one is 11:00.");
+});
+
+test("one end alone says which end is missing", () => {
+  assert.equal(clipReason({ hasRange: false, segments: 0, startSet: true, endSet: false }), "Set an end first: click the timeline or press O");
+  assert.equal(clipReason({ hasRange: false, segments: 0, startSet: false, endSet: true }), "Set a start first: click the timeline or press I");
+  assert.equal(clipReason({ hasRange: false, segments: 0, startSet: true, endSet: true }), "The end has to come after the start");
+  assert.equal(clipReason({ hasRange: false, segments: 0 }), "Set an end first: click the timeline or press O");
 });

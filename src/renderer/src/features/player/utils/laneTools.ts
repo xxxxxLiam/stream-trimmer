@@ -26,7 +26,21 @@ export function grabbedEdge(x: number, startX: number, endX: number): "start" | 
 export const ZOOM_STEP = 20;
 export const zoomStep = (alt: boolean) => (alt ? -ZOOM_STEP : ZOOM_STEP);
 
-/** How the first-clip hint says to pick a part, for the tool in hand: scissors click twice, the pointer drags. */
+/**
+ * How the first-clip hint says to pick a part, for the tool in hand: scissors click twice, the pointer
+ * drags, and the flag, hand and zoom tools do not pick a range at all so they point at the scissors.
+ */
 export function pickHintLead(tool: string): string {
-  return tool === "clip" ? "Click to set the start, click again for the end" : "Drag on the timeline";
+  switch (tool) {
+    case "clip":
+      return "Click to set the start, click again for the end";
+    case "flag":
+      return "Flags mark a spot; use the scissors to click a start and an end";
+    case "hand":
+      return "The hand moves the view; use the scissors to click a start and an end";
+    case "zoom":
+      return "Zoom resizes the view; use the scissors to click a start and an end";
+    default:
+      return "Drag on the timeline";
+  }
 }

@@ -9,7 +9,7 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
-import { availableDestinations, clipReason, clipSections } from "../utils/clipDestination";
+import { availableDestinations, clipReason, clipSections, sectionsLength } from "../utils/clipDestination";
 import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
 
@@ -33,13 +33,16 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     };
   }, []);
 
+  const { startText, endText } = useClipperContext();
   const hasRange = range !== null;
+  const toCut = clipSections(segments, range);
   const reason = clipReason({
     hasRange,
     segments: segments.length,
-    rangeSeconds: range ? range.end - range.start : undefined,
+    totalSeconds: sectionsLength(toCut),
+    startSet: startText.trim() !== "",
+    endSet: endText.trim() !== "",
   });
-  const toCut = clipSections(segments, range);
 
   const clip = () => {
     if (!reason) host.cutSegments(toCut);

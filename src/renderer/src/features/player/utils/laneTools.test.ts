@@ -32,3 +32,9 @@ test("the first-clip hint matches the tool in hand", () => {
   assert.equal(pickHintLead("clip"), "Click to set the start, click again for the end");
   assert.equal(pickHintLead("pointer"), "Drag on the timeline");
 });
+
+test("B2-8: flag, hand and zoom each get their own hint, none says Drag", () => {
+  const leads = ["flag", "hand", "zoom"].map(pickHintLead);
+  assert.equal(new Set(leads).size, 3);
+  for (const l of leads) assert.doesNotMatch(l, /^Drag/);
+});

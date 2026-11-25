@@ -33,10 +33,26 @@ export function toAfterCutting(d: ClipDestination): AfterCutting {
   return d === "finalcut" ? "finalcut" : "nothing";
 }
 
-/** Why Clip cannot run, or null. A clip being made is not a reason: the next one joins the line. */
-export function clipReason(s: { hasRange: boolean; segments: number; rangeSeconds?: number }): string | null {
-  if (s.hasRange && s.rangeSeconds !== undefined && overCapMessage(s.rangeSeconds)) return overCapMessage(s.rangeSeconds);
-  if (!s.hasRange && s.segments === 0) return "Set an end first: click the timeline or press O";
+/**
+ * Why Clip cannot run, or null. A clip being made is not a reason: the next one joins the line.
+ * totalSeconds is the whole joined clip (every locked section plus the current range), because the
+ * cap applies to what is cut, not to the part last marked. startSet/endSet say which ends are typed
+ * or marked: one end alone is no range.
+ */
+export function clipReason(s: {
+  hasRange: boolean;
+  segments: number;
+  totalSeconds?: number;
+  startSet?: boolean;
+  endSet?: boolean;
+}): string | null {
+  const over = s.totalSeconds !== undefined ? overCapMessage(s.totalSeconds) : "";
+  if (over && (s.hasRange || s.segments > 0)) return over;
+  if (!s.hasRange && s.segments === 0) {
+    if (s.startSet && s.endSet) return "The end has to come after the start";
+    if (s.endSet) return "Set a start first: click the timeline or press I";
+    return "Set an end first: click the timeline or press O";
+  }
   return null;
 }
 

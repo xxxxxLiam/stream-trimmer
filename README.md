@@ -75,7 +75,8 @@ chmod +x Clipr-Linux-x64.AppImage && ./Clipr-Linux-x64.AppImage
 - **Transcript-first.** Read the transcript to find the moment and jump to it.
 - **Mark a range, press Clip.** Drag on the timeline or set in and out with the
   keyboard. Only that section downloads, so a 1-minute clip from a 3-hour
-  podcast comes down in seconds. There is no length cap.
+  podcast comes down in seconds. A clip can be up to 10 minutes,
+  joined sections included.
 - **One file, several moments.** Add more sections and they come down joined,
   in order, as one file.
 - **Campaigns.** Each client has its own folder, daily count and clip bank.
