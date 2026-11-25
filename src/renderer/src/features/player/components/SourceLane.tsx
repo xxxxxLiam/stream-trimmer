@@ -16,13 +16,20 @@ import LaneLabel from "./LaneLabel";
 /** The picture strip's top and bottom inset in the lane: the selection outline sits exactly on it. */
 export const STRIP_INSET = 6;
 
-/** The Ice grip on a section's edge: what the Pointer grabs to resize it. */
-function Grip({ x }: { x: number }) {
+/**
+ * The grip on a section's edge: what the Pointer and the Range tool grab to resize it. At rest a slim Ice bar;
+ * over it, it widens and turns Frost so it reads as clickable; held down, it narrows and shortens a touch so it
+ * reads as pressed.
+ */
+function Grip({ x, state = "rest" }: { x: number; state?: "rest" | "hover" | "pressed" }) {
+  const look =
+    state === "pressed" ? "w-[3px] scale-y-90 bg-ice" : state === "hover" ? "w-[6px] bg-frost" : "w-[4px] bg-ice";
   return (
     <span
       aria-hidden="true"
       data-grip
-      className="pointer-events-none absolute w-[4px] -translate-x-1/2 rounded-chip bg-ice"
+      data-grip-state={state}
+      className={`pointer-events-none absolute -translate-x-1/2 rounded-chip transition-[width,transform] duration-100 ${look}`}
       style={{ left: x, top: STRIP_INSET + 6, bottom: STRIP_INSET + 6 }}
     />
   );
@@ -42,6 +49,7 @@ function TimePill({ at, text }: { at: number; text: string }) {
 }
 
 export default function SourceLane({ c, height = 44 }: { c: TimelineController; height?: number }) {
+  const gripState = (t: number) => (c.pressedGrip === t ? "pressed" : c.pressedGrip === null && c.hoverGrip === t ? "hover" : "rest");
   const covered = [...c.sections, ...c.used.filter((u) => u.end > u.start)].sort((a, b) => a.start - b.start);
   // Unused footage is dimmed: everything not under a picked range or a made clip.
   const dim: { start: number; end: number }[] = [];
@@ -89,8 +97,8 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
                       // The outline's outer edge sits exactly on the picture strip's top and bottom lines.
                       style={{ left: x, width: w, top: STRIP_INSET, bottom: STRIP_INSET }}
                     />
-                    <Grip x={x} />
-                    <Grip x={x + w} />
+                    <Grip x={x} state={gripState(s.start)} />
+                    <Grip x={x + w} state={gripState(s.end)} />
                   </span>
                 );
               })}
@@ -107,8 +115,8 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
                     bottom: STRIP_INSET,
                   }}
                 />
-                <Grip x={toX(c.axis, c.mergeHint.start)} />
-                <Grip x={toX(c.axis, c.mergeHint.end)} />
+                <Grip x={toX(c.axis, c.mergeHint.start)} state={gripState(c.mergeHint.start)} />
+                <Grip x={toX(c.axis, c.mergeHint.end)} state={gripState(c.mergeHint.end)} />
                 <TimePill
                   at={(toX(c.axis, c.mergeHint.start) + toX(c.axis, c.mergeHint.end)) / 2}
                   text={`Joins when you let go · ${clockTime(c.mergeHint.start)}–${clockTime(c.mergeHint.end)}`}
