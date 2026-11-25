@@ -14,13 +14,23 @@ import type { MenuItem } from "./PopoverMenu";
 const NAMES: Record<PanelGroupId, string> = { left: "Left panels", centre: "Centre panels", right: "Right panels" };
 
 export default function PanelGroup({ group }: { group: "left" | "right" }) {
-  const { layout, panels, activate, close, open, move, reset, save } = usePanelLayoutState();
+  const { layout, panels, activate, close, open, move, moveToGroup, reset, save } = usePanelLayoutState();
   const state = layout.groups[group];
+  const other = group === "left" ? "right" : "left";
   const tabs = state.tabs.flatMap((id) => getPanel(id) ?? []);
   const activeDef = state.active ? getPanel(state.active) : undefined;
   const menuItems: MenuItem[] = [
     ...(activeDef && activeDef.closable !== false
       ? [{ key: "close", label: `Close ${activeDef.title}`, onSelect: () => close(activeDef.id) } as MenuItem]
+      : []),
+    ...(activeDef && activeDef.group !== "centre"
+      ? [
+          {
+            key: "move-group",
+            label: `Move ${activeDef.title} to ${NAMES[other]}`,
+            onSelect: () => moveToGroup(activeDef.id, other),
+          } as MenuItem,
+        ]
       : []),
     { kind: "separator", key: "sep" },
     { key: "reset", label: "Reset layout", onSelect: reset },
@@ -39,6 +49,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
         addable={closedPanels(layout, panels)}
         onAdd={open}
         menuItems={menuItems}
+        onDropPanel={(id, index) => moveToGroup(id, group, index)}
       />
       {activeDef ? (
         <div

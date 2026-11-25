@@ -5,6 +5,6 @@
     "types": ["node"],
     "jsx": "preserve"
   },
-  "include": ["src/main", "src/common"],
+  "include": ["src/main", "src/common", "relay/src"],
   "exclude": ["**/*.test.ts", "**/*.test.tsx", "src/main/**/testSupport"]
 }

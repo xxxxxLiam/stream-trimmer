@@ -112,3 +112,59 @@ test("junk in storage falls back to the built-in layout", () => {
   assert.deepEqual(normalizeLayout("nope", defs), defaultLayout(defs));
   assert.deepEqual(normalizeLayout({ groups: { left: 3 }, sizes: { left: "wide" } }, defs).sizes, DEFAULT_SIZES);
 });
+
+// ---- Audit run 1: F-7, F-8, F-10, F-13 ----
+import { SIDE_FLOOR, fitSides, movePanelToGroup } from "./panelLayout";
+
+test("F-7: a panel moves to the other group, becomes its shown tab, and the source picks a neighbour", () => {
+  let l = movePanelToGroup(defaultLayout(defs), "videos", "right");
+  assert.deepEqual(l.groups.right.tabs, ["export", "history", "videos"]);
+  assert.equal(l.groups.right.active, "videos");
+  assert.deepEqual(l.groups.left.tabs, ["transcript", "markers"]);
+  assert.equal(l.groups.left.active, "transcript");
+  // at a position
+  l = movePanelToGroup(l, "markers", "right", 0);
+  assert.deepEqual(l.groups.right.tabs, ["markers", "export", "history", "videos"]);
+  // the centre is not movable, and the last panel of a group can leave it empty
+  assert.equal(movePanelToGroup(l, "preview", "left"), l);
+  const one = movePanelToGroup(movePanelToGroup(l, "transcript", "right"), "markers", "right");
+  assert.deepEqual(one.groups.left.tabs, []);
+  assert.equal(one.groups.left.active, null);
+});
+
+test("F-7: a moved panel survives save and load in its new group", () => {
+  const l = movePanelToGroup(defaultLayout(defs), "history", "left");
+  const back = normalizeLayout(JSON.parse(JSON.stringify(serializeLayout(l, defs))), defs);
+  assert.ok(back.groups.left.tabs.includes("history"));
+  assert.ok(!back.groups.right.tabs.includes("history"));
+});
+
+test("F-8/F-10/F-13: saved side widths are fitted so Preview keeps its minimum width", () => {
+  // a layout saved on a big screen, opened at the minimum window (1160, minus 16 padding)
+  const f = fitSides({ left: 560, right: 560 }, 1144);
+  assert.ok(1144 - f.left - f.right >= CENTRE_MIN_W, `preview ${1144 - f.left - f.right}`);
+  assert.ok(f.left >= SIDE_FLOOR && f.right >= SIDE_FLOOR);
+  // zoomed to ~190%: 1144 / 1.9 = 602 css px; the sides give way, never below the floor
+  const z = fitSides({ left: 300, right: 300 }, 602);
+  assert.ok(z.left >= SIDE_FLOOR && z.right >= SIDE_FLOOR);
+  assert.ok(602 - z.left - z.right >= 602 - 2 * 191 - 1 || 602 - z.left - z.right >= CENTRE_MIN_W - 1);
+  // plenty of room: untouched; an empty group takes nothing
+  assert.deepEqual(fitSides({ left: 300, right: 300 }, 1600), { left: 300, right: 300 });
+  assert.deepEqual(fitSides({ left: 300, right: 300 }, 1000, { left: false, right: true }), { left: 0, right: 300 });
+  assert.ok(fitSides({ left: 300, right: 300 }, 1000, { left: false, right: true }).right <= 1000 - CENTRE_MIN_W);
+});
+
+test("F-10: a stored layout can never lose Preview or Timeline", () => {
+  const bad = {
+    groups: { left: { tabs: ["preview", "videos"], active: "preview" }, right: { tabs: ["timeline", "export"], active: "nope" }, centre: { tabs: [], active: null } },
+    sizes: { left: 999999, right: -5, timeline: 3 },
+  };
+  const l = normalizeLayout(bad, defs);
+  assert.deepEqual([...l.groups.centre.tabs].sort(), ["preview", "timeline"]);
+  assert.ok(!l.groups.left.tabs.includes("preview") && !l.groups.right.tabs.includes("timeline"));
+  for (const g of ["left", "right"] as const) {
+    const a = l.groups[g].active;
+    assert.ok(a === null ? l.groups[g].tabs.length === 0 : l.groups[g].tabs.includes(a));
+  }
+  assert.ok(l.sizes.left <= SIZE_LIMITS.left.max && l.sizes.right >= SIZE_LIMITS.right.min && l.sizes.timeline >= SIZE_LIMITS.timeline.min);
+});

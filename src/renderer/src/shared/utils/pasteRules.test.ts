@@ -33,5 +33,5 @@ test("A-15: a name has a limit, a bad quota is capped, and delete drops the camp
 });
 
 test("A-16: tips wait for the first campaign (or for the prompt to be dismissed)", () => {
-  assert.match(src("../../routes/App.tsx"), /useTipsController\(!!info && \(!!campaign \|\| campaignPromptDismissed\)\)/);
+  assert.match(src("../../routes/App.tsx"), /useTipsController\(!!info && active && \(!!campaign \|\| campaignPromptDismissed\)\)/);
 });

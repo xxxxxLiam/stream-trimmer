@@ -21,7 +21,7 @@
     "test:renderer": "tsx --test \"src/renderer/**/*.test.ts\" \"src/renderer/**/*.test.tsx\"",
     "check": "npm run typecheck && npm test && npm run lint",
     "prepare": "git config core.hooksPath .githooks || true",
-    "test": "tsx --test \"src/main/**/*.test.ts\" \"src/main/**/*.test.cjs\" \"src/preload/**/*.test.ts\" \"src/common/**/*.test.ts\" \"scripts/*.test.ts\" \"src/renderer/**/*.test.ts\" \"src/renderer/**/*.test.tsx\"",
+    "test": "tsx --test \"src/main/**/*.test.ts\" \"src/main/**/*.test.cjs\" \"src/preload/**/*.test.ts\" \"src/common/**/*.test.ts\" \"scripts/*.test.ts\" \"relay/**/*.test.ts\" \"src/renderer/**/*.test.ts\" \"src/renderer/**/*.test.tsx\"",
     "preview": "vite preview",
     "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\"",
     "dev:electron": "cross-env ELECTRON_DEV=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"node scripts/build-main.cjs && wait-on http://localhost:8080 && electron out/main/index.cjs\"",
@@ -34,7 +34,8 @@
     "release:linux": "npm run build:electron && electron-builder --linux AppImage --publish always",
     "release": "npm run build:electron && electron-builder -mwl --publish always",
     "parity": "node scripts/parity/parity.cjs",
-    "parity:el": "node scripts/parity/elements.cjs"
+    "parity:el": "node scripts/parity/elements.cjs",
+    "build:relay": "node scripts/build-relay.cjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

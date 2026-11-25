@@ -15,6 +15,7 @@ import {
   closePanel,
   defaultLayout,
   moveTab,
+  movePanelToGroup,
   normalizeLayout,
   openPanel,
   resizeGroup,
@@ -93,6 +94,16 @@ export function forgetPanelLayoutForTest() {
   layoutForVersion = -1;
 }
 
+/**
+ * Resize one group. A drag calls this with persist false while moving and persist true at the end:
+ * the end of a drag finds the size already in place, so set() sees no change and writes nothing;
+ * the layout is therefore saved here.
+ */
+export function resizePanel(key: keyof PanelSizes, px: number, containerWidth?: number, persist = true) {
+  set(resizeGroup(current(), key, px, containerWidth), persist);
+  if (persist) writeSetting(LAYOUT_KEY, serializeLayout(current(), listPanels()));
+}
+
 export function usePanelLayoutState() {
   const snapshot = useSyncExternalStore(subscribe, current, current);
   const panels = listPanels();
@@ -110,11 +121,8 @@ export function usePanelLayoutState() {
       if (def) set(togglePanel(current(), def));
     }, []),
     move: useCallback((id: PanelId, by: -1 | 1) => set(moveTab(current(), id, by)), []),
-    resize: useCallback(
-      (key: keyof PanelSizes, px: number, containerWidth?: number, persist = true) =>
-        set(resizeGroup(current(), key, px, containerWidth), persist),
-      [],
-    ),
+    moveToGroup: useCallback((id: PanelId, to: "left" | "right", index?: number) => set(movePanelToGroup(current(), id, to, index)), []),
+    resize: resizePanel,
     /** Write the current layout once a drag ends (drags call resize with persist false). */
     commit: useCallback(() => writeSetting(LAYOUT_KEY, serializeLayout(current(), listPanels())), []),
     reset: resetPanelLayout,

@@ -17,3 +17,10 @@ test("C-1: a cut clears ITS tab's store, never the module-level active one", () 
   assert.ok(!/import \{[^}]*\bclearSegments\b[^}]*\} from "\.\/hooks\/useSegmentsState"/.test(app));
   assert.match(app, /clear: clearSegments\s*\} = useSegmentsState\(\)/);
 });
+
+test("F-1: one top bar and one tips host, for the open video only", () => {
+  assert.match(app, /useTipsController\(!!info && active &&/);
+  assert.match(app, /\{active && \(\s*<TopBar/);
+  assert.match(app, /\{active && \(\s*<BottomBar/);
+  assert.equal((app.match(/<TopBar/g) ?? []).length, 1);
+});
