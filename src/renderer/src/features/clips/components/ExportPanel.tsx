@@ -4,6 +4,8 @@
  * Description: The Export panel (the bank): the clip being made on top, then "Waiting in this video"
  *   with the suggested next on an Ice edge. Logic-free: everything comes from useExportController.
  */
+import { clipLength, type BankedClip } from "../../../shared/utils/bank";
+import { lengthVerdict, type LengthRule } from "../../../shared/utils/lengthRule";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { useMomentNote } from "../../../shared/utils/momentNoteStore";
 import { useEntryActions } from "../../../shared/hooks/useEntryActions";
@@ -18,6 +20,12 @@ import MakingRow from "./MakingRow";
 import OfflineRow from "./OfflineRow";
 import CrashNoteHost from "../../help/components/CrashNoteHost";
 import WaitingRow from "./WaitingRow";
+
+/** A moment shorter than the campaign's minimum says so in one dim line; the rule is the editor's to bend. */
+function underMinimum(clip: BankedClip, rule: LengthRule | null, campaign: string): string | undefined {
+  const v = lengthVerdict(clipLength(clip), rule, campaign);
+  return v.state === "out" && /under/.test(v.label) ? v.label : undefined;
+}
 
 const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
 
@@ -98,6 +106,7 @@ export default function ExportPanel() {
                 suggested={clip.id === c.nextId}
                 selected={clip.id === c.selectedId}
                 made={clip.status !== "banked"}
+                lengthNote={underMinimum(clip, c.lengthRule, c.campaignName)}
                 onSelect={() => c.select(clip)}
                 onMake={() => void c.make(clip)}
                 onRemove={() => c.remove(clip)}

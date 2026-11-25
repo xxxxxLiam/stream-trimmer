@@ -5,6 +5,7 @@
  *   confined to the folders the user chose (see saveRoots.ts); payload shapes are
  *   validated by the IPC handlers before they reach these functions.
  */
+import { checkFolder } from "./folderCheck";
 import { describeSaveError } from "./saveError";
 import { savedResult } from "./savedFile";
 import fs from "node:fs";
@@ -129,6 +130,11 @@ export async function saveFiles(payload: any) {
  * Cheap existence probe so the Downloads list can dim rows whose file was
  * moved or deleted outside the app. Only answers for paths inside the folders the person chose.
  */
+/** Can Clipr write into this folder? Only the folders the person chose are looked at. */
+export function checkSaveFolder(payload: unknown) {
+  return checkFolder(payload, saveRoots());
+}
+
 export function fileExists(targetPath: string): boolean {
   return existsWithin(targetPath, saveRoots());
 }
