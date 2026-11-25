@@ -47,3 +47,7 @@ resources/bin
 # agent test-build scratch dirs
 .tb-*/
 .testbuild/
+
+# Liam pastes this one file into Cloudflare, so it is committed.
+!relay/dist
+!relay/dist/worker.js
