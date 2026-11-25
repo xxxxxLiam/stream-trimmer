@@ -8,7 +8,10 @@
 /** `advanceOn`: the real action that finishes a step, so the person learns by doing instead of pressing Next. */
 export type TipStep = {
   target: string;
+  /** When several controls match `target`, the one whose text or label is this. */
+  withText?: string;
   text: string;
+  /** `click: "target"` means a click on the ringed control itself; any other string is a selector. */
   advanceOn?: { keys?: string[]; click?: string };
 };
 export type Tip = {
