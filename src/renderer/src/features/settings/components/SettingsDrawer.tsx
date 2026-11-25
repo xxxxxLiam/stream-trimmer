@@ -12,7 +12,6 @@ import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
 import SettingsCampaigns from "./SettingsCampaigns";
-import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
@@ -189,16 +188,6 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
     );
   } else if (view.kind === "campaigns") {
     body = <SettingsCampaigns rows={c.rows} onEdit={(id) => c.setView({ kind: "campaign", id })} onAdd={() => c.setAdding(true)} onBack={c.back} onClose={onClose} />;
-  } else if (view.kind === "folder") {
-    body = (
-      <SettingsFolder
-        label={c.clipsFolderLabel}
-        problem={problem}
-        onChange={() => void c.campaigns.pickParentClipsDir().then((p) => setProblem(p ?? ""))}
-        onBack={c.back}
-        onClose={onClose}
-      />
-    );
   } else {
     body = (
       <SettingsTopList
@@ -209,7 +198,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onAutoUpdate={c.setAutoUpdate}
         onPatchApp={c.patchApp}
         onOpenCampaigns={() => c.setView({ kind: "campaigns" })}
-        onOpenFolder={() => c.setView({ kind: "folder" })}
+        folderProblem={problem}
+        onChangeFolder={() => void c.campaigns.pickParentClipsDir().then((p) => setProblem(p ?? ""))}
         onClose={onClose}
       />
     );

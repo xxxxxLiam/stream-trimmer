@@ -13,7 +13,6 @@ import SettingsCampaign, { type SettingsCampaignProps } from "./SettingsCampaign
 import SettingsEditor from "./SettingsEditor";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import SettingsCampaigns from "./SettingsCampaigns";
-import SettingsFolder from "./SettingsFolder";
 import SettingsTopList from "./SettingsTopList";
 import { parentOf } from "../hooks/useSettingsController";
 
@@ -22,10 +21,13 @@ const read = (f: string) => readFileSync(join(process.cwd(), "src/renderer/src",
 
 test("top list: Your work rows, two switches, nothing about editor, quality or crashes", () => {
   const h = renderToStaticMarkup(
-    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onOpenFolder={noop} onClose={noop} />,
+    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onChangeFolder={noop} onClose={noop} />,
   );
   assert.match(h, /aria-label="Campaigns: Acme, Nova"/);
-  assert.match(h, /aria-label="Clips folder: Downloads\/Clipr"/);
+  // Liam, 25 Nov: a page with one control is not a page; the Change button sits flat on the row.
+  assert.match(h, /Downloads\/Clipr/);
+  assert.match(h, /aria-label="Change the clips folder"/);
+  assert.doesNotMatch(h, /aria-label="Clips folder: /);
   assert.match(h, /role="switch"[^>]*aria-checked="true"[^>]*aria-label="Tell me when the queue finishes"/);
   assert.match(h, /aria-checked="false"[^>]*aria-label="Update automatically"/);
   assert.match(h, /aria-label="Close Settings"/);
@@ -133,11 +135,9 @@ test("delete takes two clicks", () => {
   assert.match(renderToStaticMarkup(<SettingsCampaign {...campaign} confirmingDelete />), />Click again to delete Acme</);
 });
 
-test("clips folder view and Back targets", () => {
-  const h = renderToStaticMarkup(<SettingsFolder label="Downloads/Clipr" problem="" onChange={noop} onBack={noop} onClose={noop} />);
-  assert.match(h, /aria-label="Change the clips folder"/);
+test("Back targets, and there is no separate Clips folder page", () => {
+  assert.throws(() => read("features/settings/components/SettingsFolder.tsx"));
   assert.deepEqual(parentOf({ kind: "campaign", id: "a" }), { label: "Campaigns", view: { kind: "campaigns" } });
-  assert.deepEqual(parentOf({ kind: "folder" })?.label, "Settings");
   assert.equal(parentOf({ kind: "top" }), null);
 });
 
