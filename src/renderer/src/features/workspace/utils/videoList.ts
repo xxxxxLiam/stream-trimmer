@@ -76,6 +76,15 @@ export function linkKind(text: string): "video" | "bad" | "none" {
   return extractVideoId(t) ? "video" : "bad";
 }
 
+/** The first YouTube video link inside pasted text (share text such as "Watch this https://youtu.be/abc – wow"). */
+export function linkInText(text: string): string | null {
+  for (const raw of text.split(/\s+/)) {
+    const token = raw.replace(/^[("'<\[]+|[)"'>\],.;!?]+$/g, "");
+    if (token && linkKind(token) === "video") return token;
+  }
+  return null;
+}
+
 export function looksLikeLink(text: string): boolean {
   return linkKind(text) !== "none";
 }

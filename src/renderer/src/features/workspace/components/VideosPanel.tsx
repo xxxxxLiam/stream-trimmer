@@ -96,7 +96,7 @@ export default function VideosPanel() {
             type="button"
             aria-label={`Remove filter ${p}`}
             onClick={() => v.removePill(p)}
-            className="chip flex-none border-hairlineStrong"
+            className="chip min-w-[0px] max-w-[96px] shrink truncate border-hairlineStrong"
           >
             {p}
             <IconClose width={12} height={12} />
@@ -108,10 +108,13 @@ export default function VideosPanel() {
           value={v.text}
           onChange={(e) => v.setText(e.target.value)}
           onKeyDown={onKey}
+          onPaste={(e) => {
+            if (v.pasteText(e.clipboardData.getData("text"))) e.preventDefault();
+          }}
           placeholder={v.pills.length ? "" : "Search or paste a link"}
           autoComplete="off"
           spellCheck={false}
-          className="min-w-[0px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim"
+          className="min-w-[48px] flex-1 bg-transparent text-body text-fg outline-none placeholder:text-fg-dim"
         />
         {v.filtered && (
           <button type="button" className="flex-none text-meta text-fg-dim hover:text-fg" onClick={v.clearFilters}>
