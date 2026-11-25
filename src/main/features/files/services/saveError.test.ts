@@ -36,3 +36,17 @@ test("each failed save carries a code the Export row can act on (Change folder),
   assert.equal(code(new Error("weird")), "SAVE_FAILED");
   assert.match(describeSaveError(err("ENOSPC", "x")).error, /folder is full/);
 });
+
+test("E2-5: a bad file name or empty data is not blamed on the folder", () => {
+  const long = describeSaveError(err("ENAMETOOLONG", "ENAMETOOLONG: name too long, link '/x/aaaa'"));
+  assert.equal(long.code, "FILE_NAME_INVALID");
+  assert.match(long.error, /file name/);
+  assert.doesNotMatch(long.error, /folder/);
+  const nul = describeSaveError(new TypeError("The argument 'path' must be a string without null bytes"));
+  assert.equal(nul.code, "FILE_NAME_INVALID");
+  const none = describeSaveError(err("NOTHING_TO_SAVE", "no data"));
+  assert.equal(none.code, "NOTHING_TO_SAVE");
+  assert.doesNotMatch(none.error, /folder/);
+  // A real folder problem still says folder.
+  assert.equal(describeSaveError(err("ENOTDIR", "not a directory")).code, "FOLDER_GONE");
+});

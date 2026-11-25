@@ -19,17 +19,24 @@ export interface FailureLike {
   code: string;
   cause?: string;
   error: string;
+  /** `cause` is yt-dlp's own text, which stays out of the row. */
+  rawCause?: boolean;
 }
 
+/** What the row says when the cause is the tool's own text (it is in Copy details). */
+export const RAW_CAUSE_SENTENCE = "YouTube stopped the download.";
+
 /**
- * `retried` is true once the one tool-update retry has been spent, so a second failure is
- * final (and Copy details shows). Disk-full and cannot-download never retry.
+ * Only `retrying` (a tool update really running before the one retry) is "failed". Everything else,
+ * including the second failure after that retry, is "failed-final" (Retry and Copy details).
+ * Disk-full and cannot-download never retry.
  */
 export function rowStateFor(failure: FailureLike, opts: { retrying?: boolean; retried?: boolean } = {}): ClipRowState {
-  const reason = failure.cause || failure.error;
+  const reason = failure.rawCause ? RAW_CAUSE_SENTENCE : failure.cause || failure.error;
   if (failure.code === "disk_full") return { state: "no-space", reason };
   if (failure.code === "private_video") return { state: "cannot-download", kind: "private", reason };
   if (opts.retrying) return { state: "failed", reason, retrying: true };
-  if (opts.retried) return { state: "failed-final", reason };
-  return { state: "failed", reason, retrying: false };
+  // Only `retrying` means a tool update is running. Every other failure is final: the row must never promise
+  // an update or a second try that is not coming (E2-1), and Copy details belongs on it.
+  return { state: "failed-final", reason };
 }

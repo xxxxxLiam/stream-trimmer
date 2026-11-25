@@ -151,6 +151,12 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     },
   },
   {
+    // A network share (\\fileserver\home\jane\x.mp4), also as it prints inside JSON (doubled backslashes). The
+    // server and folder names can be a person's name, so the whole path goes, up to a quote or line end.
+    id: "unc-path",
+    apply: (t) => t.replace(/(?<![\w\\])\\{2,}[\w.$-]+[^\n"'<>|*?]*/g, "<network path>"),
+  },
+  {
     id: "email",
     apply: (t) => t.replace(/[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu, "<email>"),
   },

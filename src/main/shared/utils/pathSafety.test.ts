@@ -131,3 +131,23 @@ test("dragTarget: only a real file inside an allowed folder (D-1 guard)", () => 
   assert.equal(ps.dragTarget(42, [root]), null);
   assert.equal(ps.dragTarget(path.join(root, "missing.mp4"), [root]), null);
 });
+
+test("E-12: existsWithin answers only for files inside the chosen folders", () => {
+  const root = tmp();
+  const outside = tmp();
+  fs.writeFileSync(path.join(root, "a.mp4"), "x");
+  fs.writeFileSync(path.join(outside, "secret.txt"), "x");
+  assert.equal(ps.existsWithin(path.join(root, "a.mp4"), [root]), true);
+  assert.equal(ps.existsWithin(path.join(root, "gone.mp4"), [root]), false, "inside but missing");
+  assert.equal(ps.existsWithin(path.join(outside, "secret.txt"), [root]), false, "exists but outside");
+  assert.equal(ps.existsWithin("/etc/passwd", [root]), false);
+  assert.equal(ps.existsWithin(path.join(root, "..", path.basename(outside), "secret.txt"), [root]), false, "dot-dot out");
+  assert.equal(ps.existsWithin(root, [root]), false, "the folder itself is not a clip");
+  assert.equal(ps.existsWithin("relative/a.mp4", [root]), false);
+  assert.equal(ps.existsWithin("a\0b", [root]), false);
+  assert.equal(ps.existsWithin(42, [root]), false);
+  assert.equal(ps.existsWithin(path.join(root, "a.mp4"), []), false, "no chosen folders, no answers");
+  // A link inside the folder that points outside it does not count.
+  fs.symlinkSync(path.join(outside, "secret.txt"), path.join(root, "link.mp4"));
+  assert.equal(ps.existsWithin(path.join(root, "link.mp4"), [root]), false);
+});

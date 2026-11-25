@@ -360,6 +360,12 @@ export type FailureCode =
   | "private_video"
   | "sign_in_needed"
   | "video_unavailable"
+  | "video_removed"
+  | "bot_check"
+  | "access_refused"
+  | "rate_limited"
+  | "format_unavailable"
+  | "tools_missing"
   | "network_dropped"
   | "out_point_past_end"
   | "save_folder_gone"
@@ -392,6 +398,8 @@ export interface ClipFailure {
   error: string;
   /** Extra numbers a button needs, e.g. where to snap the out point. */
   detail?: Record<string, number>;
+  /** True when `cause` is yt-dlp's own text (no row matched). It goes to Copy details, never onto the row. */
+  rawCause?: boolean;
 }
 
 function failure(
@@ -483,6 +491,8 @@ export interface FailureContext {
 const PATTERNS = {
   private:
     /private video|video is private|members[- ]only|join this channel|available to this channel'?s members|requires? (?:a )?(?:membership|payment)/i,
+  rateLimited: /HTTP Error 429|Too Many Requests/i,
+  formatGone: /requested format is not available/i,
   noFfmpeg: /ffprobe and ffmpeg not found|ffmpeg not found|ffmpeg is not installed/i,
   permission: /EACCES|EPERM|permission denied/i,
   disk: /ENOSPC|no space left on device|not enough space|disk full/i,
@@ -508,7 +518,7 @@ export function classifyFailure(
   const kept = (extra?: string) => `${MARKED_KEPT}${extra ? ` ${extra}` : ""}`;
 
   const reason = ytReasonOf(text);
-  if (reason && (reason.kind === "age" || reason.kind === "signin")) {
+  if (reason && reason.kind === "age") {
     return failure(
       "sign_in_needed",
       403,
@@ -517,7 +527,25 @@ export function classifyFailure(
       kept(),
     );
   }
-  if (reason && (reason.kind === "removed" || reason.kind === "region" || reason.kind === "live")) {
+  if (reason && reason.kind === "signin") {
+    return failure(
+      "bot_check",
+      403,
+      "YouTube is asking this computer to prove it isn't a bot, so it won't share the video until you sign in",
+      { id: "import_cookies", label: "Import cookies from a signed-in account" },
+      kept(),
+    );
+  }
+  if (reason && reason.kind === "removed") {
+    return failure(
+      "video_removed",
+      404,
+      reason.sentence,
+      { id: "retry", label: "Try a different video" },
+      kept(),
+    );
+  }
+  if (reason && (reason.kind === "region" || reason.kind === "live")) {
     return failure(
       "video_unavailable",
       404,
@@ -526,10 +554,20 @@ export function classifyFailure(
       kept(),
     );
   }
-  if (reason?.kind === "refused") return refusedFailure("");
+  if (reason?.kind === "refused") return PATTERNS.rateLimited.test(text) ? rateLimitedFailure() : refusedFailure("");
+  if (PATTERNS.rateLimited.test(text)) return rateLimitedFailure();
+  if (PATTERNS.formatGone.test(text)) {
+    return failure(
+      "format_unavailable",
+      500,
+      "YouTube offers no version of this video at the quality you asked for",
+      { id: "retry", label: "Pick another quality, then try again" },
+      kept(),
+    );
+  }
   if (PATTERNS.noFfmpeg.test(text)) {
     return failure(
-      "unknown",
+      "tools_missing",
       500,
       "Clipr's video tools are incomplete on this computer",
       { id: "retry", label: "Restart Clipr to repair them" },
@@ -604,19 +642,33 @@ export function classifyFailure(
     );
   }
   const tail = text.trim();
+  return {
+    ...failure(
+      "unknown",
+      500,
+      tail || "The download failed for a reason yt-dlp did not explain",
+      { id: "retry", label: "Try again" },
+      kept("Anything already fetched is on disk."),
+    ),
+    ...(tail ? { rawCause: true } : {}),
+  };
+}
+
+/** YouTube answered 429: too many requests from this computer. Waiting is the fix. */
+export function rateLimitedFailure(): ClipFailure {
   return failure(
-    "unknown",
-    500,
-    tail || "The download failed for a reason yt-dlp did not explain",
-    { id: "retry", label: "Try again" },
-    kept("Anything already fetched is on disk."),
+    "rate_limited",
+    429,
+    "YouTube is limiting requests from this computer for a while",
+    { id: "retry", label: "Wait a few minutes, then try again" },
+    `${MARKED_KEPT} Anything already fetched is on disk.`,
   );
 }
 
-/** A 403 or a failed fetch of the media itself: not one of the seven rows. */
+/** A 403 or a failed fetch of the media itself: YouTube said no to this request. */
 export function refusedFailure(_tail = ""): ClipFailure {
   return failure(
-    "unknown",
+    "access_refused",
     500,
     "YouTube refused the media request for this video",
     { id: "retry", label: "Try again in a moment, or pick a different quality" },

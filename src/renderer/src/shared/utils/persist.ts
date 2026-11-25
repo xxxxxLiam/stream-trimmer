@@ -44,12 +44,32 @@ export function readSetting<T = string>(key: string, fallback: T): T {
   }
 }
 
+/** Called with the key when the app refused or failed to save a value, so one line can tell the person (E2-4). */
+type RefusedListener = (key: string, reason: string) => void;
+const refusedListeners = new Set<RefusedListener>();
+
+export function onSaveRefused(cb: RefusedListener): () => void {
+  refusedListeners.add(cb);
+  return () => {
+    refusedListeners.delete(cb);
+  };
+}
+
+/** Reads the answer to a save. Nothing is dropped silently: a refusal or a failure reaches the listeners. */
+export function reportSaveResult(key: string, result: unknown): void {
+  const r = result as { ok?: boolean; reason?: string } | null | undefined;
+  if (!r || r.ok !== false) return;
+  for (const cb of refusedListeners) cb(key, r?.reason ?? "write-failed");
+}
+
 export function writeSetting(key: string, value: unknown): void {
   const a = api();
   if (a) {
     if (value === null || value === undefined) delete cache[key];
     else cache[key] = value;
-    void a.setSetting?.(key, value ?? null);
+    void Promise.resolve(a.setSetting?.(key, value ?? null))
+      .then((result) => reportSaveResult(key, result))
+      .catch(() => reportSaveResult(key, { ok: false, reason: "write-failed" }));
     return;
   }
   if (typeof window === "undefined") return;

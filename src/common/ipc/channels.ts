@@ -33,6 +33,7 @@ export const IPC = {
   ownerCheck: "owner:check",
   reportSend: "report:send",
   settingsAll: "settings:all",
+  settingsLost: "settings:lost",
   settingsRestoredAt: "settings:restoredAt",
   settingsSet: "settings:set",
   shellOpenYouTubeSignIn: "shell:openYouTubeSignIn",

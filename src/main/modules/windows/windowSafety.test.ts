@@ -37,13 +37,13 @@ test("external links: https and mailto go to the browser; smb, file, ms-msdt, ht
     assert.equal(isSafeExternalUrl(bad), false, String(bad).slice(0, 40));
 });
 
-test("a dead page is reloaded once, then left alone for a minute; a clean exit is not a crash", () => {
+test("a dead page is reloaded once, then gets the static fallback for a minute (E2-2); a clean exit is not a crash", () => {
   let t = 1_000_000;
   const r = createCrashRecovery(() => t);
   assert.equal(r.onGone("clean-exit"), "leave");
   assert.equal(r.onGone("crashed"), "reload");
   t += 5_000;
-  assert.equal(r.onGone("crashed"), "leave");
+  assert.equal(r.onGone("crashed"), "fallback");
   t += 61_000;
   assert.equal(r.onGone("oom"), "reload");
 });
