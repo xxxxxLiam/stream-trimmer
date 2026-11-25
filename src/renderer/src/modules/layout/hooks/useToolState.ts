@@ -20,10 +20,10 @@ export type ToolState = {
 
 /**
  * The key that picks each tool, after Final Cut (A pointer, B blade, H hand, Z zoom). M is not here:
- * it drops a flag at the playhead while watching, so the Flag tool is F and Select range is S (R is
- * Retry). A tool key never fires with Cmd, Ctrl or Alt held.
+ * it drops a flag at the playhead while watching, so the Flag tool is F and Select range is D (R is
+ * Retry; S and B are the Keyboard board's skip and bank keys in the review flow, so S stays free). A tool key never fires with Cmd, Ctrl or Alt held.
  */
-export const TOOL_KEYS: Record<TimelineTool, string> = { pointer: "a", clip: "b", range: "s", flag: "f", hand: "h", zoom: "z" };
+export const TOOL_KEYS: Record<TimelineTool, string> = { pointer: "a", clip: "b", range: "d", flag: "f", hand: "h", zoom: "z" };
 
 export function toolForKey(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey?: boolean }): TimelineTool | null {
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return null;
