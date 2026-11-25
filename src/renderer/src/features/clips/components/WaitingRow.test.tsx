@@ -14,14 +14,14 @@ const clip = { id: "b1", label: "Honest Version", segments: [{ start: 4324, end:
 const noop = () => {};
 
 test("F-14: a made row's name is the disabled token, and nothing on the row uses opacity", () => {
-  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Honest Version" suggested={false} selected={false} made onSelect={noop} onMake={noop} onRemove={noop} />);
+  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Honest Version" suggested={false} selected={false} made onSelect={noop} onMake={noop} onRemove={noop} onRename={noop} />);
   assert.doesNotMatch(html, /opacity-/);
   assert.match(html, /text-disabled[^>]*>Honest Version/);
   // The whole row reads dimmed the board's way: range line, chips and dot too, none of it fg-dim.
   assert.match(html, /text-disabled">0:|text-disabled[^>]*>1:12:04/);
   assert.match(html, /border-hairline px-\[4px\][^>]*text-disabled/);
   assert.match(html, /bg-frost-tint-60/);
-  const waiting = renderToStaticMarkup(<WaitingRow clip={clip} name="Honest Version" suggested={false} selected={false} onSelect={noop} onMake={noop} onRemove={noop} />);
+  const waiting = renderToStaticMarkup(<WaitingRow clip={clip} name="Honest Version" suggested={false} selected={false} onSelect={noop} onMake={noop} onRemove={noop} onRename={noop} />);
   assert.doesNotMatch(waiting, /text-disabled[^>]*>Honest Version/);
 });
 
@@ -33,17 +33,17 @@ test("F-14: a History row with a missing file uses the disabled token, not opaci
 
 test("a clip that ran past the end says where it stops, in one dim line; a made one does not", () => {
   const clip = { id: "B01", label: "Big Deal", segments: [{ start: 8000, end: 8073 }], status: "banked", ranPastEnd: 8073 } as never;
-  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Big Deal" suggested={false} selected={false} onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} />);
+  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Big Deal" suggested={false} selected={false} onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} onRename={() => undefined} />);
   assert.match(html, /Ran past the end; stops at 2:14:33/);
-  const made = renderToStaticMarkup(<WaitingRow clip={clip} name="Big Deal" suggested={false} selected={false} made onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} />);
+  const made = renderToStaticMarkup(<WaitingRow clip={clip} name="Big Deal" suggested={false} selected={false} made onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} onRename={() => undefined} />);
   assert.doesNotMatch(made, /Ran past the end/);
 });
 
 test("C3-5: a moment under the campaign's minimum says so in one dim line", () => {
   const clip = { id: "B02", label: "Short", segments: [{ start: 8072, end: 8073 }], status: "banked" } as never;
-  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Short" suggested={false} selected={false} lengthNote="29 s under Acme’s 0:30" onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} />);
+  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Short" suggested={false} selected={false} lengthNote="29 s under Acme’s 0:30" onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} onRename={() => undefined} />);
   assert.match(html, /29 s under Acme’s 0:30/);
-  const none = renderToStaticMarkup(<WaitingRow clip={clip} name="Short" suggested={false} selected={false} onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} />);
+  const none = renderToStaticMarkup(<WaitingRow clip={clip} name="Short" suggested={false} selected={false} onSelect={() => undefined} onMake={() => undefined} onRemove={() => undefined} onRename={() => undefined} />);
   assert.doesNotMatch(none, /under/);
 });
 
