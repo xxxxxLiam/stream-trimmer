@@ -270,7 +270,8 @@ function isYouTubeHost(host: string): boolean {
  * "https://". Channels, handles, playlists and search pages have no id and give null.
  */
 export function extractVideoId(raw: string): string | null {
-  const text = raw.trim();
+  // Two links pasted together (from a chat or a note): the first one is the one that opens.
+  const text = raw.trim().split(/\s+/)[0] ?? "";
   if (!text) return null;
   let u: URL;
   try {
@@ -303,7 +304,7 @@ export function normalizeYouTubeUrl(url: string): string {
   const id = extractVideoId(url);
   if (!id) return url;
   try {
-    const u = new URL(url);
+    const u = new URL(url.trim().split(/\s+/)[0]);
     const t = u.searchParams.get("t") || u.searchParams.get("start");
     const q = new URLSearchParams({ v: id });
     if (t) q.set("t", t);

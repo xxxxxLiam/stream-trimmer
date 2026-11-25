@@ -140,7 +140,9 @@ export function sameFolder(a: string, b: string): boolean {
   return a !== "" && b !== "" && normFolder(a) === normFolder(b);
 }
 
-export type CampaignProblem = "name-empty" | "name-taken" | "folders-same" | "pattern-no-number";
+export const MAX_NAME_LENGTH = 60;
+
+export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "folders-same" | "pattern-no-number";
 
 export function validateCampaign(
   c: Pick<Campaign, "name" | "clipsDir" | "dataDir" | "clipIdPattern">,
@@ -160,6 +162,7 @@ export function validateCampaign(
 export function campaignNameProblems(name: string, others: readonly Pick<Campaign, "id" | "name">[], editingId?: string): string[] {
   const found: CampaignProblem[] = [];
   if (!name.trim()) found.push("name-empty");
+  else if (name.trim().length > MAX_NAME_LENGTH) found.push("name-long");
   else if (others.some((o) => o.id !== editingId && o.name.trim().toLowerCase() === name.trim().toLowerCase())) found.push("name-taken");
   return found.map(describeCampaignProblem);
 }
@@ -168,6 +171,8 @@ export function describeCampaignProblem(p: CampaignProblem): string {
   switch (p) {
     case "name-empty":
       return "Give the campaign a name.";
+    case "name-long":
+      return `Keep the name to ${MAX_NAME_LENGTH} characters or fewer.`;
     case "name-taken":
       return "Another campaign already has that name.";
     case "folders-same":
@@ -473,7 +478,7 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         clipsDir: typeof r.clipsDir === "string" ? r.clipsDir : "",
         dataDir: typeof r.dataDir === "string" ? r.dataDir : "",
         usedRanges: used,
-        dailyQuota: typeof r.dailyQuota === "number" && r.dailyQuota >= 1 ? Math.floor(r.dailyQuota) : DEFAULT_DAILY_QUOTA,
+        dailyQuota: typeof r.dailyQuota === "number" && r.dailyQuota >= 1 ? Math.min(99, Math.floor(r.dailyQuota)) : DEFAULT_DAILY_QUOTA,
         ...(typeof r.fcpLookId === "string" && r.fcpLookId ? { fcpLookId: r.fcpLookId } : {}),
       }),
     );

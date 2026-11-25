@@ -9,7 +9,7 @@
 import { useState } from "react";
 import CentredDialog from "../../../shared/components/CentredDialog";
 import { useCampaign } from "../hooks/CampaignContext";
-import { campaignClipsDir, campaignNameProblems, type Campaign } from "../../../shared/utils/campaigns";
+import { MAX_NAME_LENGTH, campaignClipsDir, campaignNameProblems, type Campaign } from "../../../shared/utils/campaigns";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import {
@@ -48,7 +48,7 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
     <form onSubmit={submit} className="flex flex-col gap-[16px]" id="ui-campaign-form">
       <label className="flex flex-col gap-[4px]">
         <span className="text-meta text-fg-dim">Name</span>
-        <input id="ui-campaign-name" className={field} value={name} autoFocus placeholder="For example, Acme podcast" onChange={(e) => setName(e.target.value)} aria-invalid={problems.length > 0} />
+        <input id="ui-campaign-name" className={field} value={name} autoFocus maxLength={MAX_NAME_LENGTH + 20} placeholder="For example, Acme podcast" onChange={(e) => setName(e.target.value)} aria-invalid={problems.length > 0} />
       </label>
       <div className="flex items-center justify-between gap-[12px]">
         <span className="text-body leading-[normal]">Clips a day</span>

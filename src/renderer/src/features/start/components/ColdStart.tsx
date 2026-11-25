@@ -14,6 +14,9 @@ export type ColdStartProps = {
   value: string;
   onChange: (v: string) => void;
   onPasteButton: () => void;
+  /** The box got a paste or Enter: text that is not a video link then gets its sentence. */
+  onPasteText: () => void;
+  onSubmit: () => void;
   /** A YouTube link found on the clipboard, shown as a one-click offer. Never opened by itself. */
   offer: { text: string; short: string } | null;
   onUseOffer: () => void;
@@ -93,6 +96,13 @@ export default function ColdStart(p: ColdStartProps) {
                   spellCheck={false}
                   value={p.value}
                   onChange={(e) => p.onChange(e.target.value)}
+                  onPaste={p.onPasteText}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      p.onSubmit();
+                    }
+                  }}
                   placeholder="Paste a YouTube link"
                   className="min-w-[0px] flex-1 bg-transparent text-[15px] text-fg outline-none"
                 />

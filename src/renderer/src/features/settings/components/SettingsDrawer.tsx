@@ -18,7 +18,8 @@ import { useFinalCutLook } from "../hooks/useFinalCutLook";
 import { useClipDestination } from "../../player/hooks/useClipDestination";
 import { campaignClipsDir } from "../../../shared/utils/campaigns";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
-import { DEFAULT_DAILY_QUOTA, toggleLanguage } from "../utils/settingsPrefs";
+import { readSetting, writeSetting } from "../../../shared/utils/persist";
+import { DEFAULT_DAILY_QUOTA, dropCampaignPrefs, toggleLanguage } from "../utils/settingsPrefs";
 import type { AudioTrack } from "../../../shared/utils/clip";
 import type { EditorHandoffSettings } from "../../../shared/utils/fcpxml";
 
@@ -107,6 +108,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
           if (confirming === campaign.id) {
             setConfirming(null);
             c.campaigns.remove(campaign.id);
+            dropCampaignPrefs(campaign.id, (k) => readSetting<Record<string, unknown>>(k, {}), writeSetting);
           } else setConfirming(campaign.id);
         }}
         onBack={c.back}
