@@ -26,7 +26,7 @@ function Row({
   return (
     <div
       className={
-        "group relative mx-[10px] my-[3px] flex items-center gap-[10px] rounded-control border bg-raised p-[8px] " +
+        "group relative mx-[10px] mb-[6px] flex items-center gap-[10px] rounded-control border bg-raised p-[8px] " +
         (row.isOpen ? "border-ice shadow-row" : "border-transparent")
       }
     >
@@ -87,7 +87,7 @@ export default function VideosPanel() {
       <div
         id="ui-source-chip"
         role="search"
-        className="mx-[10px] mb-[6px] mt-[10px] flex h-target flex-none items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
+        className="mx-[10px] mb-[10px] mt-[10px] flex h-target flex-none items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
       >
         <IconSearch />
         {v.pills.map((p) => (
@@ -124,7 +124,7 @@ export default function VideosPanel() {
         {v.opening && (
           <div
             role="status"
-            className="relative mx-[10px] my-[3px] overflow-hidden rounded-control border border-ice bg-raised p-[8px] shadow-row"
+            className="relative mx-[10px] mb-[6px] overflow-hidden rounded-control border border-ice bg-raised p-[8px] shadow-row"
           >
             <div className="flex items-center gap-[10px]">
               <span aria-hidden="true" className="h-[26px] w-[44px] flex-none rounded-chip bg-hover" />
@@ -159,7 +159,7 @@ export default function VideosPanel() {
             type="button"
             aria-expanded={v.doneOpen}
             onClick={v.toggleDone}
-            className="mx-[10px] mt-[6px] flex h-[32px] w-[calc(100%-20px)] items-center justify-between px-[4px] text-meta text-fg-dim hover:text-fg"
+            className="mx-[10px] mb-[3px] mt-[9px] flex h-[32px] w-[calc(100%-20px)] items-center justify-between px-[4px] text-meta leading-[normal] text-fg-dim hover:text-fg"
           >
             Done · {doneCount}
             <span className={"inline-flex " + (v.doneOpen ? "rotate-180" : "")}>
