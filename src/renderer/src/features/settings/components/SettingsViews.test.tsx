@@ -51,6 +51,8 @@ const campaign: SettingsCampaignProps = {
   onPatch: noop,
   onToggleLanguage: noop,
   onOpenFolder: noop,
+  onChangeFolder: async () => null,
+  onRename: () => [],
   confirmingDelete: false,
   onDelete: noop,
   onBack: noop,
@@ -100,4 +102,19 @@ test("App mounts the drawer, the gear toggles it and the campaign menu opens it 
   assert.match(app, /const openCampaignSettings = \(campaignId: string\) => \{\s*setSettingsStartAt\(campaignId\)/);
   assert.match(app, /<CampaignMenu onOpenSettings=\{openCampaignSettings\} \/>/);
   assert.match(app, /onToggleSettings=\{\(\) => \{\s*setSettingsStartAt\(null\)/);
+});
+
+test("A-5: a campaign can be renamed and its folder changed from its own view", () => {
+  const h = renderToStaticMarkup(<SettingsCampaign {...campaign} />);
+  assert.match(h, /<label for="campaign-name"[^>]*>Name<\/label>/);
+  assert.match(h, /id="campaign-name"[^>]*value="Acme"/);
+  assert.match(h, /aria-label="Change the Acme folder"/);
+  const view = read("features/settings/components/SettingsCampaign.tsx");
+  assert.match(view, /onBlur=\{commitName\}/);
+  assert.match(view, /e\.key === "Enter"\) commitName\(\)/);
+  const drawer = read("features/settings/components/SettingsDrawer.tsx");
+  assert.match(drawer, /campaignNameProblems\(next, c\.campaigns\.campaigns, campaign\.id\)/);
+  // Renaming must not move the folder the clips already sit in.
+  assert.match(drawer, /update\(campaign\.id, \{ name: next\.trim\(\), \.\.\.\(pinned \? \{ clipsDir: pinned \} : \{\}\) \}\)/);
+  assert.match(drawer, /onChangeFolder=\{\(\) => c\.campaigns\.pickClipsDir\(campaign\.id\)\}/);
 });

@@ -24,7 +24,7 @@ export type WaitingRowProps = {
   onRemove: () => void;
 };
 
-const chip = "rounded-chip border border-hairlineStrong px-[5px] py-[1px] text-meta leading-[normal] text-fg-dim";
+const chip = "rounded-chip border border-hairlineStrong px-[4px] py-[1px] text-meta leading-[normal] text-fg-dim";
 
 export default function WaitingRow({ clip, name, suggested, selected, made, onSelect, onMake, onRemove }: WaitingRowProps) {
   const edge = suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
@@ -37,7 +37,7 @@ export default function WaitingRow({ clip, name, suggested, selected, made, onSe
         className={`flex min-h-[47px] w-full items-center gap-[8px] rounded-control border px-[8px] py-[6px] leading-[normal] text-left hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost ${edge}`}
       >
         <span
-          className={`size-[9px] flex-none rounded-full border ${made ? "border-frost bg-frost" : "border-fg-dim"}`}
+          className={`size-[9px] flex-none rounded-[50%] border ${made ? "border-frost bg-frost" : "border-fg-dim"}`}
           role="img"
           aria-label={made ? "Made" : "Waiting"}
         />

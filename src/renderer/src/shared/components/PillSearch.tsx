@@ -61,7 +61,7 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
                 onClick={() => onPillsChange(pills.filter((x) => x !== p))}
                 className="inline-flex h-[44px] items-center"
               >
-                <span className="inline-flex h-[28px] items-center gap-[4px] rounded-[14px] border border-hairlineStrong bg-raised pl-[12px] pr-[6px] text-meta leading-[normal] text-fg">
+                <span className="inline-flex h-[30px] items-center gap-[4px] rounded-[14px] border border-hairlineStrong bg-raised pl-[12px] pr-[6px] text-meta leading-[normal] text-fg">
                   {p}
                   <span className="inline-flex w-[18px] justify-center text-fg-dim">
                     <IconClose />
