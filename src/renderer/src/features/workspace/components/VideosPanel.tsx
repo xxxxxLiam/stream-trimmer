@@ -5,6 +5,7 @@
  *   Pick one to open it, hover one for the ✕ "Done with this video", paste a link to open that
  *   video. Done videos fold away with an 8 s Undo line. Logic lives in useVideosController.
  */
+import VideoThumb from "../../../shared/components/VideoThumb";
 import type { KeyboardEvent } from "react";
 import { IconClose, IconSearch } from "../../../shared/components/PanelIcons";
 import { useVideosController, type VideoRow } from "../hooks/useVideosController";
@@ -36,7 +37,7 @@ function Row({
         aria-current={row.isOpen ? "true" : undefined}
         className="flex min-w-[0px] flex-1 items-center gap-[10px] text-left"
       >
-        <span aria-hidden="true" className="h-[26px] w-[44px] flex-none rounded-chip bg-hover" />
+        <VideoThumb videoId={row.videoId} />
         <span className="min-w-[0px]">
           <span
             className={
