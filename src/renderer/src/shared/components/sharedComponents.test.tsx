@@ -39,12 +39,14 @@ test("tip Button wears the dotted Ice ring", () => {
   assert.match(html(<Button variant="tip">Next video</Button>), /border-dotted border-ice/);
 });
 
-test("SplitButton: glow only when asked, both halves disabled together", () => {
+test("SplitButton: glow only when asked; disabled dims Clip but the destination arrow stays usable (C-10)", () => {
   const props = { label: "Clip", onPress() {}, onOpenMenu() {}, menuIcon: glyph };
   assert.doesNotMatch(html(<SplitButton {...props} />), /shadow-cut/);
   assert.match(html(<SplitButton {...props} glowing />), /shadow-cut/);
   const off = html(<SplitButton {...props} glowing disabled />);
-  assert.equal(off.match(/aria-disabled="true"/g)?.length, 2);
+  assert.equal(off.match(/aria-disabled="true"/g)?.length, 1, "only the Clip half is disabled");
+  assert.match(off, /<button[^>]*aria-label="Where clips go"(?![^>]*aria-disabled)/);
+  assert.doesNotMatch(off.slice(off.indexOf("aria-haspopup")), /aria-disabled/);
   assert.doesNotMatch(off, /shadow-cut/);
   assert.match(off, /aria-label="Where clips go"/);
 });
