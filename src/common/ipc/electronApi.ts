@@ -6,6 +6,7 @@
  * lives in common rather than as an ambient renderer type.
  */
 import type { CookieBrowser } from "../constants/cookieBrowsers";
+import type { FcpLookFileResult } from "../types/fcpLook";
 import type { CookieCheck, SignInSignal } from "../types/signIn";
 import type { RestartToUpdateResult, UpdateReady } from "../types/updates";
 
@@ -163,6 +164,10 @@ export interface ElectronAPI {
     browsers: CookieBrowser[];
   }>;
 
+  /** Opens the native picker for the user's Final Cut export and returns the parsed look, or a plain reason. */
+  pickFinalCutLook: () => Promise<FcpLookFileResult>;
+  /** The same reader for a file or .fcpxmld bundle dropped on the window. */
+  readFinalCutLook: (file: File) => Promise<FcpLookFileResult>;
   /** The footer's "at 360p" and "Sign in for 1080p" pill read this. */
   getSignInSignal: () => Promise<SignInSignal>;
   onSignInSignal: (cb: (signal: SignInSignal) => void) => () => void;

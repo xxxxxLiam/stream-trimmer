@@ -8,7 +8,7 @@
  */
 import { useId } from "react";
 import type { EditorHandoffSettings } from "../../../shared/utils/fcpxml";
-import { parseLook } from "../utils/look";
+import { parseLook } from "../../../../../common/utils/fcpLook";
 
 export type LookEditorProps = {
   settings: EditorHandoffSettings;

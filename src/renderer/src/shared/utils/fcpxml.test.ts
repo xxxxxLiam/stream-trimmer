@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { parseLook } from "../../../../common/utils/fcpLook";
+import { sampleExport } from "../../../../common/utils/fcpLook.fixture";
 import {
   AFTER_CUTTING_VALUES,
   DEFAULT_EDITOR_SETTINGS,
@@ -653,4 +655,28 @@ test("session batch: a clip shorter than a timeline frame is left out with a rea
     }
     assert.equal(validate(r.xml), "");
   }
+});
+
+// ---- the user's own look ----------------------------------------------------
+//
+// The bundled DTD is 1.10 only, and its version attribute is fixed. So for exports written at
+// 1.11 to 1.13 the check below validates the same document with only that attribute set back to
+// 1.10: it proves the structure around the look is valid, not that Final Cut at 1.13 accepts it.
+// Not verified in Final Cut (macOS only): see the PR for what to try on a Mac.
+
+for (const version of ["1.10", "1.11", "1.12", "1.13"]) {
+  test(`a project with the user's look (export version ${version}) keeps the look and validates against the DTD`, { skip: !hasXmllint }, () => {
+    const look = parseLook(sampleExport({ version }));
+    const xml = buildFcpxml({ eventName: "Raw", clips: [clip(), clip({ id: "B", path: "/x/b.mp4" })], project: { ...PROJECT, look } });
+    assert.match(xml, new RegExp(`<fcpxml version="${version.replace(".", "\\.")}">`));
+    assert.equal((xml.match(/<adjust-transform scale="1\.2 1\.2"\/>/g) ?? []).length, 2, "the look is on every project clip");
+    assert.match(xml, /<effect id="fx1" name="Color Board"/);
+    assert.equal(validate(xml.replace(/<fcpxml version="[\d.]+">/, '<fcpxml version="1.10">')), "");
+  });
+}
+
+test("the look's DTD check can fail (mutation guard: an element the DTD does not know is rejected)", { skip: !hasXmllint }, () => {
+  const look = parseLook(sampleExport({ clipChildren: '<adjust-transform scale="1.2 1.2"/><not-a-final-cut-element/>' }));
+  const xml = buildFcpxml({ eventName: "Raw", clips: [clip()], project: { ...PROJECT, look } });
+  assert.notEqual(validate(xml.replace(/<fcpxml version="[\d.]+">/, '<fcpxml version="1.10">')), "");
 });
