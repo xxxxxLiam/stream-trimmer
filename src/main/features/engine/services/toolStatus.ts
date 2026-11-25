@@ -20,12 +20,23 @@ export interface ToolsStatus {
   tools: { ytdlp: ToolReport; ffmpeg: ToolReport; deno: ToolReport };
 }
 
-/** What probing one tool gave: no path, a path that wouldn't run, or its version line. */
-export type Probe = { path: null } | { path: string; ok: false } | { path: string; ok: true; version: string };
+/**
+ * What probing one tool gave: no path, a path that wouldn't run, or its version line. `timedOut` is a run that was
+ * still going when the wait ended: not a failure. On a Mac the first run of a newly installed or downloaded unsigned
+ * program (the app's own tools, or a yt-dlp the quiet update just fetched) is checked by macOS first and can take
+ * well over ten seconds, and the second run is fast.
+ */
+export type Probe = { path: null } | { path: string; ok: false; timedOut?: true } | { path: string; ok: true; version: string };
+
+/** How long one probe waits for a tool's first answer. */
+export const PROBE_TIMEOUT_MS = 40_000;
+/** This many timeouts in a row on one tool and it is reported broken after all. */
+export const MAX_PROBE_TIMEOUTS = 3;
 
 export function reportOf(probe: Probe | undefined): ToolReport {
   if (!probe) return { state: "checking" };
   if (probe.path === null) return { state: "missing" };
+  if ("timedOut" in probe && probe.timedOut) return { state: "checking" };
   if (!("ok" in probe) || !probe.ok) return { state: "broken" };
   return { state: "ready", version: probe.version };
 }
@@ -48,9 +59,11 @@ type Exec = (file: string, args: string[], opts: object, cb: (err: Error | null,
 export function probeBinary(binary: string | null, versionArg: string, exec: Exec = execFile as unknown as Exec): Promise<Probe> {
   return new Promise((resolve) => {
     if (!binary || !fs.existsSync(binary)) return resolve({ path: null });
-    exec(binary, [versionArg], { timeout: 10_000, windowsHide: true, env: childEnv() }, (err, stdout) => {
+    exec(binary, [versionArg], { timeout: PROBE_TIMEOUT_MS, windowsHide: true, env: childEnv() }, (err, stdout) => {
       const line = String(stdout ?? "").split("\n").find((l) => l.trim());
-      if (err || !line) resolve({ path: binary, ok: false });
+      const e = err as (Error & { killed?: boolean; code?: unknown }) | null;
+      if (e && (e.killed || e.code === "ETIMEDOUT")) resolve({ path: binary, ok: false, timedOut: true });
+      else if (err || !line) resolve({ path: binary, ok: false });
       else resolve({ path: binary, ok: true, version: line.trim() });
     });
   });
@@ -72,6 +85,7 @@ const probedAt: { ytdlp: number; ffmpeg: number; deno: number } = { ytdlp: 0, ff
 /** A broken result is looked at again no sooner than this after the last look. */
 export const REPROBE_BACKOFF_MS = 3_000;
 const inFlight = new Set<string>();
+const timeouts: Record<"ytdlp" | "ffmpeg" | "deno", number> = { ytdlp: 0, ffmpeg: 0, deno: 0 };
 let probeFn: (binary: string | null, arg: string) => Promise<Probe> = (b, a) => probeBinary(b, a);
 
 /** Test seam: replace what a probe runs. */
@@ -92,7 +106,16 @@ function probe(name: Name, now: number): void {
   probedAt[name] = now;
   const t = targets[name]();
   void probeFn(t.binary, t.arg).then((p) => {
-    probes[name] = p;
+    // A timeout is "still checking" a few times over; a run of them means the tool really hangs.
+    const timedOut = "timedOut" in p && p.timedOut === true;
+    const before = probes[name];
+    if (timedOut && before && "ok" in before && before.ok) {
+      // It ran fine before (a re-check after a quiet tool update was just slow): keep that answer.
+      inFlight.delete(name);
+      return;
+    }
+    timeouts[name] = timedOut ? timeouts[name] + 1 : 0;
+    probes[name] = timedOut && timeouts[name] >= MAX_PROBE_TIMEOUTS ? { path: p.path as string, ok: false } : p;
     inFlight.delete(name);
   });
 }
@@ -103,7 +126,10 @@ function probe(name: Name, now: number): void {
  */
 export function jsRuntimeProblem(): boolean {
   const p = probes.deno;
-  if (p) return p.path === null || !("ok" in p) || !p.ok;
+  if (p) {
+    if ("timedOut" in p && p.timedOut) return false;
+    return p.path === null || !("ok" in p) || !p.ok;
+  }
   return denoPath() === null;
 }
 
@@ -152,4 +178,5 @@ export function resetToolProbesForTest(): void {
   started = false;
   inFlight.clear();
   probedAt.ytdlp = probedAt.ffmpeg = probedAt.deno = 0;
+  timeouts.ytdlp = timeouts.ffmpeg = timeouts.deno = 0;
 }
