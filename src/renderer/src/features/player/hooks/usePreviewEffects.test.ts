@@ -22,3 +22,12 @@ test("a held J or L shuttle also stops when the window loses focus or is hidden,
   assert.match(src, /document\.addEventListener\("visibilitychange"/);
   assert.match(src, /window\.removeEventListener\("blur", stopShuttle\)/);
 });
+
+import { readFileSync as readEffectsSrc } from "node:fs";
+
+test("the preview plays only a joined clip's sections: the step runs while playing, looping or not", () => {
+  const src = readEffectsSrc(new URL("./usePreviewEffects.ts", import.meta.url), "utf8");
+  assert.match(src, /if \(!player\.playing\) return;\s*const step = joinedStep\(sections, player\.currentTime, loop\);/);
+  assert.match(src, /if \(!loop \|\| sections\.length >= 2\) return;/);
+  assert.match(src, /player\.pause\(\);\s*player\.seekTo\(step\.at\);/);
+});

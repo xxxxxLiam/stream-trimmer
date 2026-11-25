@@ -65,3 +65,8 @@ test("Clip makes the locked sections then the marked part; a repeat of the last 
   assert.deepEqual(clipSections([], { start: 5, end: 5 }), []);
   assert.equal(sectionsLength([a, b]), 34);
 });
+
+test("A4-4: with no campaign the Clip button says to make one", () => {
+  assert.match(clipReason({ hasRange: true, segments: 0, noCampaign: true }) ?? "", /Make a campaign first/);
+  assert.equal(clipReason({ hasRange: true, segments: 0 }), null);
+});

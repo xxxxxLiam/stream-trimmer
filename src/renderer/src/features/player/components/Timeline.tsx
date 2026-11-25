@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTimelineView } from "../hooks/TimelineControllerContext";
 import { cursorFor, sourceLaneHeight } from "../utils/laneTools";
 import { useTranscriptLane } from "../hooks/useTranscriptLane";
+import { useAudioLanes } from "../hooks/useAudioLanes";
 import AudioLanes from "./AudioLanes";
 import ClipsLane from "./ClipsLane";
 import SourceLane from "./SourceLane";
@@ -21,6 +22,7 @@ export default function Timeline() {
   const c = useTimelineView();
   const laneBox = useRef<HTMLDivElement>(null);
   const transcriptLane = useTranscriptLane();
+  const audioLanes = useAudioLanes();
   const { setWidth } = c;
   const [height, setHeight] = useState(0);
   // Alt turns the zoom tool's click into a zoom out, and its cursor says so.
@@ -90,7 +92,7 @@ export default function Timeline() {
         >
           {transcriptLane ? <TranscriptLane c={c} /> : null}
           <SourceLane c={c} height={sourceLaneHeight(height)} />
-          <AudioLanes c={c} />
+          {audioLanes ? <AudioLanes c={c} /> : null}
           <ClipsLane c={c} />
         </div>
       </div>

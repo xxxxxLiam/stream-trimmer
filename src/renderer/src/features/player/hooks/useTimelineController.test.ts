@@ -220,3 +220,9 @@ test("Fit and the far right keep end room; the view can go out; pointer times st
   assert.match(filmstrip, /Math\.min\(p\.t1, duration \?\? p\.t1\)/);
   assert.match(sourceLane, /duration=\{c\.duration\}/);
 });
+
+test("the lane works out the over-cap line live from the range's length, and grows to hold it", () => {
+  assert.match(clipsLane, /unsaved && c\.totalSeconds > MAX_CLIP_SECONDS \? overCapMessage\(c\.totalSeconds\) : ""/);
+  assert.match(clipsLane, /\(overCap \? OVER_LINE_H : 0\)/);
+  assert.match(clipsLane, /over=\{overCap\}/);
+});
