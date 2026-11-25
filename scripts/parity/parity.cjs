@@ -17,6 +17,23 @@ const REPO = path.resolve(__dirname, "..", "..");
 /** The 1px border a board draws round its window. */
 const FRAME_PX = 1;
 
+/**
+ * Where the visible part of a board's window (frame.clip, in frame coordinates) lies inside the border:
+ * how much to trim from the board image, and the matching rect of the app window (which is the
+ * interior, FRAME_PX smaller on every side).
+ */
+function interiorOf(frame) {
+  const c = frame.clip;
+  const x0 = Math.max(c.x, FRAME_PX);
+  const y0 = Math.max(c.y, FRAME_PX);
+  const x1 = Math.min(c.x + c.width, frame.width - FRAME_PX);
+  const y1 = Math.min(c.y + c.height, frame.height - FRAME_PX);
+  return {
+    trim: { left: x0 - c.x, top: y0 - c.y, width: x1 - x0, height: y1 - y0 },
+    app: { x: x0 - FRAME_PX, y: y0 - FRAME_PX, width: x1 - x0, height: y1 - y0 },
+  };
+}
+
 function args() {
   const a = process.argv.slice(2);
   const out = { screen: null, fixture: null, threshold: 0.1, boardOnly: false, window: undefined, el: undefined };
@@ -117,7 +134,7 @@ async function appRegion(win, frame, fx, useWindow) {
   }
   if (r) return r;
   if (!useWindow) throw new Error("--el needs a fixture region (selector or x, y, width, height)");
-  return { x: 0, y: 0, width: frame.clip.width - 2 * FRAME_PX, height: frame.clip.height - 2 * FRAME_PX };
+  return interiorOf(frame).app;
 }
 
 /**
@@ -199,10 +216,9 @@ async function main() {
   fs.writeFileSync(path.join(outDir, "app.png"), appPng);
   let b = PNG.sync.read(boardPng);
   if (o.window !== undefined && o.el === undefined && !fixture.region && !fixture.window) {
-    const w = b.width - 2 * FRAME_PX;
-    const h = b.height - 2 * FRAME_PX;
-    const inner = new PNG({ width: w, height: h });
-    PNG.bitblt(b, inner, FRAME_PX, FRAME_PX, w, h, 0, 0);
+    const t = interiorOf(frame).trim;
+    const inner = new PNG({ width: t.width, height: t.height });
+    PNG.bitblt(b, inner, t.left, t.top, t.width, t.height, 0, 0);
     b = inner;
   }
   let p = PNG.sync.read(appPng);
@@ -255,4 +271,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { loadFixture, withApp };
+module.exports = { loadFixture, withApp, interiorOf };

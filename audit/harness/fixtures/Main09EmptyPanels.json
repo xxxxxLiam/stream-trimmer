@@ -1,5 +1,5 @@
 {
- "_doc": "Board 03.2.14: Markers and Export empty (nothing banked, nothing flagged).",
+ "_doc": "Board 03.2.14: Markers and Export empty (nothing banked, nothing flagged). The board draws only the top of the window (the rest is its notes), so the part under the panels is masked on both sides.",
  "extends": "MainBase",
  "seed": {
   "clipper.bank": {}
@@ -10,6 +10,14 @@
   },
   {
    "wait": 300
+  }
+ ],
+ "mask": [
+  {
+   "x": 0,
+   "y": 484,
+   "width": 1358,
+   "height": 274
   }
  ]
 }
