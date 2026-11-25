@@ -10,6 +10,7 @@ import { useEffect, useRef } from "react";
 import { DrawerHeader, drawerBodyRoomy, outlineButton } from "../../../shared/components/DrawerRows";
 import { MAX_NOTE } from "../utils/reports";
 import type { ReportState } from "../hooks/useReportMutations";
+import { Check2 } from "react-bootstrap-icons";
 
 export type HelpReportProps = {
   note: string;
@@ -37,9 +38,7 @@ export default function HelpReport(p: HelpReportProps) {
         {kept || sent ? (
           <>
             <div ref={done} tabIndex={-1} role="status" className="flex items-center gap-[8px] outline-none box-content min-h-[44px] rounded-control border border-hairlineStrong bg-raised px-[12px] text-body">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-frost">
-                <path d="M5 12.5l4.5 4.5L19 7.5" />
-              </svg>
+              <Check2 width={16} height={16} className="text-frost" aria-hidden="true" focusable="false" />
               <span className="leading-[20px]">{sent ? "Sent. Thank you." : "Saved. Clipr will send it when it can."}</span>
             </div>
             {kept && <p className="m-[0px] text-meta text-fg-dim">The report is kept on this computer and sent on a later launch. Copy details still works if you want to pass it on yourself.</p>}

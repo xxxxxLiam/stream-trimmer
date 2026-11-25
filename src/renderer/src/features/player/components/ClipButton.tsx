@@ -12,6 +12,7 @@ import { Menu, MenuItem, MenuLabel } from "../../../shared/components/Menu";
 import { useClipController } from "../hooks/useClipController";
 import { menuTarget } from "../utils/menuKeys";
 import { CaretIcon } from "./TransportIcons";
+import { Check2 } from "react-bootstrap-icons";
 
 export default function ClipButton({ openUp = false, listenForKey = false }: { openUp?: boolean; listenForKey?: boolean }) {
   const c = useClipController({ listenForKey });
@@ -81,9 +82,7 @@ export default function ClipButton({ openUp = false, listenForKey = false }: { o
               key={d.id}
               checked={c.destination === d.id}
               leading={
-                <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 8.5l3 3 7-7" />
-                </svg>
+                <Check2 width={14} height={14} aria-hidden="true" focusable="false" />
               }
               onClick={() => c.setDestination(d.id)}
             >

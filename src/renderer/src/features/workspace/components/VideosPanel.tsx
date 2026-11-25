@@ -5,6 +5,7 @@
  *   Pick one to open it, ⋯ on a row opens Mark done, Open on YouTube and Remove video, Done videos fold away with an 8 s Undo line. Logic lives in useVideosController.
  */
 import VideoThumb from "../../../shared/components/VideoThumb";
+import { ChevronRight } from "react-bootstrap-icons";
 import type { KeyboardEvent } from "react";
 import ActionRow, { type RowAction } from "../../../shared/components/ActionRow";
 import { IconClose, IconSearch } from "../../../shared/components/PanelIcons";
@@ -168,9 +169,7 @@ export default function VideosPanel() {
           >
             Done · {doneCount}
             <span className={"inline-flex " + (v.doneOpen ? "rotate-90" : "")}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                <path d="M3.5 2l3 3-3 3" />
-              </svg>
+              <ChevronRight width={10} height={10} aria-hidden="true" focusable="false" />
             </span>
           </button>
         )}

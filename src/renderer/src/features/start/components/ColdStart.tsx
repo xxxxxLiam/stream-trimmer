@@ -5,6 +5,7 @@
  *   link box, the No ads / No account chips and the folder chip. One job: get a link in. Logic-free;
  *   useStartController feeds it. States: empty, link already copied, checking tools, tool cannot be fixed.
  */
+import { Check2, Folder } from "react-bootstrap-icons";
 import { BrandLockup } from "../../../shared/components/BrandMark";
 import PreparingLine from "../../player/components/PreparingLine";
 import type { ToolsStatus } from "../utils/startUtils";
@@ -37,9 +38,7 @@ export type ColdStartProps = {
 };
 
 const Tick = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" className="text-ice" aria-hidden="true">
-    <path d="M2.5 6.5l2.5 2.5 4.5-5.5" />
-  </svg>
+  <Check2 width={12} height={12} className="text-ice" aria-hidden="true" focusable="false" />
 );
 
 const pill =
@@ -134,9 +133,7 @@ export default function ColdStart(p: ColdStartProps) {
               onClick={p.onOpenFolder}
               className="ml-auto inline-flex h-target items-center gap-[8px] rounded-control border border-hairlineStrong bg-raised px-[16px] text-meta text-fg hover:bg-hover"
             >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                <path d="M2 6V3.5h4L7.5 5H14v7.5H2z" />
-              </svg>
+              <Folder width={14} height={14} aria-hidden="true" focusable="false" />
               {p.folderLabel}
             </button>
           </div>

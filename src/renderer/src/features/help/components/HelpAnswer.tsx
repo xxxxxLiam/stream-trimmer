@@ -9,6 +9,7 @@
 import { DrawerHeader } from "../../../shared/components/DrawerRows";
 import { stepsOf, type HelpAnswer as Answer } from "../utils/helpContent";
 import HelpStepPicture from "./HelpStepPicture";
+import { PlayFill } from "react-bootstrap-icons";
 
 export type HelpAnswerProps = { answer: Answer; onBack: () => void; onClose: () => void; onShowMe: () => void };
 
@@ -48,9 +49,7 @@ export default function HelpAnswer({ answer, onBack, onClose, onShowMe }: HelpAn
             onClick={onShowMe}
             className="flex h-target w-full items-center justify-center gap-[8px] rounded-[22px] bg-ice text-body font-medium text-bg"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M7 5v14l11-7z" />
-            </svg>
+            <PlayFill width={16} height={16} aria-hidden="true" focusable="false" />
             Show me in Clipr
           </button>
         </div>
