@@ -29,7 +29,7 @@ const STEP_BUTTON = "inline-flex h-[44px] w-[32px] items-center justify-center r
 export default function TimelineTools() {
   const { tool, setTool, zoom, setZoom, zoomBy, fit } = useToolState();
   return (
-    <div id="ui-timeline-tools" className="flex h-[44px] shrink-0 items-center border-b border-hairline px-[6px] text-meta text-fg-dim">
+    <div id="ui-timeline-tools" className="flex h-[44px] shrink-0 items-center border-b border-hairline px-[7px] text-meta text-fg-dim">
       <div role="toolbar" aria-label="Timeline tools" className="flex">
         {TOOLS.map(({ tool: t, label, icon: IconFor }) => (
           <button
