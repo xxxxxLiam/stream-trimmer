@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addPending, flushPending, makeReport, normalizePending, relayUrlFrom, reportText, sendToRelay } from "./reports";
+import { cutNote, addPending, flushPending, makeReport, normalizePending, relayUrlFrom, reportText, sendToRelay } from "./reports";
 
 const now = new Date("2026-11-24T19:00:00Z");
 
@@ -48,4 +48,14 @@ test("the relay address is a build-time setting: only an https address counts, a
   assert.equal(relayUrlFrom("https://relay.example.com/report"), "https://relay.example.com/report");
   assert.equal(relayUrlFrom("  https://relay.example.com/r  "), "https://relay.example.com/r");
   for (const bad of ["", "http://relay.example.com", "javascript:1", "relay.example.com", undefined, 5, null]) assert.equal(relayUrlFrom(bad), "");
+});
+
+test("F-9: the 2,000-character cut never splits an emoji", () => {
+  const text = "a".repeat(1999) + "😀" + "tail";
+  const cut = cutNote(text, 2000);
+  assert.equal(cut, "a".repeat(1999), "the emoji does not fit whole, so it is left out, not halved");
+  assert.doesNotMatch(cut, /[\ud800-\udbff]$/);
+  assert.equal(makeReport(text, "", now, "x").note, cut);
+  assert.equal(cutNote("short", 2000), "short");
+  assert.equal(cutNote("a" + "👨‍👩‍👧" + "b", 5), "a", "a joined family emoji is one character");
 });

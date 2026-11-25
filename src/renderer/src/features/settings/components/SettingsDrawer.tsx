@@ -16,7 +16,7 @@ import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
 import { useFinalCutLook } from "../hooks/useFinalCutLook";
 import { useClipDestination } from "../../player/hooks/useClipDestination";
-import { campaignClipsDir } from "../../../shared/utils/campaigns";
+import { campaignClipsDir, campaignNameProblems } from "../../../shared/utils/campaigns";
 import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { DEFAULT_DAILY_QUOTA, dropCampaignPrefs, toggleLanguage } from "../utils/settingsPrefs";
@@ -102,6 +102,15 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         onOpenFolder={() => {
           const dir = campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir);
           if (dir) void window.electronAPI?.showInFolder(dir);
+        }}
+        onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}
+        onRename={(next) => {
+          const found = campaignNameProblems(next, c.campaigns.campaigns, campaign.id);
+          if (found.length) return found;
+          // The folder follows the name unless the campaign has its own, so pin the current one: renaming must not orphan its clips.
+          const pinned = campaign.clipsDir || campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir);
+          c.campaigns.update(campaign.id, { name: next.trim(), ...(pinned ? { clipsDir: pinned } : {}) });
+          return [];
         }}
         confirmingDelete={confirming === campaign.id}
         onDelete={() => {
