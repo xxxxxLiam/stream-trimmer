@@ -16,7 +16,7 @@ import { audioLanesOf } from "../../../shared/utils/audioLanguages";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
-import { clampX, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
+import { clampX, edgeScroll, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
 import { axisDuringDrag, axisTicks, focusForAnchor, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
@@ -24,8 +24,12 @@ import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
 import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
+import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
+import { dialogOpen } from "../../../shared/utils/dialogOpen";
 
 export const DRAG_START_PX = 3;
+/** Pixels of the window a full-speed edge scroll moves every 40 ms tick. */
+const EDGE_SCROLL_PX = 14;
 const dash = "—";
 
 export function useTimelineController() {
@@ -208,10 +212,33 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragKind]);
 
+  // An unsaved range goes away with its ×, or with Esc (never mid-drag, never while typing or in a dialog or menu).
+  const clearRange = () => {
+    clipper.setStartText("");
+    clipper.setEndText("");
+    s.setScissorsStart(null);
+  };
+  const tabActive = useIsTabActive();
+  const hasRange = !!range;
+  const dragging = !!s.drag;
+  useEffect(() => {
+    if (!tabActive || !hasRange || dragging) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || dialogOpen() || document.querySelector('[role="menu"]')) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
+      clearRange();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabActive, hasRange, dragging]);
+
   const lastScrub = useRef<number | null>(null);
   const onLanePointerMove = (e: PointerEvent<HTMLElement>) => {
     const d = s.drag;
     if (!d || e.buttons !== 1) return;
+    pointer.current = { clientX: e.clientX, left: laneLeft(e) };
     if (d.kind === "pan") {
       const per = (win.end - win.start) / Math.max(1, s.width);
       s.setFocus(Math.min(duration, Math.max(0, d.startFocus - (e.clientX - d.startX) * per)));
@@ -228,14 +255,45 @@ export function useTimelineController() {
       }
       return;
     }
-    const t = timeAt(e);
+    dragTo(d, e.clientX, laneLeft(e));
+  };
+
+  /** Move the scrub / range / edge drag to where the pointer is (kept on the lane: past the end is the end). */
+  const dragTo = (d: NonNullable<typeof s.drag>, clientX: number, left: number) => {
+    const t = toT(axis, clampX(clientX - left, s.width));
     if (t === null) return;
     if (d.kind === "edge") {
       setRange(d.fixed, t);
-    } else if (d.kind === "range" && Math.abs(e.clientX - s.dragOrigin) >= DRAG_START_PX) {
+    } else if (d.kind === "range" && Math.abs(clientX - s.dragOrigin) >= DRAG_START_PX) {
       setRange(d.anchor, t);
     }
   };
+
+  // Dragging the playhead or a range edge to either end of a zoomed timeline scrolls it, so the rest of the
+  // video can be reached by dragging. The pointer keeps arriving while it is held at the edge or beyond it.
+  const pointer = useRef({ clientX: 0, left: 0 });
+  const scrollRef = useRef<() => void>(() => {});
+  scrollRef.current = () => {
+    const d = s.drag;
+    if (!d || d.kind === "pan" || !(duration > 0) || tools.zoom === 0) return;
+    const v = edgeScroll(pointer.current.clientX - pointer.current.left, s.width);
+    if (!v) return;
+    const per = (win.end - win.start) / Math.max(1, s.width);
+    const next = Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + v * per * EDGE_SCROLL_PX));
+    if (frozen.current && frozen.current.folded) return;
+    if (frozen.current) frozen.current = { axis: linearAxis(windowFor(duration, tools.zoom, next), s.width) as Axis, fold: [], folded: false };
+    s.setFocus(next);
+    if (d.kind === "scrub") {
+      const at = toT(axis, clampX(pointer.current.clientX - pointer.current.left, s.width));
+      if (at !== null) clipper.requestSeek(Math.round(Math.min(Math.max(0, at), duration)));
+    } else dragTo(d, pointer.current.clientX, pointer.current.left);
+  };
+  const scrolling = dragKind === "scrub" || dragKind === "range" || dragKind === "edge";
+  useEffect(() => {
+    if (!scrolling) return;
+    const id = window.setInterval(() => scrollRef.current(), 40);
+    return () => window.clearInterval(id);
+  }, [scrolling]);
 
   const onLanePointerUp = () => {
     const d = s.drag;
@@ -314,6 +372,7 @@ export function useTimelineController() {
     onLaneWheel,
     onLaneClickCapture,
     addSection,
+    clearRange,
     removeSection: (i: number) => store.remove(i),
     seek: (t: number) => clipper.requestSeek(t),
   };

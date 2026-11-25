@@ -29,8 +29,8 @@ test("alt zooms out", () => {
 });
 
 test("the first-clip hint matches the tool in hand", () => {
-  assert.equal(pickHintLead("clip"), "Click to set the start, click again for the end");
-  assert.equal(pickHintLead("pointer"), "Choose Select range, then drag on the timeline");
+  assert.equal(pickHintLead("clip"), "Click the pictures to set the start, click again for the end");
+  assert.equal(pickHintLead("pointer"), "Press D, then drag across the pictures");
 });
 
 test("B2-8: flag, hand and zoom each get their own hint, none says Drag", () => {
@@ -140,4 +140,17 @@ test("V18-T-6: packed rows never overlap inside a row", () => {
     for (let j = i + 1; j < bars.length; j++)
       if (slots[i].row === slots[j].row)
         assert.ok(bars[j].left >= bars[i].left + bars[i].width || bars[i].left >= bars[j].left + bars[j].width);
+});
+
+import { edgeScroll } from "./laneTools";
+
+test("dragging near an end of the timeline scrolls it: harder the closer, full speed at or past the edge", () => {
+  assert.equal(edgeScroll(400, 800), 0);
+  assert.ok(edgeScroll(16, 800) < 0 && edgeScroll(16, 800) > -1);
+  assert.ok(edgeScroll(784, 800) > 0 && edgeScroll(784, 800) < 1);
+  assert.equal(edgeScroll(0, 800), -1);
+  assert.equal(edgeScroll(-200, 800), -1);
+  assert.equal(edgeScroll(1000, 800), 1);
+  assert.ok(edgeScroll(8, 800) < edgeScroll(24, 800)); // closer is stronger (more negative)
+  assert.equal(edgeScroll(5, 40), 0); // a lane too narrow for two zones never scrolls
 });

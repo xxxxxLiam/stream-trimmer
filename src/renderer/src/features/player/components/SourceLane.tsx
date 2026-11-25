@@ -34,7 +34,8 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
       >
         {c.opening ? null : (
           <>
-            {c.firstClipHint ? null : <Filmstrip axis={c.axis} levels={c.storyboards} height={height - 12} />}
+            {/* The picture strip shows the moment the video opens, ready to scrub; no range is needed first. */}
+            <Filmstrip axis={c.axis} levels={c.storyboards} height={height - 12} />
             {dim.map((d) => {
               const x = toX(c.axis, d.start);
               return (
@@ -90,7 +91,7 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
             ))}
             {c.firstClipHint ? (
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-body text-fg-dim">
-                <span>
+                <span className="rounded-chip bg-bg-overlay-50 px-[12px] py-[4px] text-fg">
                   {pickHintLead(c.tool)}, or press <KeyHint>I</KeyHint> and <KeyHint>O</KeyHint>, to pick the part you want. Then Clip.
                 </span>
               </span>

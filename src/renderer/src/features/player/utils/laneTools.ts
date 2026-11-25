@@ -34,17 +34,17 @@ export const zoomStep = (alt: boolean) => (alt ? -ZOOM_STEP : ZOOM_STEP);
 export function pickHintLead(tool: string): string {
   switch (tool) {
     case "clip":
-      return "Click to set the start, click again for the end";
+      return "Click the pictures to set the start, click again for the end";
     case "range":
-      return "Drag on the timeline";
+      return "Drag across the pictures";
     case "flag":
-      return "Flags mark a spot; use Select range to drag a part";
+      return "Flags mark a spot; press D, then drag across the pictures";
     case "hand":
-      return "The hand moves the view; use Select range to drag a part";
+      return "The hand moves the view; press D, then drag across the pictures";
     case "zoom":
-      return "Zoom resizes the view; use Select range to drag a part";
+      return "Zoom resizes the view; press D, then drag across the pictures";
     default:
-      return "Choose Select range, then drag on the timeline";
+      return "Press D, then drag across the pictures";
   }
 }
 
@@ -109,6 +109,18 @@ export function placeLabels(bars: readonly LabelBar[], laneWidth: number): Label
     out[i] = room >= 24 ? { inside: false, outsideWidth: Math.min(room, labelWidth(b.label)) } : { inside: true, outsideWidth: 0 };
   });
   return out;
+}
+
+/**
+ * Dragging the playhead (or a range edge) near either end of a zoomed timeline scrolls it: -1..1 for how hard
+ * to push left or right, 0 in the middle. Right at the edge, or past it, is full speed.
+ */
+export const EDGE_ZONE = 32;
+export function edgeScroll(x: number, width: number, zone = EDGE_ZONE): number {
+  if (!(width > 2 * zone)) return 0;
+  if (x < zone) return -Math.min(1, (zone - x) / zone);
+  if (x > width - zone) return Math.min(1, (x - (width - zone)) / zone);
+  return 0;
 }
 
 /**

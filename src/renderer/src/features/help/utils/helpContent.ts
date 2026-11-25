@@ -302,5 +302,5 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "⌘ ,", does: "Settings" },
   { keys: "⌘ ;", does: "Symbols" },
   { keys: "⌘ /", does: "Help" },
-  { keys: "Esc", does: "Close a drawer or leave full screen" },
+  { keys: "Esc", does: "Close a drawer, leave full screen, or remove a range that is not a clip yet" },
 ];
