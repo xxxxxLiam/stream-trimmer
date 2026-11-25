@@ -175,3 +175,55 @@ test("V18-T-9: zoom 90 and zoom 100 show visibly different spans on a 10-minute 
   assert.equal(spanFor(600, 100), 30);
   assert.equal(spanFor(600, 0), 600);
 });
+
+import { END_PAD_PX, spanFor as spanForPad } from "./timelineAxis";
+import { ZOOM_MIN } from "../../../modules/layout/hooks/useToolState";
+
+const W = 800;
+const f = END_PAD_PX / W;
+
+test("Fit keeps room after the video's end: the end sits PAD px short of the lane's right edge", () => {
+  const win = windowFor(1000, 0, 500, f);
+  assert.equal(win.start, 0);
+  const endX = (1000 / (win.end - win.start)) * W;
+  assert.ok(Math.abs(endX - (W - END_PAD_PX)) < 0.001, `video ends at ${endX}px of ${W}`);
+  // No pad asked for: the old Fit, edge to edge.
+  assert.deepEqual(windowFor(1000, 0, 500), { start: 0, end: 1000 });
+});
+
+test("zoomed in and scrolled to the far right, the same room stays after the video's end", () => {
+  const win = windowFor(1000, 60, 1000, f);
+  const span = win.end - win.start;
+  assert.ok(win.end > 1000, "the window runs past the end");
+  assert.ok(Math.abs(((win.end - 1000) / span) * W - END_PAD_PX) < 0.001);
+  // And never past it: scrolling further right does not slide away more than the pad.
+  assert.equal(windowFor(1000, 60, 5000, f).end, win.end);
+  // Scrolled to the far left, nothing before the start.
+  assert.equal(windowFor(1000, 60, -50, f).start, 0);
+});
+
+test("zoomed out past Fit down to one third: the whole video fills a third of the lane, centred", () => {
+  const out = windowFor(1000, ZOOM_MIN, 0, f);
+  const span = out.end - out.start;
+  assert.ok(Math.abs((1000 / span) * W - W / 3) < 0.001, "the video is a third of the lane wide");
+  assert.ok(out.start < 0 && out.end > 1000, "room both sides");
+  // Between Fit and the limit the span grows steadily and never shrinks.
+  let last = spanForPad(1000, 0, f);
+  for (let z = -1; z >= ZOOM_MIN; z--) {
+    const s = spanForPad(1000, z, f);
+    assert.ok(s > last, `zoom ${z} shows more than ${z + 1}`);
+    last = s;
+  }
+  assert.equal(spanForPad(1000, -999, f), spanForPad(1000, ZOOM_MIN, f), "clamped at the limit");
+});
+
+test("zoomForSpan is the inverse of spanFor with the pad", () => {
+  const z = zoomForSpan(1000, spanForPad(1000, 40, f), f);
+  assert.ok(Math.abs(z - 40) < 0.05);
+});
+
+test("ruler ticks stay inside the video when the view shows room around it", () => {
+  const win = windowFor(1000, ZOOM_MIN, 0, f);
+  const ticks = rulerTicks(win, W, 110, { start: 0, end: 1000 });
+  assert.ok(ticks.length > 0 && ticks.every((t) => t.t >= 0 && t.t <= 1000));
+});

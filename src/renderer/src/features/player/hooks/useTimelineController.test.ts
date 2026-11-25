@@ -76,19 +76,19 @@ test("a short timeline scrolls its tracks vertically under a ruler that stays pu
 });
 
 test("Fit's re-centre runs after the zoom-reset effect, so Fit (zoom to 0 and a new centre in one commit) is not cleared", () => {
-  const clear = effects.indexOf("if (a.zoom === 0) a.setFocus(null)");
+  const clear = effects.indexOf("if (a.zoom <= 0) a.setFocus(null)");
   const fit = effects.indexOf("fitWindow(a.range, a.duration)");
   assert.ok(clear > 0 && fit > 0 && clear < fit);
 });
 
 test("V18-T-1: a zoom with no centre takes the one it shows, and a scrub never moves the axis", () => {
   assert.match(effects, /a\.zoom > 0 && a\.focus === null\) a\.setFocus\(a\.win\.start/);
-  assert.match(effects, /a\.zoom === 0 \|\| a\.scrubbing\) return/);
+  assert.match(effects, /a\.zoom <= 0 \|\| a\.scrubbing\) return/);
   assert.match(src, /scrubbing: s\.drag\?\.kind === "scrub"/);
 });
 
 test("V18-T-2: wheel and pinch zoom, and the zoom tool, anchor on the pointer", () => {
-  assert.match(src, /focusForAnchor\(duration, next, t, x \/ s\.width\)/);
+  assert.match(src, /focusForAnchor\(duration, next, t, x \/ s\.width, padFrac\)/);
   assert.match(src, /zoomAt\(x, at, getZoom\(\) \+ act\.amount\)/);
   assert.match(src, /tools\.tool === "zoom"\) return zoomAt\(/);
   assert.doesNotMatch(src, /s\.setFocus\(at\);\s*tools\.zoomBy/, "centring on the pointer time drifted away from it");
@@ -179,4 +179,44 @@ test("V18-T-6: packing sees the width a bar is drawn at (18 px: padding and bord
 test("B4-2: with no transcript the search box is read-only, not disabled, so Ctrl+F can focus it", () => {
   assert.match(transcriptCol, /readOnly=\{!hasTranscript\}/);
   assert.doesNotMatch(transcriptCol, /\sdisabled=\{!hasTranscript\}/);
+});
+
+test("a video that just opened shows its picture strip at once; the first-clip hint never hides it", () => {
+  assert.match(sourceLane, /<Filmstrip axis=\{c\.axis\}/);
+  assert.doesNotMatch(sourceLane, /firstClipHint \? null : <Filmstrip/);
+  const strip = sourceLane.indexOf("<Filmstrip");
+  assert.ok(strip > 0 && !/firstClipHint/.test(sourceLane.slice(strip - 80, strip)));
+});
+
+test("unsaved range: its bar carries Create clip and a remove ×; Esc clears it, never mid-drag or while typing", () => {
+  assert.match(clipsLane, /const unsaved = !!c\.range && sections\.length === 1 && !c\.waiting\.some\(isBuilt\)/);
+  assert.match(clipsLane, /Create clip · \{length\}/);
+  assert.match(clipsLane, /aria-label="Remove this range \(Esc\)"/);
+  assert.match(clipsLane, /onCreate=\{clipNow\.clip\}/);
+  assert.match(clipsLane, /onRemove=\{c\.clearRange\}/);
+  const esc = src.slice(src.indexOf("An unsaved range goes away"), src.indexOf("const lastScrub"));
+  assert.match(esc, /e\.key !== "Escape"/);
+  assert.match(esc, /!hasRange \|\| dragging/);
+  assert.match(esc, /INPUT/);
+  assert.match(esc, /clearRange\(\)/);
+});
+
+test("dragging the playhead, a new range or an edge to either end of a zoomed timeline scrolls it", () => {
+  assert.match(src, /edgeScroll\(pointer\.current\.clientX - pointer\.current\.left, s\.width\)/);
+  assert.match(src, /window\.setInterval\(\(\) => scrollRef\.current\(\), 40\)/);
+  assert.match(src, /const scrolling = dragKind === "scrub" \|\| dragKind === "range" \|\| dragKind === "edge"/);
+  assert.match(src, /tools\.zoom <= 0\) return/); // nothing to scroll at Fit
+  assert.match(src, /s\.setFocus\(next\)/);
+});
+
+const filmstrip = readFileSync(new URL("../components/Filmstrip.tsx", import.meta.url), "utf8");
+
+test("Fit and the far right keep end room; the view can go out; pointer times stay inside the video", () => {
+  assert.match(src, /const padFrac = s\.width > 0 \? END_PAD_PX \/ s\.width : 0/);
+  assert.match(src, /windowFor\(duration, tools\.zoom, s\.focus \?\? playhead, padFrac\)/);
+  assert.match(src, /const inVideo = \(t: number \| null\)/);
+  assert.match(src, /axisTicks\(axis, 110, \{ start: 0, end: duration \}\)/);
+  assert.match(effects, /zoomForSpan\(a\.duration, w\.end - w\.start, a\.padFrac\)/);
+  assert.match(filmstrip, /Math\.min\(p\.t1, duration \?\? p\.t1\)/);
+  assert.match(sourceLane, /duration=\{c\.duration\}/);
 });

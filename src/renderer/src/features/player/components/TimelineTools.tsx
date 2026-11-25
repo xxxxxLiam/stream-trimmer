@@ -13,8 +13,8 @@ import {
   IconScissors,
   IconZoomTool,
 } from "../../../modules/layout/components/BarIcons";
-import { TOOL_KEYS, useToolState, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
-import { zoomFromX } from "../utils/laneTools";
+import { TOOL_KEYS, ZOOM_MIN, useToolState, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
+import { zoomFromX, zoomThumbPercent } from "../utils/laneTools";
 
 const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] = [
   { tool: "pointer", label: "Pointer", icon: IconPointer },
@@ -55,7 +55,7 @@ export default function TimelineTools() {
         <span
           role="slider"
           aria-label="Timeline zoom"
-          aria-valuemin={0}
+          aria-valuemin={ZOOM_MIN}
           aria-valuemax={100}
           aria-valuenow={zoom}
           tabIndex={0}
@@ -64,7 +64,7 @@ export default function TimelineTools() {
             const step = e.shiftKey ? 25 : 10;
             if (e.key === "ArrowRight" || e.key === "ArrowUp") setZoom(zoom + step);
             else if (e.key === "ArrowLeft" || e.key === "ArrowDown") setZoom(zoom - step);
-            else if (e.key === "Home") setZoom(0);
+            else if (e.key === "Home") setZoom(ZOOM_MIN);
             else if (e.key === "End") setZoom(100);
             else return;
             e.preventDefault();
@@ -82,7 +82,7 @@ export default function TimelineTools() {
         >
           {/* The 44 px slider is the hit area; the track stays the board's 3 px line. */}
           <span aria-hidden className="h-[3px] w-full rounded-[2px] bg-hover" />
-          <span aria-hidden className="absolute top-1/2 size-[13px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg" style={{ left: `${zoom}%` }} />
+          <span aria-hidden className="absolute top-1/2 size-[13px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg" style={{ left: `${zoomThumbPercent(zoom)}%` }} />
         </span>
         <button type="button" aria-label="Zoom in" className={STEP_BUTTON} onClick={() => zoomBy(10)}>
           +

@@ -22,6 +22,8 @@ type Args = {
   duration: number;
   playhead: number;
   zoom: number;
+  /** The room kept after the video's end, as a share of the lane. */
+  padFrac: number;
   fitRequests: number;
   focus: number | null;
   setFocus: (t: number | null) => void;
@@ -73,7 +75,7 @@ export function useTimelineEffects(a: Args) {
   // Zooming back out clears the centre. Declared before Fit's effect on purpose: Fit resets the zoom to 0
   // and re-centres in the same commit, so its setFocus must run last and win.
   useEffect(() => {
-    if (a.zoom === 0) a.setFocus(null);
+    if (a.zoom <= 0) a.setFocus(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.zoom]);
 
@@ -85,7 +87,7 @@ export function useTimelineEffects(a: Args) {
     fitSeen.current = a.fitRequests;
     if (!tabActive) return; // every open tab has a timeline; only the one on screen answers
     const w = fitWindow(a.range, a.duration);
-    setZoom(zoomForSpan(a.duration, w.end - w.start));
+    setZoom(zoomForSpan(a.duration, w.end - w.start, a.padFrac));
     a.setFocus((w.start + w.end) / 2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.fitRequests]);
@@ -96,7 +98,7 @@ export function useTimelineEffects(a: Args) {
     const r = a.framed;
     if (!tabActive || !r || !(a.duration > 0) || !arrivedFromElsewhere()) return;
     const w = fitWindow(r, a.duration);
-    setZoom(zoomForSpan(a.duration, w.end - w.start));
+    setZoom(zoomForSpan(a.duration, w.end - w.start, a.padFrac));
     a.setFocus((w.start + w.end) / 2);
     if (a.playhead < r.start || a.playhead > r.end) a.seek(r.start);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,7 +115,7 @@ export function useTimelineEffects(a: Args) {
   // Zoomed in, the window follows the playhead once it runs off the edge. Only when the playhead
   // moves: zooming or panning to look somewhere else must not snap the view back to it.
   useEffect(() => {
-    if (a.zoom === 0 || a.scrubbing) return; // a scrub never moves the axis under the pointer
+    if (a.zoom <= 0 || a.scrubbing) return; // a scrub never moves the axis under the pointer
     if (a.playhead < a.win.start || a.playhead > a.win.end) a.setFocus(a.playhead);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a.playhead]);

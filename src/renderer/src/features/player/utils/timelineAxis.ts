@@ -6,6 +6,7 @@
  *   skipped part folded into a short marked strip (the ruler jumps across it).
  */
 import type { Range } from "../../../shared/utils/segments";
+import { ZOOM_MIN } from "../../../modules/layout/hooks/useToolState";
 import { clockTime } from "./transport";
 
 export type Win = { start: number; end: number };
@@ -15,6 +16,11 @@ export type AxisPiece = { t0: number; t1: number; x0: number; x1: number; folded
 export type Axis = { pieces: AxisPiece[]; width: number };
 
 export const MIN_WINDOW_SECONDS = 30;
+/** The lowest zoom: the whole video fills one third of the lane. Zoom 0 is Fit; 100 is the closest. */
+export const ZOOM_OUT_RANGE = -ZOOM_MIN;
+const MAX_OUT_FACTOR = 3;
+/** The room left after the video's end at Fit and at the far right: the 24 px step of the spacing scale. */
+export const END_PAD_PX = 24;
 /** Each section sits in a stretch this long (the board: "52 s each side of the fold"), centred. */
 export const FOLD_MARGIN_SECONDS = 52;
 /** A section longer than the stretch still gets at least this much either side. */
@@ -30,19 +36,37 @@ export function linearAxis(win: Win, width: number): Axis {
  * How many seconds the zoom shows: the whole video at 0 down to the closest useful stretch at exactly
  * 100, eased (squared) so the fine end has room yet 90 and 100 still differ on a 10-minute video. Every step of the slider changes the view (no dead top end).
  */
-export function spanFor(duration: number, zoom: number): number {
+export function spanFor(duration: number, zoom: number, padFrac = 0): number {
   if (!(duration > 0)) return 0;
-  if (duration <= MIN_WINDOW_SECONDS) return duration;
-  const z = Math.min(100, Math.max(0, zoom)) / 100;
-  return MIN_WINDOW_SECONDS + (duration - MIN_WINDOW_SECONDS) * (1 - z) ** 2;
+  const fit = duration / (1 - clampPad(padFrac));
+  if (zoom < 0) {
+    // Past Fit, out: the whole video shrinks until it fills a third of the lane.
+    const t = Math.min(1, -zoom / ZOOM_OUT_RANGE);
+    return fit + (MAX_OUT_FACTOR * duration - fit) * t;
+  }
+  if (duration <= MIN_WINDOW_SECONDS) return fit;
+  const z = Math.min(100, zoom) / 100;
+  return MIN_WINDOW_SECONDS + (fit - MIN_WINDOW_SECONDS) * (1 - z) ** 2;
 }
 
-/** Zoom 0 shows the whole video; 100 shows about the closest useful stretch, around `focus`. */
-export function windowFor(duration: number, zoom: number, focus: number): Win {
+const clampPad = (f: number) => (f > 0 && f < 0.5 ? f : 0);
+
+/**
+ * Zoom 0 is Fit: the whole video, with `padFrac` of the lane left empty after its end so the end is not
+ * flush with the edge; zoomed in, the far right keeps that same room after the end. Below 0 the view goes
+ * out, centred, to where the video fills a third of the lane. `focus` is the centre of a zoomed-in view.
+ */
+export function windowFor(duration: number, zoom: number, focus: number, padFrac = 0): Win {
   if (!(duration > 0)) return { start: 0, end: 0 };
-  const span = spanFor(duration, zoom);
+  const span = spanFor(duration, zoom, padFrac);
+  if (zoom <= 0) {
+    const fit = duration / (1 - clampPad(padFrac));
+    const start = zoom === 0 ? 0 : fit / 2 - span / 2;
+    return { start, end: start + span };
+  }
+  const room = clampPad(padFrac) * span;
   let start = focus - span / 2;
-  start = Math.min(Math.max(0, start), duration - span);
+  start = Math.min(Math.max(0, start), duration + room - span);
   return { start, end: start + span };
 }
 
@@ -64,7 +88,7 @@ const LABEL_PX = 40;
 const STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
 
 /** Round-number ticks no closer than `minGapPx`, for a linear axis. */
-export function rulerTicks(win: Win, widthPx: number, minGapPx = 110): { t: number; label: string }[] {
+export function rulerTicks(win: Win, widthPx: number, minGapPx = 110, bounds?: Win): { t: number; label: string }[] {
   const span = win.end - win.start;
   if (!(span > 0) || !(widthPx > 0)) return [];
   const minSeconds = (minGapPx / widthPx) * span;
@@ -72,7 +96,7 @@ export function rulerTicks(win: Win, widthPx: number, minGapPx = 110): { t: numb
   const out: { t: number; label: string }[] = [];
   // A label that would run past the right edge is left out (the board draws none at the very edge).
   const room = (LABEL_PX / widthPx) * span;
-  for (let t = Math.ceil((win.start - 0.5) / step) * step; t <= win.end - room; t += step) out.push({ t, label: clockTime(t) });
+  for (let t = Math.ceil((Math.max(win.start, bounds?.start ?? -Infinity) - 0.5) / step) * step; t <= Math.min(win.end - room, bounds?.end ?? Infinity); t += step) out.push({ t, label: clockTime(t) });
   return out;
 }
 
@@ -150,10 +174,11 @@ export function foldedAxis(
 }
 
 /** The zoom (0 to 100) that shows `span` seconds of a `duration` video. Inverse of windowFor. */
-export function zoomForSpan(duration: number, span: number): number {
-  if (!(duration > 0) || !(span > 0) || span >= duration) return 0;
+export function zoomForSpan(duration: number, span: number, padFrac = 0): number {
+  const fit = duration / (1 - clampPad(padFrac));
+  if (!(duration > 0) || !(span > 0) || span >= fit) return 0;
   if (span <= MIN_WINDOW_SECONDS) return duration <= MIN_WINDOW_SECONDS ? 0 : 100;
-  const r = (span - MIN_WINDOW_SECONDS) / (duration - MIN_WINDOW_SECONDS);
+  const r = (span - MIN_WINDOW_SECONDS) / (fit - MIN_WINDOW_SECONDS);
   return Math.min(100, Math.max(0, Math.round((1 - r ** (1 / 2)) * 10000) / 100));
 }
 
@@ -161,18 +186,18 @@ export function zoomForSpan(duration: number, span: number): number {
  * The window centre that keeps time `t` under the same spot of the lane (`frac`, 0 to 1) after a zoom to
  * `zoom`: how a pinch or a click zooms into a point instead of sliding away from it.
  */
-export function focusForAnchor(duration: number, zoom: number, t: number, frac: number): number {
-  const span = spanFor(duration, zoom);
+export function focusForAnchor(duration: number, zoom: number, t: number, frac: number, padFrac = 0): number {
+  const span = spanFor(duration, zoom, padFrac);
   return t - Math.min(1, Math.max(0, frac)) * span + span / 2;
 }
 
 /** Ruler ticks for every shown stretch of an axis, as pixels. The fold has none (it is labelled). */
-export function axisTicks(axis: Axis, minGapPx = 110): { t: number; x: number; label: string }[] {
+export function axisTicks(axis: Axis, minGapPx = 110, bounds?: Win): { t: number; x: number; label: string }[] {
   const out: { t: number; x: number; label: string }[] = [];
   for (const p of axis.pieces) {
     if (p.folded) continue;
     const w = p.x1 - p.x0;
-    for (const tick of rulerTicks({ start: p.t0, end: p.t1 }, w, minGapPx)) {
+    for (const tick of rulerTicks({ start: p.t0, end: p.t1 }, w, minGapPx, bounds)) {
       out.push({ ...tick, x: p.x0 + ((tick.t - p.t0) / (p.t1 - p.t0)) * w });
     }
   }

@@ -7,7 +7,7 @@
  *   dashed "skipped" stretch between. Names sit exactly as wide as their range, with an ellipsis
  *   and a tooltip.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { setNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { playFrom } from "../../../shared/utils/playFrom";
 import type { TimelineController } from "../hooks/useTimelineController";
@@ -16,6 +16,8 @@ import { labelWidth, packRows, placeLabels } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
+import { useClipController } from "../hooks/useClipController";
+import { IconClose } from "../../../shared/components/PanelIcons";
 import ClipNameField from "./ClipNameField";
 import LaneLabel from "./LaneLabel";
 
@@ -71,6 +73,7 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     if (tabActive) setNextClipName(nextName);
   }, [nextName, tabActive]);
   useEffect(() => () => setNextClipName(null), []);
+  const clipNow = useClipController();
   const rename = (name: string) => setTyped({ key: sectionsKey, name });
 
   // Names that do not fit their bar continue into the free space after it (cut only when that runs out).
@@ -103,6 +106,8 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     ...named.map((n) => ({ ...span(n.start, n.end), label: n.label })),
     ...others,
   ];
+  // A range that is not a clip yet: its bar invites making the clip and can be removed.
+  const unsaved = !!c.range && sections.length === 1 && !c.waiting.some(isBuilt);
   const places = placeLabels(bars, c.width);
   // Overlapping bars are stacked into thinner rows with no text (their title still names them).
   const slots = packRows(named.map((n) => span(n.start, n.end)));
@@ -220,7 +225,15 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 </span>
               ) : null,
             )}
-            {sections.length === 1 ? (
+            {unsaved ? (
+              <UnsavedRange
+                style={styleOf("built", sections[0].start, sections[0].end)}
+                length={c.lengthText}
+                blocked={clipNow.reason}
+                onCreate={clipNow.clip}
+                onRemove={c.clearRange}
+              />
+            ) : sections.length === 1 ? (
               <>
                 <ClipNameField
                   name={building(sections[0].start)}
@@ -276,5 +289,50 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** The unsaved range's bar: Ice outline on a faint tint, a centred "Create clip" pill, and an × to remove it. */
+export function UnsavedRange({
+  style,
+  length,
+  blocked,
+  onCreate,
+  onRemove,
+}: {
+  style: CSSProperties;
+  length: string;
+  blocked: string | null;
+  onCreate: () => void;
+  onRemove: () => void;
+}) {
+  const width = Number(style.width ?? 0);
+  const narrow = width < 150;
+  return (
+    <span
+      data-unsaved-range
+      className="absolute rounded-chip border border-dashed border-ice bg-ice-tint-12"
+      style={{ ...style, overflow: "visible" }}
+    >
+      <button
+        type="button"
+        onClick={onCreate}
+        aria-disabled={!!blocked}
+        title={blocked || undefined}
+        className={`absolute left-1/2 top-1/2 inline-flex h-[20px] -translate-x-1/2 -translate-y-1/2 items-center whitespace-nowrap rounded-[10px] px-[10px] text-meta font-medium leading-[normal] ${blocked ? "bg-hover text-disabled" : "bg-ice text-bg"}`}
+      >
+        Create clip · {length}
+      </button>
+      <button
+        type="button"
+        aria-label="Remove this range (Esc)"
+        title="Remove this range (Esc)"
+        onClick={onRemove}
+        className="absolute top-[1px] inline-flex h-[20px] w-[20px] items-center justify-center rounded-chip text-fg hover:bg-hover"
+        style={narrow ? { left: "100%", marginLeft: 4 } : { right: 2 }}
+      >
+        <IconClose />
+      </button>
+    </span>
   );
 }
