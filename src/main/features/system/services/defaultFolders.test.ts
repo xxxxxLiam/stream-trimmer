@@ -22,3 +22,12 @@ test("the default clips folder is Downloads/Clipr, and an old Videos/Clipr folde
   assert.ok(fs.statSync(f!.clipsDir).isDirectory());
   assert.ok(fs.existsSync(path.join(old, "a.mp4")), "the old folder and its clips stay where they were");
 });
+
+test("A2-6: only the Clips folder is created; the Data folder is named but not made", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+  const app = { getPath: () => path.join(home, "Downloads") } as never;
+  const f = await defaultFolders(app);
+  assert.ok(fs.statSync(f!.clipsDir).isDirectory());
+  assert.equal(f!.dataDir, path.join(home, "Downloads", "Clipr data"));
+  assert.deepEqual(fs.readdirSync(path.join(home, "Downloads")), ["Clipr"]);
+});

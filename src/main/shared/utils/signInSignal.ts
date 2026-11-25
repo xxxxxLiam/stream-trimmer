@@ -60,4 +60,12 @@ export function createSignInState() {
   };
 }
 
-export const signIn = createSignInState();
+/**
+ * One signal per process. The engine is bundled apart from main (out/main/engine.cjs) and gets its own copy of this
+ * module, so a plain module-level instance would be two: the engine's "session ended" would never reach the footer's
+ * signal (A2-1). The instance lives on globalThis, which both bundles share.
+ */
+const SHARED = Symbol.for("clipr.signInSignal");
+type Shared = ReturnType<typeof createSignInState>;
+const host = globalThis as unknown as Record<symbol, Shared | undefined>;
+export const signIn: Shared = (host[SHARED] ??= createSignInState());

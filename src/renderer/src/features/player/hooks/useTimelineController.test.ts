@@ -65,3 +65,12 @@ test("tool keys are wired, and the tool buttons show them in their tooltips", ()
   const bar = readFileSync(new URL("../components/TimelineTools.tsx", import.meta.url), "utf8");
   assert.match(bar, /title=\{`\$\{label\} \(\$\{TOOL_KEYS\[t\]\.toUpperCase\(\)\}\)`\}/);
 });
+
+test("a short timeline scrolls its tracks vertically under a ruler that stays put, with a keyboard route", () => {
+  const i = lane.indexOf("data-timeline-tracks");
+  const tracks = lane.slice(lane.lastIndexOf("<div", i), lane.indexOf("</div>", i));
+  assert.match(tracks, /overflow-y-auto/);
+  assert.match(tracks, /tabIndex=\{0\}/, "focusable, so the arrow keys and Page Up/Down scroll it");
+  assert.match(tracks, /<SourceLane[\s\S]*<ClipsLane/);
+  assert.ok(lane.indexOf("<TimelineRuler") < lane.lastIndexOf("<div", i), "the ruler sits above the scrolling part");
+});
