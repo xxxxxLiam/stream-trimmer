@@ -30,7 +30,8 @@ export function searchHelp(query: string): HelpResults {
   const q = query.trim();
   if (!q) return { answers: HELP_ANSWERS.filter((a) => !a.searchOnly), more: HELP_MORE.map((m) => m.id) };
   const answers = HELP_ANSWERS.filter((a) => matches(q, [a.question, ...a.paras, ...a.synonyms].join(" ")));
-  const shortcutText = SHORTCUTS.map((s) => s.does).join(" ");
+  // Key names count too: Ctrl or Cmd for ⌘, and the key itself ("enter", "space").
+  const shortcutText = SHORTCUTS.map((s) => `${s.does} ${s.keys.replace("⌘", "ctrl cmd command")}`).join(" ");
   const more = HELP_MORE.filter((m) =>
     matches(q, [m.label, ...m.synonyms, m.id === "shortcuts" ? shortcutText : ""].join(" ")),
   ).map((m) => m.id);

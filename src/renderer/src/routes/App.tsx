@@ -18,7 +18,6 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
-import { useFlushPendingReports } from "../features/help/hooks/useReportMutations";
 import { loadLastLayout } from "../shared/utils/lastLayout";
 import { CRASHED_ERROR, wasCrashed } from "../features/help/utils/crashDetails";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
@@ -581,7 +580,7 @@ function Layout({ active }: { active: boolean }) {
             <PanelWorkspace />
             {active && (
               <>
-                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: tips.replay }} />
+                <HelpDrawer open={helpOpen} onClose={closeHelp} startAt={helpStartAt} tips={{ on: tips.on, onReplay: () => { closeHelp(); tips.replay(); } }} />
                 {settingsDrawer}
                 <ImportDrawer text={importText} onClose={() => setImportText(null)} />
                 {CHANNEL_DATA_BUILT && channelAvailable && <ChannelDataDrawer open={channelOpen} onClose={() => setChannelOpen(false)} />}
@@ -619,7 +618,6 @@ function Layout({ active }: { active: boolean }) {
 }
 
 function Shell() {
-  useFlushPendingReports();
   const { tabs, activeId, setTabCampaign } = useWorkspace();
 
   // No background polling. On launch we read the imported cookies.txt once and verify it silently; if that gives

@@ -60,11 +60,15 @@ test("F-3: Help is a drawer that blocks nothing, never a dialog with a scrim", (
   assert.match(help, /<Drawer label="Help">/);
 });
 
-test("F-3: the slot stays in the header layout and the button keeps its id", () => {
+test("F-1: the button renders in place, in the top bar's own tab order, and is portalled only while a layer covers the app", () => {
   const html = renderToStaticMarkup(createElement(HelpButton, { open: false, onToggle: () => {} }));
-  assert.match(html, /aria-hidden="true"/);
-  assert.match(html, /class="icon-btn[^"]*"/);
+  assert.match(html, /<button[^>]*id="ui-help-button"/, "the live button is in the markup where the top bar puts it");
+  assert.doesNotMatch(html, /<span[^>]*aria-hidden="true"/, "no hidden placeholder while nothing covers the app");
   const src = readFileSync(join(SRC, "features/help/components/HelpButton.tsx"), "utf8");
-  assert.match(src, /createPortal\(/);
+  assert.match(src, /covered && slot/, "the portal is for the covered case only");
+  assert.match(src, /data-covers-app/);
   assert.match(src, /id="ui-help-button"/);
+  for (const f of ["shared/components/CentredDialog.tsx", "shared/components/OverlayLoader.tsx"]) {
+    assert.match(readFileSync(join(SRC, f), "utf8"), /data-covers-app/, `${f} marks itself as covering the app`);
+  }
 });

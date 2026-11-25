@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addPending, flushPending, makeReport, normalizePending, relayUrlFrom, reportText, sendToRelay } from "./reports";
+import { cutNote, makeReport, reportText, sendReport } from "./reports";
 
 const now = new Date("2026-11-24T19:00:00Z");
 
@@ -17,35 +17,35 @@ test("a report carries the note and the details, with secrets cleaned", () => {
   assert.match(reportText(r), /What happened: Clip stopped at 61%\./);
 });
 
-test("kept reports are capped and replaced by id, bad stored rows are dropped", () => {
-  let list = normalizePending([{ id: "a", at: "x", note: "n", details: "d" }, { id: 3 }, null]);
-  assert.equal(list.length, 1);
-  list = addPending(list, { id: "a", at: "y", note: "n2", details: "d" });
-  assert.equal(list.length, 1);
-  assert.equal(list[0].note, "n2");
-  for (let i = 0; i < 30; i++) list = addPending(list, { id: `r${i}`, at: "z", note: "n", details: "d" });
-  assert.equal(list.length, 20);
+test("sending goes through the main process: sent, kept, and kept when it cannot be asked", async () => {
+  const w = globalThis as unknown as { window?: { electronAPI?: unknown } };
+  const calls: unknown[] = [];
+  const set = (api: unknown) => { w.window = { electronAPI: api }; };
+  try {
+    set({ sendReport: async (p: unknown) => (calls.push(p), { ok: true, status: "sent" }) });
+    assert.equal(await sendReport("problem", "it broke po_token=abc123secretvalue", "Reported from Help"), "sent");
+    assert.deepEqual(Object.keys(calls[0] as object).sort(), ["error", "kind", "note"]);
+    assert.doesNotMatch(String((calls[0] as { note: string }).note), /abc123secretvalue/, "the note is cleaned before it leaves the window");
+    set({ sendReport: async () => ({ ok: true, status: "kept" }) });
+    assert.equal(await sendReport("crash", "", "boom"), "kept");
+    set({ sendReport: async () => { throw new Error("ipc"); } });
+    assert.equal(await sendReport("crash", "", "boom"), "kept");
+    set({});
+    assert.equal(await sendReport("crash", "", "boom"), "kept", "outside the desktop app nothing can send");
+    set({ sendReport: async (p: unknown) => (calls.push(p), { ok: true, status: "sent" }) });
+    await sendReport("crash", "a note that crash reports do not carry", "boom");
+    assert.equal((calls.at(-1) as { note?: string }).note, undefined);
+  } finally {
+    delete w.window;
+  }
 });
 
-test("without a relay nothing is sent, so the report is kept", async () => {
-  assert.equal(await sendToRelay({ id: "a", at: "x", note: "n", details: "d" }, ""), false);
-});
-
-test("flushing drops only the reports that were accepted, and a throw keeps the report", async () => {
-  const list = [
-    { id: "ok", at: "x", note: "n", details: "d" },
-    { id: "no", at: "x", note: "n", details: "d" },
-    { id: "boom", at: "x", note: "n", details: "d" },
-  ];
-  const left = await flushPending(list, async (r) => {
-    if (r.id === "boom") throw new Error("offline");
-    return r.id === "ok";
-  });
-  assert.deepEqual(left.map((r) => r.id), ["no", "boom"]);
-});
-
-test("the relay address is a build-time setting: only an https address counts, and none means reports are kept", () => {
-  assert.equal(relayUrlFrom("https://relay.example.com/report"), "https://relay.example.com/report");
-  assert.equal(relayUrlFrom("  https://relay.example.com/r  "), "https://relay.example.com/r");
-  for (const bad of ["", "http://relay.example.com", "javascript:1", "relay.example.com", undefined, 5, null]) assert.equal(relayUrlFrom(bad), "");
+test("F-9: the 2,000-character cut never splits an emoji", () => {
+  const text = "a".repeat(1999) + "😀" + "tail";
+  const cut = cutNote(text, 2000);
+  assert.equal(cut, "a".repeat(1999), "the emoji does not fit whole, so it is left out, not halved");
+  assert.doesNotMatch(cut, /[\ud800-\udbff]$/);
+  assert.equal(makeReport(text, "", now, "x").note, cut);
+  assert.equal(cutNote("short", 2000), "short");
+  assert.equal(cutNote("a" + "👨‍👩‍👧" + "b", 5), "a", "a joined family emoji is one character");
 });

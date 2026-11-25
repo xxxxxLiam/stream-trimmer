@@ -307,6 +307,12 @@
   },
   {
    "wait": 300
+  },
+  {
+   "hover": "[data-panel='preview']"
+  },
+  {
+   "wait": 200
   }
  ],
  "stub": {

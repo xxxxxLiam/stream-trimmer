@@ -47,7 +47,7 @@ export default function HelpReport(p: HelpReportProps) {
               rows={3}
               value={p.note}
               onChange={(e) => p.onNote(e.target.value)}
-              className="box-border h-[88px] resize-none rounded-control border border-hairlineStrong bg-raised p-[12px] text-body leading-[20px] text-fg outline-none"
+              className="box-border h-[88px] resize-none rounded-control border border-hairlineStrong bg-raised p-[12px] text-body leading-[20px] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost"
             />
             <p className="m-[0px] text-meta text-fg-dim">Clipr adds the error, the version numbers and a cleaned log. Nothing is sent unless you press Send report.</p>
             <div className="flex gap-[8px]">

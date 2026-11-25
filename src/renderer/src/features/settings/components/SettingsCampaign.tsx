@@ -1,10 +1,11 @@
 /**
  * File: SettingsCampaign.tsx
  * Path: src/renderer/src/features/settings/components/SettingsCampaign.tsx
- * Description: One campaign (Settings.dc.html view 3): Clips a day, Extra seconds at both ends,
- *   Languages, Folder with Open, the Final Cut library and event while Final Cut Pro is ticked, and
+ * Description: One campaign (Settings.dc.html view 3): Name, Clips a day, Extra seconds at both ends,
+ *   Languages, Folder with Change and Open, the Final Cut library and event while Final Cut Pro is ticked, and
  *   Delete campaign. No clip id fields, no format or quality.
  */
+import { useState } from "react";
 import { DrawerHeader, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 import FinalCutLayout, { type FinalCutLayoutProps } from "./FinalCutLayout";
 import FinalCutLook, { type FinalCutLookProps } from "./FinalCutLook";
@@ -33,6 +34,10 @@ export type SettingsCampaignProps = {
   onPatch: (p: Partial<CampaignPrefs>) => void;
   onToggleLanguage: (code: string) => void;
   onOpenFolder: () => void;
+  /** Choose a different folder for this campaign. Returns a sentence when it was refused, else null. */
+  onChangeFolder: () => Promise<string | null>;
+  /** Rename. Returns the problem sentences (empty, too long, taken) or none once saved. */
+  onRename: (name: string) => string[];
   /** True after the first click on Delete; the second click deletes. */
   confirmingDelete: boolean;
   onDelete: () => void;
@@ -45,10 +50,43 @@ const fieldInput = "h-target min-w-0 rounded-control border border-hairlineStron
 
 export default function SettingsCampaign(p: SettingsCampaignProps) {
   const { prefs } = p;
+  const [draft, setDraft] = useState<string | null>(null);
+  const [nameProblem, setNameProblem] = useState("");
+  const [folderProblem, setFolderProblem] = useState("");
+  const commitName = () => {
+    if (draft === null) return;
+    if (draft.trim() === p.name) {
+      setDraft(null);
+      setNameProblem("");
+      return;
+    }
+    const found = p.onRename(draft);
+    setNameProblem(found[0] ?? "");
+    if (!found.length) setDraft(null);
+  };
   return (
     <>
       <DrawerHeader closeName="Settings" title={p.name} back="Campaigns" onBack={p.onBack} onClose={p.onClose} />
       <div className={drawerBody}>
+      <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
+        <label htmlFor="campaign-name" className="text-body leading-[normal]">Name</label>
+        <input
+          id="campaign-name"
+          type="text"
+          maxLength={80}
+          value={draft ?? p.name}
+          aria-invalid={nameProblem ? true : undefined}
+          aria-describedby={nameProblem ? "campaign-name-problem" : undefined}
+          onChange={(e) => { setDraft(e.target.value); setNameProblem(""); }}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitName();
+            if (e.key === "Escape" && draft !== null) { e.stopPropagation(); setDraft(null); setNameProblem(""); }
+          }}
+          className={`${fieldInput} ${nameProblem ? "border-error" : ""}`}
+        />
+        {nameProblem && <span id="campaign-name-problem" role="alert" className="text-meta text-error">{nameProblem}</span>}
+      </div>
       <div className="flex h-[53px] items-center gap-[8px] border-b border-hairline">
         <span className="flex-1 text-body leading-[normal]">Clips a day</span>
         <button type="button" aria-label="One fewer clip a day" disabled={p.quota <= 1} onClick={() => p.onQuota(stepClipsPerDay(p.quota, -1))} className={stepButton}>−</button>
@@ -106,14 +144,20 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
         </div>
       </div>
       )}
-      <div className="flex items-center gap-[12px] py-[12px]">
+      <div className="flex flex-col gap-[4px] py-[12px]">
+      <div className="flex items-center gap-[8px]">
         <div className="flex min-w-[0px] flex-1 flex-col gap-[2px]">
           <span className="text-body leading-[normal]">Folder</span>
           <span className="truncate text-meta text-fg-dim">{p.folderLabel}</span>
         </div>
+        <button type="button" aria-label={`Change the ${p.name} folder`} onClick={() => void p.onChangeFolder().then((e) => setFolderProblem(e ?? ""))} className={outlineButton}>
+          Change
+        </button>
         <button type="button" aria-label={`Open the ${p.name} folder`} onClick={p.onOpenFolder} className={outlineButton}>
           Open
         </button>
+      </div>
+      {folderProblem && <span role="alert" className="text-meta text-error">{folderProblem}</span>}
       </div>
       {p.finalCut && (
         <div role="group" aria-label="Final Cut Pro" className="flex flex-col gap-[8px] rounded-control border border-hairlineStrong bg-raised p-[12px]">

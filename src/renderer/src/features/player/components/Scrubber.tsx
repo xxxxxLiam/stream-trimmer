@@ -85,7 +85,7 @@ export default function Scrubber({ duration, playhead, range, flags, view, onSee
   );
 }
 
-/** The track of a joined clip: one stretch per section, the one playing bright, a tick between, the playhead over it. */
+/** The track of a joined clip: one stretch per section, every one solid Ice as the board draws it, a tick between, the playhead over it. */
 function JoinedTrack({
   sections,
   at,
@@ -107,12 +107,11 @@ function JoinedTrack({
         const left = (offset / total) * 100;
         const width = (len / total) * 100;
         offset += len;
-        const playing = playhead >= s.start && playhead < s.end;
         return (
           <span key={`${s.start}-${s.end}`}>
             <span
               aria-hidden="true"
-              className={`absolute inset-y-[0px] rounded-[3px] ${playing ? "bg-ice" : "bg-ice-tint-50"}`}
+              className={`absolute inset-y-[0px] rounded-[3px] bg-ice`}
               style={{ left: `${left}%`, width: `calc(${width}% - ${i < sections.length - 1 ? 3 : 0}px)` }}
             />
             {i < sections.length - 1 ? (

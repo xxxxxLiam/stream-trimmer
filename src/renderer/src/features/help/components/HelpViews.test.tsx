@@ -104,3 +104,14 @@ test("the footer pill opens Help on its sign-in page", () => {
   assert.match(app, /onSignIn=\{openSignIn\}/);
   assert.match(app, /<HelpDrawer open=\{helpOpen\} onClose=\{closeHelp\} startAt=\{helpStartAt\}/);
 });
+
+test("F-9 and F-16: one report per click, the note goes with the report, Replay tips closes Help first", () => {
+  const read = (f: string) => readFileSync(join(process.cwd(), "src/renderer/src/features", f), "utf8");
+  const m = read("help/hooks/useReportMutations.ts");
+  assert.match(m, /if \(sending\.current\) return;/);
+  const c = read("help/hooks/useHelpController.ts");
+  assert.match(c, /await report\.send\(note\);\s*setNote\(""\)/);
+  assert.match(c, /report\.reset\(\);\s*setNote\(""\)/);
+  const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
+  assert.match(app, /onReplay: \(\) => \{ closeHelp\(\); tips\.replay\(\); \}/);
+});

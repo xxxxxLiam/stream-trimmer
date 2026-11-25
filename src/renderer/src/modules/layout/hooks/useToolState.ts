@@ -29,7 +29,7 @@ function set(patch: Partial<ToolState>) {
   for (const l of listeners) l();
 }
 
-export const clampZoom = (z: number) => Math.min(100, Math.max(0, Math.round(z)));
+export const clampZoom = (z: number) => Math.min(100, Math.max(0, Math.round(z * 10) / 10));
 
 export function setTool(tool: TimelineTool) {
   set({ tool });

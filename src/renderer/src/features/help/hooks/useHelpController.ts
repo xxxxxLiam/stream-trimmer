@@ -46,12 +46,20 @@ export function useHelpController({ open, onClose, startAt }: { open: boolean; o
     if (id === "shortcuts") setView({ kind: "shortcuts" });
     else if (id === "report") {
       report.reset();
+      setNote("");
       setView({ kind: "report" });
     } else if (id === "about") setView({ kind: "about" });
   };
 
+  // The note goes with the report; the next time Report a problem opens it is empty again.
+  const sendReport = async () => {
+    await report.send(note);
+    setNote("");
+  };
+
   return {
     view,
+    sendReport,
     top: () => setView({ kind: "top" }),
     openAnswer: (id: string) => setView({ kind: "answer", id }),
     openMore,
