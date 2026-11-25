@@ -79,6 +79,12 @@ export function safeFileName(name: string): string {
   return n.slice(0, 80).trim();
 }
 
+/** The first two words of a video title, letters and digits only ("Podcast #214, the long talk" gives "Podcast 214"). */
+export function titleWords(title: string): string {
+  const words = title.match(/[\p{L}\p{N}][\p{L}\p{N}'\u2019-]*/gu) ?? [];
+  return safeFileName(words.slice(0, 2).join(" "));
+}
+
 /** Ranked candidate names for one clip (joined clips pass every range). Best first. */
 export function rankedNames(
   table: NameTable,
@@ -128,6 +134,6 @@ export function suggestClipName(opts: {
     const safe = safeFileName(pick);
     if (safe) return nextFree(safe, taken);
   }
-  const title = safeFileName(opts.videoTitle) || "Clip";
+  const title = titleWords(opts.videoTitle) || "Clip";
   for (let n = 1; ; n++) if (!taken.has(`${title} ${n}`.toLowerCase())) return `${title} ${n}`;
 }
