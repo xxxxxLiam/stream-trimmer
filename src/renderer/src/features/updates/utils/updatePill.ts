@@ -25,3 +25,8 @@ export function restartRefusal(result: RestartToUpdateResult): string | null {
   if (result.reason === "nothing-ready") return null;
   return "The update could not restart the app. It will install when you quit.";
 }
+
+/** The quiet pill while the new version downloads (no click: nothing to do yet). */
+export function downloadingLabel(percent: number): string {
+  return `Downloading update ${Math.max(0, Math.min(100, Math.round(percent)))}%`;
+}
