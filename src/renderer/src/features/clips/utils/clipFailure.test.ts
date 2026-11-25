@@ -41,9 +41,9 @@ test("R retries; Cmd R and typing do not", () => {
 });
 
 test("the engine's row state decides the kind and whether the retry was spent", () => {
-  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: false }), { kind: "stopped", attempts: 1 });
-  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: true }), { kind: "stopped", attempts: 1, retrying: true });
-  assert.deepEqual(rowFailure({ state: "failed-final", reason: "x" }), { kind: "stopped", attempts: 2 });
+  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: false }), { kind: "stopped", attempts: 1, reason: "x" });
+  assert.deepEqual(rowFailure({ state: "failed", reason: "x", retrying: true }), { kind: "stopped", attempts: 1, reason: "x", retrying: true });
+  assert.deepEqual(rowFailure({ state: "failed-final", reason: "x" }), { kind: "stopped", attempts: 1, reason: "x", final: true });
   assert.deepEqual(rowFailure({ state: "no-space", reason: "x" }), { kind: "disk", attempts: 1 });
   assert.deepEqual(rowFailure({ state: "cannot-download", kind: "private", reason: "x" }), { kind: "private", attempts: 1 });
   assert.deepEqual(rowFailure({ state: "cannot-download", kind: "other", reason: "Members only." }), {
@@ -106,4 +106,21 @@ test("C-8: Copy details joins after the second failed Retry for every kind that 
     assert.ok(!failureActions(k, 1).includes("copyDetails"), `${k} first failure`);
     assert.ok(failureActions(k, 2).includes("copyDetails"), `${k} second failure`);
   }
+});
+
+test("E2-1 renderer half: the engine's new codes map, and a final row shows the engine's own sentence with Copy details", () => {
+  assert.equal(classifyClipFailure("video_removed"), "removed");
+  assert.equal(classifyClipFailure("bot_check"), "signin");
+  assert.equal(classifyClipFailure("access_refused"), "refused");
+  assert.equal(classifyClipFailure("rate_limited"), "ratelimited");
+  assert.equal(classifyClipFailure("format_unavailable"), "format");
+  assert.equal(classifyClipFailure("tools_missing"), "tools");
+  assert.match(failureCopy("ratelimited", 1).reason, /slow down/);
+  assert.match(failureCopy("format", 1).reason, /quality/);
+  assert.match(failureCopy("tools", 1).detail, /Restart Clipr/);
+  assert.equal(failureCopy("refused", 1, "YouTube turned this download down.").reason, "YouTube turned this download down.");
+  assert.equal(failureCopy("stopped", 1, "The engine's own words.").reason, "The engine's own words.");
+  assert.deepEqual(failureActions("stopped", 1, true), ["retry", "copyDetails"]);
+  assert.deepEqual(failureActions("format", 1, true), ["retry", "copyDetails"]);
+  assert.deepEqual(failureActions("offline", 1, true), ["retry"], "a kind with its own full sentence waits for the second failed Retry");
 });

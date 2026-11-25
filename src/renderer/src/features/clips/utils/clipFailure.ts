@@ -8,7 +8,7 @@
 import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { RETRY_SENTENCE } from "../../../../../common/types/clipRowState";
 
-export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "removed" | "refused";
+export type ClipFailureKind = "stopped" | "disk" | "private" | "offline" | "toolong" | "signin" | "removed" | "refused" | "ratelimited" | "format" | "tools";
 export type FailureAction = "retry" | "copyDetails" | "changeFolder" | "showInBrowser" | "saveForLater" | "signIn";
 
 /** What a plain "the network is down" failure looks like in the engine's message (no YouTube error involved). */
@@ -24,8 +24,12 @@ export function classifyClipFailure(code: string | undefined, message?: string):
   if (message && TOO_LONG.test(message)) return "toolong";
   if (code === "disk_full" || code === "save_folder_gone") return "disk";
   if (code === "private_video") return "private";
-  if (code === "sign_in_needed") return "signin";
-  if (code === "video_unavailable") return "removed";
+  if (code === "sign_in_needed" || code === "bot_check") return "signin";
+  if (code === "video_unavailable" || code === "video_removed") return "removed";
+  if (code === "access_refused") return "refused";
+  if (code === "rate_limited") return "ratelimited";
+  if (code === "format_unavailable") return "format";
+  if (code === "tools_missing") return "tools";
   if (code === "network_dropped") return "offline";
   if (message && REFUSED.test(message)) return "refused";
   // Only a failure with no code of its own and a network cause in its words is "offline".
@@ -34,15 +38,17 @@ export function classifyClipFailure(code: string | undefined, message?: string):
 }
 
 /** The engine's row state wins over the code: it knows whether the one retry was spent. */
-export function rowFailure(row: ClipRowState): { kind: ClipFailureKind; attempts: number; reason?: string; retrying?: boolean } {
+export function rowFailure(row: ClipRowState): { kind: ClipFailureKind; attempts: number; reason?: string; retrying?: boolean; final?: boolean } {
   if (row.state === "no-space") return { kind: "disk", attempts: 1 };
   if (row.state === "cannot-download") {
     return row.kind === "other"
       ? { kind: "private", attempts: 1, reason: row.reason }
       : { kind: "private", attempts: 1 };
   }
-  // Only a row that says the engine IS retrying may promise it; a plain failure promises nothing.
-  return { kind: "stopped", attempts: row.state === "failed-final" ? 2 : 1, ...(row.state === "failed" && row.retrying ? { retrying: true } : {}) };
+  // Only a row that says the engine IS retrying may promise it; a plain failure promises nothing. A final row
+  // carries the engine's own plain sentence, and it is final: nothing more is coming, so Copy details joins.
+  if (row.state === "failed-final") return { kind: "stopped", attempts: 1, reason: row.reason, final: true };
+  return { kind: "stopped", attempts: 1, reason: row.reason, ...(row.retrying ? { retrying: true } : {}) };
 }
 
 /** While the engine updates its tools and tries once more, the Making row says so. */
@@ -66,19 +72,25 @@ export function failureCopy(
   }
   if (kind === "signin") return { reason: "YouTube wants you signed in for this video.", detail: "Sign in, then Retry. Your range is kept." };
   if (kind === "removed") return { reason: "This video was removed or isn’t available.", detail: "Your range is kept." };
-  if (kind === "refused") return { reason: "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
+  if (kind === "refused") return { reason: reasonOverride ?? "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
   // "Will try once more" is said only when the engine really is about to (retrying:true).
-  return { reason: "YouTube stopped the download.", detail: retrying ? RETRY_SENTENCE : "" };
+  if (kind === "ratelimited") return { reason: reasonOverride ?? "YouTube is asking Clipr to slow down.", detail: "Try again in a few minutes." };
+  if (kind === "format") return { reason: reasonOverride ?? "That quality isn’t available for this video.", detail: "Pick another quality, then Retry." };
+  if (kind === "tools") return { reason: reasonOverride ?? "Clipr’s download tools are missing.", detail: "Restart Clipr, then Retry." };
+  // The engine's own plain sentence when it sent one; "will try once more" only when it really is retrying.
+  return { reason: reasonOverride ?? "YouTube stopped the download.", detail: retrying ? RETRY_SENTENCE : "" };
 }
 
 /** Retry; after the retry also failed, Copy details joins it. */
-export function failureActions(kind: ClipFailureKind, attempts: number): FailureAction[] {
+export function failureActions(kind: ClipFailureKind, attempts: number, final = false): FailureAction[] {
   if (kind === "disk") return ["changeFolder"];
   if (kind === "private" || kind === "removed") return ["showInBrowser", "saveForLater"];
   if (kind === "toolong") return [];
   if (kind === "signin") return attempts >= 2 ? ["signIn", "retry", "copyDetails"] : ["signIn", "retry"];
-  // The rest get Retry (no engine retry is promised), with Copy details once the Retry also failed.
-  return attempts >= 2 ? ["retry", "copyDetails"] : ["retry"];
+  // The rest get Retry (no engine retry is promised), with Copy details once the Retry also failed. A kind with
+  // no sentence of its own (the engine's words stand in) has Copy details at once when the engine says final.
+  const generic = kind === "stopped" || kind === "refused" || kind === "ratelimited" || kind === "format" || kind === "tools";
+  return attempts >= 2 || (final && generic) ? ["retry", "copyDetails"] : ["retry"];
 }
 
 /** R retries, but never while typing in a field and never with a modifier (⌘R is not used). */
