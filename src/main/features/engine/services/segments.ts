@@ -559,7 +559,7 @@ export function classifyFailure(
   if (PATTERNS.formatGone.test(text)) {
     return failure(
       "format_unavailable",
-      502,
+      500,
       "YouTube offers no version of this video at the quality you asked for",
       { id: "retry", label: "Pick another quality, then try again" },
       kept(),
