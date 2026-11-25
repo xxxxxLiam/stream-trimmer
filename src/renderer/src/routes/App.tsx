@@ -18,6 +18,8 @@ import {
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
+import { useFlushPendingReports } from "../features/help/hooks/useReportMutations";
+import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
 import { CHANNEL_DATA_BUILT, useOwnerAccess } from "../shared/utils/ownerGate";
@@ -44,6 +46,7 @@ import {
 import TopBar from "../modules/layout/components/TopBar";
 import BottomBar from "../modules/layout/components/BottomBar";
 import { useSignInSignalEffects } from "../modules/layout/hooks/useSignInSignalEffects";
+import SettingsRestoredNote from "../features/settings/components/SettingsRestoredNote";
 import TipCard from "../features/tips/components/TipCard";
 import { useTipsController } from "../features/tips/hooks/useTipsController";
 import ImportDrawer from "../features/import/components/ImportDrawer";
@@ -506,6 +509,7 @@ function Layout({ active }: { active: boolean }) {
 
   return (
     <>
+      <SettingsRestoredNote />
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
@@ -570,6 +574,7 @@ function Layout({ active }: { active: boolean }) {
 }
 
 function Shell() {
+  useFlushPendingReports();
   const { tabs, activeId, setTabCampaign } = useWorkspace();
 
   // No background polling. On launch we read the imported cookies.txt once
@@ -613,7 +618,7 @@ function Shell() {
 
 export default function App() {
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallback={(error) => <CrashScreenHost error={error} />}>
       <WorkspaceProvider>
         <CampaignProvider>
           <Shell />

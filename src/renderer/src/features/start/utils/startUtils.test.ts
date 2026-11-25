@@ -34,3 +34,13 @@ test("the engine's tool report becomes the cold start state", () => {
   assert.equal(toolsStatusFrom(null), "ready");
   assert.equal(toolsStatusFrom({ overall: 3 }), "ready");
 });
+
+test("B-4: a failed open never shows tool output, only a plain sentence", async () => {
+  const { plainOpenError, OPEN_FAILED } = await import("./startUtils");
+  assert.equal(plainOpenError("This video is private. Sign in to open it."), "This video is private. Sign in to open it.");
+  assert.equal(plainOpenError("ERROR: [youtube] abc: Private video. yt-dlp exitCode=1"), OPEN_FAILED);
+  assert.equal(plainOpenError("Command failed: /usr/local/bin/yt-dlp --dump-json"), OPEN_FAILED);
+  assert.equal(plainOpenError("something broke\n    at run (/app/x.js:1:2)"), OPEN_FAILED);
+  assert.equal(plainOpenError(""), OPEN_FAILED);
+  assert.doesNotMatch(OPEN_FAILED, /exitCode/);
+});
