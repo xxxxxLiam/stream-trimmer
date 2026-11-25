@@ -46,6 +46,7 @@ export function setupAutoUpdater() {
     activeClips: activeJobCount,
     sendStatus: sendUpdateStatus,
     sendReady: (payload) => send(IPC.updaterReady, payload),
+    sendRestartWaiting: (waiting) => send(IPC.updaterRestartWaiting, waiting),
     downloadUrl: (version) => downloadUrl(process.platform, version),
     releasesUrl,
     log: (message) => logger.log("updater", message),
