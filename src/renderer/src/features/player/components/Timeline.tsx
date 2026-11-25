@@ -62,9 +62,20 @@ export default function Timeline() {
         onPointerUp={c.onLanePointerUp}
       >
         <TimelineRuler c={c} />
-        {transcriptLane ? <TranscriptLane c={c} /> : null}
-        <SourceLane c={c} height={sourceLaneHeight(height)} />
-        <ClipsLane c={c} />
+        {/* A timeline too short for its tracks scrolls up and down under the ruler, which stays put. The
+            bar is hidden app-wide, so the wheel, two-finger scroll and (focused) the arrow, Page Up/Down,
+            Home and End keys are the routes. */}
+        <div
+          data-timeline-tracks
+          tabIndex={0}
+          role="region"
+          aria-label="Timeline tracks"
+          className="min-h-[0px] flex-1 overflow-y-auto overflow-x-hidden outline-none focus-visible:outline-2"
+        >
+          {transcriptLane ? <TranscriptLane c={c} /> : null}
+          <SourceLane c={c} height={sourceLaneHeight(height)} />
+          <ClipsLane c={c} />
+        </div>
       </div>
       {c.folded && c.fold[0] ? (
         <div className="absolute bottom-[8px] right-[16px] text-meta text-fg-dim">Zoom: 52 s each side of the fold</div>
