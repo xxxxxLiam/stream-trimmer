@@ -280,7 +280,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: "I", does: "Mark the start of a part" },
   { keys: "O", does: "Mark the end of a part" },
   { keys: "M", does: "Drop a flag at the playhead" },
-  { keys: "A  B  S", does: "Timeline tools: Pointer, Scissors, Select range" },
+  { keys: "A  B  D", does: "Timeline tools: Pointer, Scissors, Select range" },
   { keys: "F  H  Z", does: "Timeline tools: Flag, Hand, Zoom" },
   { keys: "Shift N", does: "Go to the next video" },
   { keys: "⌘ Enter", does: "Clip" },
