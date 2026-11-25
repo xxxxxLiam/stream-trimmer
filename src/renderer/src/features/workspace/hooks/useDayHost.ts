@@ -6,6 +6,7 @@
  */
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { bankStore } from "../../../shared/utils/bank";
+import { useToday } from "../../../shared/hooks/useToday";
 import { clipsMadeToday } from "../../../shared/utils/campaigns";
 import { extractVideoId } from "../../../shared/utils/clip";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
@@ -16,6 +17,7 @@ import { nextWaitingId, waitingIn } from "../utils/videoList";
 export function useDayHost(): { day: DayState; onNextVideo: () => void } {
   const ws = useWorkspace();
   const { active: campaign } = useCampaign();
+  const now = useToday();
   const bank = useSyncExternalStore(bankStore.subscribe, bankStore.get, bankStore.get);
 
   const waitingOf = useCallback(
@@ -30,10 +32,10 @@ export function useDayHost(): { day: DayState; onNextVideo: () => void } {
     () => ({
       campaignName: campaign?.name ?? null,
       next: nextTab ? { title: ws.labelFor(nextTab.id), waiting: waitingOf(nextTab) } : null,
-      made: clipsMadeToday(campaign),
+      made: clipsMadeToday(campaign, now),
       quota: campaign?.dailyQuota ?? null,
     }),
-    [campaign, nextTab, ws, waitingOf],
+    [campaign, nextTab, ws, waitingOf, now],
   );
 
   const onNextVideo = useCallback(() => {
