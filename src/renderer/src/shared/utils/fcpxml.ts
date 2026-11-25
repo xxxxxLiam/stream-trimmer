@@ -744,7 +744,7 @@ export function groupByVideo(clips: Pick<FcpClip, "sourceUrl" | "sourceTitle">[]
 }
 
 /** A keyword value: commas separate keywords in Final Cut, so a title's own comma becomes a space. */
-const keywordText = (name: string) => name.replace(/,/g, " ").replace(/\s+/g, " ").trim();
+export const keywordText = (name: string) => name.replace(/,/g, " ").replace(/\s+/g, " ").trim();
 
 function legacyEvents(
   mediaEvent: string,
