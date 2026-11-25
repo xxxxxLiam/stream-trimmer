@@ -13,6 +13,7 @@ import path from "node:path";
 import electron from "electron";
 import {
   dragTarget,
+  existsWithin,
   moveWithoutOverwrite,
   resolveTarget,
   writeWithoutOverwrite,
@@ -125,16 +126,10 @@ export async function saveFiles(payload: any) {
 
 /**
  * Cheap existence probe so the Downloads list can dim rows whose file was
- * moved or deleted outside the app.
+ * moved or deleted outside the app. Only answers for paths inside the folders the person chose.
  */
 export function fileExists(targetPath: string): boolean {
-  try {
-    return typeof targetPath === "string" && targetPath
-      ? fs.existsSync(targetPath)
-      : false;
-  } catch {
-    return false;
-  }
+  return existsWithin(targetPath, saveRoots());
 }
 
 /**

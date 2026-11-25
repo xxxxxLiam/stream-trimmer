@@ -92,6 +92,21 @@ function dragTarget(targetPath: unknown, roots: string[]): string | null {
   }
 }
 
+/**
+ * Whether `targetPath` is a file or folder that exists AND lies inside one of `roots` (E-12). Anything outside them
+ * answers false, so the probe cannot be used to ask whether any file on the computer exists.
+ */
+function existsWithin(targetPath: unknown, roots: string[]): boolean {
+  if (typeof targetPath !== "string" || !targetPath || targetPath.includes("\0") || !path.isAbsolute(targetPath)) return false;
+  try {
+    if (!fs.existsSync(targetPath)) return false;
+    // Inside a chosen folder by its real location, so a link pointing outside it does not count.
+    return roots.some((r: unknown) => isInside(r, fs.realpathSync(targetPath), { allowRoot: false }));
+  } catch {
+    return false;
+  }
+}
+
 /** `a.mp4` -> `a 2.mp4`, `a 3.mp4`, ... (same convention as editorOpen.ts). */
 function numberedPath(target: string, n: number): string {
   const ext = path.extname(target);
@@ -150,6 +165,7 @@ export {
   allowedRoots,
   resolveTarget,
   dragTarget,
+  existsWithin,
   numberedPath,
   moveWithoutOverwrite,
   writeWithoutOverwrite,
