@@ -232,8 +232,17 @@ export interface ElectronAPI {
     version?: string;
     error?: string;
   }>;
-  /** Restarts into the downloaded update; refuses with reason "busy" while a clip is being made. */
+  /**
+   * Restarts into the downloaded update. While a clip is being made it answers `{ ok: true, waiting: true }` and
+   * Clipr restarts by itself once the clips finish (the pill reads "Restarts after <video>").
+   */
   restartToUpdate: () => Promise<RestartToUpdateResult>;
+  /** Ends a waiting restart (pressing the pill again). `cancelled` is false when nothing was waiting. */
+  cancelRestartToUpdate?: () => Promise<{ ok: true; cancelled: boolean }>;
+  /** Whether a restart is waiting right now (for a window that opened after the event). */
+  getRestartWaiting?: () => Promise<boolean>;
+  /** Fires true when a restart starts waiting, false when the wait ends (cancelled, or Clipr is restarting). */
+  onRestartWaiting?: (cb: (waiting: boolean) => void) => () => void;
   /** An update that is ready right now (for a window that opened after the event). */
   getUpdateReady: () => Promise<UpdateReady | null>;
   /** One event when a version is ready: restart (Windows, Linux) or download (unsigned Mac). */
