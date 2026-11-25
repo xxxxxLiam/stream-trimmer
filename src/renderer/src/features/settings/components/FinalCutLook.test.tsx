@@ -54,3 +54,17 @@ test("an error is one sentence in red, and the steps open in place", () => {
   assert.match(h, /Show Package Contents/);
   assert.doesNotMatch(html({}), /Show Package Contents/);
 });
+
+test("wiring: the row is fed by the saved-looks hook; the old paste editor is gone", async () => {
+  const { readFileSync, existsSync } = await import("node:fs");
+  const dir = new URL(".", import.meta.url).pathname;
+  const drawer = readFileSync(`${dir}SettingsDrawer.tsx`, "utf8");
+  assert.match(drawer, /useFinalCutLook\(/);
+  assert.match(drawer, /\blook,\n/);
+  assert.equal(existsSync(`${dir}../../handoff/components/LookEditor.tsx`), false);
+  const handoff = readFileSync(`${dir}../../handoff/components/EditorHandoff.tsx`, "utf8");
+  assert.doesNotMatch(handoff, /LookEditor|My look/);
+  const hook = readFileSync(`${dir}../hooks/useFinalCutLook.ts`, "utf8");
+  assert.match(hook, /addPickedLook/);
+  assert.match(hook, /deleteSavedLook/);
+});
