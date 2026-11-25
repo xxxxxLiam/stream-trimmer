@@ -87,7 +87,7 @@ export default function VideosPanel() {
       <div
         id="ui-source-chip"
         role="search"
-        className="mx-[10px] mb-[10px] mt-[10px] flex h-target flex-none items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
+        className="mx-[10px] mb-[9px] mt-[10px] flex h-target flex-none items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
       >
         <IconSearch />
         {v.pills.map((p) => (

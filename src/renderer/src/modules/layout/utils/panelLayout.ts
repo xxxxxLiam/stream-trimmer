@@ -21,7 +21,7 @@ export type PanelLayout = {
   sizes: PanelSizes;
 };
 
-export const DEFAULT_SIZES: PanelSizes = { left: 300, right: 300, timeline: 197 };
+export const DEFAULT_SIZES: PanelSizes = { left: 300, right: 300, timeline: 200 };
 
 /** Resize limits. The centre keeps at least CENTRE_MIN_W whatever the sides are set to. */
 export const SIZE_LIMITS = {

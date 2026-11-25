@@ -38,7 +38,7 @@ const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] =
 
 const VALUE_BUTTON = "inline-flex h-[44px] items-center";
 const VALUE_FACE =
-  "inline-flex h-[28px] items-center gap-[6px] rounded-control border border-hairlineStrong bg-raised px-[10px] text-meta text-fg";
+  "inline-flex h-[30px] items-center gap-[6px] rounded-control border border-hairlineStrong bg-raised px-[10px] text-meta text-fg";
 
 export type BottomBarProps = {
   /** How many clips the next Clip makes (one per ticked language). */
@@ -97,7 +97,7 @@ export default function BottomBar({
   ];
 
   return (
-    <div className="relative m-[8px] flex h-[54px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-[6px] text-meta text-fg-dim">
+    <div className="relative mx-[8px] mb-[3px] mt-[8px] flex h-[54px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-[6px] text-meta text-fg-dim">
       <div role="toolbar" aria-label="Timeline tools" className="flex">
         {TOOLS.map(({ tool: t, label, icon: IconFor }) => (
           <button

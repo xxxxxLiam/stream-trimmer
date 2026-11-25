@@ -1,6 +1,9 @@
 {
- "_doc": "Shared workspace fixture: an open video (stub yt-dlp, transcript from podcast214.vtt), two campaigns, a bank for the open video, three open videos Extends Preview (fake player at 1:12:31, range picked).",
- "extends": "Preview",
+ "_doc": "Board 03.2.4: Transcript tab open on the left.",
+ "extends": "MainMaking",
+ "stub": {
+  "vttFile": "podcast214-board.vtt"
+ },
  "steps": [
   {
    "wait": 1500
@@ -58,9 +61,33 @@
   },
   {
    "wait": 300
+  },
+  {
+   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-expanded]')].find(x=>/Done/.test(x.textContent)); if(b&&b.getAttribute('aria-expanded')==='false') b.click();})()"
+  },
+  {
+   "hover": "span:text-is('clip length')"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "(()=>{const b=[...document.querySelectorAll('button[aria-label=\"Make this clip\"]')];b[0].click()})()"
+  },
+  {
+   "waitFor": "[role=progressbar][aria-label*='%']"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "hover": "span:text-is('clip length')"
+  },
+  {
+   "wait": 200
   }
- ],
- "stub": {
-  "vttFile": "podcast214-board.vtt"
- }
+ ]
 }

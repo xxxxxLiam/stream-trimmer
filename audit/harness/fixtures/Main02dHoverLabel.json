@@ -1,0 +1,12 @@
+{
+ "_doc": "Board 03.2.5: hover label with the key over Forward 5 s.",
+ "extends": "MainMaking",
+ "stepsAppend": [
+  {
+   "hover": "button[aria-label='Forward 5 seconds']"
+  },
+  {
+   "wait": 300
+  }
+ ]
+}
