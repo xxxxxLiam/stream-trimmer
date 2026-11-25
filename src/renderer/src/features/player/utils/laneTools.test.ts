@@ -29,12 +29,29 @@ test("alt zooms out", () => {
 });
 
 test("the first-clip hint matches the tool in hand", () => {
-  assert.equal(pickHintLead("clip"), "Click to set the start, click again for the end");
-  assert.equal(pickHintLead("pointer"), "Drag on the timeline");
+  assert.equal(pickHintLead("clip"), "Drag on the timeline, or click to set the start and click again for the end");
+  assert.equal(pickHintLead("pointer"), "Choose the scissors, then drag on the timeline");
 });
 
 test("B2-8: flag, hand and zoom each get their own hint, none says Drag", () => {
   const leads = ["flag", "hand", "zoom"].map(pickHintLead);
   assert.equal(new Set(leads).size, 3);
-  for (const l of leads) assert.doesNotMatch(l, /^Drag/);
+  for (const l of leads) assert.doesNotMatch(l, /^(Drag|Choose)/);
+});
+
+import { clampX, wheelAction } from "./laneTools";
+
+test("wheel: sideways pans, Shift+wheel pans, Ctrl/Cmd+wheel zooms, plain vertical is left alone", () => {
+  const e = { deltaX: 0, deltaY: 0, shiftKey: false, ctrlKey: false, metaKey: false };
+  assert.deepEqual(wheelAction({ ...e, deltaX: 40, deltaY: 3 }), { kind: "pan", pixels: 40 });
+  assert.deepEqual(wheelAction({ ...e, deltaY: 30, shiftKey: true }), { kind: "pan", pixels: 30 });
+  assert.equal(wheelAction({ ...e, deltaY: 30 }), null);
+  assert.deepEqual(wheelAction({ ...e, deltaY: -10, ctrlKey: true }), { kind: "zoom", direction: 1 });
+  assert.deepEqual(wheelAction({ ...e, deltaY: 10, metaKey: true }), { kind: "zoom", direction: -1 });
+});
+
+test("a scrub that leaves the lane stays on its ends", () => {
+  assert.equal(clampX(-20, 500), 0);
+  assert.equal(clampX(900, 500), 500);
+  assert.equal(clampX(120, 500), 120);
 });

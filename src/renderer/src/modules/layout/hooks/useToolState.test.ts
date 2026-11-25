@@ -19,3 +19,8 @@ test("zoom is clamped, Fit resets it and counts, the tool changes", () => {
   assert.equal(getToolStateForTest().tool, "flag");
   assert.equal(clampZoom(12.644), 12.64, "hundredths, so Fit can frame a range as the board does");
 });
+
+test("a fresh timeline starts on the pointer, which only moves the playhead", () => {
+  resetToolStateForTest();
+  assert.equal(getToolStateForTest().tool, "pointer");
+});

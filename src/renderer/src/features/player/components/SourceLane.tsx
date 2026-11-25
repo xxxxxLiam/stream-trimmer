@@ -3,8 +3,9 @@
  * Path: src/renderer/src/features/player/components/SourceLane.tsx
  * Description: The Source lane: the filmstrip with unused footage dimmed, the picked range outlined
  *   in Ice with its glow, flags, the Frost playhead, and the fold. The lane is where the tools act:
- *   drag sets a range, the scissors click a start then an end, the flag tool drops flags.
+ *   the pointer moves the playhead (click or drag), the scissors drag a range or click a start then an end, the wheel pans, the flag tool drops flags.
  */
+import { useEffect, useRef } from "react";
 import type { TimelineController } from "../hooks/useTimelineController";
 import { pickHintLead } from "../utils/laneTools";
 import { toX } from "../utils/timelineAxis";
@@ -27,12 +28,25 @@ export default function SourceLane({ c }: { c: TimelineController }) {
     const end = c.axis.pieces[c.axis.pieces.length - 1]?.t1 ?? c.duration;
     if (at < end) dim.push({ start: at, end });
   }
+  const laneRef = useRef<HTMLDivElement>(null);
+  const onWheel = c.onLaneWheel;
+  // A native listener: React's wheel handler is passive and cannot stop the page from scrolling.
+  useEffect(() => {
+    const el = laneRef.current;
+    if (!el) return;
+    const h = (e: WheelEvent) => {
+      if (onWheel(e, el.getBoundingClientRect().left)) e.preventDefault();
+    };
+    el.addEventListener("wheel", h, { passive: false });
+    return () => el.removeEventListener("wheel", h);
+  });
   return (
     <div className="flex h-[44px] items-center">
       <LaneLabel>Source</LaneLabel>
       <div
         className={`relative h-full flex-1 touch-none select-none ${CURSORS[c.tool]}`}
         data-lane="source"
+        ref={laneRef}
         onPointerDown={c.onLanePointerDown}
         onPointerMove={c.onLanePointerMove}
         onPointerUp={c.onLanePointerUp}

@@ -14,7 +14,7 @@ import { useToolState } from "../../../modules/layout/hooks/useToolState";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
-import { grabbedEdge, scissorsClick, zoomStep } from "../utils/laneTools";
+import { clampX, grabbedEdge, scissorsClick, wheelAction, zoomStep } from "../utils/laneTools";
 import { snapToWord } from "../utils/snap";
 import { axisDuringDrag, axisTicks, foldedAxis, linearAxis, toT, toX, windowFor, type Axis, type Fold } from "../utils/timelineAxis";
 import { clockTime } from "../utils/transport";
@@ -123,37 +123,44 @@ export function useTimelineController() {
     }
     if (tools.tool === "hand") return s.setDrag({ kind: "pan", startX: e.clientX, startFocus: s.focus ?? playhead });
     if (tools.tool === "clip") {
-      // Scissors only mark: a first click is the start, the second is the end. They never seek.
-      const step = scissorsClick(s.scissorsStart, t);
-      if (step.kind === "start") {
-        s.setScissorsStart(step.at);
-        markByHand();
-        clipper.setStartFromSeconds(snap(step.at, "start"));
-        clipper.setEndText("");
-      } else {
-        setRange(step.start, step.end);
-        s.setScissorsStart(null);
+      // Scissors mark: press and drag sets a range, or click a start then click an end. They never
+      // seek. A grabbed edge of the picked range is dragged to resize it.
+      if (range) {
+        const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
+        if (edge) {
+          frozen.current = shown;
+          return s.setDrag({ kind: "edge", edge });
+        }
       }
+      frozen.current = shown;
+      s.setDrag({ kind: "range", anchor: t });
+      s.setDragOrigin(e.clientX);
       return;
     }
-    if (range) {
-      const edge = grabbedEdge(x, toX(axis, range.start), toX(axis, range.end));
-      if (edge) {
-        frozen.current = shown;
-        return s.setDrag({ kind: "edge", edge });
-      }
-    }
-    frozen.current = shown;
-    s.setDrag({ kind: "range", anchor: t });
-    s.setDragOrigin(e.clientX);
+    // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
+    s.setDrag({ kind: "scrub" });
+    clipper.requestSeek(Math.round(t));
   };
 
+  const lastScrub = useRef<number | null>(null);
   const onLanePointerMove = (e: PointerEvent<HTMLElement>) => {
     const d = s.drag;
     if (!d || e.buttons !== 1) return;
     if (d.kind === "pan") {
       const per = (win.end - win.start) / Math.max(1, s.width);
       s.setFocus(Math.min(duration, Math.max(0, d.startFocus - (e.clientX - d.startX) * per)));
+      return;
+    }
+    if (d.kind === "scrub") {
+      const box = e.currentTarget.getBoundingClientRect();
+      const at = toT(axis, clampX(e.clientX - box.left, box.width));
+      if (at !== null) {
+        const sec = Math.round(Math.min(Math.max(0, at), duration));
+        if (sec !== lastScrub.current) {
+          lastScrub.current = sec;
+          clipper.requestSeek(sec);
+        }
+      }
       return;
     }
     const t = timeAt(e);
@@ -169,11 +176,39 @@ export function useTimelineController() {
   const onLanePointerUp = (e: PointerEvent<HTMLElement>) => {
     const d = s.drag;
     s.setDrag(null);
-    // A plain click on the lane moves the playhead; a drag already set the range.
+    lastScrub.current = null;
+    // A scissors press that did not move is a click: the first one is the start, the second the end.
     if (d?.kind === "range" && Math.abs(e.clientX - s.dragOrigin) < DRAG_START_PX) {
       const t = timeAt(e);
-      if (t !== null) clipper.requestSeek(Math.round(t));
+      if (t === null) return;
+      const step = scissorsClick(s.scissorsStart, t);
+      if (step.kind === "start") {
+        s.setScissorsStart(step.at);
+        markByHand();
+        clipper.setStartFromSeconds(snap(step.at, "start"));
+        clipper.setEndText("");
+      } else {
+        setRange(step.start, step.end);
+        s.setScissorsStart(null);
+      }
+    } else if (d?.kind === "range") {
+      s.setScissorsStart(null); // a drag made the range
     }
+  };
+
+  /** Wheel and trackpad over the lane: pan sideways, Ctrl/Cmd zooms around the pointer. Returns true when used. */
+  const onLaneWheel = (e: WheelEvent, left: number): boolean => {
+    const act = wheelAction(e);
+    if (!act || !(duration > 0)) return false;
+    if (act.kind === "pan") {
+      const per = (win.end - win.start) / Math.max(1, s.width);
+      s.setFocus(Math.min(duration, Math.max(0, (s.focus ?? (win.start + win.end) / 2) + act.pixels * per)));
+    } else {
+      const at = toT(axis, e.clientX - left);
+      if (at !== null) s.setFocus(at);
+      tools.zoomBy(zoomStep(act.direction < 0));
+    }
+    return true;
   };
 
   const addSection = () => {
@@ -222,6 +257,7 @@ export function useTimelineController() {
     onLanePointerDown,
     onLanePointerMove,
     onLanePointerUp,
+    onLaneWheel,
     addSection,
     removeSection: (i: number) => store.remove(i),
     seek: (t: number) => clipper.requestSeek(t),

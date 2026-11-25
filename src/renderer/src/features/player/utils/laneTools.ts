@@ -27,13 +27,13 @@ export const ZOOM_STEP = 20;
 export const zoomStep = (alt: boolean) => (alt ? -ZOOM_STEP : ZOOM_STEP);
 
 /**
- * How the first-clip hint says to pick a part, for the tool in hand: scissors click twice, the pointer
- * drags, and the flag, hand and zoom tools do not pick a range at all so they point at the scissors.
+ * How the first-clip hint says to pick a part, for the tool in hand: scissors drag or click twice, the pointer
+ * only moves the playhead, and the flag, hand and zoom tools do not pick a range at all so they point at the scissors.
  */
 export function pickHintLead(tool: string): string {
   switch (tool) {
     case "clip":
-      return "Click to set the start, click again for the end";
+      return "Drag on the timeline, or click to set the start and click again for the end";
     case "flag":
       return "Flags mark a spot; use the scissors to click a start and an end";
     case "hand":
@@ -41,6 +41,23 @@ export function pickHintLead(tool: string): string {
     case "zoom":
       return "Zoom resizes the view; use the scissors to click a start and an end";
     default:
-      return "Drag on the timeline";
+      return "Choose the scissors, then drag on the timeline";
   }
 }
+
+/**
+ * What a wheel or trackpad gesture over the timeline does, as in an editor: a sideways swipe (or
+ * Shift + wheel) pans along the video, Ctrl/Cmd + wheel zooms around the pointer, a plain vertical
+ * wheel does nothing here and is left to the page.
+ */
+export type WheelAction = { kind: "pan"; pixels: number } | { kind: "zoom"; direction: 1 | -1 } | null;
+
+export function wheelAction(e: { deltaX: number; deltaY: number; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): WheelAction {
+  if (e.ctrlKey || e.metaKey) return e.deltaY === 0 ? null : { kind: "zoom", direction: e.deltaY < 0 ? 1 : -1 };
+  const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+  const pixels = sideways ? e.deltaX : e.shiftKey ? e.deltaY : 0;
+  return pixels === 0 ? null : { kind: "pan", pixels };
+}
+
+/** The pointer's x inside the lane, kept on the lane so a scrub that leaves it still reads the end. */
+export const clampX = (x: number, width: number) => Math.min(Math.max(0, x), Math.max(0, width));
