@@ -31,3 +31,13 @@ for (const [raw, kind] of cases) {
     assert.match(f.error, /[.]$/);
   });
 }
+
+test("Saad: opening a video with 'Requested format is not available' and no JavaScript runtime names the missing part", () => {
+  const raw = "ERROR: [youtube] dg7ZH4-UJag: Requested format is not available. Use --list-formats for a list of available formats";
+  const f = describeInfoFailure(raw, { jsRuntimeMissing: true });
+  assert.equal(f.kind, "tools");
+  assert.match(f.error, /part of Clipr that YouTube needs is missing/i);
+  assert.doesNotMatch(f.error, /--list-formats|exitCode|yt-dlp/i);
+  assert.equal(describeInfoFailure(raw).kind, "unknown");
+  assert.equal(describeInfoFailure("ERROR: [youtube] a: Private video", { jsRuntimeMissing: true }).kind, "private");
+});

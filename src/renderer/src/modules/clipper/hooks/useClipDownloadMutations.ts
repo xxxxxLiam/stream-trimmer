@@ -13,6 +13,7 @@ import { FOLDER_FAILURE, folderProblem } from "../../../shared/utils/folderCheck
 import { ROOM_REASON, roomProblem } from "../../../shared/utils/freeSpace";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
 import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, saveFailure, videoUrlProblem } from "../utils/downloadErrors";
+import { shouldResetProgress } from "../utils/downloadErrors";
 import { type SavedFiles } from "./useSavedFilesState";
 
 export function useClipDownloadMutations({
@@ -54,6 +55,8 @@ export function useClipDownloadMutations({
   const [downloadNote, setDownloadNote] = useState("");
   const downloadAbortRef = useRef<AbortController | null>(null);
   const downloadJobRef = useRef<string | null>(null);
+  // Which download is the latest, so a finished one's delayed reset can't wipe the next one's progress.
+  const runCounter = useRef(0);
   const [failure, setFailure] = useState<DownloadFailureInfo | null>(null);
 
   const cancelDownload = useCallback(() => {
@@ -99,6 +102,7 @@ export function useClipDownloadMutations({
     const cutStart = segs[0].start;
     const cutEnd = segs[segs.length - 1].end;
     let saved = false;
+    const run = ++runCounter.current;
     setError("");
     setDownloading(true);
     setDownloadProgress(0);
@@ -374,6 +378,7 @@ export function useClipDownloadMutations({
       if (downloadJobRef.current === jobId) downloadJobRef.current = null;
       setDownloading(false);
       window.setTimeout(() => {
+        if (!shouldResetProgress(run, runCounter.current)) return;
         setDownloadPhase("idle");
         setDownloadProgress(0);
       }, 1200);

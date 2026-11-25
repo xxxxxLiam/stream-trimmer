@@ -557,6 +557,11 @@ export interface FcpClip {
   cutAt?: number;
   /** Keyword and keyword collection this clip gets in the event (see `importLayout`); blank for none. */
   keyword?: string;
+  /**
+   * This file is another language of the clip with this id. It gets no project of its own: it is a
+   * disabled connected clip in its parent's project, so one clip is one project.
+   */
+  parentId?: string;
   /** From ffprobe on this exact file. */
   media: MediaInfo;
 }
@@ -638,6 +643,17 @@ export function resolveProjectNames(
     seen.add(name);
     return name;
   });
+}
+
+/** Project names aligned to the clips; a dub (a clip with a parent in the batch) has no project, so its name is "". */
+export function projectNamesFor(
+  clips: Pick<FcpClip, "id" | "label" | "projectName" | "parentId">[],
+  project: Pick<FcpxmlProject, "namePattern" | "campaignName" | "sourceTitle">,
+): string[] {
+  const owners = clips.filter((c) => !(c.parentId && clips.some((p) => p.id === c.parentId)));
+  const names = resolveProjectNames(owners, project);
+  let n = 0;
+  return clips.map((c) => (owners.includes(c) ? names[n++] : ""));
 }
 
 /**
@@ -757,11 +773,11 @@ function legacyEvents(
     `    <event name="${attrText(mediaEvent)}">`,
     ...collections,
     ...mediaItems,
-    ...(merged ? projectItems : []),
+    ...(merged ? projectItems.filter(Boolean) : []),
     `    </event>`,
   ];
   if (hasProject && !merged) {
-    events.push(`    <event name="${attrText(projectEvent)}">`, ...projectItems, `    </event>`);
+    events.push(`    <event name="${attrText(projectEvent)}">`, ...projectItems.filter(Boolean), `    </event>`);
   }
   return events;
 }
@@ -792,7 +808,7 @@ function laidOutEvents(o: {
           `      </smart-collection>`,
         ]
       : []),
-    ...g.indexes.flatMap((i) => [o.mediaItems[i], ...(hasProjects ? [o.projectItems[i]] : [])]),
+    ...g.indexes.flatMap((i) => [o.mediaItems[i], ...(hasProjects && o.projectItems[i] ? [o.projectItems[i]] : [])]),
   ];
   const event = (name: string, lines: string[]) => [`    <event name="${attrText(name)}">`, ...lines, `    </event>`];
 
@@ -863,7 +879,7 @@ export function buildFcpxml(input: FcpxmlInput): string {
     return id;
   };
 
-  const projectNames = input.project ? resolveProjectNames(input.clips, input.project) : [];
+  const projectNames = input.project ? projectNamesFor(input.clips, input.project) : [];
   const layout = input.layout;
   const groups = layout ? groupByVideo(input.clips) : [];
   const folders = layout === "export" || layout === "day";
@@ -910,7 +926,9 @@ export function buildFcpxml(input: FcpxmlInput): string {
       </asset-clip>`,
     );
 
-    if (input.project) {
+    if (input.project && clip.parentId && input.clips.some((c) => c.id === clip.parentId)) {
+      projectItems.push(""); // a dub lives inside its parent's project
+    } else if (input.project) {
       const tl = resolveTimeline(input.project.timeline, m, input.project.look?.format);
       const tlFormat = formatFor(tl.width, tl.height, tl.fps);
       // Whole timeline frames, rounded down, so the clip never overruns its media.
@@ -919,6 +937,17 @@ export function buildFcpxml(input: FcpxmlInput): string {
       if (tlFrames < 1) throw new Error(`${clip.id}: the file is shorter than one timeline frame`);
       const tlDuration = formatTime(tlFrames, tl.fps);
       const lookClip = input.project.look?.clip;
+      // Every other language of this clip, parked on lanes under the picture and switched off: enable the
+      // one wanted and mute the other, all inside this one project.
+      const dubLines = input.clips.flatMap((d, di) => {
+        if (d.parentId !== clip.id) return [];
+        const dubFrames = Math.min(tlFrames, secondsToFrames(d.media.durationSec, tl.fps));
+        if (dubFrames < 1) return [];
+        return [
+          `              <asset-clip ref="a${di + 1}" lane="-${di + 1}" offset="0s" name="${attrText(clipName(d))}" start="0s" ` +
+            `duration="${formatTime(dubFrames, tl.fps)}" enabled="0" tcFormat="NDF"/>`,
+        ];
+      });
       const seq =
         ` tcStart="0s" tcFormat="NDF"` +
         (m.audioChannels ? ` audioLayout="${m.audioChannels === 1 ? "mono" : "stereo"}"` : "") +
@@ -932,8 +961,8 @@ export function buildFcpxml(input: FcpxmlInput): string {
           `          <spine>`,
           `            <asset-clip ref="${assetId}" offset="0s" name="${name}" start="0s" ` +
             `duration="${tlDuration}" tcFormat="NDF"` +
-            (lookClip
-              ? `>${notes ? `\n              <note>${xmlEscape(noEmDash(notes))}</note>` : ""}\n${lookClip}\n            </asset-clip>`
+            (lookClip || dubLines.length > 0
+              ? `>${notes ? `\n              <note>${xmlEscape(noEmDash(notes))}</note>` : ""}${lookClip ? `\n${lookClip}` : ""}\n${dubLines.join("\n")}${dubLines.length ? "\n" : ""}            </asset-clip>`
               : note("            ")),
           `          </spine>`,
           `        </sequence>`,
@@ -1022,6 +1051,8 @@ export interface SessionClip {
   cutAt?: number;
   /** Keyword and keyword collection this clip gets in the event (see `importLayout`). */
   keyword?: string;
+  /** Set on a dub: the id of the clip (the original) whose project holds it. */
+  parentId?: string;
 }
 
 export interface SessionResult {
@@ -1070,7 +1101,13 @@ export async function buildSessionFcpxml(
   }
   const ready: FcpClip[] = [];
   const skipped: SessionResult["skipped"] = [];
+  const dropped = new Set<string>();
   for (const clip of clips) {
+    if (clip.parentId && dropped.has(clip.parentId)) {
+      dropped.add(clip.id);
+      skipped.push({ id: clip.id, reason: "Its clip could not be sent, so this language was left out too." });
+      continue;
+    }
     try {
       const media = parseProbe(await probe(clip.path));
       const candidate: FcpClip = { ...clip, media };
@@ -1079,6 +1116,7 @@ export async function buildSessionFcpxml(
       buildFcpxml({ eventName, clips: [candidate], project: options.project, layout: options.layout });
       ready.push(candidate);
     } catch (err) {
+      dropped.add(clip.id);
       skipped.push({
         id: clip.id,
         reason: err instanceof Error ? err.message : String(err),
@@ -1089,12 +1127,14 @@ export async function buildSessionFcpxml(
     const why = skipped[0]?.reason ?? "There are no clips to export";
     throw new Error(why);
   }
+  // Clips that stand on their own: a dub rides inside its clip's project and is not counted or named again.
+  const owners = ready.filter((c) => !(c.parentId && ready.some((p) => p.id === c.parentId)));
   return {
     xml: buildFcpxml({ eventName, clips: ready, library: options.library, project: options.project, layout: options.layout }),
     // One clip per document is named for the clip, so a later send never overwrites an earlier file.
-    filename: fcpxmlFilename(options.layout ? eventName.trim() || DEFAULT_EXPORT_EVENT : eventName, ready.length === 1 ? ready[0].id : undefined),
-    included: ready.length,
-    projectNames: options.project ? resolveProjectNames(ready, options.project) : [],
+    filename: fcpxmlFilename(options.layout ? eventName.trim() || DEFAULT_EXPORT_EVENT : eventName, owners.length === 1 ? owners[0].id : undefined),
+    included: owners.length,
+    projectNames: options.project ? projectNamesFor(ready, options.project).filter(Boolean) : [],
     skipped,
   };
 }

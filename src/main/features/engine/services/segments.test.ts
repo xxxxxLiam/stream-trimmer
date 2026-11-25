@@ -720,3 +720,16 @@ test("a folder that is there but refuses the write is folder_not_writable; a mis
   }
   assert.equal(classifyFailure("OSError: [Errno 2] No such file or directory: '/Volumes/Drive/clips'").code, "save_folder_gone");
 });
+
+test("Saad: 'Requested format is not available' with no JavaScript runtime is the missing part, not a quality to change", () => {
+  const raw = "ERROR: [youtube] dg7ZH4-UJag: Requested format is not available. Use --list-formats for a list of available formats";
+  const missing = classifyFailure(raw, { jsRuntimeMissing: true });
+  assert.equal(missing.code, "tools_missing");
+  assert.match(missing.error, /part of Clipr that YouTube needs is missing/i);
+  assert.equal(missing.action.label, "Reinstall Clipr");
+  // With the runtime in place the same words still mean "pick another quality".
+  assert.equal(classifyFailure(raw, { jsRuntimeMissing: false }).code, "format_unavailable");
+  assert.equal(classifyFailure(raw).code, "format_unavailable");
+  // The flag alone changes nothing else.
+  assert.equal(classifyFailure("ERROR: unable to download video data: HTTP Error 403: Forbidden", { jsRuntimeMissing: true }).code, "access_refused");
+});

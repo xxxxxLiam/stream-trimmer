@@ -127,3 +127,21 @@ test("CD2-1: an automatic outcome is tagged with the campaign it ran for", async
   await H.runAfterCutting(on, ctx(["AAA-01"], "client-a", "Client A"));
   assert.equal(H.getAfterCuttingOutcome()?.campaignId, "client-a");
 });
+
+test("languages: the original and its dubs go out as ONE document and ONE send to Final Cut", async () => {
+  const H = await import("./EditorHandoff");
+  const { DEFAULT_EDITOR_SETTINGS } = await import("../../../shared/utils/fcpxml");
+  H.resetSessionHandoff();
+  writes.length = 0;
+  const sends: unknown[] = [];
+  const w = (globalThis as any).window.electronAPI.editor;
+  const open = w.openWith;
+  w.openWith = async (a: unknown) => (sends.push(a), { ok: true });
+  const settings = { ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const };
+  const c = { ...ctx([]), clips: [mk("Hook"), { ...mk("Hook ES"), parentId: "Hook" }] };
+  await H.runAfterCutting(settings, c as any);
+  w.openWith = open;
+  assert.equal(writes.length, 1, "one file written");
+  assert.equal(sends.length, 1, "Final Cut is sent to once");
+  assert.equal(idsIn(writes[0].contents).length, 2, "both languages are in it");
+});

@@ -29,7 +29,9 @@ test("top list: campaigns listed here, sign-in, two switches; no Campaigns page,
   assert.match(h, /aria-label="Acme: 3 clips a day"/);
   assert.match(h, /aria-label="Nova: 2 clips a day"/);
   assert.match(h, /aria-label="Add campaign"/);
-  assert.match(h, /aria-label="Acme: 3 clips a day"[\s\S]*?<svg[^>]*viewBox="0 0 16 16"/, "a gear at the row's right");
+  const row = h.slice(h.indexOf('aria-label="Acme: 3 clips a day"'), h.indexOf("</button>", h.indexOf('aria-label="Acme: 3 clips a day"')));
+  assert.match(row, /M4\.646 1\.646/, "a chevron-right at the row's end");
+  assert.doesNotMatch(row, /M8 4\.754/, "not a gear: the gear is only in the top-left campaign menu");
   assert.doesNotMatch(h, /aria-label="Campaigns/);
   // The clips folder is per campaign only.
   assert.doesNotMatch(h, /Clips folder|Change the clips folder/);

@@ -97,3 +97,12 @@ export function saveFailure(result: { error?: string; code?: string }): { code?:
   }
   return {};
 }
+
+/**
+ * A finished download clears its progress 1.2 s later, but only if no newer download has started since:
+ * with several languages the next one is already running by then, and a reset would send it back to
+ * "Preparing" with a clip already in the editor.
+ */
+export function shouldResetProgress(run: number, latest: number): boolean {
+  return run === latest;
+}

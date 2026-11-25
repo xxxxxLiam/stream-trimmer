@@ -23,12 +23,12 @@ test("C-14: a Clip range that is a waiting moment marks it cut", () => {
 
 test("C-5: a clip's language copies share its id in History", () => {
   assert.match(app, /clipId: groupId \?\? clipId/);
-  assert.match(app, /afterSaved\(fileName, undefined, segments, startSettings, undefined, groupId\)/);
+  assert.match(app, /recordSaved\(fileName, undefined, segments, undefined, groupId, made\[0\]\?\.id\)/);
 });
 
 test("D2-7: Make this clip names the Final Cut clip after the file, not \"B01 - name\", so two videos' B01 moments never share a document", () => {
-  assert.match(app, /afterSaved\(nameForLanguage\(baseId, plan\), undefined, clip\.segments, startSettings, projectName, clip\.id\)/);
-  assert.doesNotMatch(app, /afterSaved\(nameForLanguage\(clip\.id, plan\), clip\.label/);
+  assert.match(app, /recordSaved\(nameForLanguage\(baseId, plan\), undefined, clip\.segments, projectName, clip\.id, made\[0\]\?\.id\)/);
+  assert.doesNotMatch(app, /recordSaved\(nameForLanguage\(clip\.id, plan\), clip\.label/);
 });
 
 test("C2-2 / C2-3: every Clip-button cut records its range before it starts, and Retry re-cuts that range without clearing the marks", () => {
@@ -44,7 +44,7 @@ test("C2-2 / C2-3: every Clip-button cut records its range before it starts, and
 test("C2-4: a Clip-button clip that is a waiting moment is recorded, grouped and so undone under the moment's id", () => {
   assert.match(app, /const groupId = moment\?\.id \?\? name/);
   assert.match(app, /recordUse\(videoId, segments, groupId, cutCampaignId\)/);
-  assert.match(app, /afterSaved\(fileName, undefined, segments, startSettings, undefined, groupId\)/);
+  assert.match(app, /recordSaved\(fileName, undefined, segments, undefined, groupId, made\[0\]\?\.id\)/);
 });
 
 test("C2-1 / F2-2 / C2-10: Add a moment and Ctrl B bank the just-marked range (else the sections) under a suggested name", () => {
@@ -102,4 +102,9 @@ test("C4-3: a failed Clip-button cut kept in Waiting keeps its name", async () =
   const eff = fs.readFileSync(new URL("../features/clips/hooks/useExportEffects.ts", import.meta.url), "utf8");
   assert.match(eff, /clipNameFor\(\{ candidates: \[f\.name\]/);
   assert.match(eff, /importClips\(q\.campaignId, q\.vid, \[\{ line: 1, id: null, label, segments: f\.segments \}\]\)/);
+});
+
+test("one hand-off per clip: the languages are collected and sent together, once, after the loop", () => {
+  assert.equal((app.match(/handOff\(made, startSettings\)/g) ?? []).length, 2);
+  assert.doesNotMatch(app, /runAfterCutting\(settings, \{[^}]*clips: \[clip\]/s);
 });
