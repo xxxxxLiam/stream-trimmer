@@ -53,46 +53,70 @@ test("D-4: a failed automatic send is published with the same message as the pan
   libraryPresent = true;
 });
 
-test("D-5: cutting another clip sends every clip of the session, not just the new one", async () => {
+const idsIn = (xml: string) => [...xml.matchAll(/<asset id="[^"]*" name="([^"]*)"/g)].map((m) => m[1]);
+const eventsIn = (xml: string) => [...xml.matchAll(/<event name="([^"]*)"/g)].map((m) => m[1]);
+
+test("D-5: each send is one document holding only that clip, never the earlier ones", async () => {
   const H = await import("./EditorHandoff");
   const { DEFAULT_EDITOR_SETTINGS } = await import("../../../shared/utils/fcpxml");
   H.resetSessionHandoff();
   writes.length = 0;
-  const off = { ...DEFAULT_EDITOR_SETTINGS };
   const on = { ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const };
-  await H.runAfterCutting(off, ctx(["A-01"]));
-  await H.runAfterCutting(off, ctx(["A-02"]));
+  await H.runAfterCutting(on, ctx(["A-01"]));
+  await H.runAfterCutting(on, ctx(["A-02"]));
   const out = await H.runAfterCutting(on, ctx(["A-03"]));
   assert.equal(out?.ok, true);
-  assert.equal(writes.length, 1);
-  assert.equal((writes[0].contents.match(/<asset id=/g) ?? []).length, 3, "all three clips are in the document");
-  // And a fourth keeps accumulating, with a re-cut id replaced rather than duplicated.
-  await H.runAfterCutting(on, ctx(["A-02"]));
-  assert.equal((writes[1].contents.match(/<asset id=/g) ?? []).length, 3);
-  await H.runAfterCutting(on, ctx(["A-04"]));
-  assert.equal((writes[2].contents.match(/<asset id=/g) ?? []).length, 4);
+  assert.equal(writes.length, 3);
+  assert.deepEqual(writes.map((w) => idsIn(w.contents)), [["A-01"], ["A-02"], ["A-03"]]);
+  assert.equal(new Set(writes.map((w) => w.filename)).size, 3, "no send overwrites another's file");
 });
 
-const idsIn = (xml: string) => [...xml.matchAll(/<asset id="[^"]*" name="([^"]*)"/g)].map((m) => m[1]);
-
-test("CD2-1: a campaign's document never holds another campaign's clips, even in a shared clips folder", async () => {
+test("D-5: clips from two videos of one campaign never land in each other's event", async () => {
   const H = await import("./EditorHandoff");
   const { DEFAULT_EDITOR_SETTINGS } = await import("../../../shared/utils/fcpxml");
   H.resetSessionHandoff();
   writes.length = 0;
-  const off = { ...DEFAULT_EDITOR_SETTINGS };
   const on = { ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const };
-  // Client A cuts two clips, automatic send off. Client B inherited the SAME folder ("/c").
-  await H.runAfterCutting(off, ctx(["AAA-01"], "client-a", "Client A"));
-  await H.runAfterCutting(off, ctx(["AAA-02"], "client-a", "Client A"));
-  const out = await H.runAfterCutting(on, ctx(["BBB-01"], "client-b", "Client B"));
-  assert.equal(out?.ok, true);
-  assert.equal(writes.length, 1);
-  assert.deepEqual(idsIn(writes[0].contents), ["BBB-01"], "only Client B's clip is in Client B's document");
-  assert.doesNotMatch(writes[0].contents, /AAA-0/);
-  // Switching back: A's own session is still A's, and still free of B's.
-  await H.runAfterCutting({ ...on }, ctx(["AAA-03"], "client-a", "Client A"));
-  assert.deepEqual(idsIn(writes[1].contents), ["AAA-01", "AAA-02", "AAA-03"]);
+  await H.runAfterCutting(on, { ...ctx(["POD-01"]), sourceTitle: "Podcast 214" });
+  await H.runAfterCutting(on, { ...ctx(["POD-02"]), sourceTitle: "Podcast 214" });
+  await H.runAfterCutting(on, { ...ctx(["FND-01"]), sourceTitle: "Founder story" });
+  assert.deepEqual(writes.map((w) => idsIn(w.contents)), [["POD-01"], ["POD-02"], ["FND-01"]]);
+  assert.deepEqual(writes.map((w) => eventsIn(w.contents)), [["Acme"], ["Acme"], ["Acme"]], "one campaign, one event");
+  assert.match(writes[2].contents, /<keyword-collection name="Founder story"\/>/);
+  assert.doesNotMatch(writes[2].contents, /Podcast 214/);
+});
+
+test("D-1: the event is the campaign's Event, falling back to the campaign name", async () => {
+  const H = await import("./EditorHandoff");
+  const { DEFAULT_EDITOR_SETTINGS } = await import("../../../shared/utils/fcpxml");
+  H.resetSessionHandoff();
+  writes.length = 0;
+  const on = { ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const };
+  await H.runAfterCutting({ ...on, mediaEvent: "Acme exports" }, { ...ctx(["A-01"]), sourceTitle: "Podcast 214" });
+  await H.runAfterCutting(on, { ...ctx(["A-02"]), sourceTitle: "Podcast 214" });
+  assert.deepEqual(writes.map((w) => eventsIn(w.contents)), [["Acme exports"], ["Acme"]]);
+});
+
+test("D-3: a rejected handoff is published with the engine's reason and the clip it was for", async () => {
+  const H = await import("./EditorHandoff");
+  const { DEFAULT_EDITOR_SETTINGS } = await import("../../../shared/utils/fcpxml");
+  H.resetSessionHandoff();
+  const w = (globalThis as any).window.electronAPI.editor;
+  const open = w.openWith;
+  w.openWith = async () => ({ ok: false, error: "Final Cut Pro is not installed." });
+  try {
+    const out = await H.runAfterCutting({ ...DEFAULT_EDITOR_SETTINGS, afterCutting: "finalcut" as const }, ctx(["A-09"]));
+    assert.equal(out?.ok, false);
+    const answer = H.getAfterCuttingOutcome()!;
+    assert.equal(answer.outcome.message, "Final Cut Pro is not installed.");
+    assert.equal(answer.outcome.clipId, "A-09");
+    assert.equal(answer.outcome.clipPath, "/c/A-09.mp4");
+    assert.deepEqual(answer.ctx.clips.map((c) => c.id), ["A-09"], "kept so it can be sent to another editor");
+    H.clearAfterCuttingOutcome();
+    assert.equal(H.getAfterCuttingOutcome(), null);
+  } finally {
+    w.openWith = open;
+  }
 });
 
 test("CD2-1: an automatic outcome is tagged with the campaign it ran for", async () => {
