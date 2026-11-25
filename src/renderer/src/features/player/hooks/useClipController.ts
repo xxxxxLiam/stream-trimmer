@@ -12,6 +12,7 @@ import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { availableDestinations, clipReason, clipSections, sectionsLength } from "../utils/clipDestination";
 import { dialogOpen } from "../../../shared/utils/dialogOpen";
+import { usePanelLayoutState } from "../../../modules/layout/hooks/usePanelLayoutState";
 import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
 import { requestEditorSetup } from "../../../shared/utils/editorSetupRequest";
@@ -19,6 +20,7 @@ import { requestEditorSetup } from "../../../shared/utils/editorSetupRequest";
 export function useClipController(opts: { listenForKey?: boolean } = {}) {
   const range = usePickedRange();
   const host = usePanelHost();
+  const { open: openPanel } = usePanelLayoutState();
   const { segments } = useSegmentsState();
   const tabActive = useIsTabActive();
   const { active: activeCampaign } = useCampaign();
@@ -63,6 +65,8 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
   const clip = () => {
     if (reason) return setReasonShown(true);
     host.cutSegments(toCut);
+    // Show the clip land: bring Export forward, even when History was in front.
+    openPanel("export");
   };
   const clipRef = useRef(clip);
   clipRef.current = clip;
