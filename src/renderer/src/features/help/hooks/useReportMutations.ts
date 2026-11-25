@@ -29,11 +29,8 @@ async function readDetails(): Promise<string> {
   }
 }
 
-export function useReportMutations() {
-  const [state, setState] = useState<ReportState>("writing");
-  const [copied, setCopied] = useState(false);
-
-  // Kept reports go out on a later launch.
+/** Kept reports (a failed Report a problem, or a crash report) go out on a later launch. Called once by the shell. */
+export function useFlushPendingReports() {
   useEffect(() => {
     const pending = normalizePending(readSetting<unknown>(PENDING_REPORTS_KEY, []));
     if (pending.length === 0) return;
@@ -41,6 +38,11 @@ export function useReportMutations() {
       if (left.length !== pending.length) writeSetting(PENDING_REPORTS_KEY, left);
     });
   }, []);
+}
+
+export function useReportMutations() {
+  const [state, setState] = useState<ReportState>("writing");
+  const [copied, setCopied] = useState(false);
 
   const send = useCallback(async (note: string) => {
     const report: PendingReport = makeReport(note, await readDetails(), new Date(), `r-${Date.now().toString(36)}`);

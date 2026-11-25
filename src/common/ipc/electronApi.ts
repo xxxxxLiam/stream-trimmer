@@ -148,6 +148,8 @@ export interface ElectronAPI {
     ) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;
   };
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
+  /** ISO time when this launch restored the settings from the backup copy, else null. */
+  settingsRestoredAt?: () => Promise<string | null>;
   readDiagnostics?: () => Promise<{ path: string | null; text: string }>;
   revealDiagnostics?: () => Promise<{
     ok: boolean;
