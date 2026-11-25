@@ -5,6 +5,7 @@
  *   no model. The phrase table is built once per transcript (30-second windows, TF-IDF), then each
  *   suggestion is a cheap lookup. Two words at most; "2", "3" repeat suffixes don't count.
  */
+import { twoWordName } from "../../../../../common/utils/nameWords";
 import { STOPWORDS } from "./stopwords";
 
 export interface NameLine {
@@ -79,12 +80,6 @@ export function safeFileName(name: string): string {
   return n.slice(0, 80).trim();
 }
 
-/** The first two words of a video title, letters and digits only ("Podcast #214, the long talk" gives "Podcast 214"). */
-export function titleWords(title: string): string {
-  const words = title.match(/[\p{L}\p{N}][\p{L}\p{N}'\u2019-]*/gu) ?? [];
-  return safeFileName(words.slice(0, 2).join(" "));
-}
-
 /** Ranked candidate names for one clip (joined clips pass every range). Best first. */
 export function rankedNames(
   table: NameTable,
@@ -117,7 +112,7 @@ function nextFree(base: string, taken: ReadonlySet<string>): string {
 
 /**
  * The suggestion for a clip. `skip` walks down the list (the refresh button). With no usable words,
- * falls back to "<video title> 1", "2" ... `existing` are names already used, so repeats get a quiet number.
+ * falls back to two words of the video title, then "2", "3" ... `existing` are names already used, so repeats get a quiet number.
  */
 export function suggestClipName(opts: {
   table: NameTable | null;
@@ -134,6 +129,6 @@ export function suggestClipName(opts: {
     const safe = safeFileName(pick);
     if (safe) return nextFree(safe, taken);
   }
-  const title = titleWords(opts.videoTitle) || "Clip";
-  for (let n = 1; ; n++) if (!taken.has(`${title} ${n}`.toLowerCase())) return `${title} ${n}`;
+  // The same two words the saved file gets from the title, so the lane never shows another name.
+  return nextFree(safeFileName(twoWordName(opts.videoTitle)) || "Clip", taken);
 }

@@ -48,11 +48,12 @@ test("a name is at most two words", () => {
   for (const name of rankedNames(table, all, range)) assert.ok(name.split(" ").length <= 2, name);
 });
 
-test("no transcript falls back to the video title plus a number, then 2", () => {
-  const first = suggestClipName({ table: null, lines: [], ranges: range, videoTitle: "My Podcast" });
-  assert.equal(first, "My Podcast 1");
-  const second = suggestClipName({ table: null, lines: [], ranges: range, videoTitle: "My Podcast", existing: [first] });
-  assert.equal(second, "My Podcast 2");
+test("no transcript falls back to two words of the title, the same as the saved file, then 2 (C2-7)", () => {
+  const title = "Podcast #214, the long talk";
+  const first = suggestClipName({ table: null, lines: [], ranges: range, videoTitle: title });
+  assert.equal(first, "Podcast Long", "stop words and bare numbers dropped, Title Case, two words");
+  assert.equal(suggestClipName({ table: null, lines: [], ranges: range, videoTitle: title, existing: [first] }), "Podcast Long 2");
+  assert.equal(suggestClipName({ table: null, lines: [], ranges: range, videoTitle: "214" }), "Clip");
 });
 
 test("repeat names get a quiet number and refresh walks down the list", () => {
