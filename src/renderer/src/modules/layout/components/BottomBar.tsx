@@ -16,10 +16,13 @@ import {
   IconScissors,
   IconZoomTool,
 } from "./BarIcons";
+import { useNextClipName } from "../hooks/useNextClipName";
 import { useToolState, type TimelineTool } from "../hooks/useToolState";
 import {
   audioButtonLabel,
   makesText,
+  nameForLanguage,
+  planLanguages,
   shortenPath,
   toggleLanguage,
   type AudioTrackInfo,
@@ -33,9 +36,9 @@ const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] =
   { tool: "zoom", label: "Zoom tool", icon: IconZoomTool },
 ];
 
-const VALUE_BUTTON = "inline-flex h-11 items-center";
+const VALUE_BUTTON = "inline-flex h-[44px] items-center";
 const VALUE_FACE =
-  "inline-flex h-7 items-center gap-1.5 rounded-control border border-hairlineStrong bg-raised px-2.5 text-meta text-fg";
+  "inline-flex h-[28px] items-center gap-[6px] rounded-control border border-hairlineStrong bg-raised px-[10px] text-meta text-fg";
 
 export type BottomBarProps = {
   /** How many clips the next Clip makes (one per ticked language). */
@@ -71,20 +74,30 @@ export default function BottomBar({
   const hasDubs = !!tracks && tracks.some((t) => t.kind !== "original");
   const [problem, setProblem] = useState("");
 
-  const audioItems: MenuItem[] = (tracks ?? []).map((t) => {
-    const ticked = t.kind === "original" ? !(selectedLanguages ?? []).includes(`-${t.language}`) : (selectedLanguages ?? []).includes(t.language);
-    const tag = t.kind === "auto-dubbed" ? " · Auto-dubbed" : t.kind === "creator-dub" ? " · Creator dub" : "";
-    return {
-      key: t.language,
-      label: `${t.label}${t.kind === "original" ? " (original)" : ""}${tag}`,
-      checked: ticked,
-      keepOpen: true,
-      onSelect: () => onSelectLanguages(toggleLanguage(tracks ?? [], selectedLanguages, t.language)),
-    };
-  });
+  const clipName = useNextClipName();
+  const plans = planLanguages(tracks, selectedLanguages);
+  const audioItems: MenuItem[] = [
+    ...(tracks ?? []).map<MenuItem>((t) => {
+      const ticked = t.kind === "original" ? !(selectedLanguages ?? []).includes(`-${t.language}`) : (selectedLanguages ?? []).includes(t.language);
+      return {
+        key: t.language,
+        label: t.kind === "original" ? "Original" : t.label,
+        detail: t.kind === "original" ? t.label : t.kind === "auto-dubbed" ? "Auto-dubbed" : "Creator dub",
+        checked: ticked,
+        keepOpen: true,
+        onSelect: () => onSelectLanguages(toggleLanguage(tracks ?? [], selectedLanguages, t.language)),
+      };
+    }),
+    ...(clipName
+      ? ([
+          { kind: "separator", key: "sep-note" },
+          { kind: "note", key: "note", label: `${makesText(plans.length)}: ${plans.map((p) => nameForLanguage(clipName, p)).join(", ")}` },
+        ] as MenuItem[])
+      : []),
+  ];
 
   return (
-    <div className="relative m-2 flex h-[54px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-1.5 text-meta text-fg-dim">
+    <div className="relative m-[8px] flex h-[54px] shrink-0 items-center rounded-panel border border-hairline bg-raised px-[6px] text-meta text-fg-dim">
       <div role="toolbar" aria-label="Timeline tools" className="flex">
         {TOOLS.map(({ tool: t, label, icon: IconFor }) => (
           <button
@@ -94,7 +107,7 @@ export default function BottomBar({
             title={label}
             aria-pressed={tool === t}
             onClick={() => setTool(t)}
-            className={`inline-flex h-11 w-10 shrink-0 items-center justify-center rounded-control ${
+            className={`inline-flex h-[44px] w-[40px] shrink-0 items-center justify-center rounded-control ${
               tool === t ? "bg-bg text-ice" : "text-fg-dim hover:bg-hover hover:text-fg"
             }`}
           >
@@ -103,17 +116,19 @@ export default function BottomBar({
         ))}
       </div>
 
-      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap" id="ui-export-sentence">
+      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-[8px] whitespace-nowrap" id="ui-export-sentence">
         <span>{makesText(clipCount)}</span>
         {hasDubs ? (
           <PopoverMenu
             label={`Audio: ${audioButtonLabel(tracks!, selectedLanguages)}`}
             items={audioItems}
             side="above"
-            align="start"
+            align="center"
+            menuWidth={290}
+            boxes
             triggerClassName={VALUE_BUTTON}
             pressedWhenOpen={false}
-            heading="Make a clip for each ticked language"
+            heading="Audio languages"
           >
             <span className={VALUE_FACE}>
               {audioButtonLabel(tracks!, selectedLanguages)}
@@ -145,10 +160,13 @@ export default function BottomBar({
           <button
             type="button"
             id="ui-sign-in-pill"
-            className="inline-flex h-7 items-center rounded-control border border-ice px-2.5 text-meta text-fg hover:bg-ice-tint-12"
+            aria-label="Sign in for 1080p: opens Help"
+            className={`${VALUE_BUTTON} group`}
             onClick={onSignIn}
           >
-            Sign in for 1080p
+            <span className="inline-flex h-[28px] items-center whitespace-nowrap rounded-[14px] border border-ice px-[12px] text-meta font-medium text-ice group-hover:bg-ice-tint-12">
+              Sign in for 1080p
+            </span>
           </button>
         ) : null}
         {problem ? (
@@ -158,11 +176,11 @@ export default function BottomBar({
         ) : null}
       </div>
 
-      <div className="ml-auto flex items-center gap-0.5">
+      <div className="ml-auto flex items-center gap-[2px]">
         <button
           type="button"
           aria-label="Zoom out"
-          className="inline-flex h-11 w-8 items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
+          className="inline-flex h-[44px] w-[32px] items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
           onClick={() => zoomBy(-10)}
         >
           −
@@ -174,7 +192,7 @@ export default function BottomBar({
           aria-valuemax={100}
           aria-valuenow={zoom}
           tabIndex={0}
-          className="relative mx-1.5 h-[3px] w-24 rounded-[2px] bg-hover"
+          className="relative mx-[6px] h-[3px] w-[96px] rounded-[2px] bg-hover"
           onKeyDown={(e) => {
             const step = e.shiftKey ? 25 : 10;
             if (e.key === "ArrowRight" || e.key === "ArrowUp") setZoom(zoom + step);
@@ -198,12 +216,12 @@ export default function BottomBar({
         <button
           type="button"
           aria-label="Zoom in"
-          className="inline-flex h-11 w-8 items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
+          className="inline-flex h-[44px] w-[32px] items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
           onClick={() => zoomBy(10)}
         >
           +
         </button>
-        <button type="button" className="inline-flex h-11 items-center rounded-control px-2.5 text-meta text-fg-dim hover:bg-hover hover:text-fg" onClick={fit}>
+        <button type="button" className="inline-flex h-[44px] items-center rounded-control px-[10px] text-meta text-fg-dim hover:bg-hover hover:text-fg" onClick={fit}>
           Fit
         </button>
       </div>

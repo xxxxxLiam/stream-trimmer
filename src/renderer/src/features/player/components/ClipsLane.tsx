@@ -7,6 +7,8 @@
  *   dashed "skipped" stretch between. Names sit exactly as wide as their range, with an ellipsis
  *   and a tooltip.
  */
+import { useEffect } from "react";
+import { setNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { playFrom } from "../../../shared/utils/playFrom";
 import type { TimelineController } from "../hooks/useTimelineController";
 import { lengthLabel } from "../hooks/useTimelineController";
@@ -38,6 +40,12 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
     return banked?.label ?? c.suggestedName ?? timeName(start);
   };
   const sections = [...c.sections].sort((a, b) => a.start - b.start);
+  // The bottom bar's audio-language menu lists the files the next Clip makes by this name.
+  const nextName = sections.length ? building(sections[0].start) : null;
+  useEffect(() => {
+    setNextClipName(nextName);
+  }, [nextName]);
+  useEffect(() => () => setNextClipName(null), []);
   return (
     <div className="flex h-[34px] items-center">
       <LaneLabel>Clips</LaneLabel>

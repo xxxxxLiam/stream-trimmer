@@ -54,8 +54,9 @@ test("toggling ticks and unticks a language, and never leaves nothing to make", 
   assert.deepEqual(planLanguages([en, es], back), [{ language: undefined, suffix: "" }]);
 });
 
-test("a folder is shortened from the left, with the home folder as ~", () => {
-  assert.equal(shortenPath("/Users/liam/Clips/Acme"), "~/Clips/Acme");
+test("a folder is shortened from the left, without the home folder in front", () => {
+  assert.equal(shortenPath("/Users/liam/Clips/Acme"), "Clips/Acme");
+  assert.equal(shortenPath("/home/liam"), "~");
   const long = shortenPath("/Volumes/Big Drive/Campaigns/2026/Acme/Clips/Podcasts", 24);
   assert.equal(long.length, 24);
   assert.ok(long.startsWith("…"));

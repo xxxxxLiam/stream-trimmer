@@ -48,14 +48,27 @@ function loadFixture(name) {
   );
 }
 
-async function runSteps(win, steps) {
+async function runSteps(win, steps, app) {
   for (const s of steps || []) {
+    // {"send": [channel, payload]}: the main process pushes an IPC event to the window, for states
+    // that only the main process starts (an update ready, the sign-in signal).
+    if (s.send && app) {
+      await app.evaluate(({ BrowserWindow }, [channel, payload]) => {
+        for (const w of BrowserWindow.getAllWindows()) {
+          const u = w.webContents.getURL();
+          if (u.includes("127.0.0.1") || u.includes("localhost")) w.webContents.send(channel, payload);
+        }
+      }, s.send);
+      continue;
+    }
     if (s.click) await win.click(s.click);
     else if (s.fill) await win.fill(s.fill[0], s.fill[1]);
     else if (s.press) await win.keyboard.press(s.press);
     else if (s.waitFor) await win.waitForSelector(s.waitFor);
     else if (s.wait) await win.waitForTimeout(s.wait);
     else if (s.eval) await win.evaluate(s.eval);
+    else if (s.hover) await win.hover(s.hover);
+    else if (s.log) console.log("log:", JSON.stringify(await win.evaluate(s.log)));
   }
 }
 
@@ -127,7 +140,7 @@ async function withApp(screen, fx, win0, fn) {
       console.warn(`window content is ${inner.join("x")}, wanted ${win0.width}x${win0.height}`);
     }
     await a.win.waitForSelector(fx.waitFor || "#root *");
-    await runSteps(a.win, fx.steps);
+    await runSteps(a.win, fx.steps, a.app);
     await a.win.waitForTimeout(400);
     return await fn(a.win);
   } finally {
@@ -168,7 +181,11 @@ async function main() {
   }
   // Regions neither side can honestly show (the video picture, which needs YouTube): painted the same
   // flat colour on both, so they never count as a difference. Rects are relative to the compared image.
-  for (const m of fixture.mask || []) {
+  // A window board draws OS window dots that the real window frame supplies, which also pushes the
+  // campaign chip and the day count 72px right; that strip is masked unless a fixture sets keepDots.
+  const masks = [...(fixture.mask || [])];
+  if (o.window !== undefined && o.el === undefined && !fixture.keepDots) masks.push({ x: 0, y: 0, width: 260, height: 54 });
+  for (const m of masks) {
     for (const img of [b, p]) {
       for (let y = m.y; y < Math.min(img.height, m.y + m.height); y++) {
         for (let x = m.x; x < Math.min(img.width, m.x + m.width); x++) {

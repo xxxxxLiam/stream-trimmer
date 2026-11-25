@@ -100,6 +100,9 @@ try {
     getDefaultBrowser: () => ipcRenderer.invoke(IPC.systemDefaultBrowser),
     getBrowserOrder: (saved: unknown) => ipcRenderer.invoke(IPC.systemBrowserOrder, saved),
 
+    pickFinalCutLook: () => ipcRenderer.invoke(IPC.fcpLookPick),
+    // A file or .fcpxmld bundle dropped on the window: its path is read here, the text is read in main.
+    readFinalCutLook: (file: File) => ipcRenderer.invoke(IPC.fcpLookRead, electron.webUtils.getPathForFile(file)),
     getSignInSignal: () => ipcRenderer.invoke(IPC.signInStatus),
     reportBrowserSignIn: (usable: boolean) => ipcRenderer.invoke(IPC.signInReportBrowser, usable),
     onSignInSignal: (cb: (payload: unknown) => void) => {

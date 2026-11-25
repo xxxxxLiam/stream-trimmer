@@ -71,7 +71,9 @@ test("each synonym finds its answer", () => {
 
 test("search ignores case and word order, keeps list order, and an empty query shows everything", () => {
   assert.deepEqual(searchHelp("CLIP GREYED").answers.map((a) => a.id)[0], "clip-greyed");
-  assert.equal(searchHelp("").answers.length, HELP_ANSWERS.length);
+  assert.equal(searchHelp("").answers.length, HELP_ANSWERS.filter((a) => !a.searchOnly).length);
+  assert.equal(searchHelp("colour grade").answers[0].id, "final-cut-look");
+  assert.equal(searchHelp("template").answers[0].id, "final-cut-look");
   const ids = searchHelp("clip").answers.map((a) => a.id);
   assert.deepEqual(ids, HELP_ANSWERS.filter((a) => ids.includes(a.id)).map((a) => a.id));
 });

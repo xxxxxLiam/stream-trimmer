@@ -14,6 +14,8 @@ export type HelpAnswer = {
   labels: string[];
   /** Words people use for this that are not in the answer. */
   synonyms: string[];
+  /** Found by search only; the Common questions list keeps the five the board shows. */
+  searchOnly?: boolean;
 };
 
 export const HELP_ANSWERS: HelpAnswer[] = [
@@ -68,6 +70,18 @@ export const HELP_ANSWERS: HelpAnswer[] = [
     ],
     labels: ["Original", "Clip"],
     synonyms: ["dub", "language", "languages", "translation", "translate", "spanish", "audio", "voice"],
+  },
+  {
+    id: "final-cut-look",
+    question: "How do I make my Final Cut projects look like mine?",
+    searchOnly: true,
+    paras: [
+      "In Final Cut, make a project with one clip. Add your usual colour, zoom, volume and audio settings to it, and don’t cut it. Choose File, then Export XML, and save it.",
+      "Right-click the saved package, choose Show Package Contents, and find Info.fcpxml. Then open Settings, pick your campaign, and under Your look choose that file or drop it on the row.",
+      "Each campaign has its own look, and a look you have uploaded can be picked again for another campaign.",
+    ],
+    labels: ["Settings", "Your look"],
+    synonyms: ["look", "template", "preset", "colour grade", "color grade", "lut", "zoom", "volume", "final cut", "xml", "style"],
   },
 ];
 

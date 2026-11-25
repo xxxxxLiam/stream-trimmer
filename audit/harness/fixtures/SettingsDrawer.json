@@ -13,7 +13,7 @@
     "prefix": "ACM",
     "format": "mp4",
     "quality": "best",
-    "clipsDir": "/tmp/Clips/Acme",
+    "clipsDir": "/home/liam/Downloads/Clipr/Acme",
     "dataDir": "/tmp/Data/Acme",
     "usedRanges": {
      "podcast214": [
@@ -43,7 +43,7 @@
     "prefix": "NOV",
     "format": "mp4",
     "quality": "best",
-    "clipsDir": "/tmp/Clips/Nova",
+    "clipsDir": "/home/liam/Downloads/Clipr/Nova",
     "dataDir": "/tmp/Data/Nova",
     "usedRanges": {},
     "dailyQuota": 2
@@ -128,14 +128,47 @@
    }
   },
   "clipper.signInSkipped": true,
-  "clipper.tips.on": false
+  "clipper.tips.on": false,
+  "clipper.clipDestination": "finalcut",
+  "clipper.editorHandoff": {
+   "acme": {
+    "afterCutting": "finalcut",
+    "fcpLibrary": "/tmp/Library/Acme.fcpbundle",
+    "mediaEvent": "Acme"
+   }
+  },
+  "clipper.campaignPrefs": {
+   "acme": {
+    "extraSeconds": 1,
+    "languages": [
+     "original",
+     "es"
+    ]
+   }
+  }
  },
  "stub": {
   "info": {
    "id": "podcast214",
    "title": "Podcast #214, the long talk",
    "duration": 8073,
-   "uploader": "The Long Talk"
+   "uploader": "The Long Talk",
+   "formats": [
+    {
+     "format_id": "a1",
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "en",
+     "format_note": "English (original) (default)"
+    },
+    {
+     "format_id": "a2",
+     "vcodec": "none",
+     "acodec": "mp4a",
+     "language": "es",
+     "format_note": "Spanish (dubbed-auto)"
+    }
+   ]
   },
   "vttFile": "podcast214.vtt",
   "exitCode": 0,
@@ -155,7 +188,19 @@
    "click": "#ui-settings"
   },
   {
-   "wait": 600
+   "wait": 400
+  },
+  {
+   "click": "#ui-settings-drawer >> text=Campaigns"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "click": "#ui-settings-drawer >> text=Edit >> nth=0"
+  },
+  {
+   "wait": 500
   }
  ],
  "mask": [],

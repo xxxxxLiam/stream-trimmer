@@ -8,7 +8,7 @@ import { useEntryActions } from "../../../shared/hooks/useEntryActions";
 import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
 import { suggestProjectName } from "../utils/projectName";
 import { validateClipName } from "../utils/clipName";
-import { emptyExportText } from "../utils/exportRows";
+import PanelEmptyNote, { KeyChip } from "../../../modules/layout/components/PanelEmptyNote";
 import { useExportController } from "../hooks/useExportController";
 import FailedRow from "./FailedRow";
 import MakingRow from "./MakingRow";
@@ -52,7 +52,10 @@ export default function ExportPanel() {
       {c.gate ? (
         <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">{c.gate}</p>
       ) : c.waiting.length === 0 && c.made.length === 0 ? (
-        <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">{emptyExportText(IS_MAC)}</p>
+        <PanelEmptyNote>
+          Nothing waiting. Mark a part and press <KeyChip>{IS_MAC ? "⌘B" : "Ctrl B"}</KeyChip> to save it for later, or paste moments from
+          your sheet.
+        </PanelEmptyNote>
       ) : (
         <>
           <div className="flex justify-between px-[12px] pb-[4px] pt-[10px] text-meta leading-[normal] text-fg-dim">
@@ -83,7 +86,7 @@ export default function ExportPanel() {
         </p>
       )}
 
-      {!c.gate && (
+      {!c.gate && (c.waiting.length > 0 || c.made.length > 0) && (
         <button type="button" onClick={() => host.openImport()} className="mx-[6px] mt-[4px] h-[44px] rounded-control px-[8px] text-left text-meta text-fg-dim hover:text-fg">
           Import moments
         </button>

@@ -5,6 +5,18 @@
  */
 import { Icon } from "../../../shared/components/icons";
 
+export const IconPlus = () => (
+  <Icon width={14} height={14}>
+    <path d="M8 3.5v9M3.5 8h9" />
+  </Icon>
+);
+export const IconMore = () => (
+  <Icon width={14} height={14}>
+    <circle cx="4" cy="8" r=".8" />
+    <circle cx="8" cy="8" r=".8" />
+    <circle cx="12" cy="8" r=".8" />
+  </Icon>
+);
 export const IconPanels = () => (
   <Icon>
     <rect x="2" y="3" width="12" height="10" rx="2" />

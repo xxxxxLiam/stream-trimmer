@@ -35,8 +35,10 @@ import {
   type SessionClip,
 } from "../../../shared/utils/fcpxml";
 import { mergeSessionClips, sessionCampaignKey, writeClipboard } from "../../../shared/utils/handoff";
-import { parseLook } from "../utils/look";
-import LookEditor from "./LookEditor";
+import { parseLook } from "../../../../../common/utils/fcpLook";
+import { normalizeCampaigns } from "../../../shared/utils/campaigns";
+import { KEY_LOOK_MIGRATED, loadSavedLooks, lookForCampaign } from "../../../shared/utils/fcpLooks";
+import { readSetting } from "../../../shared/utils/persist";
 
 type Result = { ok: boolean; error?: string; missing?: string; path?: string };
 
@@ -93,7 +95,7 @@ function useNextProjectName(): string {
 /** The project block for the document, or undefined when no project is wanted. */
 export function projectOptions(
   settings: EditorHandoffSettings,
-  ctx: { campaignName?: string; sourceTitle?: string },
+  ctx: { campaignId?: string | null; campaignName?: string; sourceTitle?: string },
 ): FcpxmlProject | undefined {
   const eventName = resolveEventName({ from: "source", campaignName: ctx.campaignName, sourceTitle: ctx.sourceTitle });
   if (!eventName) return undefined;
@@ -103,10 +105,20 @@ export function projectOptions(
     timeline: settings.timelineFormat,
     campaignName: ctx.campaignName,
     sourceTitle: ctx.sourceTitle,
-    // parseLook throws a plain-words error when the pasted export is unusable;
-    // the caller's try/catch turns that into a failed outcome.
-    ...(settings.applyLook ? { look: parseLook(settings.lookXml ?? "") } : {}),
+    // The campaign's saved look (see fcpLooks.ts). The caller's try/catch turns a plain-words
+    // error into a failed outcome.
+    ...(lookForCampaignId(ctx.campaignId, settings) ? { look: lookForCampaignId(ctx.campaignId, settings) } : {}),
   };
+}
+
+function lookForCampaignId(campaignId: string | null | undefined, settings: EditorHandoffSettings) {
+  const campaign = normalizeCampaigns(readSetting<unknown>("clipper.campaigns", [])).find((c) => c.id === campaignId);
+  // Before the one-time move, the old single pasted look still applies. A look that cannot be read
+  // throws its plain-words error.
+  if (!readSetting<boolean>(KEY_LOOK_MIGRATED, false)) {
+    return settings.applyLook && settings.lookXml ? parseLook(settings.lookXml) : undefined;
+  }
+  return lookForCampaign(campaign, loadSavedLooks());
 }
 
 export interface HandoffContext {
@@ -351,7 +363,7 @@ const OPTIONS: { value: AfterCutting; label: string }[] = [
   { value: "finalcut", label: "Send to Final Cut Pro" },
 ];
 
-type SectionId = "library" | "projects" | "look" | "capcut";
+type SectionId = "library" | "projects" | "capcut";
 
 /** Last path segment, for a one-line summary of a long path. */
 function baseName(path: string): string {
@@ -360,18 +372,6 @@ function baseName(path: string): string {
     return decodeURIComponent(last);
   } catch {
     return last;
-  }
-}
-
-/** What "my look" is set to, and what is wrong with it if anything. */
-function describeLook(settings: EditorHandoffSettings): { summary: string; problem: string } {
-  if (!settings.applyLook) return { summary: "Off", problem: "" };
-  try {
-    const look = parseLook(settings.lookXml ?? "");
-    return { summary: look.found.length > 0 ? look.found.join(", ") : "On", problem: "" };
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    return { summary: "Needs attention", problem: `My look: ${why}` };
   }
 }
 
@@ -478,8 +478,7 @@ export default function EditorHandoff({
       libraryProblem = "The library path must be the full path, starting with /.";
     }
   }
-  const look = describeLook(settings);
-  const problems = [libraryProblem, look.problem].filter(Boolean);
+  const problems = [libraryProblem].filter(Boolean);
   const previewNames = resolveProjectNames(clips.slice(-3), {
     namePattern: settings.projectNamePattern,
     campaignName,
@@ -804,15 +803,6 @@ export default function EditorHandoff({
                   </select>
                 </label>
               </div>
-            </Section>
-            <Section
-              panelId={`${titleId}-look`}
-              title="My look"
-              summary={look.summary}
-              open={section === "look"}
-              onToggle={() => toggle("look")}
-            >
-              <LookEditor settings={settings} onChange={set} />
             </Section>
             <Section
               panelId={`${titleId}-capcut`}

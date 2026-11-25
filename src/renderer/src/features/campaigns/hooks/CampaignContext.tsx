@@ -41,12 +41,15 @@ import {
   type UsedRange,
 } from "../../../shared/utils/campaigns";
 import { bankStore } from "../../../shared/utils/bank";
+import { KEY_LOOK_MIGRATED, loadSavedLooks, migratePastedLook, saveSavedLooks } from "../../../shared/utils/fcpLooks";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 
 export type { Campaign, UsedRange } from "../../../shared/utils/campaigns";
 
 const KEY_CAMPAIGNS = "clipper.campaigns";
 const KEY_ACTIVE = "clipper.activeCampaign";
+/** The old single pasted look lives in the editor settings; it becomes a saved look once. */
+const KEY_EDITOR = "clipper.editorHandoff";
 const KEY_CLIPS = "clipper.clipsDir";
 const KEY_DATA = "clipper.dataDir";
 const KEY_DATA_OK = "clipper.dataDirConfirmed";
@@ -123,10 +126,22 @@ function idOrUndefined(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
+/** The saved campaigns, after the one-time move of the old pasted look into the saved looks. */
+function loadCampaigns(): Campaign[] {
+  const list = normalizeCampaigns(readSetting<unknown>(KEY_CAMPAIGNS, []));
+  if (readSetting<boolean>(KEY_LOOK_MIGRATED, false)) return list;
+  const legacy = readSetting<{ applyLook?: boolean; lookXml?: string }>(KEY_EDITOR, {});
+  const moved = migratePastedLook(list, loadSavedLooks(), legacy);
+  if (moved.migrated) {
+    saveSavedLooks(moved.looks);
+    writeSetting(KEY_CAMPAIGNS, moved.campaigns);
+    writeSetting(KEY_LOOK_MIGRATED, true);
+  }
+  return moved.campaigns;
+}
+
 export function CampaignProvider({ children }: { children: ReactNode }) {
-  const [campaigns, setCampaigns] = useState<Campaign[]>(() =>
-    normalizeCampaigns(readSetting<unknown>(KEY_CAMPAIGNS, [])),
-  );
+  const [campaigns, setCampaigns] = useState<Campaign[]>(loadCampaigns);
   const [activeId, setActiveIdState] = useState<string | null>(() =>
     resolveActiveId(
       normalizeCampaigns(readSetting<unknown>(KEY_CAMPAIGNS, [])),
