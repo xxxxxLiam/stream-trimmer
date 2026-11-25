@@ -151,7 +151,10 @@ export function normalizeTimeline(raw: unknown): TimelineFormat {
   const fpsText = typeof r.fps === "string" ? r.fps.trim() : typeof r.fps === "number" ? String(r.fps) : "";
   let fps = DEFAULT_TIMELINE.fps;
   if (fpsText === "source") fps = "source";
-  else if (fpsText !== "source" && parseRational(fpsText)) fps = fpsText;
+  // D3-2: "30" was the old default rate, and the Timeline switch has no rate control, so for every kind but a custom size it
+  // is a leftover that would turn a 25 fps video into a 30 fps project. Those follow the video.
+  else if (fpsText === "30" && kind !== "custom") fps = "source";
+  else if (parseRational(fpsText)) fps = fpsText;
   return {
     kind,
     width: dimension(r.width, VERTICAL_SIZE.width),

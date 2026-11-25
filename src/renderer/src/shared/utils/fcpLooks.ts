@@ -95,7 +95,14 @@ export function addSavedLook(
 ): { looks: SavedLook[]; saved: SavedLook } {
   // The same file again is the same look: reuse it rather than saving "Acme grade 2".
   const same = list.find((l) => sameLook(l.look, input.look));
-  if (same) return { looks: [...list], saved: same };
+  if (same) {
+    // D3-1: a look saved before its size was read gains it when the same file is chosen again, instead of being skipped.
+    if (!same.look.format && input.look.format) {
+      const upgraded: SavedLook = { ...same, look: { ...same.look, format: input.look.format } };
+      return { looks: list.map((l) => (l.id === same.id ? upgraded : l)), saved: upgraded };
+    }
+    return { looks: [...list], saved: same };
+  }
   const saved: SavedLook = { id: makeId(), name: uniqueLookName(list, lookNameFromFile(input.fileName)), look: input.look, addedAt: now };
   return { looks: [...list, saved], saved };
 }
