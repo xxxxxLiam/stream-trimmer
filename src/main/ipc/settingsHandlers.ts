@@ -6,6 +6,7 @@
  */
 import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
+import { pageMayWrite } from "../features/settings/services/settingsKeys";
 import { getSettings } from "../features/settings/services/settingsService";
 
 const { ipcMain } = electron;
@@ -19,6 +20,7 @@ export function registerSettingsHandlers() {
   ipcMain.handle(IPC.settingsSet, (_e: unknown, key: unknown, value: unknown) => {
     const settings = getSettings();
     if (!settings) return { ok: false };
+    if (!pageMayWrite(key, value)) return { ok: false };
     return { ok: settings.set(key, value) };
   });
 }

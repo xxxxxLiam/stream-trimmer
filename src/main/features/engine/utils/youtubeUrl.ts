@@ -52,3 +52,22 @@ export function isYouTubeUrl(value: string): boolean {
     host === "youtu.be"
   );
 }
+
+// Real ids are 11 characters; only the shape is checked, since what matters is that it names one video.
+const VIDEO_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * True for the address of one video: a watch link, youtu.be/<id>, or a shorts, live, embed or /v/ link, on
+ * the default port. A channel, a playlist page, a search or a bare host is a YouTube address but not a
+ * video, and yt-dlp would go and enumerate it.
+ */
+export function isYouTubeVideoUrl(value: string): boolean {
+  if (!isYouTubeUrl(value)) return false;
+  const u = new URL(value);
+  if (u.port) return false;
+  const host = u.hostname.toLowerCase().replace(/\.$/, "");
+  const segs = u.pathname.split("/").filter(Boolean);
+  if (host === "youtu.be") return segs.length >= 1 && VIDEO_ID.test(segs[0]);
+  if (u.pathname === "/watch") return VIDEO_ID.test(u.searchParams.get("v") ?? "");
+  return segs.length >= 2 && ["shorts", "live", "embed", "v", "e"].includes(segs[0]) && VIDEO_ID.test(segs[1]);
+}
