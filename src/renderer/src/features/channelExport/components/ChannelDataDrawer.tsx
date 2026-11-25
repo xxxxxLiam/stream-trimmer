@@ -73,6 +73,7 @@ function Body({ onClose }: { onClose: () => void }) {
         <div className="mb-[8px] flex min-h-[20px] items-center text-body font-medium leading-[normal]">You get</div>
         {[
           ["videos.csv", "Title, views, likes, upload date and tags, ranked by views"],
+          ["comments.csv", "Each video’s top 20 comments by likes, with author, date and replies seen (up to 5)"],
           ["transcripts.csv", "Every caption line with its time, for your AI to find moments"],
         ].map(([name, what]) => (
           <div key={name} className="flex min-h-target items-center gap-[10px]">

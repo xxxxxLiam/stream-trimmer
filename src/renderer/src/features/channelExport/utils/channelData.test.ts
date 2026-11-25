@@ -21,7 +21,7 @@ test("a typed count between steps snaps in the pressed direction", () => {
 
 test("the estimate is at least a minute and grows with the count", () => {
   assert.equal(estimateLine(1), "About 1 min");
-  assert.equal(estimateLine(100), "About 12 min");
+  assert.equal(estimateLine(100), "About 25 min");
 });
 
 test("last export reads with grouped numbers", () => {

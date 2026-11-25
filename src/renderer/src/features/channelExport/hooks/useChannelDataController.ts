@@ -17,13 +17,13 @@ export function useChannelDataController(open: boolean, onClose: () => void) {
   const { folders } = useCampaign();
   const [problem, setProblem] = useState("");
 
-  // The sidebar always offers the same run: long-form only, details and transcripts, no comments.
+  // The sidebar always offers the same run: long-form only, details, top comments and transcripts.
   useEffect(() => {
     if (!open) return;
     c.setContentType("longform");
     c.setExportAll(false);
     c.togglePart("videoDetails", true);
-    c.togglePart("comments", false);
+    c.togglePart("comments", true);
     c.togglePart("transcripts", true);
     if (!Number(c.limitText)) c.setLimitText(String(DEFAULT_LIMIT));
     setProblem("");
