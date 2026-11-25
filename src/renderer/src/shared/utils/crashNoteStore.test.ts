@@ -28,3 +28,11 @@ test("Crash note: the app reopens on its own page with the note in Export, not o
   const panel = readFileSync("src/renderer/src/features/clips/components/ExportPanel.tsx", "utf8");
   assert.match(panel, /<CrashNoteHost \/>\s*\n\s*\{c\.making/);
 });
+
+test("the crash note leaves when dismissed or when the next clip finishes", async () => {
+  const fs = await import("node:fs");
+  const read = (p: string) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.match(read("../components/CrashNote.tsx"), /crash-note-dismiss/);
+  assert.match(read("../../features/help/components/CrashNoteHost.tsx"), /onDismiss=\{closeCrashNote\}/);
+  assert.match(read("../../features/clips/hooks/useExportEffects.ts"), /closeCrashNote\(\);/);
+});

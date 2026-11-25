@@ -5,6 +5,7 @@
  *   forget the selection on a new video, show the finished clip with its 8 s Undo when a download
  *   completes, and drain the Undo.
  */
+import { closeCrashNote } from "../../../shared/utils/crashNoteStore";
 import { useEffect, useRef } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
@@ -56,6 +57,8 @@ export function useExportEffects(q: ReturnType<typeof useExportQueries>, s: Expo
         }
         s.setFailed(null);
         s.setOffline(null);
+        // A clip made after the crash is proof enough that things work again.
+        closeCrashNote();
         s.failCount.current = { key: "", count: 0 };
         s.attempt.current = null;
         setCutAttempt(null);

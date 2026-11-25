@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo } from "react";
 import CrashNote from "../../../shared/components/CrashNote";
-import { crashNoteText, setCrashNoteReport, useCrashNoteOpen, useCrashNoteReport, workIsBack } from "../../../shared/utils/crashNoteStore";
+import { closeCrashNote, crashNoteText, setCrashNoteReport, useCrashNoteOpen, useCrashNoteReport, workIsBack } from "../../../shared/utils/crashNoteStore";
 import { useCrashReport } from "../hooks/useCrashReport";
 import { CRASHED_ERROR } from "../utils/crashDetails";
 
@@ -24,5 +24,5 @@ export default function CrashNoteHost() {
   }, [c.copied]);
   if (!open) return null;
   const back = workIsBack(typeof window === "undefined" ? undefined : window.electronAPI?.settingsSnapshot);
-  return <CrashNote text={crashNoteText(back)} state={shared.state} copied={shared.copied} onSend={() => void c.send()} onCopy={() => void c.copy()} />;
+  return <CrashNote text={crashNoteText(back)} state={shared.state} copied={shared.copied} onSend={() => void c.send()} onCopy={() => void c.copy()} onDismiss={closeCrashNote} />;
 }
