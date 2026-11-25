@@ -16,8 +16,8 @@ test("A-3: a new campaign gets no copy of the active one's folder, and the folde
   assert.match(ctx, /campaignClipsDir\(active, defaultFolders\.clipsDir\)/);
 });
 
-test("A-3: Settings > Clips folder > Change moves the parent, not one campaign", () => {
-  assert.match(src("./SettingsDrawer.tsx"), /pickParentClipsDir\(\)/);
+test("A-3: a campaign's own folder change never rewrites the parent, and Settings has no global Clips folder row (Liam, 25 Nov)", () => {
+  assert.doesNotMatch(src("./SettingsDrawer.tsx"), /pickParentClipsDir/);
   const ctx = src("../../campaigns/hooks/CampaignContext.tsx");
   const setter = ctx.slice(ctx.indexOf("const setClipsDir = useCallback"), ctx.indexOf("const setDataDir = useCallback"));
   assert.doesNotMatch(setter, /saveDefaults/, "a campaign's own folder never rewrites the parent");
