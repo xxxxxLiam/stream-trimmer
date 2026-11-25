@@ -28,7 +28,7 @@ export default function PlayerControls({ c }: { c: PreviewController }) {
           name="Loop"
           active={c.loop}
           pressed={c.loop}
-          disabled={!player.ready || !c.range}
+          disabled={!player.ready || c.sections.length === 0}
           onClick={c.toggleLoop}
         >
           <LoopIcon />

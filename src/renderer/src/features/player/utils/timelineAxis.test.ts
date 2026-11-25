@@ -22,6 +22,7 @@ test("zoom 0 shows the whole video, more zoom shows less around the focus", () =
 test("Fit frames the range with room either side", () => {
   const w = fitWindow({ start: 4324, end: 4366 }, 8073);
   assert.ok(w.start < 4324 && w.end > 4366);
+  assert.deepEqual(w, { start: 4310, end: 4380 }); // the board: 1:11:50 to 1:13:00
   assert.ok(w.end - w.start >= 30);
   const whole = fitWindow(null, 8073);
   assert.deepEqual(whole, { start: 0, end: 8073 });
