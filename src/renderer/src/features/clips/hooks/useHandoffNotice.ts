@@ -16,10 +16,11 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { getDownloads } from "../../../shared/utils/downloads";
 import { handoffNoticeFor } from "../utils/handoffNotice";
 
-export function useHandoffNotice(campaignId: string | null) {
+/** `anyCampaign`: History sends clips of every campaign, so it shows whichever answer came last. */
+export function useHandoffNotice(campaignId: string | null, anyCampaign = false) {
   const { revealDownload } = useClipperContext();
   const answer = useSyncExternalStore(subscribeAfterCutting, getAfterCuttingOutcome, getAfterCuttingOutcome);
-  const notice = handoffNoticeFor(answer, campaignId);
+  const notice = handoffNoticeFor(answer, anyCampaign ? (answer?.campaignId ?? null) : campaignId);
 
   const showInFolder = useCallback(() => {
     const path = notice?.clipPath;
