@@ -763,8 +763,8 @@ export default function EditorHandoff({
                     value={settings.timelineFormat.kind}
                     onChange={(e) => {
                       const kind = e.target.value as TimelineKind;
-                      const fps = kind !== "source" && settings.timelineFormat.fps === "source" ? "30" : settings.timelineFormat.fps;
-                      set({ timelineFormat: { ...settings.timelineFormat, kind, fps } });
+                      // The frame rate is left as it is: vertical follows the video by default, so a kind change must not write 30.
+                      set({ timelineFormat: { ...settings.timelineFormat, kind } });
                     }}
                   >
                     <option value="vertical">Vertical 1080 x 1920</option>

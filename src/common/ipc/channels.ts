@@ -26,6 +26,7 @@ export const IPC = {
   fcpLookPick: "fcpLook:pick",
   fcpLookRead: "fcpLook:read",
   fileExists: "file:exists",
+  fileFreeSpace: "file:freeSpace",
   fileSave: "file:save",
   fileSaveFiles: "file:saveFiles",
   fileShowInFolder: "file:showInFolder",
