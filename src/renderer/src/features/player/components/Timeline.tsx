@@ -73,11 +73,12 @@ export default function Timeline() {
       {/* The tools act on this whole area, down to the empty space under the tracks. */}
       <div
         data-timeline-area
-        className={`relative flex min-h-[0px] flex-1 touch-none select-none flex-col ${cursorFor(c.tool, alt)}`}
+        className={`relative flex min-h-[0px] flex-1 touch-none select-none flex-col ${c.hoverGrip !== null || c.pressedGrip !== null ? "cursor-ew-resize" : cursorFor(c.tool, alt)}`}
         onClickCapture={c.onLaneClickCapture}
         onPointerDown={c.onLanePointerDown}
         onPointerMove={c.onLanePointerMove}
         onPointerUp={c.onLanePointerUp}
+        onPointerLeave={c.onLanePointerLeave}
       >
         <TimelineRuler c={c} />
         {/* A timeline too short for its tracks scrolls up and down under the ruler, which stays put. The

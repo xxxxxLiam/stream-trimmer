@@ -54,15 +54,15 @@ const clampPad = (f: number) => (f > 0 && f < 0.5 ? f : 0);
 /**
  * Zoom 0 is Fit: the whole video, with `padFrac` of the lane left empty after its end so the end is not
  * flush with the edge; zoomed in, the far right keeps that same room after the end. Below 0 the view goes
- * out, centred, to where the video fills a third of the lane. `focus` is the centre of a zoomed-in view.
+ * out, left-aligned (the video starts at the lane's left edge), to where the video fills a third of the lane. `focus` is the centre of a zoomed-in view.
  */
 export function windowFor(duration: number, zoom: number, focus: number, padFrac = 0): Win {
   if (!(duration > 0)) return { start: 0, end: 0 };
   const span = spanFor(duration, zoom, padFrac);
   if (zoom <= 0) {
     const fit = duration / (1 - clampPad(padFrac));
-    const start = zoom === 0 ? 0 : fit / 2 - span / 2;
-    return { start, end: start + span };
+    // Fit and every zoom-out start at the lane's left edge, as in any video editor: the video never floats in the middle.
+    return { start: 0, end: span };
   }
   const room = clampPad(padFrac) * span;
   let start = focus - span / 2;

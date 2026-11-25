@@ -202,11 +202,14 @@ test("zoomed in and scrolled to the far right, the same room stays after the vid
   assert.equal(windowFor(1000, 60, -50, f).start, 0);
 });
 
-test("zoomed out past Fit down to one third: the whole video fills a third of the lane, centred", () => {
+test("zoomed out past Fit down to one third: the whole video fills a third of the lane, left-aligned", () => {
   const out = windowFor(1000, ZOOM_MIN, 0, f);
   const span = out.end - out.start;
   assert.ok(Math.abs((1000 / span) * W - W / 3) < 0.001, "the video is a third of the lane wide");
-  assert.ok(out.start < 0 && out.end > 1000, "room both sides");
+  assert.equal(out.start, 0, "the video starts at the lane's left edge, never centred");
+  assert.ok(out.end > 1000, "the room is all on the right");
+  assert.equal(toX(linearAxis(out, W), 0), 0, "time 0 is at x = 0");
+  for (const z of [-1, -10, ZOOM_MIN / 2]) assert.equal(windowFor(1000, z, 500, f).start, 0, `zoom ${z} stays left-aligned`);
   // Between Fit and the limit the span grows steadily and never shrinks.
   let last = spanForPad(1000, 0, f);
   for (let z = -1; z >= ZOOM_MIN; z--) {
