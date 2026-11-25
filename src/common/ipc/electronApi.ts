@@ -93,8 +93,8 @@ export interface ElectronAPI {
     segments?: number;
   }) => Promise<{ ok: boolean; neededMb: number; freeMb: number | null }>;
   /**
-   * Is the folder clips are saved to usable? `gone` is a missing folder or an unplugged drive; `refused` is a folder
-   * that will not take writes (permission). Asked when Clip is pressed and while a "drive not connected" row waits.
+   * Can Clipr write into this folder? `gone` is a missing folder or an unmounted drive; `refused` is a folder that is
+   * there but will not take a file (no permission, read-only). Run it when Clip is pressed and before a save.
    */
   checkFolder?: (payload: { dirPath: string }) => Promise<{ ok: true } | { ok: false; problem: "gone" | "refused" }>;
   startDrag?: (targetPath: string) => void;

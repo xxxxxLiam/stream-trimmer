@@ -65,6 +65,7 @@ try {
       ipcRenderer.invoke(IPC.fileShowInFolder, targetPath),
     undoClip: (targetPath: unknown) => ipcRenderer.invoke(IPC.fileUndoClip, targetPath),
     checkFreeSpace: (payload: unknown) => ipcRenderer.invoke(IPC.fileFreeSpace, payload),
+    checkFolder: (payload: unknown) => ipcRenderer.invoke(IPC.fileCheckFolder, payload),
     fileExists: (targetPath: unknown) => ipcRenderer.invoke(IPC.fileExists, targetPath),
     // Fire-and-forget send, not invoke: the main process must call startDrag
     // synchronously within the drag gesture.

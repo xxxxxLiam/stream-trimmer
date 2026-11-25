@@ -680,7 +680,8 @@ test("real yt-dlp errors each get their own row, and a 403 is the refused row, n
   assert.equal(code("ERROR: Postprocessing: ffprobe and ffmpeg not found.").code, "tools_missing");
   assert.equal(code("ERROR: [youtube] a: Requested format is not available. Use --list-formats").code, "format_unavailable");
   const perm = code("ERROR: unable to open for writing: [Errno 13] Permission denied: '/Users/x/Clips/a.mp4'");
-  assert.equal(perm.code, "save_folder_gone");
+  assert.equal(perm.code, "folder_not_writable");
+  assert.equal(code("ERROR: [Errno 30] Read-only file system: '/Volumes/Disk/a.mp4'").code, "folder_not_writable");
   assert.match(perm.error, /can't write to that folder/);
   // Members-only and private still go to the private row.
   assert.equal(code("Private video. Sign in if you've been granted access").code, "private_video");
@@ -704,4 +705,18 @@ test("E2-1 / E-9: each cause has its own code and sentence, and none of them pro
     seen.add(f.code);
   }
   assert.equal(seen.size, cases.length, "no two causes share a code");
+});
+
+test("a folder that is there but refuses the write is folder_not_writable; a missing one stays save_folder_gone", () => {
+  for (const t of [
+    "PermissionError: [Errno 13] Permission denied: '/Users/x/Clips/a.mp4'",
+    "OSError: [Errno 1] Operation not permitted (EPERM)",
+    "OSError: [Errno 30] Read-only file system: '/Volumes/Disk/a.mp4'",
+    "EROFS: read-only file system, open '/Volumes/Disk/a.mp4'",
+  ]) {
+    const f = classifyFailure(t);
+    assert.equal(f.code, "folder_not_writable", t);
+    assert.equal(f.action.id, "choose_folder");
+  }
+  assert.equal(classifyFailure("OSError: [Errno 2] No such file or directory: '/Volumes/Drive/clips'").code, "save_folder_gone");
 });
