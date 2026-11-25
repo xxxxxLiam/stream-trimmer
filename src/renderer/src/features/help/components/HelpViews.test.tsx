@@ -59,7 +59,7 @@ test("an opened answer: Back to Help, numbered steps, pictures with an Ice ring,
   assert.match(h, />2<\/span><span>Click the folder icon on the clip’s row\.</);
   assert.equal((h.match(/outline-ice/g) ?? []).length, 2, "one ringed control in each of the two pictures");
   assert.match(h, /aria-hidden="true"[^>]*class="ml-\[30px\]/, "pictures are decorative");
-  assert.match(h, /Change it in Settings › Clips folder\./);
+  assert.match(h, /Change it in Settings: pick the campaign, then Folder\./);
   assert.match(h, /aria-label="Show me in Clipr: closes Help and runs these steps on the real controls"/);
   assert.match(h, /tabindex="0" aria-label="Answer"/, "the steps scroll by keys");
 });

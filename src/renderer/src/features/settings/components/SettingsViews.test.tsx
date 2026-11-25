@@ -12,7 +12,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import SettingsCampaign, { type SettingsCampaignProps } from "./SettingsCampaign";
 import SettingsEditor from "./SettingsEditor";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
-import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsTopList from "./SettingsTopList";
 import SettingsSignIn from "./SettingsSignIn";
 import { cookieReason } from "../utils/cookieReasons";
@@ -21,31 +20,40 @@ import { parentOf } from "../hooks/useSettingsController";
 const noop = () => {};
 const read = (f: string) => readFileSync(join(process.cwd(), "src/renderer/src", f), "utf8");
 
-test("top list: Your work rows, two switches, nothing about editor, quality or crashes", () => {
+test("top list: campaigns listed here, sign-in, two switches; no Campaigns page, no global Clips folder row", () => {
+  const rows = [{ id: "a", name: "Acme", summary: "3 clips a day", languages: null }, { id: "n", name: "Nova", summary: "2 clips a day", languages: null }];
   const h = renderToStaticMarkup(
-    <SettingsTopList campaignNames="Acme, Nova" clipsFolderLabel="Downloads/Clipr" app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenCampaigns={noop} onChangeFolder={noop} onOpenSignIn={noop} onClose={noop} />,
+    <SettingsTopList rows={rows} onEdit={noop} onAdd={noop} app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenSignIn={noop} onClose={noop} />,
   );
-  // Liam, 25 Nov: sign-in is a setting, so the Settings list has its row.
+  // Liam, 25 Nov: the campaigns are listed right on Settings, each opening that campaign.
+  assert.match(h, /aria-label="Acme: 3 clips a day"/);
+  assert.match(h, /aria-label="Nova: 2 clips a day"/);
+  assert.match(h, /aria-label="Add campaign"/);
+  assert.match(h, /aria-label="Acme: 3 clips a day"[\s\S]*?<svg[^>]*viewBox="0 0 16 16"/, "a gear at the row's right");
+  assert.doesNotMatch(h, /aria-label="Campaigns/);
+  // The clips folder is per campaign only.
+  assert.doesNotMatch(h, /Clips folder|Change the clips folder/);
   assert.match(h, /aria-label="Sign in for 1080p: Not signed in"/);
-  assert.match(h, /aria-label="Campaigns: Acme, Nova"/);
-  // Liam, 25 Nov: a page with one control is not a page; the Change button sits flat on the row.
-  assert.match(h, /Downloads\/Clipr/);
-  assert.match(h, /aria-label="Change the clips folder"/);
-  assert.doesNotMatch(h, /aria-label="Clips folder: /);
   assert.match(h, /role="switch"[^>]*aria-checked="true"[^>]*aria-label="Tell me when the queue finishes"/);
   assert.match(h, /aria-checked="false"[^>]*aria-label="Update automatically"/);
   assert.match(h, /aria-label="Close Settings"/);
   assert.doesNotMatch(h, /Editor|Quality|crash/i);
+  assert.throws(() => read("features/settings/components/SettingsCampaigns.tsx"));
 });
 
-test("campaigns list: summary lines, Edit per campaign, Add campaign", () => {
-  const h = renderToStaticMarkup(
-    <SettingsCampaigns rows={[{ id: "a", name: "Acme", summary: "3 clips a day", languages: "Languages: Original, Spanish" }, { id: "n", name: "Nova", summary: "2 clips a day", languages: null }]} onEdit={noop} onAdd={noop} onBack={noop} onClose={noop} />,
-  );
-  assert.match(h, /Languages: Original, Spanish/);
-  assert.match(h, /aria-label="Edit Nova"/);
-  assert.match(h, /aria-label="Add campaign"/);
-  assert.match(h, /aria-label="Back to Settings"/);
+test("top list on a Mac: no Update automatically switch (the build is unsigned and cannot update itself), the other switch stays", () => {
+  const props = { rows: [], onEdit: noop, onAdd: noop, app: { notifyQueueDone: true }, autoUpdate: true, onAutoUpdate: noop, onPatchApp: noop, onOpenSignIn: noop, onClose: noop };
+  const mac = renderToStaticMarkup(<SettingsTopList {...props} autoUpdateAvailable={false} />);
+  assert.doesNotMatch(mac, /Update automatically/);
+  assert.match(mac, /aria-label="Tell me when the queue finishes"/);
+  const other = renderToStaticMarkup(<SettingsTopList {...props} />);
+  assert.match(other, /aria-label="Update automatically"/);
+  assert.match(read("features/settings/components/SettingsDrawer.tsx"), /autoUpdateAvailable=\{updatesInPlace\(/);
+});
+
+test("Liam 25 Nov: the drawer panel grows with its content, so scrolling never shows the timeline behind it", () => {
+  assert.match(read("shared/components/Drawer.tsx"), /flex min-h-full w-\[440px\]/);
+  assert.doesNotMatch(read("shared/components/Drawer.tsx"), /flex h-full w-\[440px\]/);
 });
 
 const campaign: SettingsCampaignProps = {
@@ -75,10 +83,12 @@ test("one campaign: quota, languages, folder; no id pattern, format or quality",
   assert.match(h, /aria-label="One more clip a day"/);
   // Liam, 25 Nov: the padding is a fixed 5 seconds, so there is no choice to show.
   assert.doesNotMatch(h, /Extra seconds|aria-label="\d seconds"/);
-  assert.match(h, /aria-label="Spanish audio, ticked"/);
-  assert.match(h, /aria-label="Portuguese audio, not ticked"/);
+  // Liam, 25 Nov: Languages is one dropdown (many ticks), closed it names what is picked.
+  assert.match(h, /aria-label="Languages: Original \+ ES"/);
+  assert.match(h, /aria-haspopup="menu"/);
+  assert.doesNotMatch(h, /aria-label="Spanish audio/);
   assert.match(h, /aria-label="Open the Acme folder"/);
-  assert.match(h, /aria-label="Back to Campaigns"/);
+  assert.match(h, /aria-label="Back to Settings"/);
   assert.doesNotMatch(h, /Final Cut/);
   assert.doesNotMatch(h, /pattern|prefix|Quality|Format|short code/i);
 });
@@ -141,7 +151,7 @@ test("delete takes two clicks", () => {
 
 test("Back targets, and there is no separate Clips folder page", () => {
   assert.throws(() => read("features/settings/components/SettingsFolder.tsx"));
-  assert.deepEqual(parentOf({ kind: "campaign", id: "a" }), { label: "Campaigns", view: { kind: "campaigns" } });
+  assert.deepEqual(parentOf({ kind: "campaign", id: "a" }), { label: "Settings", view: { kind: "top" } });
   assert.equal(parentOf({ kind: "top" }), null);
 });
 
@@ -216,4 +226,19 @@ test("Liam 25 Nov: a campaign's export settings are always on its page, Final Cu
   assert.match(withEditor, /aria-label="Final Cut Pro settings for Acme"/);
   const drawer = read("features/settings/components/SettingsDrawer.tsx");
   assert.match(drawer, /const destination = hasEditorPage\(chosen\) \? chosen : "finalcut"/);
+});
+
+test("Liam 25 Nov: the Languages dropdown ticks many, Original first and on, and the menu stays open between picks", () => {
+  const src = read("features/settings/components/SettingsCampaign.tsx");
+  assert.match(src, /\[\{ code: "original", label: "Original" \}, \.\.\.p\.dubs\]/);
+  assert.match(src, /checked: prefs\.languages\.includes\(l\.code\), keepOpen: true/);
+  assert.doesNotMatch(src, /aria-pressed=\{on\}/);
+});
+
+test("Liam 25 Nov: the campaign menu has a gear on each row, not a separate '<Campaign> settings' line", () => {
+  const menu = read("features/campaigns/components/CampaignMenu.tsx");
+  assert.match(menu, /aria-label=\{`\$\{c\.name\} settings`\}/);
+  assert.match(menu, /<IconGear \/>/);
+  assert.doesNotMatch(menu, /\{current\.name\} settings/);
+  assert.match(menu, /New campaign/);
 });

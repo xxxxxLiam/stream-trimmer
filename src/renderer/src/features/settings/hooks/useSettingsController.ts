@@ -7,11 +7,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
-import { folderChipLabel } from "../../../shared/utils/folderLabel";
 import { DEFAULT_DAILY_QUOTA, campaignSummary, languagesLine } from "../utils/settingsPrefs";
 import { useSettingsState } from "./useSettingsState";
+import { editorStartCampaign } from "../utils/editorSetup";
 
-export type SettingsView = { kind: "top" } | { kind: "campaigns" } | { kind: "campaign"; id: string } | { kind: "editor"; id: string } | { kind: "signin" };
+export type SettingsView = { kind: "top" } | { kind: "campaign"; id: string } | { kind: "editor"; id: string } | { kind: "signin" };
 
 /** `startAt` value that opens Settings on the sign-in page (the footer pill). */
 export const START_AT_SIGNIN = "@signin";
@@ -19,8 +19,8 @@ export const START_AT_SIGNIN = "@signin";
 export function parentOf(v: SettingsView): { label: string; view: SettingsView } | null {
   // The label is the campaign's own name, which only the caller knows; the empty label is replaced there.
   if (v.kind === "editor") return { label: "", view: { kind: "campaign", id: v.id } };
-  if (v.kind === "campaign") return { label: "Campaigns", view: { kind: "campaigns" } };
-  if (v.kind === "campaigns" || v.kind === "signin") return { label: "Settings", view: { kind: "top" } };
+  if (v.kind === "campaign") return { label: "Settings", view: { kind: "top" } };
+  if (v.kind === "signin") return { label: "Settings", view: { kind: "top" } };
   return null;
 }
 
@@ -39,8 +39,15 @@ export function useSettingsController({
   const [view, setView] = useState<SettingsView>({ kind: "top" });
   const [adding, setAdding] = useState(false);
 
+  // True while the editor page was opened by picking an editor in the Clip menu: it then offers "Skip for now".
+  const [fromPick, setFromPick] = useState(false);
   useEffect(() => {
-    if (open) setView(startAt === START_AT_SIGNIN ? { kind: "signin" } : startAt ? { kind: "campaign", id: startAt } : { kind: "top" });
+    if (!open) return;
+    const pickedFor = editorStartCampaign(startAt);
+    setFromPick(pickedFor !== null);
+    setView(
+      startAt === START_AT_SIGNIN ? { kind: "signin" } : pickedFor ? { kind: "editor", id: pickedFor } : startAt ? { kind: "campaign", id: startAt } : { kind: "top" },
+    );
   }, [open, startAt]);
 
   useEffect(() => {
@@ -58,7 +65,7 @@ export function useSettingsController({
   // A campaign that was deleted while its view is open sends you back to the list.
   const gone = (view.kind === "campaign" || view.kind === "editor") && !campaigns.campaigns.some((c) => c.id === view.id);
   useEffect(() => {
-    if (gone) setView({ kind: "campaigns" });
+    if (gone) setView({ kind: "top" });
   }, [gone]);
 
   const rows = useMemo(
@@ -72,18 +79,17 @@ export function useSettingsController({
 
   const back = useCallback(() => {
     const p = parentOf(view);
+    setFromPick(false);
     if (p) setView(p.view);
   }, [view]);
 
   return {
     view,
+    fromPick,
     setView,
     back,
     parent: parentOf(view),
     rows,
-    campaignNames: campaigns.campaigns.map((c) => c.name).join(", "),
-    clipsFolder: campaigns.defaultFolders.clipsDir,
-    clipsFolderLabel: folderChipLabel(campaigns.defaultFolders.clipsDir),
     adding,
     setAdding,
     ...prefs,

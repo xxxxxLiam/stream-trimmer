@@ -87,6 +87,8 @@ import SymbolsDialog from "../features/symbols/components/SymbolsDialog"; // bro
 import CampaignStart from "../features/campaigns/components/CampaignStart";
 import SettingsDrawer from "../features/settings/components/SettingsDrawer";
 import { START_AT_SIGNIN } from "../features/settings/hooks/useSettingsController";
+import { editorStartAt, markSeen, needsEditorSetup, type SetupSeen } from "../features/settings/utils/editorSetup";
+import { onEditorSetupRequest } from "../shared/utils/editorSetupRequest";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
@@ -638,6 +640,20 @@ function Layout({ active }: { active: boolean }) {
     setHelpOpen(false);
     setSettingsOpen(true);
   };
+  // Picking an editor in the Clip arrow menu opens that editor's setup for this campaign, unless it is already set up or was skipped.
+  useEffect(() => {
+    if (!active) return;
+    return onEditorSetupRequest((editor) => {
+      const seen = readSetting<SetupSeen>("clipper.editorSetupSeen", {});
+      const id = campaign?.id ?? null;
+      if (!id || !needsEditorSetup(editor, { campaignId: id, fcpLibrary: editorSettingsFor(id).fcpLibrary, seen })) return;
+      // Premiere and Resolve have nothing to set, so their page is shown once; Final Cut asks again until a library is set or it is skipped.
+      if (editor !== "finalcut") writeSetting("clipper.editorSetupSeen", markSeen(seen, id, editor));
+      setSettingsStartAt(editorStartAt(id));
+      setHelpOpen(false);
+      setSettingsOpen(true);
+    });
+  }, [active, campaign?.id, editorSettingsFor]);
 
   // The footer pill and the "Downloaded at 360p" toast both open Help on its sign-in page.
 

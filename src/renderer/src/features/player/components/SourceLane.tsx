@@ -7,10 +7,39 @@
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { pickHintLead } from "../utils/laneTools";
+import { clockTime } from "../utils/transport";
 import { toX } from "../utils/timelineAxis";
 import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
 import LaneLabel from "./LaneLabel";
+
+/** The picture strip's top and bottom inset in the lane: the selection outline sits exactly on it. */
+export const STRIP_INSET = 6;
+
+/** The Ice grip on a section's edge: what the Pointer grabs to resize it. */
+function Grip({ x }: { x: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-grip
+      className="pointer-events-none absolute w-[4px] -translate-x-1/2 rounded-chip bg-ice"
+      style={{ left: x, top: STRIP_INSET + 6, bottom: STRIP_INSET + 6 }}
+    />
+  );
+}
+
+/** A small pill over the strip that shows the times of a range being moved, live. */
+function TimePill({ at, text }: { at: number; text: string }) {
+  return (
+    <span
+      role="status"
+      className="pointer-events-none absolute top-[8px] z-10 -translate-x-1/2 whitespace-nowrap rounded-chip bg-overlay-75 px-[8px] text-meta leading-[18px] text-fg"
+      style={{ left: at }}
+    >
+      {text}
+    </span>
+  );
+}
 
 export default function SourceLane({ c, height = 44 }: { c: TimelineController; height?: number }) {
   const covered = [...c.sections, ...c.used.filter((u) => u.end > u.start)].sort((a, b) => a.start - b.start);
@@ -47,18 +76,50 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
                 />
               );
             })}
-            {c.sections.map((s) => {
-              const x = toX(c.axis, s.start);
-              return (
+            {c.sections
+              .filter((s) => !(c.mergeHint && s.start >= c.mergeHint.start && s.end <= c.mergeHint.end))
+              .map((s) => {
+                const x = toX(c.axis, s.start);
+                const w = Math.max(4, toX(c.axis, s.end) - x);
+                return (
+                  <span key={`${s.start}-${s.end}`}>
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute rounded-chip border-2 border-ice bg-ice-tint-12 shadow-range"
+                      // The outline's outer edge sits exactly on the picture strip's top and bottom lines.
+                      style={{ left: x, width: w, top: STRIP_INSET, bottom: STRIP_INSET }}
+                    />
+                    <Grip x={x} />
+                    <Grip x={x + w} />
+                  </span>
+                );
+              })}
+            {c.mergeHint ? (
+              <>
                 <span
-                  key={`${s.start}-${s.end}`}
                   aria-hidden="true"
-                  className="pointer-events-none absolute rounded-chip border-2 border-ice bg-ice-tint-12 shadow-range"
-                  // The outline wraps the filmstrip (32px, centred in the lane) instead of sitting on it.
-                  style={{ left: x - 3, width: Math.max(4, toX(c.axis, s.end) - x) + 6, top: c.joined ? 12 : 3, bottom: c.joined ? 12 : 3 }}
+                  data-merge-outline
+                  className="pointer-events-none absolute rounded-chip border-2 border-frost bg-ice-tint-12"
+                  style={{
+                    left: toX(c.axis, c.mergeHint.start),
+                    width: Math.max(4, toX(c.axis, c.mergeHint.end) - toX(c.axis, c.mergeHint.start)),
+                    top: STRIP_INSET,
+                    bottom: STRIP_INSET,
+                  }}
                 />
-              );
-            })}
+                <Grip x={toX(c.axis, c.mergeHint.start)} />
+                <Grip x={toX(c.axis, c.mergeHint.end)} />
+                <TimePill
+                  at={(toX(c.axis, c.mergeHint.start) + toX(c.axis, c.mergeHint.end)) / 2}
+                  text={`Joins when you let go · ${clockTime(c.mergeHint.start)}–${clockTime(c.mergeHint.end)}`}
+                />
+              </>
+            ) : c.moving && c.range ? (
+              <TimePill
+                at={(toX(c.axis, c.range.start) + toX(c.axis, c.range.end)) / 2}
+                text={`${clockTime(c.range.start)}–${clockTime(c.range.end)}`}
+              />
+            ) : null}
             {c.flags.map((f) => (
               <span
                 key={f}

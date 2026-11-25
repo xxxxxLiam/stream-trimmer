@@ -36,6 +36,13 @@ test("macOS cannot restart into an update, the others can", () => {
   assert.equal(canInstallInPlace("linux"), true);
 });
 
+test("one rule for main and the page: darwin and MacIntel cannot update in place, Windows and Linux can", async () => {
+  const { updatesInPlace } = await import("../../../common/types/updates");
+  for (const p of ["darwin", "MacIntel", "MacARM", "macOS"]) assert.equal(updatesInPlace(p), false, p);
+  for (const p of ["win32", "Win32", "linux", "Linux x86_64", "", undefined]) assert.equal(updatesInPlace(p), true, String(p));
+  assert.equal(canInstallInPlace("darwin"), updatesInPlace("darwin"));
+});
+
 test("the download links point at the artifacts the build produces", () => {
   // The names are duplicated in updater.ts because it must not import the
   // build config at runtime. If an artifactName is renamed, this fails rather

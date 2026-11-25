@@ -32,6 +32,13 @@ export const IconHelp = (p: SVGProps<SVGSVGElement>) => (
     <path d="M6.5 6.3a1.6 1.6 0 113 .7c-.6.4-1.5.8-1.5 1.7M8 11h0" />
   </Icon>
 );
+/** The standard settings gear: eight teeth round a hub. */
+export const IconGear = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M6.54 3.22L6.85 1.50L9.15 1.50L9.46 3.22L10.35 3.59L11.79 2.59L13.41 4.21L12.41 5.65L12.78 6.54L14.50 6.85L14.50 9.15L12.78 9.46L12.41 10.35L13.41 11.79L11.79 13.41L10.35 12.41L9.46 12.78L9.15 14.50L6.85 14.50L6.54 12.78L5.65 12.41L4.21 13.41L2.59 11.79L3.59 10.35L3.22 9.46L1.50 9.15L1.50 6.85L3.22 6.54L3.59 5.65L2.59 4.21L4.21 2.59L5.65 3.59Z" strokeLinejoin="round" />
+    <circle cx="8" cy="8" r="2" />
+  </Icon>
+);
 export const IconSettings = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7" />

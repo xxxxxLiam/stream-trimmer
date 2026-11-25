@@ -82,3 +82,11 @@ test("R2: the top bar's centre is the link field; Enter adds, Esc restores, and 
   assert.match(hook, /ws\.addTab\(action\.target\)/);
   assert.ok(!/ctrlKey|metaKey/.test(hook), "L belongs to Loop the range");
 });
+
+test("R2: the top bar sits above the workspace, so the link field's panel is not hidden behind Preview", () => {
+  const bar = readFileSync(new URL("../modules/layout/components/TopBar.tsx", import.meta.url), "utf8");
+  const header = bar.match(/<header\s+className=\{`([^`]*)`/)![1];
+  assert.match(header, /\brelative z-40\b/, "a z-auto header is painted over by the later, positioned workspace row");
+  const field = readFileSync(new URL("../features/workspace/components/TopBarLinkField.tsx", import.meta.url), "utf8");
+  assert.match(field, /role="status"[\s\S]{0,80}z-30|z-30[\s\S]{0,120}role="status"/);
+});

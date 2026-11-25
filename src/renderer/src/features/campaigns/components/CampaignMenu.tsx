@@ -1,7 +1,7 @@
 /**
  * File: CampaignMenu.tsx
  * Path: src/renderer/src/features/campaigns/components/CampaignMenu.tsx
- * Description: Body of the header campaign popover: switch campaign, open its settings, create one with
+ * Description: Body of the header campaign popover: switch campaign, a gear on each row for its settings, create one with
  *   the new-campaign form. Switching re-points the folder and the used-ranges record at once. No filled-accent button here: the
  *   screen's one primary action is Cut.
  */
@@ -9,6 +9,7 @@ import { useState } from "react";
 import CampaignForm from "./CampaignForm";
 import { useCampaign } from "../hooks/CampaignContext";
 import { todayCount } from "../../../shared/utils/campaigns";
+import { IconGear } from "../../../shared/components/icons";
 
 export default function CampaignMenu({
   onClose,
@@ -21,7 +22,6 @@ export default function CampaignMenu({
   const { campaigns, activeId, setActiveId } = useCampaign();
   const [wizard, setWizard] = useState(false);
 
-  const current = campaigns.find((c) => c.id === activeId);
   const ROW =
     "flex h-[44px] w-full items-center gap-[10px] rounded-control px-[10px] text-left text-body text-fg hover:bg-hover";
   const openSettings = (id: string) => {
@@ -41,12 +41,12 @@ export default function CampaignMenu({
           {campaigns.map((c) => {
             const selected = c.id === activeId;
             return (
-              <li key={c.id}>
+              <li key={c.id} className={`flex items-center rounded-control ${selected ? "bg-hover" : ""}`}>
                 <button
                   type="button"
                   role="menuitem"
                   aria-current={selected}
-                  className={`${ROW} ${selected ? "bg-hover" : ""}`}
+                  className={`${ROW} min-w-0 flex-1 hover:bg-hover`}
                   onClick={() => {
                     setActiveId(c.id);
                     onClose?.();
@@ -62,28 +62,23 @@ export default function CampaignMenu({
                   <span className="min-w-0 truncate">{c.name}</span>
                   <span className="ml-auto shrink-0 text-meta text-fg-dim">{todayCount(c) ?? ""}</span>
                 </button>
+                {/* Liam, 25 Nov: a gear at the row's far right opens that campaign's settings; no separate "<Campaign> settings" line. */}
+                <button
+                  type="button"
+                  role="menuitem"
+                  aria-label={`${c.name} settings`}
+                  id={selected ? "ui-campaign-settings" : undefined}
+                  className="inline-flex size-target shrink-0 items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
+                  onClick={() => openSettings(c.id)}
+                >
+                  <IconGear />
+                </button>
               </li>
             );
           })}
         </ul>
       )}
       <div role="separator" className="mx-[4px] my-[6px] h-px bg-hairline" />
-      {current ? (
-        <button type="button" id="ui-campaign-settings" role="menuitem" className={ROW} onClick={() => openSettings(current.id)}>
-          <span className="inline-flex text-fg-dim">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="8" cy="8" r="2.2" />
-              <path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1" />
-            </svg>
-          </span>
-          <span className="min-w-0 truncate">{current.name} settings</span>
-          <span className="ml-auto inline-flex text-fg-dim">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-              <path d="M3.5 2l3 3-3 3" />
-            </svg>
-          </span>
-        </button>
-      ) : null}
       <button type="button" role="menuitem" className={ROW} onClick={() => setWizard(true)}>
         <span className="w-[16px] text-center text-fg-dim">+</span>
         New campaign

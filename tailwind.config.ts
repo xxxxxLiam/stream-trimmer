@@ -64,6 +64,7 @@ export default {
         },
         frost: {
           DEFAULT: "rgb(184 228 234 / <alpha-value>)",
+          "tint-08": "var(--frost-tint-08)",
           "tint-35": "var(--frost-tint-35)",
           "tint-45": "var(--frost-tint-45)",
           "tint-60": "var(--frost-tint-60)",

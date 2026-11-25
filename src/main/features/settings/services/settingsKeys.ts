@@ -26,6 +26,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.dataDirConfirmed",
   "clipper.downloads",
   "clipper.editorHandoff",
+  "clipper.editorSetupSeen",
   "clipper.fcpLastLayout",
   "clipper.fcpLastLookId",
   "clipper.fcpLookMigrated",
