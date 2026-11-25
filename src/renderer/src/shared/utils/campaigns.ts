@@ -142,7 +142,7 @@ export function sameFolder(a: string, b: string): boolean {
 
 export const MAX_NAME_LENGTH = 60;
 
-export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "folders-same" | "pattern-no-number";
+export type CampaignProblem = "name-empty" | "name-long" | "name-taken" | "folder-taken" | "folders-same" | "pattern-no-number";
 
 export function validateCampaign(
   c: Pick<Campaign, "name" | "clipsDir" | "dataDir" | "clipIdPattern">,
@@ -164,6 +164,8 @@ export function campaignNameProblems(name: string, others: readonly Pick<Campaig
   if (!name.trim()) found.push("name-empty");
   else if (name.trim().length > MAX_NAME_LENGTH) found.push("name-long");
   else if (others.some((o) => o.id !== editingId && o.name.trim().toLowerCase() === name.trim().toLowerCase())) found.push("name-taken");
+  // "A/B" and "A:B" would both save into the folder "A-B" and mix their clips.
+  else if (others.some((o) => o.id !== editingId && folderNameOf(o.name).toLowerCase() === folderNameOf(name).toLowerCase())) found.push("folder-taken");
   return found.map(describeCampaignProblem);
 }
 
@@ -175,6 +177,8 @@ export function describeCampaignProblem(p: CampaignProblem): string {
       return `Keep the name to ${MAX_NAME_LENGTH} characters or fewer.`;
     case "name-taken":
       return "Another campaign already has that name.";
+    case "folder-taken":
+      return "Another campaign already saves to a folder with that name. Change a character or two.";
     case "folders-same":
       return "Clips and Data need different folders.";
     case "pattern-no-number":
@@ -408,11 +412,15 @@ export function clipsMadeToday(c: Campaign | null | undefined, now: number = Dat
   return ids.size;
 }
 
-/** The top bar's count, "2 of 3 today", or null when the campaign has no daily quota. */
+/**
+ * The top bar's count, "2 of 3 today"; "Done for today" once the quota is made, the same words as the end card, so
+ * it never reads "3 of 2 today". Null when the campaign has no daily quota.
+ */
 export function todayCount(c: Campaign | null | undefined, now: number = Date.now()): string | null {
   const quota = c?.dailyQuota;
   if (!c || !quota || quota <= 0) return null;
-  return `${clipsMadeToday(c, now)} of ${quota} today`;
+  const made = clipsMadeToday(c, now);
+  return made >= quota ? "Done for today" : `${made} of ${quota} today`;
 }
 
 /** Takes a clip's ranges back out, e.g. when the user deletes a cut. */

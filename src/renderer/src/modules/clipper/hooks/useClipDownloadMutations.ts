@@ -7,7 +7,7 @@ import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { useCallback, useRef, useState } from "react";
 import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl, buildClipFilename, sanitizeFilename, type ClipFormat, type VideoInfo } from "../../../shared/utils/clip";
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
-import { cookiePayload, markDisconnected, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
+import { connectionNow, cookiePayload, isSignedOut, markDisconnected, requestedQuality, useYouTubeConnection, whenSignInSettled } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
 import { DownloadCancelledError, DownloadFailureError, isCancelledResponse, isQuietCancel, requestEngineCancel, saveFailure, videoUrlProblem } from "../utils/downloadErrors";
@@ -19,7 +19,7 @@ export function useClipDownloadMutations({
   start,
   end,
   format,
-  quality,
+  quality: qualityArg,
   isElectron,
   saveDir,
   connection,
@@ -104,6 +104,9 @@ export function useClipDownloadMutations({
     setDownloadNote("");
     setSavedNotice(null);
     setFailure(null);
+    // A clip made in the first seconds waits for the launch sign-in check, then asks for the quality its result allows.
+    await whenSignInSettled();
+    const quality = requestedQuality({ signedOut: isSignedOut(connectionNow()), format, quality: qualityArg });
     const controller = new AbortController();
     downloadAbortRef.current = controller;
     // When the desktop app has somewhere to put the clip, the engine hands
@@ -335,7 +338,7 @@ export function useClipDownloadMutations({
     start,
     end,
     format,
-    quality,
+    qualityArg,
     isElectron,
     saveDir,
     connection,
