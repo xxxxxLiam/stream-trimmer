@@ -136,6 +136,7 @@ try {
     },
 
     checkForUpdates: () => ipcRenderer.invoke(IPC.updaterCheck),
+    getVersionGate: () => ipcRenderer.invoke(IPC.versionGateStatus),
     restartToUpdate: () => ipcRenderer.invoke(IPC.updaterRestartToUpdate),
     cancelRestartToUpdate: () => ipcRenderer.invoke(IPC.updaterCancelRestart),
     getRestartWaiting: () => ipcRenderer.invoke(IPC.updaterRestartWaitingNow),

@@ -39,3 +39,15 @@ export const AUTO_UPDATE_SETTING = "clipper.autoUpdate";
 export function autoUpdateEnabled(settings: Record<string, unknown> | undefined): boolean {
   return settings?.[AUTO_UPDATE_SETTING] !== false;
 }
+
+/**
+ * The minimum-version gate's answer, once per launch. `blocked` is true only when the relay named a minimum above this
+ * copy; any trouble reaching the relay answers `blocked: false` so the app runs as normal.
+ */
+export interface VersionGateStatus {
+  blocked: boolean;
+  /** The minimum version the relay named, when it named a valid one. */
+  required: string | null;
+  /** This copy's version. */
+  current: string;
+}

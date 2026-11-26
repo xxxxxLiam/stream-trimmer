@@ -56,6 +56,7 @@ export const IPC = {
   systemDefaultBrowser: "system:defaultBrowser",
   systemDefaultFolders: "system:defaultFolders",
   updaterCheck: "updater:check",
+  versionGateStatus: "versionGate:status",
   updaterReady: "updater:ready",
   updaterReadyNow: "updater:readyNow",
   updaterRestartToUpdate: "updater:restartToUpdate",
