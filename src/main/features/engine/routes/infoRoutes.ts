@@ -95,8 +95,9 @@ export function registerInfoRoutes(app: Express): void {
     };
 
     let options: Record<string, unknown> = {};
-    let stderr = "";
-    try {
+    // One attempt: runs yt-dlp and reports which caption file (if any) landed in tempDir.
+    const attempt = async (): Promise<{ vtt: string | null; stderr: string }> => {
+      let stderr = "";
       await withRunCookies(
         cookieModeFor(parsed.data.cookiesFromBrowser),
         resolveCookieOptions(parsed.data.cookiesFromBrowser),
@@ -125,11 +126,23 @@ export function registerInfoRoutes(app: Express): void {
           } as any);
         },
       );
-
       const files = fs.readdirSync(tempDir);
       console.log("[server] transcript files:", files);
+      return { vtt: pickTranscriptFile(files), stderr };
+    };
 
-      const vtt = pickTranscriptFile(files);
+    try {
+      let { vtt, stderr } = await attempt();
+
+      // YouTube's caption endpoint rate-limits on its own schedule, independently of the video
+      // itself, and that refusal arrives as a warning (exit 0, no file), not a thrown error — so it
+      // is only caught here, not in the outer catch. One retry is cheap insurance against exactly
+      // that transient case; anything else failing to produce a file (no captions, a removed video,
+      // sign-in required) is final on the first try, same as before.
+      if (!vtt && describeMissingTranscript(stderr)?.kind === "refused") {
+        console.log(`[server] /api/transcript refused, retrying once: ${stderr.trim().slice(-400)}`);
+        ({ vtt, stderr } = await attempt());
+      }
 
       if (!vtt) {
         cleanup();
