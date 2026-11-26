@@ -85,12 +85,21 @@ export default function PreviewPanel() {
               />
               <div className="absolute inset-[0px] flex flex-col items-center justify-center gap-[8px] px-[24px] text-center">
                 <ExclamationTriangle size={22} className="text-fg" />
-                <span className="text-body text-fg">The owner blocks playback here</span>
-                <span className="max-w-sm text-meta text-fg-dim">Cutting and downloading still work.</span>
-                <button type="button" onClick={() => openExternal(videoId)} className="btn mt-[4px]">
-                  <BoxArrowUpRight size={12} />
-                  <span>Watch on YouTube</span>
-                </button>
+                <span className="text-body text-fg">{player.blockedBy?.owner ? "The owner blocks playback here" : "The preview did not load"}</span>
+                <span className="max-w-sm text-meta text-fg-dim">
+                  {player.blockedBy?.owner ? "Cutting and downloading still work." : `YouTube would not show it here (code ${player.blockedBy?.code ?? 0}). Cutting and downloading still work.`}
+                </span>
+                <div className="mt-[4px] flex items-center gap-[8px]">
+                  {player.blockedBy?.owner ? null : (
+                    <button type="button" onClick={player.reload} className="btn">
+                      <span>Try again</span>
+                    </button>
+                  )}
+                  <button type="button" onClick={() => openExternal(videoId)} className="btn">
+                    <BoxArrowUpRight size={12} />
+                    <span>Watch on YouTube</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

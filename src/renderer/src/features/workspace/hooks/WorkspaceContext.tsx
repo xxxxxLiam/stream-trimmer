@@ -226,10 +226,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (link) setTrying((prev) => ({ ...prev, [id]: true }));
     setTabs((prev) => [...prev, link ? { id, name: "", url: link } : { id, name: "" }]);
     if (link) {
-      // Stay on the open video; it is shown once the link has opened, and a failure never leaves the workspace.
+      // The new video is selected at once and says it is opening; a failure goes back to the video you were on
+      // and never leaves the workspace.
       setOpenFailure("");
       setOpeningId(id);
-    } else setActiveId(id);
+    }
+    setActiveId(id);
   }, []);
 
   const backTargetFor = useCallback((id: string) => backTarget(tabsRef.current, cameFromRef.current, id), []);
@@ -244,6 +246,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       delete next[id];
       return next;
     });
+    // Selected while it opened: go back to the video that was open before it.
+    if (activeRef.current === id) {
+      const back = cameFromRef.current[id];
+      const fallback = tabsRef.current.find((t) => t.id !== id)?.id;
+      const target = back && back !== id && tabsRef.current.some((t) => t.id === back) ? back : fallback;
+      if (target) setActiveId(target);
+    }
     setTabs((prev) => prev.filter((t) => t.id !== id));
   }, []);
   const clearOpenFailure = useCallback(() => setOpenFailure(""), []);
