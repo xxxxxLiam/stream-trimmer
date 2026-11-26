@@ -7,6 +7,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { readMachineId, hashMachineId } = require("../src/main/shared/services/machineId.ts");
+const { pickVersion, latestReleaseVersion } = require("./mineVersion.cjs");
 
 const root = path.join(__dirname, "..");
 const envFile = path.join(root, ".env");
@@ -54,7 +55,12 @@ function withKey(lines, key, value) {
   };
   const run = (cmd, args) => spawnSync(cmd, args, { cwd: root, stdio: "inherit", env }).status ?? 1;
   if (!fs.existsSync(path.join(root, "node_modules")) && run("npm", ["ci"]) !== 0) process.exit(1);
-  const code = run("npm", ["run", "dist:mac"]);
+  // Stamp the build with at least the latest public release, so it never opens saying it is out of
+  // date and offers an "update" that would replace this private build.
+  const local = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+  const version = pickVersion(local, await latestReleaseVersion());
+  if (version !== local) console.log(`This clone says ${local}, the latest public release is newer: stamping ${version}.`);
+  const code = run("npm", ["run", "dist:mac", "--", `--config.extraMetadata.version=${version}`]);
   if (code !== 0) process.exit(code);
   console.log("\nDone. Open dist-electron/ and install the .dmg. Panels menu > Channel data, or paste a channel link.");
   spawnSync("open", [path.join(root, "dist-electron")], { stdio: "ignore" });
