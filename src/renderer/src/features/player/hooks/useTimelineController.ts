@@ -247,6 +247,8 @@ export function useTimelineController() {
       }
     }
     // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
+    // A click on empty timeline also clears the selection (board 03.2.49), as Esc does.
+    clearSelection();
     s.setDrag({ kind: "scrub" });
     clipper.requestSeek(Math.round(t));
   };
@@ -285,6 +287,17 @@ export function useTimelineController() {
   const clearSelection = () => {
     clearRange();
     store.clear();
+  };
+  /** Delete the selected clip (board 03.2.49): its range and its waiting card go, which clears the selection. Clips already made are untouched. */
+  const deleteClip = () => {
+    if (active && videoId) {
+      const first = sections[0];
+      const id =
+        store.bankId ??
+        (sections.length === 1 && first ? store.banked.find((b) => b.clipId && b.start === first.start && b.end === first.end)?.clipId : undefined);
+      if (id) bankStore.remove(active.id, videoId, id);
+    }
+    clearSelection();
   };
   const tabActive = useIsTabActive();
   const hasRange = !!range || store.segments.length > 0;
@@ -490,6 +503,7 @@ export function useTimelineController() {
     onLaneClickCapture,
     addSection,
     clearRange,
+    deleteClip,
     removeSection: (i: number) => store.remove(i),
     seek: (t: number) => clipper.requestSeek(t),
   };
