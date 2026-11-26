@@ -87,6 +87,8 @@ export type CampaignState = {
    * (e.g. same folder as the other one), or null. Desktop app only; otherwise a no-op.
    */
   pickClipsDir: (forId?: string) => Promise<string | null>;
+  /** Same pick, but says whether a folder was actually chosen (a cancelled dialog is `picked: false`). */
+  chooseClipsDir: (forId?: string) => Promise<{ picked: boolean; problem: string | null }>;
   pickDataDir: (forId?: string) => Promise<string | null>;
   /** Choose the Clips folder (the parent of every campaign's folder). Same result as pickClipsDir. */
   pickParentClipsDir: () => Promise<string | null>;
@@ -285,20 +287,22 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     return null;
   }, [saveDefaults]);
 
-  const pickClipsDir = useCallback(
-    async (forId?: string) => {
+  const chooseClipsDir = useCallback(
+    async (forId?: string): Promise<{ picked: boolean; problem: string | null }> => {
       // A campaign pick makes <chosen>/Clipr clips/<Campaign>, a location's <chosen>/Clipr <Name> (an existing one is reused).
       const target = campaignsRef.current.find((c) => c.id === (idOrUndefined(forId) ?? activeIdRef.current));
       const api = window.electronAPI;
       if (target && api?.pickBrandedDirectory) {
         const picked = await api.pickBrandedDirectory({ kind: target.kind === "location" ? "location" : "campaign", name: target.name });
-        return picked ? setClipsDir(picked.dir, target.id) : null;
+        return picked ? { picked: true, problem: setClipsDir(picked.dir, target.id) } : { picked: false, problem: null };
       }
       const dir = await api?.pickDirectory();
-      return dir ? setClipsDir(dir, idOrUndefined(forId)) : null;
+      return dir ? { picked: true, problem: setClipsDir(dir, idOrUndefined(forId)) } : { picked: false, problem: null };
     },
     [setClipsDir],
   );
+
+  const pickClipsDir = useCallback(async (forId?: string) => (await chooseClipsDir(forId)).problem, [chooseClipsDir]);
 
   const pickDataDir = useCallback(
     async (forId?: string) => {
@@ -400,6 +404,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       setClipsDir,
       setDataDir,
       pickClipsDir,
+      chooseClipsDir,
       pickDataDir,
       pickParentClipsDir,
       confirmDataDir,
@@ -422,6 +427,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       setClipsDir,
       setDataDir,
       pickClipsDir,
+      chooseClipsDir,
       pickDataDir,
       pickParentClipsDir,
       confirmDataDir,
@@ -472,6 +478,7 @@ export function CampaignTabScope({
     setClipsDir: setClipsDirGlobal,
     setDataDir: setDataDirGlobal,
     pickClipsDir: pickClipsDirGlobal,
+    chooseClipsDir: chooseClipsDirGlobal,
     pickDataDir: pickDataDirGlobal,
   } = parent;
 
@@ -530,6 +537,10 @@ export function CampaignTabScope({
     (forId?: string) => pickClipsDirGlobal(idOrUndefined(forId) ?? id ?? undefined),
     [pickClipsDirGlobal, id],
   );
+  const chooseClipsDir = useCallback(
+    (forId?: string) => chooseClipsDirGlobal(idOrUndefined(forId) ?? id ?? undefined),
+    [chooseClipsDirGlobal, id],
+  );
   const pickDataDir = useCallback(
     (forId?: string) => pickDataDirGlobal(idOrUndefined(forId) ?? id ?? undefined),
     [pickDataDirGlobal, id],
@@ -569,6 +580,7 @@ export function CampaignTabScope({
       setClipsDir,
       setDataDir,
       pickClipsDir,
+      chooseClipsDir,
       pickDataDir,
       usedFor,
       nextClipId,
@@ -586,6 +598,7 @@ export function CampaignTabScope({
       setClipsDir,
       setDataDir,
       pickClipsDir,
+      chooseClipsDir,
       pickDataDir,
       usedFor,
       nextClipId,

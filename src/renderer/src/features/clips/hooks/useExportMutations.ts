@@ -29,7 +29,7 @@ import type { useExportQueries } from "./useExportQueries";
 export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: ExportState) {
   const seg = useSegmentsState();
   const { cutBanked, cutAgain } = usePanelHost();
-  const { recordUse, forgetUse, folders, pickClipsDir } = useCampaign();
+  const { recordUse, forgetUse, folders, chooseClipsDir } = useCampaign();
   const { removeDownload, pickSaveDir, saveDir, info, cancelDownload, setStartText, setEndText, startText, endText } = useClipperContext();
   const stopped = useRef(false);
   const { campaignId, vid } = q;
@@ -165,12 +165,22 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   latest.current = { retry, where };
   const changeFolder = useCallback(async () => {
     const before = latest.current.where;
-    if (campaignId) await pickClipsDir(campaignId);
-    else await pickSaveDir();
-    // The new folder reaches this hook a render later; wait for it (up to half a second), then cut again.
+    let picked = true;
+    if (campaignId) {
+      const r = await chooseClipsDir(campaignId);
+      picked = r.picked;
+      if (r.problem) s.setNotice(r.problem);
+      if (r.problem) return;
+    } else {
+      await pickSaveDir();
+    }
+    if (!picked) return;
+    // The new folder reaches this hook a render later; wait for it (up to half a second). A folder that is
+    // the one already set (it was changed from "Where clips go" while this error sat here) still cuts again:
+    // the error is about the old drive, and choosing a folder is the person saying "try now".
     for (let i = 0; i < 10 && latest.current.where === before; i++) await new Promise((r) => window.setTimeout(r, 50));
-    if (latest.current.where !== before) latest.current.retry();
-  }, [pickSaveDir, pickClipsDir, campaignId]);
+    latest.current.retry();
+  }, [pickSaveDir, chooseClipsDir, campaignId, s]);
 
   const showFolder = useCallback(() => {
     const dir = latest.current.where;

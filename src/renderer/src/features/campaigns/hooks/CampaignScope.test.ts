@@ -46,3 +46,18 @@ test("Settings picks a folder for the campaign it is editing, not the tab's own;
   assert.equal(saved.find((c) => c.id === "beta")?.clipsDir, "/chosen/beta");
   assert.equal(saved.find((c) => c.id === "acme")?.clipsDir, "", "the tab's own campaign is untouched");
 });
+
+test("chooseClipsDir tells a cancelled dialog from a folder that was chosen, even when it is the same folder", async () => {
+  const { CampaignProvider, CampaignTabScope, useCampaign } = await import("./CampaignContext");
+  let ctx!: ReturnType<typeof useCampaign>;
+  const Probe = () => {
+    ctx = useCampaign();
+    return null;
+  };
+  renderToString(createElement(CampaignProvider, null, createElement(CampaignTabScope, { campaignId: "acme", onChange: () => {}, children: createElement(Probe) })));
+  picked = null;
+  assert.deepEqual(await ctx.chooseClipsDir("beta"), { picked: false, problem: null });
+  picked = "/chosen/beta";
+  assert.deepEqual(await ctx.chooseClipsDir("beta"), { picked: true, problem: null });
+  assert.deepEqual(await ctx.chooseClipsDir("beta"), { picked: true, problem: null }, "the same folder again is still a pick");
+});
