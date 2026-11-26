@@ -214,3 +214,12 @@ test("the release workflow keeps each build's source maps as a private artifact 
   assert.equal(yml.includes("gh release upload"), false);
   assert.ok(pkg.build.files.includes("!**/*.map"));
 });
+
+test("a manual run can publish a pre-release that is not 'latest'; an ordinary run still publishes latest", () => {
+  const yml = readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8");
+  assert.match(yml, /prerelease:\s*\n\s*description:[^\n]*\n\s*type: boolean\n\s*default: false/);
+  assert.match(yml, /PRERELEASE: \$\{\{ github\.event\.inputs\.prerelease \|\| 'false' \}\}/);
+  assert.match(yml, /"\$\{PRERELEASE:-false\}" = "true"[\s\S]*--prerelease[\s\S]*--latest=false[\s\S]*else[\s\S]*--latest \\/);
+  // A push to main has no inputs, so it can never be a pre-release.
+  assert.match(yml, /push:\s*\n\s*branches: \[main\]/);
+});
