@@ -1,15 +1,13 @@
 /**
  * File: Timeline.tsx
  * Path: src/renderer/src/features/player/components/Timeline.tsx
- * Description: The timeline panel: tools row, ruler and the lanes (Transcript, Source, one Audio lane per ticked language, Clips),
+ * Description: The timeline panel: tools row, ruler and the lanes (Transcript, Source, Clips; no Audio lane, the language is chosen in the Clip menu),
  *   full width under the preview. The tools and zoom come from the bottom bar's shared state.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTimelineView } from "../hooks/TimelineControllerContext";
 import { cursorFor, sourceLaneHeight } from "../utils/laneTools";
 import { useTranscriptLane } from "../hooks/useTranscriptLane";
-import { useAudioLanes } from "../hooks/useAudioLanes";
-import AudioLanes from "./AudioLanes";
 import ClipsLane from "./ClipsLane";
 import SourceLane from "./SourceLane";
 import TimelineTools from "./TimelineTools";
@@ -22,7 +20,6 @@ export default function Timeline() {
   const c = useTimelineView();
   const laneBox = useRef<HTMLDivElement>(null);
   const transcriptLane = useTranscriptLane();
-  const audioLanes = useAudioLanes();
   const { setWidth } = c;
   const [height, setHeight] = useState(0);
   // Alt turns the zoom tool's click into a zoom out, and its cursor says so.
@@ -93,7 +90,6 @@ export default function Timeline() {
         >
           {transcriptLane ? <TranscriptLane c={c} /> : null}
           <SourceLane c={c} height={sourceLaneHeight(height)} />
-          {audioLanes ? <AudioLanes c={c} /> : null}
           <ClipsLane c={c} />
         </div>
       </div>

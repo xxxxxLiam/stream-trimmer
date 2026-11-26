@@ -78,15 +78,15 @@ test("a name that does not fit its bar continues into free space, and is cut onl
   assert.equal(p[3].inside, true, "no room: stays inside and truncates");
 });
 
-test("the Source lane keeps 44px at the default timeline and takes all the extra height", () => {
-  assert.equal(sourceLaneHeight(DEFAULT_SIZES.timeline), 44);
-  assert.equal(sourceLaneHeight(150), 44);
-  assert.equal(sourceLaneHeight(DEFAULT_SIZES.timeline + 180), 224);
+test("the Source lane is 76px at the default timeline (the removed Audio lane's 32px) and takes all the extra height", () => {
+  assert.equal(sourceLaneHeight(DEFAULT_SIZES.timeline), 76);
+  assert.equal(sourceLaneHeight(150), 76);
+  assert.equal(sourceLaneHeight(DEFAULT_SIZES.timeline + 180), 256);
 });
 
-test("the default timeline is tall enough for the board's five lanes under the tools row and ruler", () => {
-  // Transcript 32 + Source 44 + two Audio 32 + Clips 34, the ruler 18, the tools row 44 (+ its 10px below).
-  assert.ok(DEFAULT_SIZES.timeline >= 32 + 44 + 32 + 32 + 34 + 18 + 44 + 10);
+test("the default timeline holds the three lanes under the tools row and ruler", () => {
+  // Transcript 32 + Source 76 + Clips 34, the ruler 18, the tools row 44 (+ its 10px below).
+  assert.ok(DEFAULT_SIZES.timeline >= 32 + 76 + 34 + 18 + 44 + 10);
 });
 
 import { cursorFor, zoomFromX } from "./laneTools";
