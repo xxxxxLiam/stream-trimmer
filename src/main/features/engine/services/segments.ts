@@ -582,8 +582,8 @@ export function classifyFailure(
     return failure(
       "format_unavailable",
       500,
-      "YouTube offers no version of this video at the quality you asked for",
-      { id: "retry", label: "Pick another quality, then try again" },
+      "YouTube has no version of this video that Clipr can download right now",
+      { id: "retry", label: "Try again, or sign in to YouTube" },
       kept(),
     );
   }

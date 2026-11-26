@@ -86,6 +86,10 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
           `bestvideo[height<=${quality}]+${aAny}`,
           `best[height<=${quality}][ext=mp4]`,
           `best[height<=${quality}]`,
+          // Never a hard failure: when nothing at or below the height is listed (a signed-out session often
+          // sees only a few formats), take whatever there is. The delivered height is reported to the person.
+          `bestvideo+${aAny}`,
+          "best",
         ];
   // Pre-merged renditions carry only the original audio, so a chosen dub never falls onto them:
   // a missing dub falls back to the original up front (probePhase), not silently here.

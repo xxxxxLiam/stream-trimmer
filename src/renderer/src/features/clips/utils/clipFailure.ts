@@ -99,7 +99,7 @@ export function failureCopy(
   if (kind === "refused") return { reason: ov ?? "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
   // "Will try once more" is said only when the engine really is about to (retrying:true).
   if (kind === "ratelimited") return { reason: ov ?? "YouTube is asking Clipr to slow down.", detail: "Try again in a few minutes." };
-  if (kind === "format") return { reason: ov ?? "That quality isn’t available for this video.", detail: "Pick another quality, then Retry." };
+  if (kind === "format") return { reason: ov ?? "YouTube has no version of this video Clipr can download right now.", detail: "Retry. If it keeps happening, sign in to YouTube in Settings." };
   if (kind === "tools") return { reason: ov ?? "Clipr’s download tools are missing.", detail: "Restart Clipr, then Retry." };
   // The engine's own plain sentence when it sent one; "will try once more" only when it really is retrying.
   return { reason: ov ?? "YouTube stopped the download.", detail: retrying ? RETRY_SENTENCE : "" };

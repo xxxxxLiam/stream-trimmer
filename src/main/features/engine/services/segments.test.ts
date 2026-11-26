@@ -693,7 +693,7 @@ test("E2-1 / E-9: each cause has its own code and sentence, and none of them pro
     ["ERROR: [youtube] x: Sign in to confirm you're not a bot. Use --cookies-from-browser", "bot_check", /prove it isn't a bot/],
     ["ERROR: unable to download video data: HTTP Error 403: Forbidden", "access_refused", /refused/],
     ["ERROR: unable to download video data: HTTP Error 429: Too Many Requests", "rate_limited", /limiting requests/],
-    ["ERROR: [youtube] x: Requested format is not available", "format_unavailable", /no version of this video/],
+    ["ERROR: [youtube] x: Requested format is not available", "format_unavailable", /no version of this video that Clipr can download/],
     ["ERROR: Postprocessing: ffprobe and ffmpeg not found.", "tools_missing", /tools are incomplete/],
   ];
   const seen = new Set<string>();
@@ -727,7 +727,7 @@ test("Saad: 'Requested format is not available' with no JavaScript runtime is th
   assert.equal(missing.code, "tools_missing");
   assert.match(missing.error, /part of Clipr that YouTube needs is missing/i);
   assert.equal(missing.action.label, "Reinstall Clipr");
-  // With the runtime in place the same words still mean "pick another quality".
+  // With the runtime in place the same words still mean "no version available".
   assert.equal(classifyFailure(raw, { jsRuntimeMissing: false }).code, "format_unavailable");
   assert.equal(classifyFailure(raw).code, "format_unavailable");
   // The flag alone changes nothing else.
