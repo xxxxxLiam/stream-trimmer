@@ -283,3 +283,20 @@ test("Liam 26 Nov: the loaded bank clip's edge edits write to the bank item; a d
   const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
   assert.match(mut, /seg\.load\(clip\.segments, clip\.id\)/);
 });
+
+test("Liam 26 Nov: Esc clears the whole selection, loaded sections included; a made bank clip leaves the timeline empty", async () => {
+  const esc = src.slice(src.indexOf("An unsaved range goes away"), src.indexOf("const lastScrub"));
+  assert.match(esc, /const clearSelection = \(\) => \{\s*clearRange\(\);\s*store\.clear\(\);/);
+  assert.match(esc, /const hasRange = !!range \|\| store\.segments\.length > 0/);
+  assert.match(esc, /\n\s+clearSelection\(\);\n/, "the Esc key runs clearSelection");
+  const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
+  assert.match(mut, /if \(seg\.store\.get\(\)\.bankId === clip\.id\) \{\s*seg\.clear\(\);\s*setStartText\(""\);\s*setEndText\(""\);/);
+  // The store half is real behaviour: clear() empties loaded sections and ends the bank link.
+  const { createSegmentStore } = await import("../../../shared/hooks/useSegmentsState");
+  const store = createSegmentStore();
+  store.load([{ start: 10, end: 20 }], "B01");
+  assert.equal(store.get().bankId, "B01");
+  store.clear();
+  assert.deepEqual(store.get().segments, []);
+  assert.equal(store.get().bankId, null);
+});
