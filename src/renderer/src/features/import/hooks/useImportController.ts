@@ -18,7 +18,7 @@ export function toParsed(r: MomentRow): ParsedClip {
     line: Number(r.key) || 1,
     id: null,
     label: r.name,
-    segments: [{ start: r.start, end: r.end }],
+    segments: [{ start: r.start, end: r.end }, ...(r.more ?? [])],
     ...(r.category ? { category: r.category } : {}),
     ...(r.tier ? { tier: r.tier } : {}),
     ...(typeof r.rating === "number" ? { rating: r.rating } : {}),

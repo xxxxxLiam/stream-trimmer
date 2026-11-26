@@ -24,7 +24,6 @@ import { useTimelineState } from "./useTimelineState";
 import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
 import { bankStore, clipsFor } from "../../../shared/utils/bank";
-import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { dialogOpen } from "../../../shared/utils/dialogOpen";
 
 export const DRAG_START_PX = 3;
@@ -57,15 +56,18 @@ export function useTimelineController() {
   );
   // Liam 26 Nov: a bank card loaded on the timeline IS that bank item. Dragging or trimming its edges edits
   // the item's in and out; Clip then matches it as the same moment (matchingMoment) and counts as making it.
-  // Marking another section, clearing the marks or losing the item ends the link, and nothing is written.
+  // Adding a section keeps the link and grows the item; clearing the marks or losing the item ends it.
   const { bankId, detachBank } = store;
   useEffect(() => {
     if (!bankId || !active || !videoId) return;
     const item = clipsFor(bankStore.get(), active.id, videoId).find((c) => c.id === bankId);
-    if (!item || item.status !== "banked" || sections.length !== item.segments.length) return detachBank();
+    if (!item || item.status !== "banked" || sections.length === 0) return detachBank();
+    // A section added to (or removed from) the loaded clip goes into the same bank item. A range still being
+    // marked is not a section yet: the link stays and nothing is written until + section locks it in.
+    if (sections.length !== item.segments.length && range) return;
     if (sections.every((r, i) => r.start === item.segments[i].start && r.end === item.segments[i].end)) return;
     bankStore.setSegments(active.id, videoId, bankId, sections);
-  }, [bankId, active, videoId, sections, detachBank]);
+  }, [bankId, active, videoId, sections, range, detachBank]);
   const startPicked = clipper.startText.trim() !== "" && Number.isFinite(clipper.start) && clipper.start >= 0 && !range;
   // B3-1: an Out set before the In is stored, so the readout shows it instead of a dash.
   const endPicked = clipper.endText.trim() !== "" && Number.isFinite(clipper.end) && clipper.end >= 0 && !range;
@@ -96,7 +98,8 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sections, mergeHint?.union.start, mergeHint?.union.end],
   );
-  const liveFold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
+  // The fold is the fit for a joined clip: zooming in leaves it for the normal axis (on the playhead) so seconds can be adjusted.
+  const liveFold = joined && !s.foldOpen && tools.zoom <= 0 ? foldedAxis(sections, duration, s.width) : null;
   const live = { axis: (liveFold ? liveFold.axis : linearAxis(win, s.width)) as Axis, fold: liveFold?.fold ?? ([] as Fold[]), folded: !!liveFold };
   // The axis the pointer went down on stays for the whole drag: the drag itself creates a range, which
   // would fold the timeline under the pointer. It folds after pointer-up.
@@ -243,8 +246,7 @@ export function useTimelineController() {
       }
     }
     // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
-    // A click on empty timeline also clears the selection (board 03.2.49), as Esc does.
-    clearSelection();
+    // A click never clears the selection (Liam 26 Nov): only the trash button does, and Clip when it finishes.
     s.setDrag({ kind: "scrub" });
     clipper.requestSeek(Math.round(t));
   };
@@ -272,14 +274,14 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragKind]);
 
-  // An unsaved range goes away with its ×, or with Esc (never mid-drag, never while typing or in a dialog or menu).
+  // An unsaved range goes away with its ×.
   const clearRange = () => {
     clipper.setStartText("");
     clipper.setEndText("");
     s.setScissorsStart(null);
   };
-  // Esc clears the whole selection: the picked range and any locked sections (a loaded bank clip included), so there is always a way
-  // to start a clip by hand (Liam 26 Nov).
+  // The whole selection (the picked range and any locked sections, a loaded bank clip included) goes only with the trash button, and when Clip finishes.
+  // Never on a click or Esc (Liam 26 Nov).
   const clearSelection = () => {
     clearRange();
     store.clear();
@@ -295,21 +297,6 @@ export function useTimelineController() {
     }
     clearSelection();
   };
-  const tabActive = useIsTabActive();
-  const hasRange = !!range || store.segments.length > 0;
-  const dragging = !!s.drag;
-  useEffect(() => {
-    if (!tabActive || !hasRange || dragging) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || dialogOpen() || document.querySelector('[role="menu"]')) return;
-      const el = e.target as HTMLElement | null;
-      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
-      clearSelection();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabActive, hasRange, dragging]);
 
   const lastScrub = useRef<number | null>(null);
   // The handle the pointer is over (as its time), so it can show it is clickable. Only the Pointer and the

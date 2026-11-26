@@ -299,8 +299,8 @@ export function UnsavedRange({
       </button>
       <button
         type="button"
-        aria-label="Remove this range (Esc)"
-        title="Remove this range (Esc)"
+        aria-label="Remove this range"
+        title="Remove this range"
         onClick={onRemove}
         className="absolute top-[1px] inline-flex h-[20px] w-[20px] items-center justify-center rounded-chip text-fg hover:bg-hover"
         style={narrow ? { left: "100%", marginLeft: 4 } : { right: 2 }}

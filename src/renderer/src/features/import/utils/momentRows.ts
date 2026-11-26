@@ -21,6 +21,8 @@ export type MomentRow = {
   name: string;
   start: number;
   end: number;
+  /** More sections of the same clip (same video, same name), in row order; the first section is start/end. */
+  more?: { start: number; end: number }[];
   rating?: number;
   category?: string;
   tier?: string;
@@ -156,6 +158,7 @@ export function parseMoments(text: string, ctx: ParseContext): MomentRow[] {
           name: c.label,
           start: seg.start,
           end: seg.end,
+          ...(c.segments.length > 1 ? { more: c.segments.slice(1).map((x) => ({ start: x.start, end: x.end })) } : {}),
           ...(c.ranPastEnd !== undefined ? { ranPastEnd: c.ranPastEnd } : {}),
           ...(c.category ? { category: c.category } : {}),
           ...(c.tier ? { tier: c.tier } : {}),
@@ -234,13 +237,41 @@ export function flagNames(rows: readonly MomentRow[], existing: ReadonlyArray<{ 
  * longer counts as the other holder of a name, so its twin is not left flagged against a line that
  * will never be banked. A skipped row keeps its own flag (it is skipped either way).
  */
+/**
+ * Rows on the same video with the same name (any case) are the sections of ONE clip, in row order. The
+ * first row speaks for it (rating, topic, tier, campaign); the later rows fold into it and leave the
+ * list. Flagged and skipped rows never merge, and the same name on a different video stays two rows
+ * (the name check then flags it).
+ */
+export function mergeSections(rows: readonly MomentRow[], skipped: ReadonlySet<string> = new Set()): MomentRow[] {
+  const out: MomentRow[] = [];
+  const first = new Map<string, number>();
+  for (const r of rows) {
+    const name = r.name.trim().toLowerCase();
+    if (r.problem || skipped.has(r.key) || !name || !r.videoId) {
+      out.push(r);
+      continue;
+    }
+    const k = `${r.videoId}\u0000${name}`;
+    const at = first.get(k);
+    if (at === undefined) {
+      first.set(k, out.length);
+      out.push(r);
+    } else {
+      const head = out[at];
+      out[at] = { ...head, more: [...(head.more ?? []), { start: r.start, end: r.end }, ...(r.more ?? [])] };
+    }
+  }
+  return out;
+}
+
 export function checkImportNames(
   parsed: readonly MomentRow[],
   existing: ReadonlyArray<{ id: string; name: string }>,
   skipped: ReadonlySet<string>,
   renamed: ReadonlyMap<string, string>,
 ): MomentRow[] {
-  const applied = parsed.map((r) => (renamed.has(r.key) ? { ...r, name: renamed.get(r.key)! } : r));
+  const applied = mergeSections(parsed.map((r) => (renamed.has(r.key) ? { ...r, name: renamed.get(r.key)! } : r)), skipped);
   const checked = new Map(flagNames(applied.filter((r) => !skipped.has(r.key)), existing).map((r) => [r.key, r]));
   return applied.map((r) => checked.get(r.key) ?? r);
 }
