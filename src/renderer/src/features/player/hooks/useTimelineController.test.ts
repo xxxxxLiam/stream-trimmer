@@ -361,3 +361,16 @@ test("Design v146: Select moments is in the Export menu, ticks cards, and delete
   assert.match(panel, /Delete \{chosen\.length\}\? This can't be undone/);
   assert.match(panel, /chosen\.forEach\(\(x\) => c\.remove\(x\)\)/);
 });
+
+test("Design v147/v148: the bank card is name + rating over topic, tier and length; Sort and filter sits beside the search", () => {
+  const row = readFileSync(new URL("../../clips/components/WaitingRow.tsx", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
+  const sf = readFileSync(new URL("../../clips/components/SortFilterPanel.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(row, /rangeLine/);
+  assert.match(row, /mt-\[3px\] flex items-center gap-\[4px\]/);
+  assert.match(panel, /trailing=\{<SortFilterPanel/);
+  assert.match(panel, /Waiting in this video · \{SORT_LABELS\[view\.sort\]\}/);
+  assert.match(sf, /h-\[28px\]/);
+  assert.match(sf, /gap-\[6px\]/);
+  assert.match(sf, /mb-\[6px\] mt-\[12px\]/);
+});
