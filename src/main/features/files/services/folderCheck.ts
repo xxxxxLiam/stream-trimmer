@@ -34,19 +34,64 @@ function problemOf(err: unknown): FolderProblem | null {
   return null;
 }
 
+/** The mount point a path lives under, when the platform has one: the drive that goes missing when it is unplugged. */
+export function mountRootOf(p: string): string | null {
+  if (path.sep === "\\") {
+    const root = path.parse(p).root;
+    return root && /^[A-Za-z]:\\$/.test(root) ? root : null;
+  }
+  const m = /^(\/Volumes\/[^/]+|\/mnt\/[^/]+|\/run\/media\/[^/]+\/[^/]+|\/media\/[^/]+)(?:\/|$)/.exec(p);
+  return m ? m[1] : null;
+}
+
+function exists(f: FolderFs, p: string): boolean {
+  try {
+    f.statSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The closest folder above `p` that exists. A file in the way (the path runs through it) is `blocked`. */
+function nearestExisting(f: FolderFs, p: string): { dir: string; blocked?: false } | { blocked: true } | null {
+  let cur = path.dirname(p);
+  for (let i = 0; i < 64; i++) {
+    try {
+      return f.statSync(cur).isDirectory() ? { dir: cur } : { blocked: true };
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code ?? "";
+      if (code === "ENOTDIR") return { blocked: true };
+    }
+    const up = path.dirname(cur);
+    if (up === cur) return null;
+    cur = up;
+  }
+  return null;
+}
+
 /** `roots` are the folders the person chose. isInside compares real locations, so a link that leads outside a root does not count. */
 export function checkFolder(raw: unknown, roots: string[], deps: { fs?: FolderFs; probeName?: string; realpath?: (p: string) => string } = {}): FolderAnswer {
   const dirPath = (raw as { dirPath?: unknown } | null)?.dirPath;
   if (typeof dirPath !== "string" || !path.isAbsolute(dirPath) || dirPath.includes("\0")) return { ok: true };
   if (!roots.some((r) => isInside(r, dirPath))) return { ok: false, problem: "refused" };
   const f = deps.fs ?? fs;
+  let target = dirPath;
   try {
     if (!f.statSync(dirPath).isDirectory()) return { ok: false, problem: "blocked" };
   } catch (err) {
     const problem = problemOf(err);
-    return problem ? { ok: false, problem } : { ok: true };
+    if (problem !== "gone") return problem ? { ok: false, problem } : { ok: true };
+    // A folder that does not exist yet is not a missing drive: a campaign's own folder is only a path until
+    // the first clip is saved, and the save creates it. Only a vanished drive is "gone".
+    const mount = mountRootOf(dirPath);
+    if (mount && !exists(f, mount)) return { ok: false, problem: "gone" };
+    const near = nearestExisting(f, dirPath);
+    if (!near) return { ok: false, problem: "gone" };
+    if (near.blocked) return { ok: false, problem: "blocked" };
+    target = near.dir;
   }
-  const probe = path.join(dirPath, deps.probeName ?? `.clipr-write-check-${process.pid}-${Date.now()}`);
+  const probe = path.join(target, deps.probeName ?? `.clipr-write-check-${process.pid}-${Date.now()}`);
   try {
     f.writeFileSync(probe, "", { flag: "wx" });
   } catch (err) {
