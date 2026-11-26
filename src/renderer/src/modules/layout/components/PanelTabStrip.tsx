@@ -22,6 +22,8 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 export const PANEL_DRAG_TYPE = "application/x-clipr-panel";
 
 export type PanelTabStripProps = {
+  /** A panel's own + menu (Export: Add a moment, Import moments). */
+  addMenu?: { label: string; items: MenuItem[]; width?: number };
   /** A + that does one thing (Videos: Add a video; Markers: Add a marker; Export: Add a moment). Neither this nor addMenu: no + (board v149). */
   addAction?: { label: string; onSelect: () => void };
   /** Names the strip for screen readers, e.g. "Left panels". */
@@ -38,6 +40,7 @@ export type PanelTabStripProps = {
 };
 
 export default function PanelTabStrip({
+  addMenu,
   addAction,
   label,
   tabs,
@@ -164,6 +167,11 @@ export default function PanelTabStrip({
         {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-[32px]" /> : null}
       </div>
       <div className="flex shrink-0 items-center">
+        {addMenu ? (
+          <PopoverMenu label={addMenu.label} items={addMenu.items} menuWidth={addMenu.width} tight pressedWhenOpen triggerClassName={`${STRIP_BUTTON} aria-pressed:bg-hover aria-pressed:text-fg`}>
+            <IconPlus />
+          </PopoverMenu>
+        ) : null}
         {addAction ? (
           <button type="button" aria-label={addAction.label} title={addAction.label} onClick={addAction.onSelect} className={STRIP_BUTTON}>
             <IconPlus />
