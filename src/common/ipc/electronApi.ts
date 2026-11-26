@@ -8,7 +8,7 @@
 import type { CookieBrowser } from "../constants/cookieBrowsers";
 import type { FcpLookFileResult } from "../types/fcpLook";
 import type { CookieCheck, ImportVerified, SignInSignal } from "../types/signIn";
-import type { RestartToUpdateResult, UpdateReady } from "../types/updates";
+import type { RestartToUpdateResult, UpdateReady, VersionGateStatus } from "../types/updates";
 
 export type UpdateStatusPayload =
   | { state: "checking" }
@@ -251,6 +251,8 @@ export interface ElectronAPI {
   getRestartWaiting?: () => Promise<boolean>;
   /** Fires true when a restart starts waiting, false when the wait ends (cancelled, or Clipr is restarting). */
   onRestartWaiting?: (cb: (waiting: boolean) => void) => () => void;
+  /** The minimum-version gate: blocked only when the relay names a minimum above this copy; fails open. */
+  getVersionGate: () => Promise<VersionGateStatus>;
   /** An update that is ready right now (for a window that opened after the event). */
   getUpdateReady: () => Promise<UpdateReady | null>;
   /** One event when a version is ready: restart (Windows, Linux) or download (unsigned Mac). */

@@ -196,3 +196,15 @@ test("the built worker.js is one file that runs: it answers a bad report with 40
     globalThis.fetch = real;
   }
 });
+
+test("GET /min-version returns the dashboard value, needs the client header, and is not a report route", async () => {
+  const relay = createRelay({ fetch: (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch, now: () => 0 });
+  const ask = (init: RequestInit, e: Env = {}) => relay(new Request("https://r.test/min-version", init), e);
+  const ok = await ask({ headers: { [CLIENT_HEADER]: CLIENT_VALUE } }, { MIN_VERSION: " 19.6.0 " });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { minVersion: "19.6.0" });
+  const none = await ask({ headers: { [CLIENT_HEADER]: CLIENT_VALUE } });
+  assert.deepEqual(await none.json(), { minVersion: "" });
+  assert.equal((await ask({})).status, 403);
+  assert.equal((await ask({ method: "POST", headers: { [CLIENT_HEADER]: CLIENT_VALUE } })).status, 405);
+});
