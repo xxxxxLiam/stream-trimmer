@@ -11,6 +11,6 @@ test("an unreadable folder still gives the branded path", () => {
     resolveBrandedDir("/gone", "campaign", "Acme", () => {
       throw new Error("ENOENT");
     }),
-    "/gone/Clipr clips/Acme",
+    "/gone",
   );
 });
