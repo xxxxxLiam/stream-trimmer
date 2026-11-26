@@ -2,14 +2,18 @@
  * File: SettingsLocation.tsx
  * Path: src/renderer/src/features/settings/components/SettingsLocation.tsx
  * Description: One location (board 04.6.7): Name, Folder with Change, Sound only, Delete location, and nothing else
- *   (no quota, clip length, languages or Export settings). A folder change applies to new clips only.
+ *   (no quota, clip length or Export settings; Languages only when the video has dubs). A folder change applies to new clips only.
  */
 import { useState } from "react";
+import { ChevronDown } from "react-bootstrap-icons";
+import PopoverMenu from "../../../modules/layout/components/PopoverMenu";
 import { DrawerHeader, SwitchRow, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
 
 export type SettingsLocationProps = {
   name: string;
   folderLabel: string;
+  /** Optional Languages row (Original only until ticked). Present only when the open video has dubs. */
+  languages?: { summary: string; items: { code: string; label: string; ticked: boolean }[]; onToggle: (code: string) => void };
   soundOnly: boolean;
   onSoundOnly: (on: boolean) => void;
   /** Choose a different folder. Returns a sentence when it was refused, else null. */
@@ -77,6 +81,26 @@ export default function SettingsLocation(p: SettingsLocationProps) {
             <span className="text-meta text-fg-dim">New clips go here. Clips already made stay where they are.</span>
           )}
         </div>
+        {p.languages ? (
+          <div className="flex flex-col gap-[8px] border-b border-hairline py-[12px]">
+            <div className="flex flex-col gap-[2px]">
+              <span className="text-body leading-[normal]">Languages</span>
+              <span className="text-meta text-fg-dim">Optional. Shown only when the video has dubs.</span>
+            </div>
+            <PopoverMenu
+              label={`Languages: ${p.languages.summary}`}
+              align="start"
+              boxes
+              menuWidth={260}
+              pressedWhenOpen={false}
+              triggerClassName="inline-flex h-target w-full items-center gap-[8px] rounded-control border border-hairlineStrong bg-raised px-[12px] text-body leading-[normal] text-fg hover:bg-hover"
+              items={p.languages.items.map((l) => ({ key: l.code, label: l.label, checked: l.ticked, keepOpen: true, onSelect: () => p.languages!.onToggle(l.code) }))}
+            >
+              <span className="flex-1 truncate text-left">{p.languages.summary}</span>
+              <ChevronDown width={10} height={10} className="text-fg-dim" aria-hidden="true" focusable="false" />
+            </PopoverMenu>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-[2px] py-[4px]">
           <SwitchRow label="Sound only" on={p.soundOnly} onFlip={() => p.onSoundOnly(!p.soundOnly)} />
           <span className="text-meta text-fg-dim">Saves the sound as M4A, no picture.</span>

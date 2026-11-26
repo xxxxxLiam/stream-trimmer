@@ -442,3 +442,16 @@ test("Board 03.1.3: Home icon far left of the top bar, a Back pill in place of t
   // Cold start (fresh install) has no Home icon: the bar is only mounted with an open video.
   assert.match(app, /\{active && \(\s*<TopBar/);
 });
+
+test("A location: Clip saves to its folder only (no editor project), the menu says so, and it has its own optional Languages row", () => {
+  const app = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /settingsWithDestination\(settings, isLocation \? "folder" : getClipDestination\(\)\)/);
+  assert.equal((app.match(/withDestination\(editorRef\.current, campaign\?\.kind === "location"\)/g) ?? []).length, 2);
+  const ctl = readFileSync(new URL("./useClipController.ts", import.meta.url), "utf8");
+  assert.match(ctl, /savesTo: activeCampaign\?\.kind === "location" \? brandedLocationName\(activeCampaign\.name\) : null/);
+  const btn = readFileSync(new URL("../components/ClipButton.tsx", import.meta.url), "utf8");
+  assert.match(btn, /c\.savesTo \? \(\s*<MenuLabel>Saves to \{c\.savesTo\}<\/MenuLabel>/);
+  const loc = readFileSync(new URL("../../settings/components/SettingsLocation.tsx", import.meta.url), "utf8");
+  assert.match(loc, /Languages/);
+  assert.match(readFileSync(new URL("../../settings/components/SettingsDrawer.tsx", import.meta.url), "utf8"), /hasDubTracks\(tracks\)/);
+});

@@ -102,9 +102,13 @@ export default function ClipButton({ openUp = false, listenForKey = false, optio
         >
           {paged && page === "root" ? (
             <>
-              <MenuItem trailing={<RowValue value={c.destination === "folder" ? shortenPath(options.folder) || "Choose a folder" : destinationLabel(c.destination)} />} onClick={() => setPage("where")}>
-                Where clips go
-              </MenuItem>
+              {c.savesTo ? (
+                <MenuLabel>Saves to {c.savesTo}</MenuLabel>
+              ) : (
+                <MenuItem trailing={<RowValue value={c.destination === "folder" ? shortenPath(options.folder) || "Choose a folder" : destinationLabel(c.destination)} />} onClick={() => setPage("where")}>
+                  Where clips go
+                </MenuItem>
+              )}
               {hasDubs ? (
                 <MenuItem trailing={<RowValue value={audioButtonLabel(options.tracks!, options.selectedLanguages)} />} onClick={() => setPage("audio")}>
                   Audio
@@ -117,7 +121,8 @@ export default function ClipButton({ openUp = false, listenForKey = false, optio
               {page === "where" ? "Where clips go" : "Audio"}
             </MenuItem>
           ) : null}
-          {!paged || page === "where" ? (
+          {!paged && c.savesTo ? <MenuLabel>Saves to {c.savesTo}</MenuLabel> : null}
+          {(!paged && !c.savesTo) || (paged && page === "where") ? (
             <div className="max-h-[320px] overflow-y-auto">
               {!paged ? <MenuLabel>Where clips go</MenuLabel> : null}
               {c.destinations.map((d) => (

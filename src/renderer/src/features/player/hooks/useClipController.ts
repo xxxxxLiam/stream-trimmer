@@ -15,6 +15,7 @@ import { dialogOpen } from "../../../shared/utils/dialogOpen";
 import { usePanelLayoutState } from "../../../modules/layout/hooks/usePanelLayoutState";
 import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
+import { brandedLocationName } from "../../../shared/utils/campaigns";
 import { bankStore, clipsFor } from "../../../shared/utils/bank";
 import { requestMake } from "../../../shared/utils/makeRequest";
 import { requestEditorSetup } from "../../../shared/utils/editorSetupRequest";
@@ -99,7 +100,9 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     reasonShown,
     clip,
     hasRange,
-    destination,
+    destination: activeCampaign?.kind === "location" ? ("folder" as const) : destination,
+    /** While a location is active Clip saves to its folder only; the menu says so in place of the editors. */
+    savesTo: activeCampaign?.kind === "location" ? brandedLocationName(activeCampaign.name) : null,
     setDestination: (d: Parameters<typeof setDestination>[0]) => {
       if (availableDestinations(offered).find((x) => x.id === d)?.soon) return; // coming soon: not selectable, opens no setup
       setDestination(d);

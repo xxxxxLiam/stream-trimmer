@@ -345,3 +345,9 @@ test("a location's default folder is Clipr <Name> beside the Clipr folder, and i
   const loc = createCampaign([], { name: "B-roll", kind: "location" }).campaign;
   assert.equal(todayCount(loc), null);
 });
+
+test("a location's folder name is branded once: Clipr B-roll, never Clipr Clipr B-roll", async () => {
+  const { brandedLocationName } = await import("./campaigns");
+  assert.equal(brandedLocationName("B-roll"), "Clipr B-roll");
+  assert.equal(brandedLocationName("Clipr Music"), "Clipr Music");
+});
