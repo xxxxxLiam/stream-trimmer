@@ -16,6 +16,10 @@ on:
         type: choice
         options: [auto, patch, minor, major]
         default: auto
+      prerelease:
+        description: "Publish as a pre-release: not marked latest, so auto-update and the download page do not offer it"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # required to push the commit/tag and publish the release
@@ -205,6 +209,7 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           GH_REPO: ${{ vars.RELEASES_REPO || 'xxxxxLiam/clipr' }}
           TAG: ${{ needs.version.outputs.new_version }}
+          PRERELEASE: ${{ github.event.inputs.prerelease || 'false' }}
         run: |
           set -euo pipefail
           git fetch -q origin main
@@ -224,10 +229,21 @@ jobs:
           fi
           [ -n "$NOTES" ] || NOTES="Maintenance release."
 
-          gh release edit "$TAG" \
-            --draft=false \
-            --latest \
-            --notes "$NOTES"
+          # A pre-release is public to anyone with the link but is not "latest": electron-updater and
+          # the download page (releases/latest) keep offering the previous version. Only a manual run
+          # can ask for one (the "prerelease" input).
+          if [ "${PRERELEASE:-false}" = "true" ]; then
+            gh release edit "$TAG" \
+              --draft=false \
+              --prerelease \
+              --latest=false \
+              --notes "$NOTES"
+          else
+            gh release edit "$TAG" \
+              --draft=false \
+              --latest \
+              --notes "$NOTES"
+          fi
 
           echo "Published $TAG (${{ needs.version.outputs.level }})" >> "$GITHUB_STEP_SUMMARY"
           # $GITHUB_REPOSITORY is this (private) source repo; the release
