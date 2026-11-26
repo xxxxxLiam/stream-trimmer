@@ -9,8 +9,10 @@
 // itself and the second is shipped in the packaged app's node_modules.
 const path = require("node:path");
 const esbuild = require("esbuild");
+const { isHardened, esbuildHardeningOptions, collectLegalComments, obfuscateFile } = require("./buildHardening.cjs");
 
 const root = path.join(__dirname, "..");
+const hardened = isHardened();
 // BUILD_MAIN_OUT lets a test build into a scratch folder instead of out/.
 const outRoot = process.env.BUILD_MAIN_OUT
   ? path.resolve(process.env.BUILD_MAIN_OUT)
@@ -37,21 +39,25 @@ const common = {
   loader: { ".ts": "ts" },
   external: ["electron", "electron-updater"],
   logLevel: "info",
+  ...esbuildHardeningOptions(hardened),
 };
 
+const mainOut = path.join(outRoot, "main", "index.cjs");
+const preloadOut = path.join(outRoot, "preload", "index.cjs");
+
 Promise.all([
-  esbuild.build({
-    ...common,
-    entryPoints: [path.join(root, "src", "main", "index.ts")],
-    outfile: path.join(outRoot, "main", "index.cjs"),
-  }),
-  esbuild.build({
-    ...common,
-    entryPoints: [path.join(root, "src", "preload", "index.ts")],
-    outfile: path.join(outRoot, "preload", "index.cjs"),
-  }),
+  esbuild.build({ ...common, entryPoints: [path.join(root, "src", "main", "index.ts")], outfile: mainOut }),
+  esbuild.build({ ...common, entryPoints: [path.join(root, "src", "preload", "index.ts")], outfile: preloadOut }),
 ])
-  .then(() => console.log("[build-main] wrote", outRoot))
+  .then(() => {
+    collectLegalComments(mainOut, "the main process");
+    collectLegalComments(preloadOut, "the preload bridge");
+    if (hardened) {
+      obfuscateFile(mainOut);
+      obfuscateFile(preloadOut);
+    }
+    console.log(`[build-main] wrote ${outRoot}${hardened ? " (hardened)" : " (readable: CLIPR_DEV_BUILD)"}`);
+  })
   .catch((err) => {
     console.error(err);
     process.exit(1);
