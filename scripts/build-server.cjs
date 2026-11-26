@@ -5,6 +5,7 @@
 const path = require("node:path");
 const fs = require("node:fs");
 const esbuild = require("esbuild");
+const { esbuildMaps } = require("./sourcemaps.cjs");
 
 const channelData = /^(1|true|yes|on)$/i.test(
   String(process.env.VITE_ENABLE_CHANNEL_DATA || "").trim(),
@@ -115,6 +116,7 @@ esbuild
           }
         : {}),
     },
+    ...esbuildMaps(),
     logLevel: "info",
   })
   .then(() => {

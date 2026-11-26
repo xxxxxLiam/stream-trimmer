@@ -51,3 +51,4 @@ resources/bin
 # Liam pastes this one file into Cloudflare, so it is committed.
 !relay/dist
 !relay/dist/worker.js
+sourcemaps/

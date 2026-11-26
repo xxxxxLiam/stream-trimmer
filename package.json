@@ -36,7 +36,9 @@
     "release": "npm run build:electron && electron-builder -mwl --publish always",
     "parity": "node scripts/parity/parity.cjs",
     "parity:el": "node scripts/parity/elements.cjs",
-    "build:relay": "node scripts/build-relay.cjs"
+    "build:relay": "node scripts/build-relay.cjs",
+    "collect-sourcemaps": "node scripts/collect-sourcemaps.cjs",
+    "decode-stack": "node scripts/decodeStack.cjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
@@ -44,7 +46,9 @@
     "youtube-dl-exec": "^3.0.10"
   },
   "devDependencies": {
+    "@electron/fuses": "^1.8.0",
     "@fontsource-variable/inter": "^5.3.0",
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.0",
@@ -117,6 +121,7 @@
       }
     ],
     "asar": true,
+    "afterPack": "scripts/fuses.cjs",
     "mac": {
       "target": [
         {

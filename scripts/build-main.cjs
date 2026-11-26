@@ -9,6 +9,7 @@
 // itself and the second is shipped in the packaged app's node_modules.
 const path = require("node:path");
 const esbuild = require("esbuild");
+const { esbuildMaps } = require("./sourcemaps.cjs");
 
 const root = path.join(__dirname, "..");
 // BUILD_MAIN_OUT lets a test build into a scratch folder instead of out/.
@@ -36,6 +37,7 @@ const common = {
   target: "node20",
   loader: { ".ts": "ts" },
   external: ["electron", "electron-updater"],
+  ...esbuildMaps(),
   logLevel: "info",
 };
 
