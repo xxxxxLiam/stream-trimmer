@@ -59,15 +59,22 @@ export function isYouTubeUrl(value: string): boolean {
 // Real ids are 11 characters; only the shape is checked, since what matters is that it names one video.
 const VIDEO_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
+/** No port, or the two ordinary web ports stated outright (http's 80, https' 443, either one with either scheme: a
+ * real mobile link is sometimes written exactly that mismatched way). Anything else is an odd port nobody serves
+ * YouTube from. */
+export function isOrdinaryPort(u: URL): boolean {
+  return u.port === "" || u.port === "80" || u.port === "443";
+}
+
 /**
  * True for the address of one video: a watch link, youtu.be/<id>, or a shorts, live, embed or /v/ link, on
- * the default port. A channel, a playlist page, a search or a bare host is a YouTube address but not a
- * video, and yt-dlp would go and enumerate it.
+ * no port or one of the two ordinary web ports. A channel, a playlist page, a search, a bare host or an odd
+ * port is a YouTube address but not a video, and yt-dlp would go and enumerate it.
  */
 export function isYouTubeVideoUrl(value: string): boolean {
   if (!isYouTubeUrl(value)) return false;
   const u = new URL(value);
-  if (u.port) return false;
+  if (!isOrdinaryPort(u)) return false;
   const host = u.hostname.toLowerCase().replace(/\.$/, "");
   const segs = u.pathname.split("/").filter(Boolean);
   if (host === "youtu.be") return segs.length >= 1 && VIDEO_ID.test(segs[0]);
