@@ -7,7 +7,7 @@
  */
 import type { CookieBrowser } from "../constants/cookieBrowsers";
 import type { FcpLookFileResult } from "../types/fcpLook";
-import type { CookieCheck, SignInSignal } from "../types/signIn";
+import type { CookieCheck, ImportVerified, SignInSignal } from "../types/signIn";
 import type { RestartToUpdateResult, UpdateReady } from "../types/updates";
 
 export type UpdateStatusPayload =
@@ -114,9 +114,9 @@ export interface ElectronAPI {
     cancelled?: boolean;
     count?: number;
     error?: string;
-  }>;
+  } & Partial<ImportVerified>>;
   /** Adopts cookies.txt text (a file dropped on the window). Validated in main. */
-  importYouTubeCookiesText?: (text: string) => Promise<CookieCheck & { error?: string }>;
+  importYouTubeCookiesText?: (text: string) => Promise<CookieCheck & { error?: string } & Partial<ImportVerified>>;
   /**
    * True when this computer's salted id is in `list`. Only a boolean crosses
    * the bridge; the raw machine id stays in the main process.
