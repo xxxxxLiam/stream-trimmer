@@ -153,6 +153,8 @@ export type WorkspaceState = {
   markOpened: (id: string) => void;
   /** A pasted link is opening in the background: you stay on the video you are on until it has opened. */
   opening: boolean;
+  /** The tab whose link is opening, or null. */
+  openingId: string | null;
   /** Why the last pasted link did not open (shown in the link field's panel), or "". */
   openFailure: string;
   /** The link a tab was opening would not open: the tab is dropped, you stay where you were, and the field says why. */
@@ -450,6 +452,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       goBack,
       markOpened,
       opening: openingId !== null,
+      openingId,
       openFailure,
       failOpening,
       clearOpenFailure,

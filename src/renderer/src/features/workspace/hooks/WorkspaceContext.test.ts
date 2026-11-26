@@ -99,3 +99,27 @@ test("Liam 25 Nov: a link pasted into the top bar is selected while it opens; a 
   assert.match(add, /if \(ws\.opening\) return;/);
   assert.match(field, /Opening the video\. You stay here until it is ready\./);
 });
+
+test("Liam 26 Nov (board 03.1.4): the top field is always empty and clears on paste; the opening video is a card with the link and the sliding line; the title sits in the preview header", () => {
+  const field = readFileSync(new URL("../components/TopBarLinkField.tsx", import.meta.url), "utf8");
+  const add = readFileSync(new URL("./useAddVideoController.ts", import.meta.url), "utf8");
+  const videos = readFileSync(new URL("../components/VideosPanel.tsx", import.meta.url), "utf8");
+  const vctl = readFileSync(new URL("./useVideosController.ts", import.meta.url), "utf8");
+  const preview = readFileSync(new URL("../../player/components/PreviewPanel.tsx", import.meta.url), "utf8");
+  assert.match(field, /value=\{c\.text\}/);
+  assert.doesNotMatch(field, /c\.title/);
+  assert.match(add, /ws\.addTab\(action\.target\);\s*setTextState\(""\);/);
+  assert.match(vctl, /openingLabel/);
+  assert.match(videos, /\{v\.openingLabel\}/);
+  assert.match(videos, /<PreparingLine \/>/);
+  assert.match(preview, /mx-\[20px\] min-w-\[0px\] flex-1 truncate text-center/);
+});
+
+test("board 03.1.4: while a video opens the preview header reads 0:00 and a dash, with no Ice line of its own", () => {
+  const preview = readFileSync(new URL("../../player/components/PreviewPanel.tsx", import.meta.url), "utf8");
+  assert.match(preview, /opening \? "0:00"/);
+  assert.match(preview, /opening \? "—"/);
+  assert.doesNotMatch(preview, /PreparingLine/);
+  assert.match(preview, />Opening the video…<\/span>/);
+  assert.doesNotMatch(preview, /the transcript follows/);
+});
