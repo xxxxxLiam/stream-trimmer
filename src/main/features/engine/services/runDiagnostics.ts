@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { resolvedFfmpeg, versionOfResolved, yt } from "./binaries";
 import { jobLogs } from "./jobLogs";
 
-function readAppVersion(): string {
+export function readAppVersion(): string {
   const fromEnv = process.env.CLIPPER_APP_VERSION || process.env.npm_package_version;
   if (fromEnv) return fromEnv;
   const candidates = [

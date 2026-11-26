@@ -88,7 +88,8 @@ test("the format ladder no longer demands HLS", async (t) => {
   assert.ok(exact >= 0 && lower > exact, `step-down ordering wrong: ${ladder}`);
 
   // And the muxed-everything escape hatch stays last, never first.
-  assert.equal(tiers[tiers.length - 1], "best[height<=1080]");
+  assert.equal(tiers[tiers.length - 3], "best[height<=1080]");
+  assert.equal(tiers[tiers.length - 1], "best", "a requested quality must never be a hard failure");
 });
 
 test("a separate video+audio pair is preferred over a pre-merged stream", async (t) => {
@@ -321,7 +322,7 @@ test("a request with no quality gets MP4 at 1080p, stepping down below it (never
     const line = harness.log().split("\n").filter((l) => l.includes("/api/download exec ")).pop()!;
     const tiers = String((JSON.parse(line.replace(/^.*?options=/, "")) as { format: string }).format).split("/");
     assert.ok(tiers[0].includes("[height=1080]"), tiers[0]);
-    assert.equal(tiers[tiers.length - 1], "best[height<=1080]");
+    assert.equal(tiers[tiers.length - 1], "best");
   } finally {
     await harness.stop();
   }

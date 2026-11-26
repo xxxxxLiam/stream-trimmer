@@ -116,7 +116,8 @@ test("E2-1 renderer half: the engine's new codes map, and a final row shows the 
   assert.equal(classifyClipFailure("format_unavailable"), "format");
   assert.equal(classifyClipFailure("tools_missing"), "tools");
   assert.match(failureCopy("ratelimited", 1).reason, /slow down/);
-  assert.match(failureCopy("format", 1).reason, /quality/);
+  assert.match(failureCopy("format", 1).reason, /no version of this video/);
+  assert.doesNotMatch(JSON.stringify(failureCopy("format", 1)), /another quality/, "there is no quality picker to point at");
   assert.match(failureCopy("tools", 1).detail, /Restart Clipr/);
   assert.equal(failureCopy("refused", 1, "YouTube turned this download down.").reason, "YouTube turned this download down.");
   assert.equal(failureCopy("stopped", 1, "The engine's own words.").reason, "The engine's own words.");

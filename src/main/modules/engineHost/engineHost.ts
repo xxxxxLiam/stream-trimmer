@@ -38,6 +38,8 @@ export async function startBackend() {
   const port = await pickFreePort();
   process.env.PORT = String(port);
   process.env.ELECTRON_RESOURCES = resolveResourcesDir();
+  // Diagnostics read the app version from here; a packaged app has no package.json beside the working folder.
+  process.env.CLIPPER_APP_VERSION = app.getVersion();
   process.env.ELECTRON_USER_DATA = app.getPath("userData");
   // Where the imported cookies.txt lives. The backend resolves the path from
   // here and never accepts it from the renderer.
