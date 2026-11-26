@@ -20,6 +20,7 @@ import {
   TabActiveProvider,
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
+import CampaignSwitchHost from "../features/campaigns/components/CampaignSwitchHost";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
 import { clearInFlightCut, saveInFlightCut, takeInterruptedCut } from "../shared/utils/inFlightCut";
 import { consumeCrashFlag } from "../shared/utils/crashNoteStore";
@@ -804,6 +805,7 @@ function Shell() {
 
   return (
     <div className="surface-ground flex h-screen w-full flex-col overflow-hidden">
+      <CampaignSwitchHost />
       <div className="relative min-h-0 flex-1">
         {tabs.map((tab) => {
           const active = tab.id === activeId;

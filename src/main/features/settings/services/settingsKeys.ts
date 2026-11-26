@@ -30,6 +30,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.autoUpdate",
   "clipper.bank",
   "clipper.campaignPrefs",
+  "clipper.campaignSwitchSeen",
   "clipper.campaigns",
   "clipper.clipDestination",
   "clipper.clipsDir",
