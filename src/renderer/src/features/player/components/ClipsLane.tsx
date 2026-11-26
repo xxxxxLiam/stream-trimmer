@@ -137,8 +137,8 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
       </span>
     );
   };
-  // A selected clip (one that is not an unsaved range) gets a trash just outside the right edge of its bar: 32px, 6px gap.
-  const trashLeft = sections.length === 0 || unsaved ? null : (() => { const last = sections[sections.length - 1]; const sp = span(last.start, last.end); return sp.left + sp.width + 6; })();
+  // A selected clip (one that is not an unsaved range) gets a trash just outside the right edge of its bar: 32px, 6px gap. A bar that runs to the lane's end (zoomed to the clip) keeps the button on the lane, over the bar's end, never clipped away.
+  const trashLeft = sections.length === 0 || unsaved ? null : (() => { const last = sections[sections.length - 1]; const sp = span(last.start, last.end); return Math.max(0, Math.min(sp.left + sp.width + 6, c.width - 32)); })();
   const laneRows = Math.max(1, ...slots.map((s) => s.rows));
   // An unsaved range over the 10-minute cap says so under its bar, live as it is dragged, without a hover.
   const overCap = unsaved && c.totalSeconds > MAX_CLIP_SECONDS ? overCapMessage(c.totalSeconds) : "";

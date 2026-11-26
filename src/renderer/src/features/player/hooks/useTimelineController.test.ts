@@ -305,7 +305,7 @@ test("board 03.2.49 B: a selected clip has a 32px Delete clip trash just outside
   const lane2 = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
   assert.match(lane2, /aria-label="Delete clip"/);
   assert.match(lane2, /size-\[32px\][^"]*border-hairlineStrong bg-raised text-fg-dim/);
-  assert.match(lane2, /return sp\.left \+ sp\.width \+ 6/, "6px gap outside the right edge");
+  assert.match(lane2, /Math\.min\(sp\.left \+ sp\.width \+ 6, c\.width - 32\)/, "6px gap outside the right edge, kept on the lane when the bar runs to its end");
   assert.match(lane2, /onClick=\{c\.deleteClip\}/);
   assert.match(src, /bankStore\.remove\(active\.id, videoId, id\);\s*\}\s*clearSelection\(\);/);
   const down2 = src.slice(src.indexOf("const onLanePointerDown"), src.indexOf("const onLanePointerMove"));
