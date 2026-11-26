@@ -2,7 +2,7 @@
  * File: PanelsMenu.tsx
  * Path: src/renderer/src/modules/layout/components/PanelsMenu.tsx
  * Description: The top bar's Panels menu (board 03.2.15): a tick per side panel, the Transcript
- *   and Audio lanes under Timeline, then Save layout and Reset layout. Copy blocks and Symbols are reached
+ *   under Timeline, then Save layout and Reset layout. Copy blocks and Symbols are reached
  *   by their keys, not from here.
  */
 import { IconPanels } from "./BarIcons";
@@ -10,12 +10,10 @@ import PopoverMenu, { type MenuItem } from "./PopoverMenu";
 import { hasSavedPanelLayout, restoreSavedPanelLayout, usePanelLayoutState } from "../hooks/usePanelLayoutState";
 import { isOpen } from "../utils/panelLayout";
 import { setTranscriptLaneShown, useTranscriptLane } from "../../../features/player/hooks/useTranscriptLane";
-import { setAudioLanesShown, useAudioLanes } from "../../../features/player/hooks/useAudioLanes";
 
 export default function PanelsMenu({ triggerClassName, extraItems = [] }: { triggerClassName?: string; extraItems?: MenuItem[] }) {
   const { layout, panels, toggle, reset, save } = usePanelLayoutState();
   const laneShown = useTranscriptLane();
-  const audioShown = useAudioLanes();
   const items: MenuItem[] = [
     { kind: "heading", key: "h-panels", label: "Panels" },
     // The preview and the timeline are fixed in the centre; only the side panels come and go.
@@ -32,7 +30,6 @@ export default function PanelsMenu({ triggerClassName, extraItems = [] }: { trig
     { kind: "separator", key: "sep-timeline" },
     { kind: "heading", key: "h-timeline", label: "Timeline" },
     { key: "lane", label: "Transcript lane", checked: laneShown, keepOpen: true, onSelect: () => setTranscriptLaneShown(!laneShown) },
-    { key: "audio-lanes", label: "Audio lanes", checked: audioShown, keepOpen: true, onSelect: () => setAudioLanesShown(!audioShown) },
     { kind: "separator", key: "sep-layout" },
     { key: "save", label: "Save layout", onSelect: save },
     { key: "reset", label: "Reset layout", onSelect: reset },

@@ -5,7 +5,7 @@
  *   and never seek; the lane listens for the wheel.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const src = readFileSync(new URL("./useTimelineController.ts", import.meta.url), "utf8");
@@ -312,4 +312,14 @@ test("board 03.2.49 B: a selected clip has a 32px Delete clip trash just outside
   assert.match(down2.slice(down2.indexOf("A click on empty timeline")), /clearSelection\(\);\s*s\.setDrag\(\{ kind: "scrub" \}\)/);
   const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
   assert.match(mut, /if \(timelineEmpty && selectedId\) setSelectedId\(null\)/, "Clip, Esc or the trash leaves no bank row selected");
+});
+
+test("Liam 26 Nov, canvas v143: the timeline is Transcript, Source and Clips only; no Audio lane anywhere", () => {
+  const tl = readFileSync(new URL("../components/Timeline.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(tl, /AudioLanes|useAudioLanes/);
+  assert.match(tl, /<TranscriptLane[\s\S]*<SourceLane[\s\S]*<ClipsLane/);
+  const menu = readFileSync(new URL("../../../modules/layout/components/PanelsMenu.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(menu, /Audio lanes|audio-lanes/);
+  assert.doesNotMatch(src, /audioLanes/);
+  assert.equal(existsSync(new URL("../components/AudioLanes.tsx", import.meta.url)), false);
 });
