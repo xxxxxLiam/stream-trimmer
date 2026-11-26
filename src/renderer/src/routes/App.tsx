@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "../modules/clipper/hooks/ClipperContext";
+import { EditHistoryProvider } from "../features/player/hooks/EditHistoryContext";
 import {
   ChannelExportProvider,
   useChannelExportContext,
@@ -806,7 +807,9 @@ function Shell() {
                       campaignId={tab.campaignId}
                       onChange={(cid) => setTabCampaign(tab.id, cid)}
                     >
-                      <Layout active={active} />
+                      <EditHistoryProvider>
+                        <Layout active={active} />
+                      </EditHistoryProvider>
                     </CampaignTabScope>
                   </TabActiveProvider>
                 </ChannelBoundary>

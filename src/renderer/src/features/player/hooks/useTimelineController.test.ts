@@ -385,3 +385,22 @@ test("Design v150: danger buttons are outlined, never a red fill; the Export men
   const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
   assert.ok(group.indexOf('key: "import"') < group.indexOf('key: "copy-list"'));
 });
+
+test("Board 03.2.53: Undo and Redo sit after a hairline following Snap, are aria-disabled in the disabled colour, and the history lives with the tab", () => {
+  const tools = readFileSync(new URL("../components/TimelineTools.tsx", import.meta.url), "utf8");
+  assert.ok(tools.indexOf('aria-label="Snap"') < tools.indexOf('aria-label="Undo"'));
+  assert.ok(tools.indexOf('aria-label="Undo"') < tools.indexOf('aria-label="Redo"'));
+  assert.match(tools, /h-\[24px\] w-px bg-hairline/);
+  assert.match(tools, /ArrowCounterclockwise[\s\S]*size=\{16\}/);
+  assert.match(tools, /aria-disabled=\{!canUndo\}/);
+  assert.match(tools, /aria-disabled=\{!canRedo\}/);
+  assert.match(tools, /text-disabled/);
+  assert.match(tools, /Undo \(⌘Z\)/);
+  assert.match(tools, /Redo \(⇧⌘Z\)/);
+  const ctx = readFileSync(new URL("./EditHistoryContext.tsx", import.meta.url), "utf8");
+  assert.match(ctx, /editAction\(e, mac\)/);
+  assert.match(ctx, /bankStore\.setClips/);
+  assert.match(ctx, /store\.locked/);
+  const app = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /<EditHistoryProvider>\s*<Layout/);
+});
