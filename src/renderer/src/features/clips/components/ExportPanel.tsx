@@ -110,6 +110,7 @@ export default function ExportPanel() {
                 onSelect={() => c.select(clip)}
                 onMake={() => void c.make(clip)}
                 onRename={(label) => c.rename(clip, label)}
+                onCopy={() => c.copyClip(clip)}
                 onRemove={() => c.remove(clip)}
               />
             );

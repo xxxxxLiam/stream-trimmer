@@ -7,7 +7,7 @@
  */
 import { useState, type DragEvent } from "react";
 import { DrawerHeader, drawerBodyRoomy, outlineButton } from "../../../shared/components/DrawerRows";
-import { CheckCircleFill, ExclamationCircle } from "react-bootstrap-icons";
+import { CheckCircleFill, Clock, ExclamationCircle } from "react-bootstrap-icons";
 import PreparingLine from "../../player/components/PreparingLine";
 import type { SignInStatus } from "../utils/signInStatus";
 
@@ -52,9 +52,12 @@ function StatusCard({ status }: { status: SignInStatus }) {
   }
   if (status.state === "saved") {
     return (
-      <div role="status" className={`${box} border-hairlineStrong`}>
-        <span className="text-body text-fg">Saved, not checked yet</span>
-        <span className="text-meta text-fg-dim">{status.message}</span>
+      <div role="status" className={`${box} border-hairlineStrong flex-row items-start gap-[12px]`}>
+        <Clock size={16} aria-hidden="true" className="mt-[2px] shrink-0 text-fg-dim" />
+        <div className="flex flex-col gap-[4px]">
+          <span className="text-body text-fg">Saved, not checked yet</span>
+          <span className="text-meta text-fg-dim">YouTube didn’t answer. Clipr will check again when you download.</span>
+        </div>
       </div>
     );
   }
@@ -72,8 +75,8 @@ function StatusCard({ status }: { status: SignInStatus }) {
 
 export default function SettingsSignIn(p: SettingsSignInProps) {
   const [over, setOver] = useState(false);
-  /** Signed in: the steps and drop zone fold away, leaving the line, Replace file and Sign out. */
-  const signedIn = p.status?.state === "signed-in";
+  /** Signed in or saved (board 04.6.4): the steps and drop zone fold away, leaving the line, Replace file and Sign out. */
+  const signedIn = p.status?.state === "signed-in" || p.status?.state === "saved";
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setOver(false);

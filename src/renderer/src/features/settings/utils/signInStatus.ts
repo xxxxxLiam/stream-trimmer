@@ -13,7 +13,7 @@ export type SignInStatus =
   | { state: "checking" }
   | { state: "signed-in"; account?: string; justChecked: boolean }
   | { state: "failed"; reason: string; fix: string }
-  | { state: "saved"; message: string };
+  | { state: "saved" };
 
 /** What the main process answers after a drop: the refusal fields, or ok plus YouTube's verdict. */
 export type CookieAnswer = CookieRefusal & { verify?: "signed_in" | "rejected" | "unverified"; account?: string };
@@ -53,7 +53,7 @@ export function statusFromAnswer(res: CookieAnswer | undefined): SignInStatus {
     const s = splitSentences(res.message?.trim() || "YouTube didn't accept this sign-in.");
     return { state: "failed", reason: s.reason, fix: s.fix || "Export a fresh cookies file while signed in and add it again." };
   }
-  if (res.verify === "unverified") return { state: "saved", message: res.message?.trim() || "The file was saved, but Clipr couldn't check it with YouTube just now." };
+  if (res.verify === "unverified") return { state: "saved" };
   return { state: "signed-in", account: res.account?.trim() || undefined, justChecked: true };
 }
 

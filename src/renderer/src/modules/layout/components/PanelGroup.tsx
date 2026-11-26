@@ -48,7 +48,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   const copyList = async () => {
     if (!list || list.count === 0) return;
     try {
-      await navigator.clipboard.writeText(list.text());
+      await navigator.clipboard.writeText(await list.text());
       setSaid(`✓ Copied ${countText(list.count)}`);
     } catch {
       setSaid("Could not copy. Try Save as .txt instead.");
@@ -56,7 +56,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   };
   const saveList = async () => {
     if (!list || list.count === 0) return;
-    const text = list.text();
+    const text = await list.text();
     const name = list.fileName();
     const save = window.electronAPI?.saveTextFile;
     if (save) {

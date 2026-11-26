@@ -62,3 +62,13 @@ test("C3-4 and C3-1: Ctrl+B with nothing marked says so; an undecided sign-in ch
   const eff = readFileSync("src/renderer/src/features/clips/hooks/useExportEffects.ts", "utf8");
   assert.match(eff, /byCode === "expired" && failure\?\.hadSession === false \? "signin" : byCode/);
 });
+
+test("the bank row's menu has Copy as text for one clip (with its transcript), and the list copy waits for the transcript", () => {
+  const html = renderToStaticMarkup(<WaitingRow clip={clip} name="Honest Version" suggested={false} selected={false} onSelect={noop} onMake={noop} onRemove={noop} onRename={noop} onCopy={async () => true} />);
+  assert.doesNotMatch(html, /Copy as text/, "the menu is closed until the ⋯ opens it");
+  const row = readFileSync(new URL("./WaitingRow.tsx", import.meta.url), "utf8");
+  assert.match(row, /label: "Copy as text"/);
+  const ctl = readFileSync(new URL("../hooks/useExportController.ts", import.meta.url), "utf8");
+  assert.match(ctl, /text: async \(\) => exportListText\([^\n]*await listClips\(waiting\)/);
+  assert.match(ctl, /singleClipText\(\(await listClips\(\[clip\]\)\)\[0\]/);
+});

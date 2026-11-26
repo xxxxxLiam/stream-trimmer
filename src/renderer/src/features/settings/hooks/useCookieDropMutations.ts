@@ -15,7 +15,8 @@ export function useCookieDropMutations() {
   const settle = useCallback(async (res: CookieAnswer | undefined) => {
     const next = statusFromAnswer(res);
     setSignInStatus(next);
-    if (res?.ok) await restoreConnection();
+    // Saved but not checked: the footer keeps "at 360p" until a check succeeds (board 04.6.4).
+    if (res?.ok && res.verify !== "unverified") await restoreConnection();
   }, []);
 
   const onFile = useCallback(
