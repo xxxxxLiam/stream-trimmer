@@ -113,10 +113,10 @@ test("V18-T-5: the clip being built uses free space for its name like made and w
   assert.match(clipsLane, /outside\("built"/);
 });
 
-test("V18-T-8: the zoom slider drags and has a 44 px hit area", () => {
+test("V18-T-8: the zoom slider drags and has a 36 px hit area (Design v145)", () => {
   assert.match(tools, /onPointerMove=\{\(e\) => \{\s*if \(e\.buttons !== 1\) return/);
   assert.match(tools, /setPointerCapture/);
-  assert.match(tools, /h-\[44px\] w-\[96px\]/);
+  assert.match(tools, /h-\[36px\] w-\[96px\]/);
 });
 
 test("V18-T-11/12: Alt shows the zoom-out cursor; tool keys and M stay quiet while a dialog is open", () => {
@@ -338,4 +338,26 @@ test("Source grips are children of the section box, flush with the outline and i
 
 test("a joined clip's fold is only the fit: zooming in leaves it so the handles can be adjusted by seconds", () => {
   assert.match(src, /joined && !s\.foldOpen && tools\.zoom <= 0 \? foldedAxis/);
+});
+
+test("Design v145: Snap pill decides whether handles snap to the transcript; the drag label and per-section trash exist", () => {
+  const tools = readFileSync(new URL("../components/TimelineTools.tsx", import.meta.url), "utf8");
+  assert.match(tools, /aria-pressed=\{snap\}/);
+  assert.match(tools, /h-\[45px\]/);
+  assert.match(tools, /ui-playhead-time/);
+  assert.match(src, /tools\.snap \? Math\.round\(snapToWord\(lines, t, edge\)\) : Math\.round\(t\)/);
+  assert.match(sourceLane, /Delete section \$\{i \+ 1\}/);
+  assert.match(sourceLane, /c\.dragEdge/);
+  assert.match(sourceLane, /size-\[22px\]/);
+  assert.match(sourceLane, / long</);
+  assert.match(src, /store\.segments\.length === 1 && !range\) deleteClip\(\)/);
+});
+
+test("Design v146: Select moments is in the Export menu, ticks cards, and deletes after one confirm", () => {
+  const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
+  assert.match(group, /label: "Select moments"/);
+  assert.match(panel, /Select all/);
+  assert.match(panel, /Delete \{chosen\.length\}\? This can't be undone/);
+  assert.match(panel, /chosen\.forEach\(\(x\) => c\.remove\(x\)\)/);
 });

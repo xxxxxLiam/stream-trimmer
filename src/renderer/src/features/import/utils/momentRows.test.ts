@@ -172,3 +172,18 @@ test("multi-section: plain lines with a joined range keep every section", () => 
   const rows = parseMoments("T1-01 1:30-2:00; 8:00-9:00 Casino Muslim", ctx);
   assert.deepEqual(rows[0].more, [{ start: 480, end: 540 }]);
 });
+
+test("duplicates: a row within 2s in and out of an earlier row or a bank card is flagged; Keep marks it instead", () => {
+  const parsed = parseMoments([header, `${A}\t12:00\t12:50\tFirst Take\t\t\t\t`, `${A}\t12:01\t12:51\tSecond Take\t\t\t\t`, `${A}\t30:00\t30:40\tThird Take\t\t\t\t`, `${B}\t12:00\t12:50\tFourth Take\t\t\t\t`].join("\n"), ctx);
+  const rows = checkImportNames(parsed, [], new Set(), new Map(), [{ videoId: "ccccccccccc", start: 5, end: 50 }]);
+  assert.equal(rows[1].problem?.duplicate, true);
+  assert.equal(rows[1].problem?.reason, "1 s from First Take in this paste");
+  assert.equal(rows[0].problem, undefined);
+  assert.equal(rows[2].problem, undefined);
+  assert.equal(rows[3].problem, undefined, "another video is not a duplicate");
+  const kept = checkImportNames(parsed, [], new Set(), new Map(), [], new Set([rows[1].key]));
+  assert.equal(kept[1].problem, undefined);
+  assert.equal(kept[1].keptDuplicate, true);
+  const bank = checkImportNames(parsed.slice(0, 1), [], new Set(), new Map(), [{ videoId: "aaaaaaaaaaa", start: 11 * 60 + 59, end: 12 * 60 + 52 }]);
+  assert.equal(bank[0].problem?.duplicate, true, "an existing bank card counts");
+});

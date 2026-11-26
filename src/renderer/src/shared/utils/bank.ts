@@ -196,6 +196,9 @@ export function removeClip(data: BankData, campaignId: string, videoId: string, 
   return withClips(data, campaignId, videoId, list.filter((c) => c.id !== clipId));
 }
 
+/** The note a kept duplicate carries; the bank card shows it as a line (board 04.2.2). */
+export const DUPLICATE_NOTE = "Duplicate. Adjust it in the timeline.";
+
 export function setNote(data: BankData, campaignId: string, videoId: string, clipId: string, note: string): BankData {
   const list = clipsFor(data, campaignId, videoId);
   return withClips(

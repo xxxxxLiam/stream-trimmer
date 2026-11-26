@@ -11,7 +11,14 @@ import { normalizeTier, parseBankImport } from "../../../shared/utils/bankImport
 import { parseTimecode } from "../../../shared/utils/segments";
 import { checkNames } from "../../clips/utils/clipName";
 
-export type RowProblem = { reason: string; fix: "swap" | "skip"; /** The name is what is wrong, so the row can be renamed. */ name?: true };
+export type RowProblem = {
+  reason: string;
+  fix: "swap" | "skip";
+  /** The name is what is wrong, so the row can be renamed. */
+  name?: true;
+  /** In and out are both within 2 s of another moment: Skip or Keep (board 04.2.2). */
+  duplicate?: true;
+};
 
 export type MomentRow = {
   /** Stable within one paste: the 1-based line. */
@@ -29,6 +36,8 @@ export type MomentRow = {
   campaign?: string;
   /** The out point was past the end of the video and was moved to it (seconds). */
   ranPastEnd?: number;
+  /** A duplicate the person chose to keep: the bank card says to adjust it in the timeline. */
+  keptDuplicate?: true;
   problem?: RowProblem;
 };
 
@@ -265,13 +274,44 @@ export function mergeSections(rows: readonly MomentRow[], skipped: ReadonlySet<s
   return out;
 }
 
+/** Two moments are the same one when their in and their out are each within this many seconds. */
+export const DUPLICATE_SECONDS = 2;
+
+/** Rows on the same video that repeat an earlier row or an existing bank card are flagged "duplicate"; a kept one is marked instead. */
+export function flagDuplicates(
+  rows: readonly MomentRow[],
+  existing: ReadonlyArray<{ videoId: string; start: number; end: number; name?: string }>,
+  kept: ReadonlySet<string>,
+): MomentRow[] {
+  const near = (a: { start: number; end: number }, b: { start: number; end: number }) =>
+    Math.abs(a.start - b.start) <= DUPLICATE_SECONDS && Math.abs(a.end - b.end) <= DUPLICATE_SECONDS;
+  const seen: { videoId: string; start: number; end: number; name?: string; paste?: true }[] = [...existing];
+  return rows.map((r) => {
+    if (r.problem || !r.videoId) return r;
+    const hit = seen.find((o) => o.videoId === r.videoId && near(o, r));
+    seen.push({ videoId: r.videoId, start: r.start, end: r.end, name: r.name, paste: true });
+    if (!hit) return r;
+    if (kept.has(r.key)) return { ...r, keptDuplicate: true as const };
+    const gap = Math.round(Math.max(Math.abs(hit.start - r.start), Math.abs(hit.end - r.end)));
+    const where = hit.paste ? "in this paste" : "in Export";
+    const reason = gap === 0 ? `Same range as one ${where}` : `${gap} s from ${hit.name?.trim() || "another moment"} ${where}`;
+    return { ...r, problem: { reason, fix: "skip" as const, duplicate: true as const } };
+  });
+}
+
 export function checkImportNames(
   parsed: readonly MomentRow[],
   existing: ReadonlyArray<{ id: string; name: string }>,
   skipped: ReadonlySet<string>,
   renamed: ReadonlyMap<string, string>,
+  existingRanges: ReadonlyArray<{ videoId: string; start: number; end: number; name?: string }> = [],
+  kept: ReadonlySet<string> = new Set(),
 ): MomentRow[] {
   const applied = mergeSections(parsed.map((r) => (renamed.has(r.key) ? { ...r, name: renamed.get(r.key)! } : r)), skipped);
   const checked = new Map(flagNames(applied.filter((r) => !skipped.has(r.key)), existing).map((r) => [r.key, r]));
-  return applied.map((r) => checked.get(r.key) ?? r);
+  const named = applied.map((r) => checked.get(r.key) ?? r);
+  // A skipped row is not a twin of anything, so it neither flags nor is flagged.
+  const live = flagDuplicates(named.filter((r) => !skipped.has(r.key)), existingRanges, kept);
+  const dup = new Map(live.map((r) => [r.key, r]));
+  return named.map((r) => dup.get(r.key) ?? r);
 }

@@ -20,6 +20,8 @@ import MakingRow from "./MakingRow";
 import OfflineRow from "./OfflineRow";
 import CrashNoteHost from "../../help/components/CrashNoteHost";
 import WaitingRow from "./WaitingRow";
+import { useState } from "react";
+import { exitSelectMoments, selectAllMoments, toggleMoment, useSelectMoments } from "../../../shared/utils/selectMomentsStore";
 
 /** A moment shorter than the campaign's minimum says so in one dim line; the rule is the editor's to bend. */
 function underMinimum(clip: BankedClip, rule: LengthRule | null, campaign: string): string | undefined {
@@ -35,6 +37,14 @@ export default function ExportPanel() {
   // Every workspace tab renders its own Export; only the one in view says it.
   const active = useIsTabActive();
   const momentNote = useMomentNote();
+  const pick = useSelectMoments();
+  const [confirming, setConfirming] = useState(false);
+  const everyClip = [...c.waiting, ...c.made];
+  const chosen = everyClip.filter((x) => pick.ids.has(x.id));
+  const leave = () => {
+    setConfirming(false);
+    exitSelectMoments();
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
@@ -96,7 +106,47 @@ export default function ExportPanel() {
           <div className="flex justify-between px-[12px] pb-[4px] pt-[10px] text-meta leading-[normal] text-fg-dim">
             Waiting in this video<span>{c.waiting.length}</span>
           </div>
-          {[...c.waiting, ...c.made].map((clip) => {
+          {pick.on ? (
+            <div className="mx-[10px] mb-[4px] flex items-center gap-[8px] text-meta text-fg-dim" id="ui-select-moments">
+              <span className="tabular-nums">{chosen.length} selected</span>
+              <button type="button" className="rounded-control px-[8px] py-[4px] hover:bg-hover hover:text-fg" onClick={() => selectAllMoments(everyClip.map((x) => x.id))}>
+                Select all
+              </button>
+              {confirming ? (
+                <>
+                  <span className="ml-auto text-fg">Delete {chosen.length}? This can't be undone.</span>
+                  <button
+                    type="button"
+                    className="rounded-control border border-error px-[8px] py-[4px] text-error"
+                    onClick={() => {
+                      chosen.forEach((x) => c.remove(x));
+                      leave();
+                    }}
+                  >
+                    Delete
+                  </button>
+                  <button type="button" className="rounded-control px-[8px] py-[4px] hover:bg-hover hover:text-fg" onClick={() => setConfirming(false)}>
+                    Keep
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={chosen.length === 0}
+                    className="ml-auto rounded-control px-[8px] py-[4px] text-fg hover:bg-hover disabled:text-disabled"
+                    onClick={() => setConfirming(true)}
+                  >
+                    Delete {chosen.length || ""}
+                  </button>
+                  <button type="button" className="rounded-control px-[8px] py-[4px] hover:bg-hover hover:text-fg" onClick={leave}>
+                    Done
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
+          {everyClip.map((clip) => {
             const name = validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip);
             return (
               <WaitingRow
@@ -112,6 +162,7 @@ export default function ExportPanel() {
                 onRename={(label) => c.rename(clip, label)}
                 onCopy={() => c.copyClip(clip)}
                 onRemove={() => c.remove(clip)}
+                picking={pick.on ? { checked: pick.ids.has(clip.id), onToggle: () => toggleMoment(clip.id) } : undefined}
               />
             );
           })}

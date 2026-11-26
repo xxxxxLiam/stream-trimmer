@@ -118,11 +118,33 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
           </section>
         ))}
 
-        {c.flagged.length > 0 && (
+        {c.flagged.some((m) => m.problem?.duplicate) && (
+          <section aria-label="Duplicates">
+            <SectionLabel>Duplicates</SectionLabel>
+            <ul className="m-[0px] flex list-none flex-col p-[0px]">
+              {c.flagged.filter((m) => m.problem?.duplicate).map((m) => (
+                <li key={m.key} className="flex min-h-[64px] items-center gap-[12px] border-b border-hairline">
+                  <span className="min-w-[0px] flex-1">
+                    <span className="block truncate text-body">{m.name || `Line ${m.key}`}</span>
+                    <span className="block text-meta text-fg-dim">{m.problem?.reason}</span>
+                  </span>
+                  <button type="button" className="text-meta text-fg-dim hover:text-fg" onClick={() => c.skip(m.key)}>
+                    Skip
+                  </button>
+                  <button type="button" className="text-meta text-ice hover:underline" onClick={() => c.keep(m.key)}>
+                    Keep
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {c.flagged.some((m) => !m.problem?.duplicate) && (
           <section aria-label="Needs a look">
             <SectionLabel>Needs a look</SectionLabel>
             <ul className="m-[0px] flex list-none flex-col p-[0px]">
-              {c.flagged.map((m) => (
+              {c.flagged.filter((m) => !m.problem?.duplicate).map((m) => (
                 <li key={m.key} className="flex min-h-target items-center gap-[12px] border-b border-hairline">
                   <span className="min-w-[0px] flex-1">
                     {renaming === m.key ? (

@@ -3,6 +3,7 @@
  * Path: src/renderer/src/modules/layout/components/PanelGroup.tsx
  * Description: One tabbed group (left or right): the tab strip over the active panel's body.
  */
+import { enterSelectMoments } from "../../../shared/utils/selectMomentsStore";
 import { createElement, useEffect, useState } from "react";
 import PanelTabStrip, { panelBodyDomId, tabDomId } from "./PanelTabStrip";
 import { usePanelHostOptional } from "../hooks/PanelHostContext";
@@ -77,6 +78,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   const listItems: MenuItem[] = list
     ? [
         { key: "copy-list", label: "Copy as text", icon: <IconCopy />, detail: list.count > 0 ? countText(list.count) : undefined, disabled: list.count === 0, onSelect: () => void copyList() },
+        ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", disabled: list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
         { key: "save-list", label: "Save as .txt…", icon: <IconSaveFile />, disabled: list.count === 0, onSelect: () => void saveList() },
         ...(list.count === 0 ? [{ kind: "note", key: "list-empty", label: list.emptyNote } as MenuItem] : []),
         { kind: "separator", key: "sep-list" } as MenuItem,
