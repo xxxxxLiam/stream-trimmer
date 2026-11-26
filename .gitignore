@@ -25,6 +25,9 @@ out
 # Bundled binaries (regenerated on build)
 resources/bin
 
+# PO token provider (GPL-3.0, built on demand — see docs/pot-provider.md; never committed)
+resources/pot-provider
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
