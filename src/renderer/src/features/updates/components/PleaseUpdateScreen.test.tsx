@@ -35,7 +35,7 @@ test("Ice appears once, in the mark: the buttons carry no Ice and no fill but th
   const html = screen();
   const buttons = html.match(/<button[\s\S]*?<\/button>/g) ?? [];
   for (const b of buttons) assert.doesNotMatch(b, /ice/);
-  assert.match(buttons[0], /bg-fg[^"]*text-bg/);
+  assert.match(buttons[0] ?? "", /bg-fg[^"]*text-bg/);
 });
 
 test("the download button goes to the releases page", () => {
