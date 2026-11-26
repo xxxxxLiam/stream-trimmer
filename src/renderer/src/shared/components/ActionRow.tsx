@@ -48,6 +48,7 @@ export default function ActionRow({ id, name, actions, className, children }: Ac
     <div data-open={open || undefined} className={cx("relative box-border rounded-control bg-raised", className)}>
       <div className="flex items-center">
         <div className="min-w-0 flex-1">{children}</div>
+        {actions.length === 0 ? null : (
         <button
           type="button"
           aria-label={`More for ${name}`}
@@ -57,6 +58,7 @@ export default function ActionRow({ id, name, actions, className, children }: Ac
         >
           <IconMore />
         </button>
+        )}
       </div>
       {open && (
         <div role="menu" aria-label={`Actions for ${name}`} className="mx-[8px] border-t border-hairline pb-[4px] pt-[4px]">

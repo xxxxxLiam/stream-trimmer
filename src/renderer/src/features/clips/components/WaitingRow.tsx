@@ -6,6 +6,7 @@
  *   row in place with Clip now, Rename and Remove (the shared list row).
  */
 import { useEffect, useState } from "react";
+import { ExclamationTriangle } from "react-bootstrap-icons";
 import ActionRow from "../../../shared/components/ActionRow";
 import { IconCopy, IconMake, IconRemove, IconRename } from "../../../shared/components/rowIcons";
 import { finishRename, renameKey } from "../../player/utils/laneRename";
@@ -39,7 +40,7 @@ const chip = "rounded-chip border border-hairlineStrong px-[4px] py-[1px] text-m
 const madeChip = "rounded-chip border border-hairline px-[4px] py-[1px] text-meta leading-[normal] text-disabled";
 
 export default function WaitingRow({ clip, name, suggested, selected, made, lengthNote, onSelect, onMake, onRename, onCopy, onRemove, picking }: WaitingRowProps) {
-  const edge = suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
+  const edge = picking?.checked ? "border-fg" : suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [said, setSaid] = useState("");
@@ -66,7 +67,7 @@ export default function WaitingRow({ clip, name, suggested, selected, made, leng
     { key: "remove", label: "Remove", icon: <IconRemove />, onSelect: onRemove, danger: true },
   ];
   return (
-    <ActionRow id={`clip:${clip.id}`} name={name} actions={actions} className={`mx-[6px] my-[2px] border ${edge}`}>
+    <ActionRow id={`clip:${clip.id}`} name={name} actions={picking ? [] : actions} className={`mx-[6px] my-[2px] border ${edge}`}>
       {draft !== null ? (
         <div className="px-[8px] py-[6px]">
           <input
@@ -111,16 +112,18 @@ export default function WaitingRow({ clip, name, suggested, selected, made, leng
               role="checkbox"
               aria-checked={picking.checked}
               aria-label={`Select ${name}`}
-              className={`flex size-[16px] flex-none items-center justify-center rounded-chip border text-meta leading-[normal] ${picking.checked ? "border-ice text-ice" : "border-hairlineStrong"}`}
+              className={`flex size-[18px] flex-none items-center justify-center rounded-chip border text-meta leading-[normal] ${picking.checked ? "border-ice bg-ice text-bg" : "border-hairlineStrong"}`}
             >
               {picking.checked ? "✓" : ""}
             </span>
-          ) : null}
+          ) : (
           <span
             className={`size-[9px] flex-none rounded-[50%] border ${made ? "border-frost-tint-60 bg-frost-tint-60" : "border-fg-dim"}`}
             role="img"
             aria-label={made ? "Made" : "Waiting"}
           />
+          )}
+
           <span className="min-w-0 flex-1">
             <span className="flex items-baseline justify-between gap-[8px]">
               <span className={`block min-w-0 truncate whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
@@ -132,7 +135,12 @@ export default function WaitingRow({ clip, name, suggested, selected, made, leng
               <span className={`text-meta leading-[normal] ${made ? "text-disabled" : "text-fg-dim"}`}>{formatLength(clipLength(clip))}</span>
             </span>
             {said && <span role="status" className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{said}</span>}
-            {clip.note === DUPLICATE_NOTE && !made && <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{DUPLICATE_NOTE}</span>}
+            {clip.note === DUPLICATE_NOTE && !made && (
+              <span className="mt-[3px] flex items-center gap-[4px] whitespace-nowrap text-meta leading-[normal] text-fg">
+                <ExclamationTriangle aria-hidden="true" size={12} />
+                {DUPLICATE_NOTE}
+              </span>
+            )}
             {lengthNote && !made && <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{lengthNote}</span>}
             {clip.ranPastEnd !== undefined && !made && (
               <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">Ran past the end; stops at {boardTime(clip.ranPastEnd)}</span>

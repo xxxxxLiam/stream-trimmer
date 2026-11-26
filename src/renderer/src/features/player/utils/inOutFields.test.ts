@@ -12,7 +12,7 @@ test("a typed or pasted time becomes the clipper's HH:MM:SS text, in any of the 
   assert.deepEqual(readTime("1:12:04", 8000), { kind: "set", text: "01:12:04" });
   assert.deepEqual(readTime(" 72:04 ", 8000), { kind: "set", text: "01:12:04" });
   assert.deepEqual(readTime("4324", 8000), { kind: "set", text: "01:12:04" });
-  assert.deepEqual(readTime("01:12:04.9", 8000), { kind: "set", text: "01:12:04" });
+  assert.deepEqual(readTime("01:12:04.9", 8000), { kind: "set", text: "01:12:04.9" }, "tenths are kept");
 });
 
 test("an empty field clears that end; nonsense and a time past the video's end get a sentence", () => {

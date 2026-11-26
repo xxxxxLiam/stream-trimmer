@@ -9,7 +9,6 @@ import type { TimelineController } from "../hooks/useTimelineController";
 import { pickHintLead } from "../utils/laneTools";
 import { clockTime, clockTimePrecise } from "../utils/transport";
 import { Magnet } from "react-bootstrap-icons";
-import { IconRemove } from "../../../shared/components/rowIcons";
 import { lengthLabel } from "../hooks/useTimelineController";
 import { toX } from "../utils/timelineAxis";
 import { KeyHint } from "../../../shared/components/Tooltip";
@@ -106,38 +105,21 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
                   </span>
                 );
               })}
-            {c.segments.map((seg, i) => {
-              // A trash per locked section (board 03.2.50): 32px just outside its right edge, inside the bar when the next section is within 44px.
-              const right = toX(c.axis, seg.end);
-              const next = c.segments.filter((o) => o.start >= seg.end && o !== seg).sort((a, b) => a.start - b.start)[0];
-              const crowded = next ? toX(c.axis, next.start) - right < 44 : false;
-              const left = crowded ? right - 22 - 4 : Math.min(right + 6, c.width - 32);
-              return (
-                <button
-                  key={`trash-${seg.start}-${seg.end}`}
-                  type="button"
-                  aria-label={`Delete section ${i + 1}`}
-                  title="Delete this section"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => c.removeSection(i)}
-                  className={`absolute top-[6px] inline-flex items-center justify-center rounded-control border border-hairlineStrong bg-raised text-fg-dim hover:bg-hover hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost ${crowded ? "size-[22px]" : "size-[32px]"}`}
-                  style={{ left }}
-                >
-                  <IconRemove />
-                </button>
-              );
-            })}
             {c.dragEdge ? (
               <span
                 role="status"
-                className="pointer-events-none absolute top-[-2px] z-10 flex -translate-x-1/2 -translate-y-full items-center gap-[4px] whitespace-nowrap"
-                style={{ left: toX(c.axis, c.dragEdge.time) }}
+                className="pointer-events-none absolute top-[-2px] z-10 flex -translate-y-full items-center gap-[4px] whitespace-nowrap"
+                // Centred over the handle, but kept inside the lane near its ends.
+                style={{
+                  left: toX(c.axis, c.dragEdge.time),
+                  transform: `translate(${toX(c.axis, c.dragEdge.time) > c.width - 120 ? "-100%" : toX(c.axis, c.dragEdge.time) < 120 ? "0" : "-50%"}, -100%)`,
+                }}
               >
-                <span className="inline-flex items-center gap-[4px] rounded-chip bg-raised px-[8px] text-meta leading-[20px] tabular-nums text-fg">
-                  {c.snapOn ? <Magnet aria-hidden="true" size={12} /> : null}
+                <span className="inline-flex items-center gap-[4px] rounded-chip bg-fg px-[8px] text-meta font-medium leading-[20px] tabular-nums text-bg">
+                  {c.snapOn ? <Magnet aria-hidden="true" size={12} className="text-ice" /> : null}
                   {clockTimePrecise(c.dragEdge.time)}
                 </span>
-                <span className="rounded-chip bg-raised px-[8px] text-meta leading-[20px] text-fg-dim">{lengthLabel(c.dragEdge.length)} long</span>
+                <span className="order-first rounded-chip border border-hairlineStrong bg-raised px-[8px] text-meta leading-[20px] text-fg">{lengthLabel(c.dragEdge.length)} long</span>
               </span>
             ) : null}
             {c.mergeHint ? (
