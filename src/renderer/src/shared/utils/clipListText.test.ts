@@ -85,3 +85,9 @@ test("Copy one clip: its line without a number, its link and its transcript rang
   assert.doesNotMatch(singleClipText({ name: "A", segments: segs, transcript: { none: "no-transcript" } }, "v"), /^1\./);
   assert.match(singleClipText({ name: "A", segments: segs, transcript: { none: "no-transcript" } }, "v"), /No transcript for this video\./);
 });
+
+test("Copy with transcript: a clip of two sections lists each section's own words", () => {
+  const segs = [{ start: 4324, end: 4330 }, { start: 4400, end: 4410 }];
+  assert.equal(clipTranscriptText(talk, segs), "1:12:04 to 1:12:10\nthis is the point\n\n1:13:20 to 1:13:30\nafter it");
+  assert.match(clipTranscriptText(talk, [{ start: 4324, end: 4330 }, { start: 100, end: 110 }]), /0:01:40 to 0:01:50\nNo words in this part\.$/);
+});

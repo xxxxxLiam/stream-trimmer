@@ -9,10 +9,10 @@ import { UnsavedRange } from "./ClipsLane";
 
 const noop = () => {};
 
-test("the unsaved range's bar has the Create clip pill with the length and the × with its Esc hint", () => {
+test("the unsaved range's bar has the Create clip pill with the length and the × with its remove label", () => {
   const html = renderToStaticMarkup(<UnsavedRange style={{ left: 10, width: 300 }} length="0:42" blocked={null} onCreate={noop} onRemove={noop} />);
   assert.match(html, /Create clip · 0:42/);
-  assert.match(html, /aria-label="Remove this range \(Esc\)"/);
+  assert.match(html, /aria-label="Remove this range"/);
   assert.match(html, /bg-ice text-bg/);
 });
 
