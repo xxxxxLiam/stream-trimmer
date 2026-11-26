@@ -17,7 +17,7 @@ import { makingText, undoText } from "../utils/exportRows";
 import UndoRing from "./UndoRing";
 
 export type MakingRowProps =
-  | { kind: "making"; name: string; percent: number; phase: string; retrying?: boolean; onCancel?: () => void }
+  | { kind: "making"; name: string; percent: number; phase: string; retrying?: boolean; signedInRetry?: boolean; onCancel?: () => void }
   | {
       kind: "finished";
       name: string;
@@ -82,6 +82,8 @@ export default function MakingRow(props: MakingRowProps) {
               <span className="text-error">{failureCopy("stopped", 1).reason}</span>{" "}
               <span className="text-fg-dim">{RETRY_SENTENCE}</span>
             </div>
+          ) : props.signedInRetry && preparing ? (
+            <div className={SUB}>Signed in. Trying again…</div>
           ) : (
             <div className={SUB}>{makingText(props.percent, props.phase)}</div>
           )}

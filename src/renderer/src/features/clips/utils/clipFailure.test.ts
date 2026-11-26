@@ -192,3 +192,13 @@ test("C4-5: a path through a file says a folder cannot be made there, not that t
   assert.deepEqual(failureCopy("nofolder", 1, undefined, false, undefined, "Acme"), { reason: "Clipr can’t make Acme’s folder there.", detail: "A file is in the way. Pick another folder." });
   assert.deepEqual(failureActions("nofolder", 1), ["changeFolder"]);
 });
+
+test("Board 03.2.56: after a sign-in the retry says 'Signed in. Trying again…' on the making row with the sliding Ice line", async () => {
+  const { readFileSync } = await import("node:fs");
+  const ctl = readFileSync("src/renderer/src/features/clips/hooks/useExportController.ts", "utf8");
+  assert.match(ctl, /retryAfterSignIn\)/, "the sign-in retry goes through the flag");
+  assert.match(ctl, /signedInRetry: justSignedIn/);
+  const mk = readFileSync("src/renderer/src/features/clips/components/MakingRow.tsx", "utf8");
+  assert.match(mk, /props\.signedInRetry && preparing[\s\S]*Signed in\. Trying again…/);
+  assert.match(mk, /bg-ice/);
+});
