@@ -323,3 +323,12 @@ test("Liam 26 Nov, canvas v143: the timeline is Transcript, Source and Clips onl
   assert.doesNotMatch(src, /audioLanes/);
   assert.equal(existsSync(new URL("../components/AudioLanes.tsx", import.meta.url)), false);
 });
+
+test("canvas v144 timeline measures: panel padding 8, Transcript 32, Source 76, Clips 34, trash 32 at top 1", () => {
+  const tl = readFileSync(new URL("../components/Timeline.tsx", import.meta.url), "utf8");
+  assert.match(tl, /bg-panel pb-\[8px\]/);
+  const lane2 = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+  assert.match(lane2, /absolute top-\[1px\] inline-flex size-\[32px\]/);
+  const tr = readFileSync(new URL("../components/TranscriptLane.tsx", import.meta.url), "utf8");
+  assert.match(tr, /h-\[32px\]/);
+});
