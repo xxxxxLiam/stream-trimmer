@@ -25,6 +25,7 @@ import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/cam
 import { clearInFlightCut, saveInFlightCut, takeInterruptedCut } from "../shared/utils/inFlightCut";
 import { consumeCrashFlag } from "../shared/utils/crashNoteStore";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
+import VersionGate from "../features/updates/components/VersionGate";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
@@ -845,11 +846,13 @@ export default function App() {
   consumeCrashFlag(window.location.search, (clean) => window.history.replaceState(null, "", `${window.location.pathname}${clean}${window.location.hash}`));
   return (
     <ErrorBoundary fallback={(error) => <CrashScreenHost error={error} />}>
-      <WorkspaceProvider>
-        <CampaignProvider>
-          <Shell />
-        </CampaignProvider>
-      </WorkspaceProvider>
+      <VersionGate>
+        <WorkspaceProvider>
+          <CampaignProvider>
+            <Shell />
+          </CampaignProvider>
+        </WorkspaceProvider>
+      </VersionGate>
     </ErrorBoundary>
   );
 }
