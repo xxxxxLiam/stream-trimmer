@@ -280,8 +280,14 @@ export function useTimelineController() {
     clipper.setEndText("");
     s.setScissorsStart(null);
   };
+  // Esc clears the whole selection: the picked range and any locked sections (a loaded bank clip included), so there is always a way
+  // to start a clip by hand (Liam 26 Nov).
+  const clearSelection = () => {
+    clearRange();
+    store.clear();
+  };
   const tabActive = useIsTabActive();
-  const hasRange = !!range;
+  const hasRange = !!range || store.segments.length > 0;
   const dragging = !!s.drag;
   useEffect(() => {
     if (!tabActive || !hasRange || dragging) return;
@@ -289,7 +295,7 @@ export function useTimelineController() {
       if (e.key !== "Escape" || e.defaultPrevented || dialogOpen() || document.querySelector('[role="menu"]')) return;
       const el = e.target as HTMLElement | null;
       if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
-      clearRange();
+      clearSelection();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

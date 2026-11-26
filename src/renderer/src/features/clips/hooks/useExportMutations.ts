@@ -29,7 +29,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   const seg = useSegmentsState();
   const { cutBanked, cutAgain } = usePanelHost();
   const { recordUse, forgetUse, folders, pickClipsDir } = useCampaign();
-  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload } = useClipperContext();
+  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload, setStartText, setEndText } = useClipperContext();
   const stopped = useRef(false);
   const { campaignId, vid } = q;
 
@@ -66,6 +66,14 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
           const ok = await cutBanked(clip, name);
           if (ok) {
             finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
+            // Liam 26 Nov: a clip that has been made is no longer the selection. If it is the one on the timeline, the
+            // timeline and the marks go empty so the next clip can be marked by hand; otherwise what is marked is left alone.
+            if (seg.store.get().bankId === clip.id) {
+              seg.clear();
+              setStartText("");
+              setEndText("");
+              s.setSelectedId((cur) => (cur === clip.id ? null : cur));
+            }
             // Its own Undo, even when the next queued clip starts at once.
             const newest = getDownloads().find((d) => d.kind === "clip");
             if (newest) {
@@ -78,7 +86,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
       };
       return queue.current.enqueue(run);
     },
-    [campaignId, vid, cutBanked, recordUse, s, info?.title],
+    [campaignId, vid, cutBanked, recordUse, s, info?.title, seg, setStartText, setEndText],
   );
 
   // The ✕ / Esc on the Making row: the clip goes back to Waiting with its range kept, no notice, no confirm.
