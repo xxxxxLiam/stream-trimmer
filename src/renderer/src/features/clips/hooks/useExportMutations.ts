@@ -38,7 +38,8 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
       s.setSelectedId(clip.id);
       // Opening a clip that ran past the end is the person seeing it: the line has done its job.
       if (clip.ranPastEnd !== undefined && campaignId && vid) bankStore.clearRanPastEnd(campaignId, vid, clip.id);
-      seg.load(clip.segments);
+      // The loaded range is this bank item: edits on the timeline edit it, and Clip makes it.
+      seg.load(clip.segments, clip.id);
       if (clip.segments[0]) playFrom(clip.segments[0].start);
     },
     [seg, s, campaignId, vid],

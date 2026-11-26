@@ -25,6 +25,7 @@ import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
 import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
+import { bankStore, clipsFor } from "../../../shared/utils/bank";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { dialogOpen } from "../../../shared/utils/dialogOpen";
 
@@ -58,6 +59,17 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [store.segments, range?.start, range?.end],
   );
+  // Liam 26 Nov: a bank card loaded on the timeline IS that bank item. Dragging or trimming its edges edits
+  // the item's in and out; Clip then matches it as the same moment (matchingMoment) and counts as making it.
+  // Marking another section, clearing the marks or losing the item ends the link, and nothing is written.
+  const { bankId, detachBank } = store;
+  useEffect(() => {
+    if (!bankId || !active || !videoId) return;
+    const item = clipsFor(bankStore.get(), active.id, videoId).find((c) => c.id === bankId);
+    if (!item || item.status !== "banked" || sections.length !== item.segments.length) return detachBank();
+    if (sections.every((r, i) => r.start === item.segments[i].start && r.end === item.segments[i].end)) return;
+    bankStore.setSegments(active.id, videoId, bankId, sections);
+  }, [bankId, active, videoId, sections, detachBank]);
   const startPicked = clipper.startText.trim() !== "" && Number.isFinite(clipper.start) && clipper.start >= 0 && !range;
   // B3-1: an Out set before the In is stored, so the readout shows it instead of a dash.
   const endPicked = clipper.endText.trim() !== "" && Number.isFinite(clipper.end) && clipper.end >= 0 && !range;

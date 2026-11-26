@@ -234,3 +234,18 @@ test("ranPastEnd is kept on import and goes when the clip is opened", () => {
   const opened = clearRanPastEnd(imported, C, V, clipsFor(imported, C, V)[0].id);
   assert.equal(clipsFor(opened, C, V)[0].ranPastEnd, undefined);
 });
+
+test("Liam 26 Nov: trimming a loaded bank clip edits that bank item, and Clip then matches it as the same moment", async () => {
+  const { setClipSegments } = await import("./bank");
+  const { matchingMoment } = await import("../../features/clips/utils/finishBankedCut");
+  const d0 = importClips({}, "c1", "v1", parse("A1 1:00-2:00")).data;
+  const item = clipsFor(d0, "c1", "v1")[0];
+  const d1 = setClipSegments(d0, "c1", "v1", item.id, [{ start: 55, end: 130 }]);
+  const edited = clipsFor(d1, "c1", "v1");
+  assert.equal(edited.length, 1, "no second clip is created");
+  assert.deepEqual(edited[0].segments, [{ start: 55, end: 130 }]);
+  assert.equal(matchingMoment(edited, [{ start: 55, end: 130 }])?.id, item.id, "Clip on the edited range is that bank item");
+  assert.equal(matchingMoment(clipsFor(d0, "c1", "v1"), [{ start: 55, end: 130 }]), undefined, "without the edit it would not match");
+  assert.equal(setClipSegments(d0, "c1", "v1", "nope", [{ start: 1, end: 2 }]), d0);
+  assert.equal(setClipSegments(d0, "c1", "v1", item.id, []), d0, "an empty edit never wipes the item");
+});
