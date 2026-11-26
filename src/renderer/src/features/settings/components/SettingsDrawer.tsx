@@ -13,6 +13,8 @@ import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
 import SettingsSignIn from "./SettingsSignIn";
+import SettingsLocation from "./SettingsLocation";
+import SettingsNewLocation, { locationFolderName } from "./SettingsNewLocation";
 import { useCookieDropMutations } from "../hooks/useCookieDropMutations";
 import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import { signInRowValue, type SignInStatus } from "../utils/signInStatus";
@@ -141,6 +143,54 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         }
       />
     );
+  } else if (view.kind === "newLocation") {
+    body = (
+      <SettingsNewLocation
+        defaultFolder={(name) => folderChipLabel(campaignClipsDir({ name, clipsDir: "", kind: "location" }, c.campaigns.defaultFolders.clipsDir), 3)}
+        onChoose={async (name) => (await window.electronAPI?.pickBrandedDirectory?.({ kind: "location", name }))?.dir ?? null}
+        onAdd={(input) => {
+          const found = campaignNameProblems(input.name, c.campaigns.campaigns);
+          if (found.length) return found;
+          c.campaigns.create({ name: input.name, kind: "location", soundOnly: input.soundOnly, ...(input.clipsDir ? { clipsDir: input.clipsDir } : {}) });
+          c.setView({ kind: "top" });
+          return [];
+        }}
+        onBack={c.back}
+        onClose={onClose}
+      />
+    );
+  } else if (view.kind === "campaign" && campaign?.kind === "location") {
+    body = (
+      <SettingsLocation
+        name={campaign.name}
+        folderLabel={folderChipLabel(campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir), 3)}
+        soundOnly={campaign.soundOnly === true}
+        onSoundOnly={(on) => c.campaigns.update(campaign.id, { soundOnly: on })}
+        onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}
+        onRename={(next) => {
+          const found = campaignNameProblems(next, c.campaigns.campaigns, campaign.id);
+          if (found.length) return found;
+          // Pin the current folder: renaming must not orphan the clips already there.
+          const pinned = campaign.clipsDir || campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir);
+          c.campaigns.update(campaign.id, { name: next.trim(), ...(pinned ? { clipsDir: pinned } : {}) });
+          return [];
+        }}
+        confirmingDelete={confirming === campaign.id}
+        onDelete={() => {
+          if (confirming === campaign.id) {
+            if (Date.now() - armedAt.current < DELETE_GUARD_MS) return;
+            setConfirming(null);
+            c.campaigns.remove(campaign.id);
+            dropCampaignPrefs(campaign.id, (k) => readSetting<Record<string, unknown>>(k, {}), writeSetting);
+          } else {
+            armedAt.current = Date.now();
+            setConfirming(campaign.id);
+          }
+        }}
+        onBack={c.back}
+        onClose={onClose}
+      />
+    );
   } else if (view.kind === "campaign" && campaign) {
     const fcp = editor.settingsFor(campaign.id);
     body = (
@@ -179,6 +229,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
           const r = await window.electronAPI?.showInFolder(dir);
           return r?.missing ? FOLDER_NOT_MADE_YET : null;
         }}
+        folderChosen={Boolean(campaign.clipsDir)}
         onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}
         onRename={(next) => {
           const found = campaignNameProblems(next, c.campaigns.campaigns, campaign.id);
@@ -221,6 +272,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         rows={c.rows}
         onEdit={(id) => c.setView({ kind: "campaign", id })}
         onAdd={() => c.setAdding(true)}
+        onAddLocation={() => c.setView({ kind: "newLocation" })}
+        locationFolder={locationFolderName}
         app={c.app}
         autoUpdate={c.autoUpdate}
         autoUpdateAvailable={updatesInPlace(typeof navigator === "undefined" ? "" : navigator.platform)}

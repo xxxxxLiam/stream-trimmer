@@ -22,6 +22,8 @@ export type SettingsCampaignProps = {
   quota: number;
   onQuota: (n: number) => void;
   folderLabel: string;
+  /** The campaign has a folder of its own (chosen); until then it is the default and the button says Choose. */
+  folderChosen?: boolean;
   /** The optional clip length rule in seconds (either end may be unset), and writing it. Never blocks Clip. */
   lengthRule: { min?: number; max?: number };
   onLengthRule: (patch: { lengthMinSec?: number; lengthMaxSec?: number }) => void;
@@ -169,8 +171,8 @@ export default function SettingsCampaign(p: SettingsCampaignProps) {
           <span className="text-body leading-[normal]">Folder</span>
           <span className="truncate text-meta text-fg-dim">{p.folderLabel}</span>
         </div>
-        <button type="button" aria-label={`Change the ${p.name} folder`} onClick={() => void p.onChangeFolder().then((e) => setFolderProblem(e ?? ""))} className={outlineButton}>
-          Change
+        <button type="button" aria-label={`${p.folderChosen ? "Change" : "Choose"} the ${p.name} folder`} onClick={() => void p.onChangeFolder().then((e) => setFolderProblem(e ?? ""))} className={outlineButton}>
+          {p.folderChosen ? "Change" : "Choose"}
         </button>
         <button type="button" aria-label={`Open the ${p.name} folder`} onClick={() => void Promise.resolve(p.onOpenFolder()).then((n) => setFolderNote(n ?? ""))} className={outlineButton}>
           Open

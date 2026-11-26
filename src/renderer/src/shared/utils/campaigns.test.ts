@@ -338,3 +338,10 @@ test("kind and soundOnly: old records stay campaigns with their folder untouched
   assert.equal(back.clipsDir, "/m/Clipr Sound effects");
   assert.equal(createCampaign([], { name: "A" }).campaign.kind, undefined);
 });
+
+test("a location's default folder is Clipr <Name> beside the Clipr folder, and it has no daily count", () => {
+  assert.equal(campaignClipsDir({ name: "B-roll", clipsDir: "", kind: "location" }, "/Users/me/Downloads/Clipr"), "/Users/me/Downloads/Clipr B-roll");
+  assert.equal(campaignClipsDir({ name: "Acme", clipsDir: "" }, "/Users/me/Downloads/Clipr"), "/Users/me/Downloads/Clipr/Acme");
+  const loc = createCampaign([], { name: "B-roll", kind: "location" }).campaign;
+  assert.equal(todayCount(loc), null);
+});

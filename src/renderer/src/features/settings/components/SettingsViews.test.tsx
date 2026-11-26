@@ -14,6 +14,8 @@ import SettingsEditor from "./SettingsEditor";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import SettingsTopList from "./SettingsTopList";
 import SettingsSignIn from "./SettingsSignIn";
+import SettingsLocation from "./SettingsLocation";
+import SettingsNewLocation, { locationFolderName, presetSoundOnly } from "./SettingsNewLocation";
 import { signInRowValue, statusFromAnswer } from "../utils/signInStatus";
 import { cookieReason } from "../utils/cookieReasons";
 import { parentOf } from "../hooks/useSettingsController";
@@ -24,12 +26,12 @@ const read = (f: string) => readFileSync(join(process.cwd(), "src/renderer/src",
 test("top list: campaigns listed here, sign-in, two switches; no Campaigns page, no global Clips folder row", () => {
   const rows = [{ id: "a", name: "Acme", summary: "3 clips a day", languages: null }, { id: "n", name: "Nova", summary: "2 clips a day", languages: null }];
   const h = renderToStaticMarkup(
-    <SettingsTopList rows={rows} onEdit={noop} onAdd={noop} app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenSignIn={noop} onClose={noop} />,
+    <SettingsTopList rows={rows} onEdit={noop} onAdd={noop} onAddLocation={noop} app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenSignIn={noop} onClose={noop} />,
   );
   // Liam, 25 Nov: the campaigns are listed right on Settings, each opening that campaign.
   assert.match(h, /aria-label="Acme: 3 clips a day"/);
   assert.match(h, /aria-label="Nova: 2 clips a day"/);
-  assert.match(h, /aria-label="Add campaign"/);
+  assert.match(h, /aria-label="New campaign"/);
   const row = h.slice(h.indexOf('aria-label="Acme: 3 clips a day"'), h.indexOf("</button>", h.indexOf('aria-label="Acme: 3 clips a day"')));
   assert.match(row, /M4\.646 1\.646/, "a chevron-right at the row's end");
   assert.doesNotMatch(row, /M8 4\.754/, "not a gear: the gear is only in the top-left campaign menu");
@@ -45,7 +47,7 @@ test("top list: campaigns listed here, sign-in, two switches; no Campaigns page,
 });
 
 test("top list on a Mac: no Update automatically switch (the build is unsigned and cannot update itself), the other switch stays", () => {
-  const props = { rows: [], onEdit: noop, onAdd: noop, app: { notifyQueueDone: true }, autoUpdate: true, onAutoUpdate: noop, onPatchApp: noop, onOpenSignIn: noop, onClose: noop };
+  const props = { rows: [], onEdit: noop, onAdd: noop, onAddLocation: noop, app: { notifyQueueDone: true }, autoUpdate: true, onAutoUpdate: noop, onPatchApp: noop, onOpenSignIn: noop, onClose: noop };
   const mac = renderToStaticMarkup(<SettingsTopList {...props} autoUpdateAvailable={false} />);
   assert.doesNotMatch(mac, /Update automatically/);
   assert.match(mac, /aria-label="Tell me when the queue finishes"/);
@@ -171,7 +173,7 @@ test("A-5: a campaign can be renamed and its folder changed from its own view", 
   const h = renderToStaticMarkup(<SettingsCampaign {...campaign} />);
   assert.match(h, /<label for="campaign-name"[^>]*>Name<\/label>/);
   assert.match(h, /id="campaign-name"[^>]*value="Acme"/);
-  assert.match(h, /aria-label="Change the Acme folder"/);
+  assert.match(h, /aria-label="Choose the Acme folder"/);
   const view = read("features/settings/components/SettingsCampaign.tsx");
   assert.match(view, /onBlur=\{commitName\}/);
   assert.match(view, /e\.key === "Enter"\) commitName\(\)/);
@@ -283,4 +285,54 @@ test("Liam 25 Nov: the campaign menu has a gear on each row, not a separate '<Ca
   assert.match(menu, /<IconGear \/>/);
   assert.doesNotMatch(menu, /\{current\.name\} settings/);
   assert.match(menu, /New campaign/);
+});
+
+test("board 04.6: Settings lists Campaigns then Locations (folder under the name), with New campaign and New location", () => {
+  const rows = [
+    { id: "a", name: "Acme", summary: "3 clips a day", languages: null },
+    { id: "b", name: "B-roll", summary: "1 clip a day", languages: null, location: true },
+  ];
+  const h = renderToStaticMarkup(
+    <SettingsTopList rows={rows} onEdit={noop} onAdd={noop} onAddLocation={noop} locationFolder={locationFolderName} app={{ notifyQueueDone: true }} autoUpdate={false} onAutoUpdate={noop} onPatchApp={noop} onOpenSignIn={noop} onClose={noop} />,
+  );
+  assert.ok(h.indexOf(">Campaigns<") < h.indexOf('aria-label="Acme: 3 clips a day"'));
+  assert.ok(h.indexOf('aria-label="Acme: 3 clips a day"') < h.indexOf(">Locations<"));
+  assert.match(h, /aria-label="B-roll: Clipr B-roll"/, "a location row shows the folder it makes");
+  assert.doesNotMatch(h, /1 clip a day/, "a location has no quota line");
+  assert.match(h, /aria-label="New location"/);
+});
+
+test("board 04.6.6: New location has Name, preset chips, Folder with Choose and the branded line, Sound only, Add location", () => {
+  const h = renderToStaticMarkup(<SettingsNewLocation defaultFolder={(n) => `Downloads/Clipr ${n}`} onChoose={async () => null} onAdd={() => []} onBack={noop} onClose={noop} />);
+  for (const preset of ["B-roll", "Sound effects", "Music", "Reference"]) assert.match(h, new RegExp(`>${preset}</button>`));
+  assert.match(h, />Choose</);
+  assert.match(h, /Clipr makes a folder “Clipr Location” inside the folder you choose\./);
+  assert.match(h, /Saves the sound as M4A, no picture\./);
+  assert.match(h, /aria-checked="false"[^>]*aria-label="Sound only"/, "off by default");
+  assert.match(h, />Add location</);
+  assert.equal(presetSoundOnly("Sound effects"), true);
+  assert.equal(presetSoundOnly("B-roll"), false);
+  assert.equal(locationFolderName("B-roll"), "Clipr B-roll");
+  assert.equal(locationFolderName("Clipr Sounds"), "Clipr Sounds");
+  const src = read("features/settings/components/SettingsNewLocation.tsx");
+  assert.match(src, /if \(!soundTouched\) setSound\(presetSoundOnly\(n\)\)/, "a preset turns Sound only on for Sound effects until the person flips it");
+});
+
+test("board 04.6.7: a location page is Name, Folder with Change, Sound only and Delete location, nothing else", () => {
+  const h = renderToStaticMarkup(<SettingsLocation name="B-roll" folderLabel="Downloads/Clipr B-roll" soundOnly={false} onSoundOnly={noop} onChangeFolder={async () => null} onRename={() => []} confirmingDelete={false} onDelete={noop} onBack={noop} onClose={noop} />);
+  assert.match(h, />Change</);
+  assert.match(h, /New clips go here\. Clips already made stay where they are\./);
+  assert.match(h, /Delete location/);
+  assert.doesNotMatch(h, /Clips a day|Languages|Export settings|clip length/i);
+});
+
+test("locations in the campaign menu and the chip: two groups, a location has no count, the folder picks are branded", () => {
+  const menu = read("features/campaigns/components/CampaignMenu.tsx");
+  assert.match(menu, />Locations</);
+  assert.match(menu, /New location/);
+  assert.match(menu, /openSettings\(START_AT_NEW_LOCATION\)/);
+  const ctx = read("features/campaigns/hooks/CampaignContext.tsx");
+  assert.match(ctx, /api\.pickBrandedDirectory\(\{ kind: target\.kind === "location" \? "location" : "campaign"/);
+  const drawer = read("features/settings/components/SettingsDrawer.tsx");
+  assert.match(drawer, /campaign\?\.kind === "location"/);
 });
