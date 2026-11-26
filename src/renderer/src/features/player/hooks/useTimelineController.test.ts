@@ -355,14 +355,24 @@ test("Design v145: Snap pill decides whether handles snap to the transcript; the
   assert.match(src, /store\.segments\.length === 1 && !range\) deleteClip\(\)/);
 });
 
-test("Design v146: Select moments is in the Export menu, ticks cards, and deletes after one confirm", () => {
+test("Design v146: Select moments is in the Export menu, ticks cards, and deletes on a 3 second hold with no dialog", () => {
   const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
   const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
   assert.match(group, /label: "Select moments"/);
   assert.match(panel, /Select all/);
-  assert.match(panel, /This cannot be undone/);
-  assert.match(panel, /Delete \{chosen\.length\} \{chosen\.length === 1 \? "moment" : "moments"\}\?/);
-  assert.match(panel, /chosen\.forEach\(\(x\) => c\.remove\(x\)\)/);
+  assert.match(panel, /<HoldButton[\s\S]*label=\{`Hold to delete \$\{chosen\.length \|\| ""\}`\.trim\(\)\}[\s\S]*chosen\.forEach\(\(x\) => c\.remove\(x\)\)/);
+  assert.doesNotMatch(panel, /alertdialog|This cannot be undone/);
+  const hold = readFileSync(new URL("../../../shared/components/HoldButton.tsx", import.meta.url), "utf8");
+  assert.match(hold, /Keep holding/);
+  assert.match(hold, /bg-hairlineStrong/);
+  assert.doesNotMatch(hold, /bg-error/);
+  assert.match(readFileSync(new URL("../../../shared/hooks/useHold.ts", import.meta.url), "utf8"), /HOLD_MS = 3000/);
+  const row = readFileSync(new URL("../../clips/components/WaitingRow.tsx", import.meta.url), "utf8");
+  assert.match(row, /label: "Hold to remove"[\s\S]*hold: true/);
+  // Layout is fixed: no Save layout or Reset layout anywhere in the menus.
+  for (const f of ["modules/layout/components/PanelGroup.tsx", "modules/layout/components/PanelsMenu.tsx"]) {
+    assert.doesNotMatch(readFileSync(new URL(`../../../${f}`, import.meta.url), "utf8"), /Save layout|Reset layout/);
+  }
 });
 
 test("Design v147/v148: the bank card is name + rating over topic, tier and length; Sort and filter sits beside the search", () => {
@@ -381,9 +391,8 @@ test("Design v147/v148: the bank card is name + rating over topic, tier and leng
 test("Design v150: danger buttons are outlined, never a red fill; the Export menu starts with Import and Select moments", () => {
   const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(panel, /bg-error/);
-  assert.match(panel, /rounded-\[22px\] border border-error bg-raised text-meta font-semibold text-error/);
   const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
-  assert.ok(group.indexOf('key: "import"') < group.indexOf('key: "copy-list"'));
+  assert.ok(group.indexOf('key: "select-moments"') < group.indexOf('key: "copy-list"'));
 });
 
 test("Board 03.2.53: Undo and Redo sit after a hairline following Snap, are aria-disabled in the disabled colour, and the history lives with the tab", () => {

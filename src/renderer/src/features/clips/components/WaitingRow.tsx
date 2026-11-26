@@ -64,7 +64,7 @@ export default function WaitingRow({ clip, name, suggested, selected, made, leng
     ...(made ? [] : [{ key: "clip", label: "Clip now", icon: <IconMake />, onSelect: onMake }]),
     ...(made ? [] : [{ key: "rename", label: "Rename", icon: <IconRename />, onSelect: () => setDraft(name) }]),
     ...(onCopy ? [{ key: "copy", label: "Copy as text", icon: <IconCopy />, onSelect: () => void copy() }] : []),
-    { key: "remove", label: "Remove", icon: <IconRemove />, onSelect: onRemove, danger: true },
+    { key: "remove", label: "Hold to remove", icon: <IconRemove />, onSelect: onRemove, danger: true, hold: true },
   ];
   return (
     <ActionRow id={`clip:${clip.id}`} name={name} actions={picking ? [] : actions} className={`mx-[6px] my-[2px] border ${edge}`}>
