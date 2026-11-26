@@ -79,7 +79,7 @@ function main(argv) {
   const root = dir ?? path.join(__dirname, "..", "sourcemaps", version);
   const maps = listMaps(root);
   if (maps.length === 0) {
-    console.error(`No source maps found in ${root}. Download them for ${version} (gh run download -n sourcemaps-${version}).`);
+    console.error(`No source maps found in ${root}. Download them for ${version} (gh run download -n sourcemaps-${version}-<Linux|macOS|Windows> -D <folder>, then pass --dir; maps are per platform).`);
     process.exit(1);
   }
   const { TraceMap, originalPositionFor } = require("@jridgewell/trace-mapping");
