@@ -95,8 +95,9 @@ import { onEditorSetupRequest } from "../shared/utils/editorSetupRequest";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
-function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
-  return settingsWithDestination(settings, getClipDestination());
+function withDestination(settings: EditorHandoffSettings, isLocation = false): EditorHandoffSettings {
+  // A location (B-roll, sound effects, music) has one destination, its folder: no editor project, whatever is ticked.
+  return settingsWithDestination(settings, isLocation ? "folder" : getClipDestination());
 }
 
 const EDITOR_KEY = "clipper.editorHandoff";
@@ -423,7 +424,7 @@ function Layout({ active }: { active: boolean }) {
     async (segments: Segment[], retryName?: string) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
-      const startSettings = withDestination(editorRef.current);
+      const startSettings = withDestination(editorRef.current, campaign?.kind === "location");
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
       // A retry keeps the failed attempt's name; a new cut takes the lane's, else a suggested one.
       const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
@@ -483,7 +484,7 @@ function Layout({ active }: { active: boolean }) {
   const cutBankedNow = useCallback(
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
-      const startSettings = withDestination(editorRef.current);
+      const startSettings = withDestination(editorRef.current, campaign?.kind === "location");
       const baseId = projectName?.trim() || clip.id;
       let madeAny = false;
       const made: SessionClip[] = [];
@@ -506,7 +507,7 @@ function Layout({ active }: { active: boolean }) {
       }
       return madeAny;
     },
-    [download, recordSaved, handOff],
+    [download, recordSaved, handOff, campaign?.kind],
   );
   // The same line as Clip: a banked moment made while a clip is making waits its turn.
   const cutBanked = (clip: BankedClip, projectName?: string) => cutQueue.current.enqueue(() => cutBankedNow(clip, projectName));
