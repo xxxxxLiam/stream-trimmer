@@ -62,8 +62,12 @@ test("C2-8: both cut paths set the making name and the making moment as they sta
 
 test("C2-6: Change folder changes the folder the cut used (the campaign's) and then re-runs the cut", () => {
   const mut = readFileSync("src/renderer/src/features/clips/hooks/useExportMutations.ts", "utf8");
-  assert.match(mut, /if \(campaignId\) await pickClipsDir\(campaignId\)/);
-  assert.match(mut, /latest\.current\.where !== before\) latest\.current\.retry\(\)/);
+  assert.match(mut, /await chooseClipsDir\(campaignId\)/);
+  // Picking always cuts again (a folder equal to the one already set must not leave the error standing);
+  // only a cancelled dialog or a refused folder does not.
+  assert.match(mut, /if \(!picked\) return;/);
+  assert.match(mut, /latest\.current\.retry\(\);\n  \}, \[pickSaveDir, chooseClipsDir/);
+  assert.doesNotMatch(mut, /latest\.current\.where !== before\) latest\.current\.retry/);
   const eff = readFileSync("src/renderer/src/features/clips/hooks/useExportEffects.ts", "utf8");
   assert.match(eff, /kind: classified !== "stopped" \? classified : \(fromRow\?\.kind \?\? classified\)/);
 });
