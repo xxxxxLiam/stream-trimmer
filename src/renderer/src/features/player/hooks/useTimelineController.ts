@@ -142,7 +142,8 @@ export function useTimelineController() {
   // Never past the video: the padding after its end, and the view out past Fit, are not footage.
   const inVideo = (t: number | null) => (t === null ? null : Math.min(Math.max(0, t), duration));
   const timeAt = (e: PointerEvent<HTMLElement>): number | null => inVideo(toT(axis, e.clientX - laneLeft(e)));
-  const snap = (t: number, edge: "start" | "end") => Math.round(snapToWord(lines, t, edge));
+  // Snap on: to the transcript. Off: free, to the second.
+  const snap = (t: number, edge: "start" | "end") => (tools.snap ? Math.round(snapToWord(lines, t, edge)) : Math.round(t));
 
   const setRange = (a: number, b: number) => {
     const lo = Math.min(a, b);
@@ -486,7 +487,14 @@ export function useTimelineController() {
     addSection,
     clearRange,
     deleteClip,
-    removeSection: (i: number) => store.remove(i),
+    removeSection: (i: number) => {
+      // The last section going clears the clip (and removes its bank item, as the clip trash does).
+      if (store.segments.length === 1 && !range) deleteClip();
+      else store.remove(i);
+    },
+    snapOn: tools.snap,
+    /** The handle being dragged: its exact time, whether it snapped, and the range's length. */
+    dragEdge: s.drag?.kind === "edge" && range ? { time: s.drag.edge === "start" ? range.start : range.end, length: range.end - range.start } : null,
     seek: (t: number) => clipper.requestSeek(t),
   };
 }
