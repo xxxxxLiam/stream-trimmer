@@ -82,13 +82,15 @@ test("B-11: the picked In and Out are saved with the video and survive a relaunc
 
 import { readFileSync } from "node:fs";
 
-test("Liam 25 Nov: a link pasted into the top bar opens in the background; a failure keeps the workspace and the field says why", () => {
+test("Liam 25 Nov: a link pasted into the top bar is selected while it opens; a failure returns to the previous video and keeps the workspace and the field says why", () => {
   const ctx = readFileSync(new URL("./WorkspaceContext.tsx", import.meta.url), "utf8");
   const add = readFileSync(new URL("./useAddVideoController.ts", import.meta.url), "utf8");
   const field = readFileSync(new URL("../components/TopBarLinkField.tsx", import.meta.url), "utf8");
-  // addTab with a link does not switch to the new tab (that showed the cold start while it opened or failed).
-  assert.match(ctx, /if \(link\) \{[\s\S]*?setOpeningId\(id\);\s*\} else setActiveId\(id\);/);
-  // It is shown once it has opened, unless the user went elsewhere meanwhile.
+  // addTab with a link selects the new tab at once (Liam 26 Nov), so something visibly happens while it opens.
+  assert.match(ctx, /if \(link\) \{[\s\S]*?setOpeningId\(id\);\s*\}\s*setActiveId\(id\);/);
+  // A failed open goes back to the video that was open before it.
+  assert.match(ctx, /failOpening[\s\S]*?if \(activeRef\.current === id\) \{[\s\S]*?if \(target\) setActiveId\(target\);/);
+  // Once opened it stays selected, unless the user went elsewhere meanwhile.
   assert.match(ctx, /if \(openingRef\.current === id\) \{[\s\S]*?if \(activeRef\.current === cameFromRef\.current\[id\]\) setActiveId\(id\);/);
   // A failed open drops the tab, stays put, and hands the reason to the field.
   assert.match(ctx, /failOpening[\s\S]*?setOpenFailure\(message \|\| "That link did not open\."\);[\s\S]*?setTabs\(\(prev\) => prev\.filter\(\(t\) => t\.id !== id\)\);/);

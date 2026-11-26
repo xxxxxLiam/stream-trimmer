@@ -14,6 +14,9 @@ import {
   SEEK_TIMEOUT_MS,
   acceptPolledTime,
   shouldStayPaused,
+  OWNER_BLOCK_CODES,
+  CONFIG_ERROR_CODES,
+  BLOCKED_RETRIES,
   type PendingSeek,
 } from "./useYouTubePlayerController";
 
@@ -79,4 +82,15 @@ test("seeking keeps the play state: paused, cued and ended stay paused, playing 
 test("seekTo puts the pause back through shouldStayPaused", () => {
   const src = readFileSync(new URL("./useYouTubePlayerController.ts", import.meta.url), "utf8");
   assert.match(src, /const stayPaused = shouldStayPaused\(playerRef\.current\?\.getPlayerState\(\)/);
+});
+
+test("only 101, 150 and 152 say the owner blocks playback; 153 is a configuration error that is retried first", () => {
+  assert.deepEqual(OWNER_BLOCK_CODES, [101, 150, 152]);
+  assert.deepEqual(CONFIG_ERROR_CODES, [153]);
+  assert.ok(BLOCKED_RETRIES >= 1);
+  const src = readFileSync(new URL("./useYouTubePlayerController.ts", import.meta.url), "utf8");
+  assert.match(src, /OWNER_BLOCK_CODES\.includes\(code\)\) setBlockedBy\(\{ owner: true, code \}\)/);
+  assert.match(src, /CONFIG_ERROR_CODES\.includes\(code\)\) failOrRetry\(code\)/);
+  const panel = readFileSync(new URL("../components/PreviewPanel.tsx", import.meta.url), "utf8");
+  assert.match(panel, /player\.blockedBy\?\.owner \? "The owner blocks playback here" : "The preview did not load"/);
 });

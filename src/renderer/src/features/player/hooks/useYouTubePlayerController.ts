@@ -45,7 +45,13 @@ export function acceptPolledTime(polled: number, pending: PendingSeek, now: numb
 export function shouldStayPaused(playerState: number, autoplay: boolean): boolean {
   return !autoplay && playerState !== 1 && playerState !== 3;
 }
-const EMBED_BLOCKED_CODES = [101, 150, 153];
+/** The owner turned embedding off (101, 150, 152). Only these say "the owner blocks playback". */
+export const OWNER_BLOCK_CODES = [101, 150, 152];
+/** 153 is a player configuration error (the embed got no valid referrer): ours to retry, never the owner's doing. */
+export const CONFIG_ERROR_CODES = [153];
+/** A blocked-looking embed is often a glitch a reload fixes: the player is rebuilt this many times before the panel says blocked. */
+export const BLOCKED_RETRIES = 2;
+export const BLOCKED_RETRY_MS = 700;
 
 interface YTPlayer {
   destroy(): void;
@@ -101,6 +107,10 @@ export interface YouTubePlayerApi {
   containerRef: (el: HTMLDivElement | null) => void;
   ready: boolean;
   blocked: boolean;
+  /** Why the preview is blocked: the owner (a real block), or the embed would not load (a code, 0 when the player script failed). */
+  blockedBy: { owner: boolean; code: number } | null;
+  /** Try the embed again from the blocked panel. */
+  reload: () => void;
   playing: boolean;
   /** True once the video has played to its end, until it plays or is sought again. */
   ended: boolean;
@@ -119,7 +129,10 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const [mountKey, setMountKey] = useState(0);
   const [ready, setReady] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+  const [blockedBy, setBlockedBy] = useState<{ owner: boolean; code: number } | null>(null);
+  const blocked = blockedBy !== null;
+  const [reloadKey, setReloadKey] = useState(0);
+  const blockedTries = useRef({ videoId: "", count: 0 });
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -176,9 +189,23 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
     const startAt = resumeStart(lastTime.current, videoId);
 
     setReady(false);
-    setBlocked(false);
+    setBlockedBy(null);
     setPlaying(false);
     setCurrentTime(startAt);
+
+    // Quietly rebuild the player a couple of times before showing the blocked panel.
+    const failOrRetry = (code: number) => {
+      const tries = blockedTries.current;
+      if (tries.videoId !== videoId) {
+        tries.videoId = videoId;
+        tries.count = 0;
+      }
+      if (tries.count < BLOCKED_RETRIES) {
+        tries.count += 1;
+        retryTimer = window.setTimeout(() => !cancelled && setReloadKey((k) => k + 1), BLOCKED_RETRY_MS);
+      } else setBlockedBy({ owner: false, code });
+    };
+    let retryTimer: number | undefined;
 
     loadApi()
       .then((YT) => {
@@ -218,16 +245,18 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
             },
             onError: (e: { data: number }) => {
               if (cancelled) return;
-              if (EMBED_BLOCKED_CODES.includes(Number(e.data)))
-                setBlocked(true);
+              const code = Number(e.data);
+              if (OWNER_BLOCK_CODES.includes(code)) setBlockedBy({ owner: true, code });
+              else if (CONFIG_ERROR_CODES.includes(code)) failOrRetry(code);
             },
           },
         });
       })
-      .catch(() => !cancelled && setBlocked(true));
+      .catch(() => !cancelled && failOrRetry(0));
 
     return () => {
       cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
       try {
         // Remember where this video was, for a resume. Only trust a live reading.
         const t = readyRef.current ? playerRef.current?.getCurrentTime() : undefined;
@@ -243,7 +272,7 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
       }
       playerRef.current = null;
     };
-  }, [videoId, mountKey, unloaded]);
+  }, [videoId, mountKey, unloaded, reloadKey]);
 
   // Poll the playhead — the IFrame API has no time-update event.
   useEffect(() => {
@@ -262,6 +291,12 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [ready, tabActive, videoId]);
+
+  const reload = useCallback(() => {
+    blockedTries.current = { videoId: "", count: 0 };
+    setBlockedBy(null);
+    setReloadKey((k) => k + 1);
+  }, []);
 
   const seekTo = useCallback((seconds: number, autoplay = false) => {
     try {
@@ -329,6 +364,8 @@ export function useYouTubePlayerController(videoId: string | null): YouTubePlaye
     containerRef,
     ready,
     blocked,
+    blockedBy,
+    reload,
     playing,
     ended,
     currentTime,
