@@ -2,40 +2,43 @@
  * File: useCookieDropMutations.ts
  * Path: src/renderer/src/features/settings/hooks/useCookieDropMutations.ts
  * Description: Writes for the sign-in page: adopt a dropped or chosen cookies.txt through the main
- *   process and report the approved reason when it is refused. Dropping a new file replaces the
- *   sentence; success clears it (the footer's "at 360p" and pill go away by themselves).
+ *   process. The status card goes to Checking before the main process is asked (it answers only after
+ *   YouTube has been tried), then to the answer. A new drop restarts Checking.
  */
-import { useCallback, useState } from "react";
-import { cookieReason, type CookieReason, type CookieRefusal } from "../utils/cookieReasons";
-import { restoreConnection } from "../../../shared/utils/youtubeConnection";
+import { useCallback } from "react";
+import { restoreConnection, signOut } from "../../../shared/utils/youtubeConnection";
+import { setSignInStatus, statusFromAnswer, useSignInStatus, type CookieAnswer } from "../utils/signInStatus";
 
 export function useCookieDropMutations() {
-  const [problem, setProblem] = useState<CookieReason | null>(null);
-  const [done, setDone] = useState(false);
+  const status = useSignInStatus();
 
-  const settle = useCallback(async (res: CookieRefusal | undefined) => {
-    if (res?.ok) {
-      setProblem(null);
-      setDone(true);
-      await restoreConnection();
-    } else {
-      setDone(false);
-      setProblem(cookieReason(res));
-    }
+  const settle = useCallback(async (res: CookieAnswer | undefined) => {
+    const next = statusFromAnswer(res);
+    setSignInStatus(next);
+    if (res?.ok) await restoreConnection();
   }, []);
 
   const onFile = useCallback(
     async (file: File | undefined | null) => {
       if (!file) return;
+      setSignInStatus({ state: "checking" });
       await settle(await window.electronAPI?.importYouTubeCookiesText?.(await file.text()));
     },
     [settle],
   );
 
   const choose = useCallback(async () => {
+    const before = status;
+    setSignInStatus({ state: "checking" });
     const res = await window.electronAPI?.importYouTubeCookies?.();
-    if (res && !res.cancelled) await settle(res as CookieRefusal);
-  }, [settle]);
+    if (res?.cancelled) setSignInStatus(before?.state === "checking" ? null : before);
+    else await settle(res as CookieAnswer | undefined);
+  }, [settle, status]);
 
-  return { problem, done, onFile, choose };
+  const leave = useCallback(async () => {
+    await signOut();
+    setSignInStatus(null);
+  }, []);
+
+  return { status, onFile, choose, signOut: leave };
 }
