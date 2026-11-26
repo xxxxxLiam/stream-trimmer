@@ -344,8 +344,90 @@ async function bundleDeno() {
   console.log(`[bundle-binaries] deno -> ${dst}`);
 }
 
+// -------- PO token provider: build bgutil-ytdlp-pot-provider from source --------
+// Never run as part of an ordinary build (see the main() guard below): this clones and compiles
+// GPL-3.0 code (see docs/pot-provider.md), which this project has not yet cleared with Liam to
+// ship. It only runs when explicitly asked for with `--pot`, and even then refuses without
+// POT_PROVIDER_LICENSE_ACK=1. Output goes to resources/pot-provider/, which is gitignored: it is
+// never committed to this repo, and the download path (potTokenProvider.ts) only uses it once this
+// has actually been run on the machine building the release.
+const POT_PROVIDER_REPO = "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git";
+// Pin a tag rather than tracking a moving branch, so "the monthly refresh" is a deliberate,
+// reviewable version bump (edit this line) rather than whatever happens to be on master that day.
+const POT_PROVIDER_REF = process.env.POT_PROVIDER_REF || "2.0.2";
+
+async function bundlePotProvider() {
+  if (process.env.POT_PROVIDER_LICENSE_ACK !== "1") {
+    throw new Error(
+      "Refusing to build the PO token provider: set POT_PROVIDER_LICENSE_ACK=1 once the GPL-3.0 " +
+        "bundling question has been cleared (see docs/pot-provider.md). Nothing else here runs " +
+        "without that — this command is the one place that gate lives.",
+    );
+  }
+  const vendorDir = path.join(__dirname, "..", "resources", "pot-provider");
+  const cloneDir = path.join(cacheDir, "bgutil-src");
+  fs.rmSync(cloneDir, { recursive: true, force: true });
+  console.log(`[bundle-binaries] cloning bgutil-ytdlp-pot-provider @ ${POT_PROVIDER_REF}`);
+  let res = spawnSync(
+    "git",
+    ["clone", "--depth", "1", "--branch", POT_PROVIDER_REF, POT_PROVIDER_REPO, cloneDir],
+    { stdio: "inherit" },
+  );
+  if (res.status !== 0) {
+    throw new Error(`git clone of the PO token provider failed (${res.status})`);
+  }
+  const serverDir = path.join(cloneDir, "server");
+  res = spawnSync("npm", ["ci"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
+  if (res.status !== 0) throw new Error(`npm ci failed in ${serverDir} (${res.status})`);
+  res = spawnSync("npx", ["tsc"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
+  if (res.status !== 0) throw new Error(`npx tsc failed in ${serverDir} (${res.status})`);
+
+  // The repo's compiled entry point has not been pinned here with certainty (see
+  // docs/pot-provider.md) — found by name under the build output rather than a hardcoded path, so
+  // this fails loudly with a clear message instead of silently vendoring the wrong file.
+  const built = findFileNamed(path.join(serverDir, "build"), "main.js");
+  if (!built) {
+    throw new Error(
+      `Could not find a built main.js under ${path.join(serverDir, "build")}. ` +
+        `Set POT_PROVIDER_ENTRY to the right path and update this script.`,
+    );
+  }
+  fs.rmSync(vendorDir, { recursive: true, force: true });
+  fs.mkdirSync(vendorDir, { recursive: true });
+  fs.copyFileSync(built, path.join(vendorDir, "server.js"));
+  fs.writeFileSync(path.join(vendorDir, "pot-provider.version"), `${POT_PROVIDER_REF}\n`);
+  console.log(`[bundle-binaries] PO token provider ${POT_PROVIDER_REF} -> ${vendorDir}/server.js`);
+  console.log(
+    "[bundle-binaries] NOT verified on this machine: that the `canvas` native dependency has a " +
+      `prebuilt binary for ${platform}/${arch}, and that the vendored server actually starts and ` +
+      "mints a token. Run the app and watch for a provider failing to listen before trusting this build.",
+  );
+}
+
+function findFileNamed(dir, name) {
+  if (!fs.existsSync(dir)) return null;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const found = findFileNamed(full, name);
+      if (found) return found;
+    } else if (entry.name === name) {
+      return full;
+    }
+  }
+  return null;
+}
+
 (async () => {
   try {
+    if (process.argv.includes("--pot")) {
+      // A separate, explicit mode: `node scripts/bundle-binaries.cjs --pot` only builds the PO
+      // token provider, never yt-dlp/ffmpeg/deno, so running it can't accidentally touch the
+      // binaries an ordinary build already refreshes.
+      await bundlePotProvider();
+      console.log("[bundle-binaries] done (--pot)");
+      return;
+    }
     await cached(
       platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
       () => null,
