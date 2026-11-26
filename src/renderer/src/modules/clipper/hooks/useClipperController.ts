@@ -139,6 +139,8 @@ export function useClipperController() {
     getTranscript: transcript.getTranscript,
     loadingTranscript: transcript.loadingTranscript,
     transcriptError: transcript.transcriptError,
+    transcriptKind: transcript.transcriptKind,
+    retryTranscript: transcript.retryTranscript,
     transcript: transcript.transcript,
     rangeTranscript: transcript.rangeTranscript,
     filteredTranscript: transcript.filteredTranscript,

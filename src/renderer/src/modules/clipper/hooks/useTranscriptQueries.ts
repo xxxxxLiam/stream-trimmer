@@ -38,6 +38,7 @@ export function useTranscriptQueries({
   }, []);
   const [transcript, setTranscript] = useState<TranscriptLine[] | null>(null);
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  const [transcriptKind, setTranscriptKind] = useState<string | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [transcriptQuery, setTranscriptQuery] = useState("");
 
@@ -45,6 +46,7 @@ export function useTranscriptQueries({
   useEffect(() => {
     setTranscript(null);
     setTranscriptError(null);
+    setTranscriptKind(null);
     setShowTranscript(false);
     setTranscriptQuery("");
   }, [videoId]);
@@ -74,11 +76,13 @@ export function useTranscriptQueries({
       const out = transcriptOutcome(data);
       setTranscript(out.lines);
       setTranscriptError(out.error);
+      setTranscriptKind(out.kind ?? null);
       return out;
     } catch {
       const out = transcriptOutcome(null);
       setTranscript(out.lines);
       setTranscriptError(out.error);
+      setTranscriptKind(null);
       return out;
     } finally {
       setLoadingTranscript(false);
@@ -92,6 +96,15 @@ export function useTranscriptQueries({
       return next;
     });
   }, [transcript, loadTranscript]);
+
+  /** Try the transcript again now (after a sign-in, or when the person asks). */
+  const retryTranscript = useCallback(() => {
+    if (loadingTranscript) return;
+    setTranscript(null);
+    setTranscriptError(null);
+    setTranscriptKind(null);
+    void loadTranscript();
+  }, [loadingTranscript, loadTranscript]);
 
   /** Fetch the transcript once, on demand (used by the Transcript tab). */
   const ensureTranscript = useCallback(() => {
@@ -154,6 +167,8 @@ export function useTranscriptQueries({
     getTranscript,
     loadingTranscript,
     transcriptError,
+    transcriptKind,
+    retryTranscript,
     transcript,
     rangeTranscript,
     filteredTranscript,

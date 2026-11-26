@@ -10,7 +10,7 @@ import { CopyFailureDiagnostics } from "../../../shared/components/DiagnosticsDi
 import type { DownloadFailureInfo } from "../../../modules/clipper/utils/clipperTypes";
 import { failureActions, failureCopy, type FailureAction } from "../utils/clipFailure";
 import type { FailedClip } from "../hooks/useExportState";
-import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../utils/pillClasses";
+import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../../../shared/utils/pillClasses";
 
 const PRIMARY = PRIMARY_PILL;
 const QUIET = QUIET_PILL;
@@ -62,10 +62,10 @@ export default function FailedRow({ failed, failure, campaignName, signedIn = tr
               />
             ) : null;
           }
-          const label = a === "showInBrowser" || a === "saveForLater" || a === "signIn" || a === "showFolder" ? LABEL[a] : `${LABEL[a]} ${failed.name}`;
+          const label = a === "retry" && failed.kind === "format" ? `Try again ${failed.name}` : a === "showInBrowser" || a === "saveForLater" || a === "signIn" || a === "showFolder" ? LABEL[a] : `${LABEL[a]} ${failed.name}`;
           return (
             <button key={a} type="button" aria-label={label} className={HIT} onClick={() => onAction(a)}>
-              <span className={i === 0 ? PRIMARY : QUIET}>{LABEL[a]}</span>
+              <span className={i === 0 ? PRIMARY : QUIET}>{a === "retry" && failed.kind === "format" ? "Try again" : LABEL[a]}</span>
             </button>
           );
         })}
