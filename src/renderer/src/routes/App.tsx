@@ -75,6 +75,7 @@ import { useAudioLanguageState } from "../modules/layout/hooks/useAudioLanguageS
 import { nameForLanguage, planLanguages } from "../shared/utils/audioLanguages";
 import type { MenuItem } from "../modules/layout/components/PopoverMenu";
 import PanelWorkspace from "../modules/layout/components/PanelWorkspace";
+import { addFlagTo } from "../shared/hooks/useFlagsState";
 import PanelsMenu from "../modules/layout/components/PanelsMenu";
 import { PanelHostProvider, type PanelHost } from "../modules/layout/hooks/PanelHostContext";
 import { getClipDestination } from "../features/player/hooks/useClipDestination";
@@ -612,6 +613,9 @@ function Layout({ active }: { active: boolean }) {
     openImport: (text) => setImportText(text ?? ""),
     openSignIn,
     addMoment,
+    addMarker: () => {
+      if (videoId) addFlagTo(videoId, playhead);
+    },
     openChannel: (url) => {
       if (url) channel.setChannelUrl(url);
       setChannelOpen(true);

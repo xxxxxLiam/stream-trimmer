@@ -11,8 +11,6 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { useFlagsState } from "../../../shared/hooks/useFlagsState";
 import { ZOOM_MIN, getZoom, useToolState } from "../../../modules/layout/hooks/useToolState";
-import { useAudioLanguageState } from "../../../modules/layout/hooks/useAudioLanguageState";
-import { audioLanesOf } from "../../../shared/utils/audioLanguages";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import type { NamedRange } from "../../../shared/utils/segments";
 import { clipSections, sectionsLength } from "../utils/clipDestination";
@@ -26,7 +24,6 @@ import { useTimelineState } from "./useTimelineState";
 import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
 import { bankStore, clipsFor } from "../../../shared/utils/bank";
-import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { dialogOpen } from "../../../shared/utils/dialogOpen";
 
 export const DRAG_START_PX = 3;
@@ -40,8 +37,6 @@ export function useTimelineController() {
   const tools = useToolState();
   const { active } = useCampaign();
   const range = usePickedRange();
-  const [audioSel] = useAudioLanguageState(active?.id ?? null);
-  const audioLanes = useMemo(() => audioLanesOf(clipper.info?.audioTracks, audioSel), [clipper.info?.audioTracks, audioSel]);
   const flagsApi = useFlagsState(clipper.videoId);
   const s = useTimelineState();
   const { duration, videoId } = clipper;
@@ -61,15 +56,18 @@ export function useTimelineController() {
   );
   // Liam 26 Nov: a bank card loaded on the timeline IS that bank item. Dragging or trimming its edges edits
   // the item's in and out; Clip then matches it as the same moment (matchingMoment) and counts as making it.
-  // Marking another section, clearing the marks or losing the item ends the link, and nothing is written.
+  // Adding a section keeps the link and grows the item; clearing the marks or losing the item ends it.
   const { bankId, detachBank } = store;
   useEffect(() => {
     if (!bankId || !active || !videoId) return;
     const item = clipsFor(bankStore.get(), active.id, videoId).find((c) => c.id === bankId);
-    if (!item || item.status !== "banked" || sections.length !== item.segments.length) return detachBank();
+    if (!item || item.status !== "banked" || sections.length === 0) return detachBank();
+    // A section added to (or removed from) the loaded clip goes into the same bank item. A range still being
+    // marked is not a section yet: the link stays and nothing is written until + section locks it in.
+    if (sections.length !== item.segments.length && range) return;
     if (sections.every((r, i) => r.start === item.segments[i].start && r.end === item.segments[i].end)) return;
     bankStore.setSegments(active.id, videoId, bankId, sections);
-  }, [bankId, active, videoId, sections, detachBank]);
+  }, [bankId, active, videoId, sections, range, detachBank]);
   const startPicked = clipper.startText.trim() !== "" && Number.isFinite(clipper.start) && clipper.start >= 0 && !range;
   // B3-1: an Out set before the In is stored, so the readout shows it instead of a dash.
   const endPicked = clipper.endText.trim() !== "" && Number.isFinite(clipper.end) && clipper.end >= 0 && !range;
@@ -100,7 +98,8 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sections, mergeHint?.union.start, mergeHint?.union.end],
   );
-  const liveFold = joined && !s.foldOpen ? foldedAxis(sections, duration, s.width) : null;
+  // The fold is the fit for a joined clip: zooming in leaves it for the normal axis (on the playhead) so seconds can be adjusted.
+  const liveFold = joined && !s.foldOpen && tools.zoom <= 0 ? foldedAxis(sections, duration, s.width) : null;
   const live = { axis: (liveFold ? liveFold.axis : linearAxis(win, s.width)) as Axis, fold: liveFold?.fold ?? ([] as Fold[]), folded: !!liveFold };
   // The axis the pointer went down on stays for the whole drag: the drag itself creates a range, which
   // would fold the timeline under the pointer. It folds after pointer-up.
@@ -143,7 +142,8 @@ export function useTimelineController() {
   // Never past the video: the padding after its end, and the view out past Fit, are not footage.
   const inVideo = (t: number | null) => (t === null ? null : Math.min(Math.max(0, t), duration));
   const timeAt = (e: PointerEvent<HTMLElement>): number | null => inVideo(toT(axis, e.clientX - laneLeft(e)));
-  const snap = (t: number, edge: "start" | "end") => Math.round(snapToWord(lines, t, edge));
+  // Snap on: to the transcript, whole seconds. Off: free, to a tenth of a second.
+  const snap = (t: number, edge: "start" | "end") => (tools.snap ? Math.round(snapToWord(lines, t, edge)) : Math.round(t * 10) / 10);
 
   const setRange = (a: number, b: number) => {
     const lo = Math.min(a, b);
@@ -247,8 +247,7 @@ export function useTimelineController() {
       }
     }
     // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
-    // A click on empty timeline also clears the selection (board 03.2.49), as Esc does.
-    clearSelection();
+    // A click never clears the selection (Liam 26 Nov): only the trash button does, and Clip when it finishes.
     s.setDrag({ kind: "scrub" });
     clipper.requestSeek(Math.round(t));
   };
@@ -276,14 +275,14 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragKind]);
 
-  // An unsaved range goes away with its ×, or with Esc (never mid-drag, never while typing or in a dialog or menu).
+  // An unsaved range goes away with its ×.
   const clearRange = () => {
     clipper.setStartText("");
     clipper.setEndText("");
     s.setScissorsStart(null);
   };
-  // Esc clears the whole selection: the picked range and any locked sections (a loaded bank clip included), so there is always a way
-  // to start a clip by hand (Liam 26 Nov).
+  // The whole selection (the picked range and any locked sections, a loaded bank clip included) goes only with the trash button, and when Clip finishes.
+  // Never on a click or Esc (Liam 26 Nov).
   const clearSelection = () => {
     clearRange();
     store.clear();
@@ -299,21 +298,6 @@ export function useTimelineController() {
     }
     clearSelection();
   };
-  const tabActive = useIsTabActive();
-  const hasRange = !!range || store.segments.length > 0;
-  const dragging = !!s.drag;
-  useEffect(() => {
-    if (!tabActive || !hasRange || dragging) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || dialogOpen() || document.querySelector('[role="menu"]')) return;
-      const el = e.target as HTMLElement | null;
-      if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
-      clearSelection();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabActive, hasRange, dragging]);
 
   const lastScrub = useRef<number | null>(null);
   // The handle the pointer is over (as its time), so it can show it is clickable. Only the Pointer and the
@@ -364,7 +348,8 @@ export function useTimelineController() {
       if (!d.moved && Math.abs(clientX - s.dragOrigin) < DRAG_START_PX) return;
       if (!d.moved) s.setDrag({ ...d, moved: true });
       const r = movedRange(d.len, d.grab, t, duration);
-      clipper.setRangeFromSeconds(r.start, r.end);
+      // Whole seconds while snapping; tenths when Snap is off.
+      clipper.setRangeFromSeconds(tools.snap ? Math.round(r.start) : r.start, tools.snap ? Math.round(r.end) : r.end);
     } else if (d.kind === "edge") {
       setRange(d.fixed, t);
     } else if (d.kind === "range" && Math.abs(clientX - s.dragOrigin) >= DRAG_START_PX) {
@@ -456,7 +441,6 @@ export function useTimelineController() {
     playhead,
     range,
     sections: shownSections,
-    audioLanes,
     suggestedName,
     joined,
     total,
@@ -504,7 +488,14 @@ export function useTimelineController() {
     addSection,
     clearRange,
     deleteClip,
-    removeSection: (i: number) => store.remove(i),
+    removeSection: (i: number) => {
+      // The last section going clears the clip (and removes its bank item, as the clip trash does).
+      if (store.segments.length === 1 && !range) deleteClip();
+      else store.remove(i);
+    },
+    snapOn: tools.snap,
+    /** The handle being dragged: its exact time, whether it snapped, and the range's length. */
+    dragEdge: s.drag?.kind === "edge" && range ? { time: s.drag.edge === "start" ? range.start : range.end, length: range.end - range.start } : null,
     seek: (t: number) => clipper.requestSeek(t),
   };
 }

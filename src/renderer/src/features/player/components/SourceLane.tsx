@@ -7,7 +7,9 @@
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { pickHintLead } from "../utils/laneTools";
-import { clockTime } from "../utils/transport";
+import { clockTime, clockTimePrecise } from "../utils/transport";
+import { Magnet } from "react-bootstrap-icons";
+import { lengthLabel } from "../hooks/useTimelineController";
 import { toX } from "../utils/timelineAxis";
 import { KeyHint } from "../../../shared/components/Tooltip";
 import Filmstrip from "./Filmstrip";
@@ -21,16 +23,16 @@ export const STRIP_INSET = 6;
  * over it, it widens and turns Frost so it reads as clickable; held down, it narrows and shortens a touch so it
  * reads as pressed.
  */
-function Grip({ x, state = "rest" }: { x: number; state?: "rest" | "hover" | "pressed" }) {
+function Grip({ side, state = "rest" }: { side: "left" | "right"; state?: "rest" | "hover" | "pressed" }) {
   const look =
-    state === "pressed" ? "w-[3px] scale-y-90 bg-ice" : state === "hover" ? "w-[6px] bg-frost" : "w-[4px] bg-ice";
+    state === "pressed" ? "w-[3px] -top-[2px] -bottom-[2px] scale-y-90 bg-ice" : state === "hover" ? "w-[6px] -top-[2px] -bottom-[2px] bg-frost" : "w-[4px] -top-[2px] -bottom-[2px] bg-ice";
+  // A child of the section box: flush with the outline's outer edge, the full height of the section (pressed: 90%).
   return (
     <span
       aria-hidden="true"
       data-grip
       data-grip-state={state}
-      className={`pointer-events-none absolute -translate-x-1/2 rounded-chip transition-[width,transform] duration-100 ${look}`}
-      style={{ left: x, top: STRIP_INSET + 6, bottom: STRIP_INSET + 6 }}
+      className={`pointer-events-none absolute rounded-chip transition-[width,transform] duration-100 ${side === "left" ? "-left-[2px]" : "-right-[2px]"} ${look}`}
     />
   );
 }
@@ -96,12 +98,30 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
                       className="pointer-events-none absolute rounded-chip border-2 border-ice bg-ice-tint-12 shadow-range"
                       // The outline's outer edge sits exactly on the picture strip's top and bottom lines.
                       style={{ left: x, width: w, top: STRIP_INSET, bottom: STRIP_INSET }}
-                    />
-                    <Grip x={x} state={gripState(s.start)} />
-                    <Grip x={x + w} state={gripState(s.end)} />
+                    >
+                      <Grip side="left" state={gripState(s.start)} />
+                      <Grip side="right" state={gripState(s.end)} />
+                    </span>
                   </span>
                 );
               })}
+            {c.dragEdge ? (
+              <span
+                role="status"
+                className="pointer-events-none absolute top-[-2px] z-10 flex -translate-y-full items-center gap-[4px] whitespace-nowrap"
+                // Centred over the handle, but kept inside the lane near its ends.
+                style={{
+                  left: toX(c.axis, c.dragEdge.time),
+                  transform: `translate(${toX(c.axis, c.dragEdge.time) > c.width - 120 ? "-100%" : toX(c.axis, c.dragEdge.time) < 120 ? "0" : "-50%"}, -100%)`,
+                }}
+              >
+                <span className="inline-flex items-center gap-[4px] rounded-chip bg-fg px-[8px] text-meta font-medium leading-[20px] tabular-nums text-bg">
+                  {c.snapOn ? <Magnet aria-hidden="true" size={12} className="text-ice" /> : null}
+                  {clockTimePrecise(c.dragEdge.time)}
+                </span>
+                <span className="order-first rounded-chip border border-hairlineStrong bg-raised px-[8px] text-meta leading-[20px] text-fg">{lengthLabel(c.dragEdge.length)} long</span>
+              </span>
+            ) : null}
             {c.mergeHint ? (
               <>
                 <span
@@ -114,9 +134,10 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
                     top: STRIP_INSET,
                     bottom: STRIP_INSET,
                   }}
-                />
-                <Grip x={toX(c.axis, c.mergeHint.start)} state={gripState(c.mergeHint.start)} />
-                <Grip x={toX(c.axis, c.mergeHint.end)} state={gripState(c.mergeHint.end)} />
+                >
+                  <Grip side="left" state={gripState(c.mergeHint.start)} />
+                  <Grip side="right" state={gripState(c.mergeHint.end)} />
+                </span>
                 <TimePill
                   at={(toX(c.axis, c.mergeHint.start) + toX(c.axis, c.mergeHint.end)) / 2}
                   text={`Joins when you let go · ${clockTime(c.mergeHint.start)}–${clockTime(c.mergeHint.end)}`}

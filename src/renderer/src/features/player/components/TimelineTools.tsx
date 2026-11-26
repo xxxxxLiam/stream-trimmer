@@ -1,7 +1,7 @@
 /**
  * File: TimelineTools.tsx
  * Path: src/renderer/src/features/player/components/TimelineTools.tsx
- * Description: The 44px row at the top of the timeline panel: the six tools on the left, zoom with Fit on
+ * Description: The 45px row at the top of the timeline panel: the six tools on the left, zoom with Fit on
  *   the right, a hairline under it. The tools and zoom are shared state (useToolState) the lanes read.
  */
 import type { ReactElement } from "react";
@@ -14,7 +14,10 @@ import {
   IconZoomTool,
 } from "../../../modules/layout/components/BarIcons";
 import { TOOL_KEYS, ZOOM_MIN, useToolState, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
+import { Magnet } from "react-bootstrap-icons";
+import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { zoomFromX, zoomThumbPercent } from "../utils/laneTools";
+import { clockTime } from "../utils/transport";
 
 const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] = [
   { tool: "pointer", label: "Pointer", icon: IconPointer },
@@ -25,12 +28,13 @@ const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] =
   { tool: "zoom", label: "Zoom tool", icon: IconZoomTool },
 ];
 
-const STEP_BUTTON = "inline-flex h-[44px] w-[32px] items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg";
+const STEP_BUTTON = "inline-flex h-[36px] w-[32px] items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg";
 
 export default function TimelineTools() {
-  const { tool, setTool, zoom, setZoom, zoomBy, fit } = useToolState();
+  const { tool, setTool, zoom, setZoom, zoomBy, fit, snap, toggleSnap } = useToolState();
+  const { playhead } = useSegmentsState();
   return (
-    <div id="ui-timeline-tools" className="flex h-[44px] shrink-0 items-center border-b border-hairline px-[7px] text-meta text-fg-dim">
+    <div id="ui-timeline-tools" className="relative flex h-[45px] shrink-0 items-center border-b border-hairline py-[4px] pl-[8px] pr-[10px] text-meta text-fg-dim">
       <div role="toolbar" aria-label="Timeline tools" className="flex">
         {TOOLS.map(({ tool: t, label, icon: IconFor }) => (
           <button
@@ -40,7 +44,7 @@ export default function TimelineTools() {
             title={`${label} (${TOOL_KEYS[t].toUpperCase()})`}
             aria-pressed={tool === t}
             onClick={() => setTool(t)}
-            className={`inline-flex h-[44px] w-[40px] shrink-0 items-center justify-center rounded-control ${
+            className={`inline-flex h-[36px] w-[40px] shrink-0 items-center justify-center rounded-control ${
               tool === t ? "bg-bg text-ice" : "text-fg-dim hover:bg-hover hover:text-fg"
             }`}
           >
@@ -48,6 +52,21 @@ export default function TimelineTools() {
           </button>
         ))}
       </div>
+      <span aria-hidden="true" className="mx-[8px] h-[20px] w-px bg-hairline" />
+      <button
+        type="button"
+        aria-pressed={snap}
+        aria-label="Snap"
+        title="Snap handles to the transcript. Off: move them freely, by the second."
+        onClick={toggleSnap}
+        className={`inline-flex h-[28px] items-center gap-[6px] rounded-[14px] border px-[10px] text-meta ${snap ? "border-ice text-ice" : "border-hairlineStrong text-fg-dim hover:bg-hover hover:text-fg"}`}
+      >
+        <Magnet aria-hidden="true" size={14} />
+        Snap
+      </button>
+      <span id="ui-playhead-time" className="pointer-events-none absolute left-1/2 -translate-x-1/2 tabular-nums text-fg">
+        {clockTime(playhead)}
+      </span>
       <div className="ml-auto flex items-center gap-[2px]">
         <button type="button" aria-label="Zoom out" className={STEP_BUTTON} onClick={() => zoomBy(-10)}>
           −
@@ -59,7 +78,7 @@ export default function TimelineTools() {
           aria-valuemax={100}
           aria-valuenow={zoom}
           tabIndex={0}
-          className="relative mx-[6px] flex h-[44px] w-[96px] cursor-pointer touch-none items-center"
+          className="relative mx-[6px] flex h-[36px] w-[96px] cursor-pointer touch-none items-center"
           onKeyDown={(e) => {
             const step = e.shiftKey ? 25 : 10;
             if (e.key === "ArrowRight" || e.key === "ArrowUp") setZoom(zoom + step);
@@ -87,7 +106,7 @@ export default function TimelineTools() {
         <button type="button" aria-label="Zoom in" className={STEP_BUTTON} onClick={() => zoomBy(10)}>
           +
         </button>
-        <button type="button" className="inline-flex h-[44px] items-center rounded-control px-[10px] text-meta text-fg-dim hover:bg-hover hover:text-fg" onClick={fit}>
+        <button type="button" className="inline-flex h-[36px] items-center rounded-control px-[10px] text-meta text-fg-dim hover:bg-hover hover:text-fg" onClick={fit}>
           Fit
         </button>
       </div>

@@ -160,9 +160,9 @@ export function packRows(bars: readonly { left: number; width: number }[]): RowS
 }
 
 /**
- * The Source lane is 44px at the default timeline size; when the timeline is made taller the picture
+ * The Source lane is 68px at the default timeline size (Design v145); when the timeline is made taller the picture
  * strip takes all the extra height (the Transcript and Clips lanes keep theirs).
  */
-export const SOURCE_LANE_MIN = 44;
+export const SOURCE_LANE_MIN = 68;
 export const sourceLaneHeight = (timelineHeight: number) =>
   SOURCE_LANE_MIN + Math.max(0, Math.round(timelineHeight) - DEFAULT_SIZES.timeline);

@@ -204,6 +204,28 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
               </button>
             )}
             {sections.length > 1
+              ? c.segments.map((seg, i) => {
+                  // A trash per section (board 03.2.50): 32px just outside its right edge, inside the bar (22px, flush right) when the next section starts within 44px.
+                  const right = toX(c.axis, seg.end);
+                  const next = c.segments.filter((o) => o !== seg && o.start >= seg.end).sort((a, b) => a.start - b.start)[0];
+                  const crowded = next ? toX(c.axis, next.start) - right < 44 : false;
+                  return (
+                    <button
+                      key={`trash-${seg.start}-${seg.end}`}
+                      type="button"
+                      aria-label={`Delete section ${i + 1}`}
+                      title="Delete this section"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => c.removeSection(i)}
+                      className={`absolute inline-flex items-center justify-center rounded-control border border-hairlineStrong bg-raised text-fg-dim hover:bg-hover hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost ${crowded ? "top-[6px] size-[22px]" : "top-[1px] size-[32px]"}`}
+                      style={{ left: crowded ? right - 22 - 1 : Math.min(right + 6, c.width - 32) }}
+                    >
+                      <IconRemove />
+                    </button>
+                  );
+                })
+              : null}
+            {sections.length > 1
               ? sections.map((s, i) => {
                   const first = i === 0;
                   const last = i === sections.length - 1;
@@ -299,8 +321,8 @@ export function UnsavedRange({
       </button>
       <button
         type="button"
-        aria-label="Remove this range (Esc)"
-        title="Remove this range (Esc)"
+        aria-label="Remove this range"
+        title="Remove this range"
         onClick={onRemove}
         className="absolute top-[1px] inline-flex h-[20px] w-[20px] items-center justify-center rounded-chip text-fg hover:bg-hover"
         style={narrow ? { left: "100%", marginLeft: 4 } : { right: 2 }}

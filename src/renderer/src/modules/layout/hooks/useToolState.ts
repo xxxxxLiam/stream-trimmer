@@ -16,6 +16,8 @@ export type ToolState = {
   zoom: number;
   /** Counts up on every Fit press; the timeline fits the view to the range when it changes. */
   fitRequests: number;
+  /** On: handles snap to the transcript. Off: they move freely, to the second. */
+  snap: boolean;
 };
 
 /**
@@ -31,13 +33,13 @@ export function toolForKey(e: { key: string; metaKey: boolean; ctrlKey: boolean;
   return TIMELINE_TOOLS.find((t) => TOOL_KEYS[t] === k) ?? null;
 }
 
-const INITIAL: ToolState = { tool: "pointer", zoom: 0, fitRequests: 0 };
+const INITIAL: ToolState = { tool: "pointer", zoom: 0, fitRequests: 0, snap: true };
 let state: ToolState = INITIAL;
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<ToolState>) {
   const next = { ...state, ...patch };
-  if (next.tool === state.tool && next.zoom === state.zoom && next.fitRequests === state.fitRequests) return;
+  if (next.tool === state.tool && next.zoom === state.zoom && next.fitRequests === state.fitRequests && next.snap === state.snap) return;
   state = next;
   for (const l of listeners) l();
 }
@@ -51,6 +53,9 @@ export function setTool(tool: TimelineTool) {
 }
 export function setZoom(zoom: number) {
   set({ zoom: clampZoom(zoom) });
+}
+export function setSnap(snap: boolean) {
+  set({ snap });
 }
 export const getZoom = () => state.zoom;
 export function requestFit() {
@@ -80,5 +85,7 @@ export function useToolState() {
     setZoom: useCallback(setZoom, []),
     zoomBy: useCallback((delta: number) => setZoom(state.zoom + delta), []),
     fit: useCallback(requestFit, []),
+    setSnap: useCallback(setSnap, []),
+    toggleSnap: useCallback(() => setSnap(!state.snap), []),
   };
 }

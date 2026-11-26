@@ -11,6 +11,7 @@ import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { bankStore, clipsFor } from "../../../shared/utils/bank";
 import type { ParsedClip } from "../../../shared/utils/bankImport";
+import { DUPLICATE_NOTE } from "../../../shared/utils/bank";
 import { checkImportNames, parseMoments, planBank, resolveRows, type MomentRow } from "../utils/momentRows";
 
 export function toParsed(r: MomentRow): ParsedClip {
@@ -18,11 +19,12 @@ export function toParsed(r: MomentRow): ParsedClip {
     line: Number(r.key) || 1,
     id: null,
     label: r.name,
-    segments: [{ start: r.start, end: r.end }],
+    segments: [{ start: r.start, end: r.end }, ...(r.more ?? [])],
     ...(r.category ? { category: r.category } : {}),
     ...(r.tier ? { tier: r.tier } : {}),
     ...(typeof r.rating === "number" ? { rating: r.rating } : {}),
     ...(typeof r.ranPastEnd === "number" ? { ranPastEnd: r.ranPastEnd } : {}),
+    ...(r.keptDuplicate ? { note: DUPLICATE_NOTE } : {}),
   };
 }
 
@@ -32,14 +34,16 @@ export function useImportController(text: string, onClose: () => void) {
   const { open: openPanel } = usePanelLayoutState();
   const [swapped, setSwapped] = useState<ReadonlySet<string>>(new Set());
   const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
+  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
   const [renamed, setRenamed] = useState<ReadonlyMap<string, string>>(new Map());
 
   const rows = useMemo(() => {
     // Names already in the active campaign's bank, for this video and every other.
     const data = bankStore.get();
     const existing = active ? Object.keys(data[active.id] ?? {}).flatMap((v) => clipsFor(data, active.id, v).map((c) => ({ id: c.id, name: c.label }))) : [];
-    return checkImportNames(parseMoments(text, { openVideoId: videoId ?? null, openDuration: duration || undefined }), existing, skipped, renamed);
-  }, [text, videoId, duration, active, skipped, renamed]);
+    const ranges = active ? Object.keys(data[active.id] ?? {}).flatMap((v) => clipsFor(data, active.id, v).flatMap((c) => c.segments.length ? [{ videoId: v, start: c.segments[0].start, end: c.segments[0].end, name: c.label }] : [])) : [];
+    return checkImportNames(parseMoments(text, { openVideoId: videoId ?? null, openDuration: duration || undefined }), existing, skipped, renamed, ranges, kept);
+  }, [text, videoId, duration, active, skipped, renamed, kept]);
   const r = useMemo(() => resolveRows(rows, swapped, skipped), [rows, swapped, skipped]);
 
   // Same campaign whatever the case, accents or spacing ("Tyler  Oliveira" = "tyler oliveira").
@@ -78,6 +82,7 @@ export function useImportController(text: string, onClose: () => void) {
     openVideoId: videoId ?? null,
     swap: (k: string) => setSwapped((s) => flip(s, k)),
     skip: (k: string) => setSkipped((s) => flip(s, k)),
+    keep: (k: string) => setKept((s) => flip(s, k)),
     rename: (k: string, name: string) => setRenamed((m) => new Map(m).set(k, name)),
     bank,
   };

@@ -53,8 +53,8 @@ function transcriptLines(t: string | TranscriptNote): string[] {
   return ["", ...rows.map((r) => (r ? `   ${r}` : "")), ""];
 }
 
-/** The words said in a clip's ranges, one caption line per row. Rolling captions repeat lines: a row the same as the one before is dropped. */
-export function clipTranscriptText(lines: readonly TranscriptLine[], segments: ReadonlyArray<{ start: number; end: number }>): string {
+/** The words said in one range, one caption line per row. Rolling captions repeat lines: a row the same as the one before is dropped. */
+function wordsOf(lines: readonly TranscriptLine[], segments: ReadonlyArray<{ start: number; end: number }>): string {
   const fold = (r: string) => r.toLowerCase().replace(/\s+/g, " ").trim();
   const out: string[] = [];
   for (const row of wordsInRanges(lines, segments).split("\n")) {
@@ -62,6 +62,14 @@ export function clipTranscriptText(lines: readonly TranscriptLine[], segments: R
     out.push(row);
   }
   return out.join("\n");
+}
+
+/** The words said in a clip's ranges. A clip of several sections gives each its own "1:30 to 2:00" heading and words. */
+export function clipTranscriptText(lines: readonly TranscriptLine[], segments: ReadonlyArray<{ start: number; end: number }>): string {
+  if (segments.length < 2) return wordsOf(lines, segments);
+  return segments
+    .map((s) => `${hms(s.start)} to ${hms(s.end)}\n${wordsOf(lines, [s]) || NOTES.empty}`)
+    .join("\n\n");
 }
 
 /** What goes under a clip: its words, or the plain reason there are none. */

@@ -5,7 +5,7 @@
  *   and never seek; the lane listens for the wheel.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const src = readFileSync(new URL("./useTimelineController.ts", import.meta.url), "utf8");
@@ -113,10 +113,10 @@ test("V18-T-5: the clip being built uses free space for its name like made and w
   assert.match(clipsLane, /outside\("built"/);
 });
 
-test("V18-T-8: the zoom slider drags and has a 44 px hit area", () => {
+test("V18-T-8: the zoom slider drags and has a 36 px hit area (Design v145)", () => {
   assert.match(tools, /onPointerMove=\{\(e\) => \{\s*if \(e\.buttons !== 1\) return/);
   assert.match(tools, /setPointerCapture/);
-  assert.match(tools, /h-\[44px\] w-\[96px\]/);
+  assert.match(tools, /h-\[36px\] w-\[96px\]/);
 });
 
 test("V18-T-11/12: Alt shows the zoom-out cursor; tool keys and M stay quiet while a dialog is open", () => {
@@ -190,17 +190,13 @@ test("a video that just opened shows its picture strip at once; the first-clip h
   assert.ok(strip > 0 && !/firstClipHint/.test(sourceLane.slice(strip - 80, strip)));
 });
 
-test("unsaved range: its bar carries Create clip and a remove ×; Esc clears it, never mid-drag or while typing", () => {
+test("unsaved range: its bar carries Create clip and a remove ×; Esc and a click never clear it", () => {
   assert.match(clipsLane, /const unsaved = !!c\.range && sections\.length === 1 && !c\.waiting\.some\(isBuilt\)/);
   assert.match(clipsLane, /Create clip · \{length\}/);
-  assert.match(clipsLane, /aria-label="Remove this range \(Esc\)"/);
+  assert.match(clipsLane, /aria-label="Remove this range"/);
   assert.match(clipsLane, /onCreate=\{clipNow\.clip\}/);
   assert.match(clipsLane, /onRemove=\{c\.clearRange\}/);
-  const esc = src.slice(src.indexOf("An unsaved range goes away"), src.indexOf("const lastScrub"));
-  assert.match(esc, /e\.key !== "Escape"/);
-  assert.match(esc, /!hasRange \|\| dragging/);
-  assert.match(esc, /INPUT/);
-  assert.match(esc, /clearRange\(\)/);
+  assert.doesNotMatch(src, /e\.key !== "Escape" \|\| e\.defaultPrevented/, "Esc never clears the selection");
 });
 
 test("dragging the playhead, a new range or an edge to either end of a zoomed timeline scrolls it", () => {
@@ -242,7 +238,7 @@ test("pointer tool: pressing a selected range's body on the Source lane moves it
   assert.match(down, /target\.closest\('\[data-lane="source"\]'\)/);
   assert.match(down, /kind: "move", grab: t - hit\.r\.start, len: hit\.r\.end - hit\.r\.start/);
   assert.match(down, /pickSection\(/);
-  assert.match(src, /const r = movedRange\(d\.len, d\.grab, t, duration\);\s*clipper\.setRangeFromSeconds\(r\.start, r\.end\)/);
+  assert.match(src, /const r = movedRange\(d\.len, d\.grab, t, duration\);[\s\S]*?clipper\.setRangeFromSeconds\(tools\.snap \? Math\.round\(r\.start\) : r\.start, tools\.snap \? Math\.round\(r\.end\) : r\.end\)/);
   assert.match(src, /if \(!d\.moved\) \{[\s\S]*?clipper\.requestSeek\(Math\.round\(d\.pressedAt\)\)/);
 });
 
@@ -272,23 +268,23 @@ test("handles: the Pointer and the Range tool show a hover, and a held handle sh
   assert.match(src, /\(tools\.tool === "pointer" \|\| tools\.tool === "range"\)[\s\S]*grabbedEdge\(x, toX\(axis, r\.start\), toX\(axis, r\.end\)\)/);
   assert.match(src, /hoverGrip: s\.drag \? null : hoverGrip,/);
   assert.match(src, /pressedGrip: s\.drag\?\.kind === "edge"/);
-  assert.match(sourceLane, /state === "pressed" \? "w-\[3px\] scale-y-90 bg-ice" : state === "hover" \? "w-\[6px\] bg-frost"/);
+  assert.match(sourceLane, /state === "pressed" \? "w-\[3px\][^"]*scale-y-90 bg-ice" : state === "hover" \? "w-\[6px\][^"]*bg-frost"/);
   assert.match(lane, /cursor-ew-resize/);
   assert.match(lane, /onPointerLeave=\{c\.onLanePointerLeave\}/);
 });
 
-test("Liam 26 Nov: the loaded bank clip's edge edits write to the bank item; a different section count ends the link", () => {
+test("Liam 26 Nov: the loaded bank clip's edge edits write to the bank item; an added section grows the item and keeps the link", () => {
   assert.match(src, /bankStore\.setSegments\(active\.id, videoId, bankId, sections\)/);
-  assert.match(src, /sections\.length !== item\.segments\.length\) return detachBank\(\)/);
+  assert.match(src, /sections\.length !== item\.segments\.length && range\) return;/);
+  assert.doesNotMatch(src, /sections\.length !== item\.segments\.length\) return detachBank\(\)/);
   const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
   assert.match(mut, /seg\.load\(clip\.segments, clip\.id\)/);
 });
 
-test("Liam 26 Nov: Esc clears the whole selection, loaded sections included; a made bank clip leaves the timeline empty", async () => {
+test("Liam 26 Nov: Only the trash (and a finished Clip) clears the whole selection, loaded sections included; a made bank clip leaves the timeline empty", async () => {
   const esc = src.slice(src.indexOf("An unsaved range goes away"), src.indexOf("const lastScrub"));
+  assert.doesNotMatch(esc, /Escape/);
   assert.match(esc, /const clearSelection = \(\) => \{\s*clearRange\(\);\s*store\.clear\(\);/);
-  assert.match(esc, /const hasRange = !!range \|\| store\.segments\.length > 0/);
-  assert.match(esc, /\n\s+clearSelection\(\);\n/, "the Esc key runs clearSelection");
   const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
   assert.match(mut, /if \(seg\.store\.get\(\)\.bankId === clip\.id\) \{\s*seg\.clear\(\);\s*setStartText\(""\);\s*setEndText\(""\);/);
   // The store half is real behaviour: clear() empties loaded sections and ends the bank link.
@@ -309,7 +305,83 @@ test("board 03.2.49 B: a selected clip has a 32px Delete clip trash just outside
   assert.match(lane2, /onClick=\{c\.deleteClip\}/);
   assert.match(src, /bankStore\.remove\(active\.id, videoId, id\);\s*\}\s*clearSelection\(\);/);
   const down2 = src.slice(src.indexOf("const onLanePointerDown"), src.indexOf("const onLanePointerMove"));
-  assert.match(down2.slice(down2.indexOf("A click on empty timeline")), /clearSelection\(\);\s*s\.setDrag\(\{ kind: "scrub" \}\)/);
+  assert.doesNotMatch(down2.slice(down2.indexOf("A click never clears")).slice(0, 220), /clearSelection\(\)/, "a click on the timeline only moves the playhead");
   const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
   assert.match(mut, /if \(timelineEmpty && selectedId\) setSelectedId\(null\)/, "Clip, Esc or the trash leaves no bank row selected");
+});
+
+test("Liam 26 Nov, canvas v143: the timeline is Transcript, Source and Clips only; no Audio lane anywhere", () => {
+  const tl = readFileSync(new URL("../components/Timeline.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(tl, /AudioLanes|useAudioLanes/);
+  assert.match(tl, /<TranscriptLane[\s\S]*<SourceLane[\s\S]*<ClipsLane/);
+  const menu = readFileSync(new URL("../../../modules/layout/components/PanelsMenu.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(menu, /Audio lanes|audio-lanes/);
+  assert.doesNotMatch(src, /audioLanes/);
+  assert.equal(existsSync(new URL("../components/AudioLanes.tsx", import.meta.url)), false);
+});
+
+test("canvas v144 timeline measures: panel padding 8, Transcript 32, Source 76, Clips 34, trash 32 at top 1", () => {
+  const tl = readFileSync(new URL("../components/Timeline.tsx", import.meta.url), "utf8");
+  assert.match(tl, /bg-panel pb-\[8px\]/);
+  const lane2 = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+  assert.match(lane2, /absolute top-\[1px\] inline-flex size-\[32px\]/);
+  const tr = readFileSync(new URL("../components/TranscriptLane.tsx", import.meta.url), "utf8");
+  assert.match(tr, /h-\[32px\]/);
+});
+
+test("Source grips are children of the section box, flush with the outline and its full height", () => {
+  assert.match(sourceLane, /-left-\[2px\]/);
+  assert.match(sourceLane, /-right-\[2px\]/);
+  assert.match(sourceLane, /<Grip side="left"/);
+  assert.doesNotMatch(sourceLane, /STRIP_INSET \+ 6/);
+});
+
+test("a joined clip's fold is only the fit: zooming in leaves it so the handles can be adjusted by seconds", () => {
+  assert.match(src, /joined && !s\.foldOpen && tools\.zoom <= 0 \? foldedAxis/);
+});
+
+test("Design v145: Snap pill decides whether handles snap to the transcript; the drag label and per-section trash exist", () => {
+  const tools = readFileSync(new URL("../components/TimelineTools.tsx", import.meta.url), "utf8");
+  assert.match(tools, /aria-pressed=\{snap\}/);
+  assert.match(tools, /h-\[45px\]/);
+  assert.match(tools, /ui-playhead-time/);
+  assert.match(src, /tools\.snap \? Math\.round\(snapToWord\(lines, t, edge\)\) : Math\.round\(t \* 10\) \/ 10/);
+  const clips2 = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+  assert.match(clips2, /Delete section \$\{i \+ 1\}/);
+  assert.doesNotMatch(sourceLane, /Delete section/);
+  assert.match(sourceLane, /c\.dragEdge/);
+  assert.match(clips2, /size-\[22px\]/);
+  assert.match(sourceLane, / long</);
+  assert.match(src, /store\.segments\.length === 1 && !range\) deleteClip\(\)/);
+});
+
+test("Design v146: Select moments is in the Export menu, ticks cards, and deletes after one confirm", () => {
+  const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
+  assert.match(group, /label: "Select moments"/);
+  assert.match(panel, /Select all/);
+  assert.match(panel, /This cannot be undone/);
+  assert.match(panel, /Delete \{chosen\.length\} \{chosen\.length === 1 \? "moment" : "moments"\}\?/);
+  assert.match(panel, /chosen\.forEach\(\(x\) => c\.remove\(x\)\)/);
+});
+
+test("Design v147/v148: the bank card is name + rating over topic, tier and length; Sort and filter sits beside the search", () => {
+  const row = readFileSync(new URL("../../clips/components/WaitingRow.tsx", import.meta.url), "utf8");
+  const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
+  const sf = readFileSync(new URL("../../clips/components/SortFilterPanel.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(row, /rangeLine/);
+  assert.match(row, /mt-\[3px\] flex items-center gap-\[4px\]/);
+  assert.match(panel, /trailing=\{<SortFilterPanel/);
+  assert.match(panel, /\{SORT_LABELS\[view\.sort\]\}/);
+  assert.match(sf, /h-\[28px\]/);
+  assert.match(sf, /gap-\[6px\]/);
+  assert.match(sf, /mb-\[6px\] mt-\[12px\]/);
+});
+
+test("Design v150: danger buttons are outlined, never a red fill; the Export menu starts with Import and Select moments", () => {
+  const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(panel, /bg-error/);
+  assert.match(panel, /rounded-\[22px\] border border-error bg-raised text-meta font-semibold text-error/);
+  const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
+  assert.ok(group.indexOf('key: "import"') < group.indexOf('key: "copy-list"'));
 });

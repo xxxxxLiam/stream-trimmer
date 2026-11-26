@@ -258,13 +258,21 @@ export function buildClipFilename(
   return `${safe} [${s}-${e}].${ext}`;
 }
 
-// Parse "HH:MM:SS", "MM:SS", or bare "SS" into seconds. Returns null if invalid.
+/** formatTimestamp, plus tenths when the time has them ("00:01:12.4"). Whole seconds read exactly as before. */
+export function formatPrecise(seconds: number): string {
+  const t = Math.max(0, Math.round((Number.isFinite(seconds) ? seconds : 0) * 10) / 10);
+  const whole = Math.floor(t);
+  const tenth = Math.round((t - whole) * 10);
+  return tenth === 0 ? formatTimestamp(whole) : `${formatTimestamp(whole)}.${tenth}`;
+}
+
+// Parse "HH:MM:SS", "MM:SS", or bare "SS" (the seconds may carry a fraction: "1:12.4") into seconds. Returns null if invalid.
 export function parseTimestamp(text: string | null | undefined): number | null {
   if (text == null) return null;
   const t = String(text).trim();
   if (t === "") return null;
   const parts = t.split(":").map((p) => p.trim());
-  if (parts.some((p) => p === "" || !/^\d+$/.test(p))) return null;
+  if (parts.some((p, i) => p === "" || !(i === parts.length - 1 ? /^\d+(\.\d+)?$/ : /^\d+$/).test(p))) return null;
   const nums = parts.map(Number);
   if (nums.length === 1) return nums[0];
   if (nums.length === 2) return nums[0] * 60 + nums[1];

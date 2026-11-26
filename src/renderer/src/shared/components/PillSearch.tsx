@@ -14,9 +14,13 @@ export type PillSearchProps = {
   onPillsChange: (pills: string[]) => void;
   /** The quiet line under the pills, e.g. "12 clips". */
   count: string;
+  /** A control beside the field (the bank's Sort and filter button). */
+  trailing?: React.ReactNode;
+  /** Pills and the count sit inside the field, as in the bank (board 03.2.52). */
+  inline?: boolean;
 };
 
-export default function PillSearch({ placeholder, pills, onPillsChange, count }: PillSearchProps) {
+export default function PillSearch({ placeholder, pills, onPillsChange, count, trailing, inline }: PillSearchProps) {
   const [text, setText] = useState("");
 
   const commit = () => {
@@ -28,15 +32,24 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
 
   return (
     <div className="flex flex-none flex-col">
+      <div className="flex items-center">
       <label
         role="search"
-        className="mx-[10px] mb-[6px] mt-[10px] flex h-[44px] items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
+        className="mx-[10px] mb-[6px] mt-[10px] flex h-[44px] min-w-0 flex-1 items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
       >
         <IconSearch />
+        {inline
+          ? pills.map((p) => (
+              <button key={p} type="button" aria-label={`Remove filter ${p}`} onClick={() => onPillsChange(pills.filter((x) => x !== p))} className="inline-flex h-[24px] flex-none items-center gap-[4px] rounded-[12px] bg-hover pl-[10px] pr-[6px] text-meta leading-[normal] text-fg">
+                {p}
+                <span className="inline-flex w-[14px] justify-center text-fg-dim"><IconClose /></span>
+              </button>
+            ))
+          : null}
         <input
           type="text"
           value={text}
-          placeholder={placeholder}
+          placeholder={inline && pills.length > 0 ? "" : placeholder}
           aria-label={placeholder}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -49,8 +62,11 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
           }}
           className="min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-dim"
         />
+        {inline ? <span role="status" className="flex-none text-meta text-fg-dim">{pills.length > 0 ? count : ""}</span> : null}
       </label>
-      {pills.length > 0 && (
+      {trailing ? <span className="mr-[10px] mt-[4px] flex-none">{trailing}</span> : null}
+      </div>
+      {!inline && pills.length > 0 && (
         <div className="-mt-[6px] flex items-center px-[12px]">
           <div className="flex flex-wrap items-center">
             {pills.map((p) => (
@@ -75,9 +91,11 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
           </button>
         </div>
       )}
-      <div role="status" className="px-[14px] pb-[2px] text-meta leading-[normal] text-fg-dim">
-        {count}
-      </div>
+      {inline ? null : (
+        <div role="status" className="px-[14px] pb-[2px] text-meta leading-[normal] text-fg-dim">
+          {count}
+        </div>
+      )}
     </div>
   );
 }

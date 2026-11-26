@@ -121,7 +121,7 @@ test("C-13: import flags names the naming rule forbids, repeats, and names alrea
 });
 
 test("C2-12: skipping one of two rows with the same name frees the other, and a rename clears its flag", () => {
-  const parsed = parseMoments(["name\tstart\tend", "Hard Truth\t0:01:00\t0:01:30", "Hard Truth\t0:05:00\t0:05:30"].join("\n"), ctx);
+  const parsed = parseMoments(["name\tstart\tend", "Hard Truth\t0:01:00\t0:01:30", "Hard Truth\t0:05:00\t0:05:30"].join("\n"), ctx).map((r, i) => (i ? { ...r, videoId: "bbbbbbbbbbb" } : r));
   const flagged = checkImportNames(parsed, [], new Set(), new Map());
   assert.ok(flagged.every((r) => r.problem?.name), "both are flagged while both count");
   const afterSkip = checkImportNames(parsed, [], new Set([flagged[0].key]), new Map());
@@ -145,4 +145,45 @@ test("C4-4: a plain line that runs past the end of the open video says so", () =
   const rows = parseMoments("2:14:00-2:20:00 Ran Over", ctx);
   assert.equal(rows[0].end, 8073);
   assert.equal(rows[0].ranPastEnd, 8073);
+});
+
+test("multi-section: rows with the same video and name are ONE clip, first row speaks for it", () => {
+  const parsed = parseMoments(
+    [header, `${A}\t1:30\t2:00\tCasino Muslim\t9\tMoney\t1\tOrbit`, `${A}\t8:00\t9:00\tcasino muslim\t3\tOther\t3\tNova`, `${A}\t20:00\t20:30\tSecond Take\t7\t\t2\t`].join("\n"),
+    ctx,
+  );
+  const rows = checkImportNames(parsed, [], new Set(), new Map());
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((r) => !r.problem));
+  assert.deepEqual(rows[0].more, [{ start: 480, end: 540 }]);
+  assert.equal(rows[0].rating, 9);
+  assert.equal(rows[0].campaign, "Orbit");
+  assert.equal(planBank(resolveRows(rows, new Set(), new Set()).good)[0].rows[0].more?.length, 1);
+});
+
+test("multi-section: the same name on a different video is still flagged", () => {
+  const parsed = parseMoments([header, `${A}\t1:30\t2:00\tCasino Muslim\t\t\t\t`, `${B}\t8:00\t9:00\tCasino Muslim\t\t\t\t`].join("\n"), ctx);
+  const rows = checkImportNames(parsed, [], new Set(), new Map());
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((r) => r.problem?.name));
+});
+
+test("multi-section: plain lines with a joined range keep every section", () => {
+  const rows = parseMoments("T1-01 1:30-2:00; 8:00-9:00 Casino Muslim", ctx);
+  assert.deepEqual(rows[0].more, [{ start: 480, end: 540 }]);
+});
+
+test("duplicates: a row within 2s in and out of an earlier row or a bank card is flagged; Keep marks it instead", () => {
+  const parsed = parseMoments([header, `${A}\t12:00\t12:50\tFirst Take\t\t\t\t`, `${A}\t12:01\t12:51\tSecond Take\t\t\t\t`, `${A}\t30:00\t30:40\tThird Take\t\t\t\t`, `${B}\t12:00\t12:50\tFourth Take\t\t\t\t`].join("\n"), ctx);
+  const rows = checkImportNames(parsed, [], new Set(), new Map(), [{ videoId: "ccccccccccc", start: 5, end: 50 }]);
+  assert.equal(rows[1].problem?.duplicate, true);
+  assert.equal(rows[1].problem?.reason, "1 s from First Take in this paste");
+  assert.equal(rows[0].problem, undefined);
+  assert.equal(rows[2].problem, undefined);
+  assert.equal(rows[3].problem, undefined, "another video is not a duplicate");
+  const kept = checkImportNames(parsed, [], new Set(), new Map(), [], new Set([rows[1].key]));
+  assert.equal(kept[1].problem, undefined);
+  assert.equal(kept[1].keptDuplicate, true);
+  const bank = checkImportNames(parsed.slice(0, 1), [], new Set(), new Map(), [{ videoId: "aaaaaaaaaaa", start: 11 * 60 + 59, end: 12 * 60 + 52 }]);
+  assert.equal(bank[0].problem?.duplicate, true, "an existing bank card counts");
 });
