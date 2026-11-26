@@ -6,6 +6,15 @@
  */
 import * as youtubeSession from "./youtubeSession";
 import * as logger from "../../../modules/logger/logger";
+import { verifyImportedSession } from "./verifyImport";
+
+/** A refusal passes through untouched; an adopted file gets YouTube's verdict added. */
+async function withVerdict(result: any) {
+  if (!result || !result.ok) return result;
+  const verified = await verifyImportedSession(process.env.PORT);
+  logger.log("youtube", `cookie import verify=${verified.verify}`);
+  return { ...result, ...verified };
+}
 
 /**
  * Cheap, offline read of the imported cookies.txt. Says whether a session
@@ -34,7 +43,7 @@ export async function importCookiesFromFile(filePath: string) {
     "youtube",
     `cookie import ok=${result.ok}${result.ok ? ` cookies=${result.count}` : `: ${result.error}`}`,
   );
-  return result;
+  return withVerdict(result);
 }
 
 /**
@@ -48,7 +57,7 @@ export async function importCookiesFromText(text: string) {
       "youtube",
       `cookie drop ok=${result.ok}${result.ok ? ` cookies=${result.count}` : `: ${result.error}`}`,
     );
-    return result;
+    return await withVerdict(result);
   } catch (err: unknown) {
     logger.log("youtube", `cookie drop threw: ${logger.describe(err)}`);
     return { ok: false, error: logger.describe(err) };
