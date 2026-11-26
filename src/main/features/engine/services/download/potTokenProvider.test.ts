@@ -6,7 +6,21 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractorArgsFor, startPotProvider, vendorEntryPoint } from "./potTokenProvider";
+import path from "node:path";
+import { extractorArgsFor, startPotProvider, vendorDir, vendorEntryPoint } from "./potTokenProvider";
+
+test("vendorDir resolves under the packaged resources folder, not process.cwd(), once packaged", () => {
+  const before = process.env.ELECTRON_RESOURCES;
+  try {
+    delete process.env.ELECTRON_RESOURCES;
+    assert.equal(vendorDir(), path.join(process.cwd(), "resources", "pot-provider"));
+    process.env.ELECTRON_RESOURCES = "/packaged/resources";
+    assert.equal(vendorDir(), path.join("/packaged/resources", "pot-provider"));
+  } finally {
+    if (before === undefined) delete process.env.ELECTRON_RESOURCES;
+    else process.env.ELECTRON_RESOURCES = before;
+  }
+});
 
 test("extractorArgsFor adds the provider's base url as a second extractor-args entry", () => {
   assert.deepEqual(extractorArgsFor("youtube:player_client=default"), ["youtube:player_client=default"]);
@@ -16,9 +30,17 @@ test("extractorArgsFor adds the provider's base url as a second extractor-args e
   ]);
 });
 
-test("vendorEntryPoint is null until tools:refresh has vendored a server.js", () => {
+test("vendorEntryPoint is null until tools:refresh-pot has vendored both the build and node_modules", () => {
   assert.equal(vendorEntryPoint("/anywhere", () => false), null);
-  assert.equal(vendorEntryPoint("/anywhere", () => true), "/anywhere/server.js");
+  assert.equal(vendorEntryPoint("/anywhere", () => true), "/anywhere/build/main.js");
+});
+
+test("vendorEntryPoint is null when the build exists but node_modules does not (a half-finished vendor)", () => {
+  const entry = "/anywhere/build/main.js";
+  assert.equal(
+    vendorEntryPoint("/anywhere", (p) => p === entry),
+    null,
+  );
 });
 
 test("startPotProvider is a no-op (null, no spawn) when nothing is vendored", async () => {
