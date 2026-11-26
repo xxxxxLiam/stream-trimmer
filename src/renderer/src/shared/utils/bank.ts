@@ -244,13 +244,25 @@ export function setClipSegments(data: BankData, campaignId: string, videoId: str
   return withClips(data, campaignId, videoId, list.map((c) => (c.id === clipId ? { ...c, segments: next } : c)));
 }
 
+/** Put a made clip back in the bank at its old place, waiting again (Undo of a clip just made). */
+export function restoreClip(data: BankData, campaignId: string, videoId: string, clip: BankedClip, index: number): BankData {
+  const list = clipsFor(data, campaignId, videoId);
+  if (list.some((c) => c.id === clip.id)) return data;
+  const next = [...list];
+  next.splice(Math.min(Math.max(index, 0), next.length), 0, { ...clip, status: "banked" });
+  return withClips(data, campaignId, videoId, next);
+}
+
 export type CutResult = { data: BankData; clip: BankedClip; ranges: Segment[] };
 
-/** Flip a clip to `cut` and return the ranges that must be appended to usedRanges. Null when there is no such clip. */
+/**
+ * A made clip leaves the bank (Liam, 26 Nov): it is already in History, so it does not stay in Export too.
+ * Returns the ranges that must be appended to usedRanges. Null when there is no such clip.
+ */
 export function markCut(data: BankData, campaignId: string, videoId: string, clipId: string): CutResult | null {
   const clip = clipsFor(data, campaignId, videoId).find((c) => c.id === clipId);
   if (!clip) return null;
-  const next = setStatus(data, campaignId, videoId, clipId, "cut");
+  const next = removeClip(data, campaignId, videoId, clipId);
   return { data: next, clip: { ...clip, status: "cut" }, ranges: clip.segments.map((s) => ({ ...s })) };
 }
 
@@ -359,6 +371,8 @@ export type BankStore = {
   subscribe: (l: () => void) => () => void;
   importClips: (campaignId: string, videoId: string, parsed: readonly ParsedClip[]) => ImportResult;
   markCut: (campaignId: string, videoId: string, clipId: string) => CutResult | null;
+  /** Undo of a clip just made: the moment that left the bank on Clip comes back, waiting. Does nothing for a clip never cut here. */
+  restoreCut: (campaignId: string, videoId: string, clipId: string) => void;
   setStatus: (campaignId: string, videoId: string, clipId: string, status: BankStatus) => void;
   remove: (campaignId: string, videoId: string, clipId: string) => void;
   setNote: (campaignId: string, videoId: string, clipId: string, note: string) => void;
@@ -380,6 +394,9 @@ export function createBankStore(io: BankIO): BankStore {
     io.save(next);
     listeners.forEach((l) => l());
   };
+  // What each made clip looked like and where it stood, so Undo can put it back (in memory: Undo lasts seconds).
+  const cutStash = new Map<string, { clip: BankedClip; index: number }>();
+  const stashKey = (c: string, v: string, id: string) => `${c}\u0000${v}\u0000${id}`;
   return {
     get: () => data,
     subscribe: (l) => {
@@ -394,9 +411,19 @@ export function createBankStore(io: BankIO): BankStore {
       return res;
     },
     markCut: (c, v, id) => {
+      const index = clipsFor(data, c, v).findIndex((x) => x.id === id);
       const res = markCut(data, c, v, id);
-      if (res) commit(res.data);
+      if (res) {
+        cutStash.set(stashKey(c, v, id), { clip: res.clip, index });
+        commit(res.data);
+      }
       return res;
+    },
+    restoreCut: (c, v, id) => {
+      const held = cutStash.get(stashKey(c, v, id));
+      if (!held) return;
+      cutStash.delete(stashKey(c, v, id));
+      commit(restoreClip(data, c, v, held.clip, held.index));
     },
     setStatus: (c, v, id, s) => commit(setStatus(data, c, v, id, s)),
     remove: (c, v, id) => commit(removeClip(data, c, v, id)),
