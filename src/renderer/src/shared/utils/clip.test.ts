@@ -91,3 +91,13 @@ test("V18-T-3/4: two times make a range whichever came first", () => {
   assert.deepEqual(orderedRange(30, 20), { start: 20, end: 30 });
   assert.deepEqual(orderedRange(20, 30), { start: 20, end: 30 });
 });
+
+test("fractional times: parseTimestamp reads a fraction on the seconds; formatPrecise keeps tenths and leaves whole seconds as they were", async () => {
+  const { parseTimestamp, formatPrecise } = await import("./clip");
+  assert.equal(parseTimestamp("00:01:12.4"), 72.4);
+  assert.equal(parseTimestamp("1:12.5"), 72.5);
+  assert.equal(parseTimestamp("1.5:12"), null);
+  assert.equal(formatPrecise(72), "00:01:12");
+  assert.equal(formatPrecise(72.44), "00:01:12.4");
+  assert.equal(formatPrecise(72.96), "00:01:13");
+});

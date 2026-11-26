@@ -22,8 +22,8 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 export const PANEL_DRAG_TYPE = "application/x-clipr-panel";
 
 export type PanelTabStripProps = {
-  /** A panel's own + menu (Export: Import moments, Add a moment) in place of "Add a panel". */
-  addMenu?: { label: string; items: MenuItem[]; width?: number };
+  /** A + that does one thing (Videos: Add a video; Markers: Add a marker; Export: Add a moment). Neither this nor addMenu: no + (board v149). */
+  addAction?: { label: string; onSelect: () => void };
   /** Names the strip for screen readers, e.g. "Left panels". */
   label: string;
   tabs: PanelDefinition[];
@@ -31,9 +31,6 @@ export type PanelTabStripProps = {
   onActivate: (id: PanelId) => void;
   onClose: (id: PanelId) => void;
   onMove: (id: PanelId, by: -1 | 1) => void;
-  /** Closed panels that could be added to this strip from "+". */
-  addable: PanelDefinition[];
-  onAdd: (id: PanelId) => void;
   /** Rows for the group menu, built by the group. */
   menuItems: MenuItem[];
   /** A tab dropped on this strip, at `index` (or the end when undefined). */
@@ -41,15 +38,13 @@ export type PanelTabStripProps = {
 };
 
 export default function PanelTabStrip({
-  addMenu,
+  addAction,
   label,
   tabs,
   active,
   onActivate,
   onClose,
   onMove,
-  addable,
-  onAdd,
   menuItems,
   onDropPanel,
 }: PanelTabStripProps) {
@@ -101,10 +96,6 @@ export default function PanelTabStrip({
     else return;
     e.preventDefault();
   };
-
-  const addItems: MenuItem[] = addable.length
-    ? addable.map((d) => ({ key: d.id, label: d.title, onSelect: () => onAdd(d.id) }))
-    : [{ key: "none", label: "Every panel is open", disabled: true, onSelect: () => {} }];
 
   const hasPanel = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes(PANEL_DRAG_TYPE);
   const dropOn = (e: React.DragEvent, index?: number) => {
@@ -173,16 +164,11 @@ export default function PanelTabStrip({
         {fade.end ? <span aria-hidden data-fade="end" className="tab-fade tab-fade-end pointer-events-none absolute inset-y-0 right-0 w-[32px]" /> : null}
       </div>
       <div className="flex shrink-0 items-center">
-        <PopoverMenu
-          label={addMenu?.label ?? `Add a panel to ${label.toLowerCase()}`}
-          items={addMenu?.items ?? addItems}
-          menuWidth={addMenu?.width}
-          tight={Boolean(addMenu)}
-          pressedWhenOpen={Boolean(addMenu)}
-          triggerClassName={addMenu ? `${STRIP_BUTTON} aria-pressed:bg-hover aria-pressed:text-fg` : STRIP_BUTTON}
-        >
-          <IconPlus />
-        </PopoverMenu>
+        {addAction ? (
+          <button type="button" aria-label={addAction.label} title={addAction.label} onClick={addAction.onSelect} className={STRIP_BUTTON}>
+            <IconPlus />
+          </button>
+        ) : null}
         <PopoverMenu label={`${label} menu`} items={menuItems} menuWidth={212} pressedWhenOpen={false} triggerClassName={STRIP_BUTTON}>
           <IconMore />
         </PopoverMenu>

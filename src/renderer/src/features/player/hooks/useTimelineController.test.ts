@@ -238,7 +238,7 @@ test("pointer tool: pressing a selected range's body on the Source lane moves it
   assert.match(down, /target\.closest\('\[data-lane="source"\]'\)/);
   assert.match(down, /kind: "move", grab: t - hit\.r\.start, len: hit\.r\.end - hit\.r\.start/);
   assert.match(down, /pickSection\(/);
-  assert.match(src, /const r = movedRange\(d\.len, d\.grab, t, duration\);\s*clipper\.setRangeFromSeconds\(r\.start, r\.end\)/);
+  assert.match(src, /const r = movedRange\(d\.len, d\.grab, t, duration\);[\s\S]*?clipper\.setRangeFromSeconds\(tools\.snap \? Math\.round\(r\.start\) : r\.start, tools\.snap \? Math\.round\(r\.end\) : r\.end\)/);
   assert.match(src, /if \(!d\.moved\) \{[\s\S]*?clipper\.requestSeek\(Math\.round\(d\.pressedAt\)\)/);
 });
 
@@ -345,7 +345,7 @@ test("Design v145: Snap pill decides whether handles snap to the transcript; the
   assert.match(tools, /aria-pressed=\{snap\}/);
   assert.match(tools, /h-\[45px\]/);
   assert.match(tools, /ui-playhead-time/);
-  assert.match(src, /tools\.snap \? Math\.round\(snapToWord\(lines, t, edge\)\) : Math\.round\(t\)/);
+  assert.match(src, /tools\.snap \? Math\.round\(snapToWord\(lines, t, edge\)\) : Math\.round\(t \* 10\) \/ 10/);
   assert.match(sourceLane, /Delete section \$\{i \+ 1\}/);
   assert.match(sourceLane, /c\.dragEdge/);
   assert.match(sourceLane, /size-\[22px\]/);

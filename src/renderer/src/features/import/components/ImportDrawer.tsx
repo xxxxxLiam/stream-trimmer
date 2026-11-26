@@ -212,7 +212,7 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
 /** Back to the + button the drawer was opened from, so the keyboard is not left on the page body. */
 function focusAddButton() {
   window.setTimeout(() => {
-    const add = document.querySelector<HTMLElement>('button[aria-label="Add to Export"]') ?? document.querySelector<HTMLElement>('button[aria-label^="Add a panel"]');
+    const add = document.querySelector<HTMLElement>('button[aria-label="Add a moment"]');
     add?.focus();
   }, 0);
 }

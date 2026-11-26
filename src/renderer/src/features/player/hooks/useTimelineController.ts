@@ -142,8 +142,8 @@ export function useTimelineController() {
   // Never past the video: the padding after its end, and the view out past Fit, are not footage.
   const inVideo = (t: number | null) => (t === null ? null : Math.min(Math.max(0, t), duration));
   const timeAt = (e: PointerEvent<HTMLElement>): number | null => inVideo(toT(axis, e.clientX - laneLeft(e)));
-  // Snap on: to the transcript. Off: free, to the second.
-  const snap = (t: number, edge: "start" | "end") => (tools.snap ? Math.round(snapToWord(lines, t, edge)) : Math.round(t));
+  // Snap on: to the transcript, whole seconds. Off: free, to a tenth of a second.
+  const snap = (t: number, edge: "start" | "end") => (tools.snap ? Math.round(snapToWord(lines, t, edge)) : Math.round(t * 10) / 10);
 
   const setRange = (a: number, b: number) => {
     const lo = Math.min(a, b);
@@ -348,7 +348,8 @@ export function useTimelineController() {
       if (!d.moved && Math.abs(clientX - s.dragOrigin) < DRAG_START_PX) return;
       if (!d.moved) s.setDrag({ ...d, moved: true });
       const r = movedRange(d.len, d.grab, t, duration);
-      clipper.setRangeFromSeconds(r.start, r.end);
+      // Whole seconds while snapping; tenths when Snap is off.
+      clipper.setRangeFromSeconds(tools.snap ? Math.round(r.start) : r.start, tools.snap ? Math.round(r.end) : r.end);
     } else if (d.kind === "edge") {
       setRange(d.fixed, t);
     } else if (d.kind === "range" && Math.abs(clientX - s.dragOrigin) >= DRAG_START_PX) {

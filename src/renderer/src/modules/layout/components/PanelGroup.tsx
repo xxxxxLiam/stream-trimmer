@@ -25,19 +25,16 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   const tabs = state.tabs.flatMap((id) => getPanel(id) ?? []);
   const activeDef = state.active ? getPanel(state.active) : undefined;
   const host = usePanelHostOptional();
-  // Board 04.2: with Export in front, + adds to Export. The panel menu (···) still opens and closes panels.
+  // Board v149: the + appears only where it adds something, and does one thing. Transcript and History have none.
+  const addAction =
+    activeDef?.id === "videos"
+      ? { label: "Add a video", onSelect: () => document.getElementById("ui-topbar-link")?.focus() }
+      : activeDef?.id === "markers" && host?.addMarker
+        ? { label: "Add a marker", onSelect: host.addMarker }
+        : activeDef?.id === "export" && host
+          ? { label: "Add a moment", onSelect: () => host.addMoment() }
+          : undefined;
   const mac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
-  const addMenu =
-    activeDef?.id === "export" && host
-      ? {
-          label: "Add to Export",
-          width: 212,
-          items: [
-            { key: "import", label: "Import moments", detail: mac ? "⌘V" : "Ctrl V", onSelect: () => host.openImport() },
-            { key: "moment", label: "Add a moment", onSelect: () => host.addMoment() },
-          ] as MenuItem[],
-        }
-      : undefined;
   // Export and History start their menu with the list as text: Copy as text (the default) and Save as .txt….
   const list = useCopyListFor(activeDef?.id);
   const [said, setSaid] = useState<string | null>(null);
@@ -78,6 +75,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   const listItems: MenuItem[] = list
     ? [
         { key: "copy-list", label: "Copy as text", icon: <IconCopy />, detail: list.count > 0 ? countText(list.count) : undefined, disabled: list.count === 0, onSelect: () => void copyList() },
+        ...(activeDef?.id === "export" && host ? [{ key: "import", label: "Import moments", detail: mac ? "⌘V" : "Ctrl V", onSelect: () => host.openImport() } as MenuItem] : []),
         ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", disabled: list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
         { key: "save-list", label: "Save as .txt…", icon: <IconSaveFile />, disabled: list.count === 0, onSelect: () => void saveList() },
         ...(list.count === 0 ? [{ kind: "note", key: "list-empty", label: list.emptyNote } as MenuItem] : []),
@@ -86,18 +84,6 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
     : [];
   const menuItems: MenuItem[] = [
     ...listItems,
-    ...(activeDef && activeDef.closable !== false
-      ? [{ key: "close", label: `Close ${activeDef.title}`, onSelect: () => close(activeDef.id) } as MenuItem]
-      : []),
-    ...(activeDef && activeDef.group !== "centre"
-      ? [
-          {
-            key: "move-group",
-            label: `Move ${activeDef.title} to the ${other}`,
-            onSelect: () => moveToGroup(activeDef.id, other),
-          } as MenuItem,
-        ]
-      : []),
     { kind: "separator", key: "sep" },
     { key: "reset", label: "Reset layout", onSelect: reset },
     { key: "save", label: "Save layout", onSelect: save },
@@ -106,17 +92,14 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   return (
     <section aria-label={NAMES[group]} className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <PanelTabStrip
-        addMenu={addMenu}
+        addAction={addAction}
         label={NAMES[group]}
         tabs={tabs}
         active={state.active}
         onActivate={activate}
         onClose={close}
         onMove={move}
-        addable={closedPanels(layout, panels)}
-        onAdd={open}
         menuItems={menuItems}
-        onDropPanel={(id, index) => moveToGroup(id, group, index)}
       />
       {activeDef ? (
         <div
