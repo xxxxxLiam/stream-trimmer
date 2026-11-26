@@ -9,6 +9,7 @@ import electron from "electron";
 import { getMainWindow } from "../modules/windows/windows";
 import { readFcpLookFile } from "../features/editor/services/fcpLookFile";
 import { rememberPickedDir } from "../features/files/services/saveRoots";
+import { resolveBrandedDir } from "../features/files/services/brandedFolder";
 import { saveTextFile } from "../features/files/services/saveTextFile";
 
 const { app, dialog, ipcMain } = electron;
@@ -22,6 +23,19 @@ export function registerDialogHandlers() {
     if (res.canceled || res.filePaths.length === 0) return null;
     rememberPickedDir(res.filePaths[0]);
     return res.filePaths[0];
+  });
+
+  ipcMain.handle(IPC.dialogPickBrandedDirectory, async (_e: unknown, payload: any) => {
+    const kind = payload?.kind === "location" ? "location" : payload?.kind === "campaign" ? "campaign" : null;
+    if (!kind || typeof payload.name !== "string") return null;
+    const res = await dialog.showOpenDialog(getMainWindow(), {
+      title: "Choose a folder",
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (res.canceled || res.filePaths.length === 0) return null;
+    const chosen = res.filePaths[0];
+    rememberPickedDir(chosen);
+    return { chosen, dir: resolveBrandedDir(chosen, kind, payload.name.slice(0, 200)) };
   });
 
   ipcMain.handle(IPC.dialogSaveText, async (_e: unknown, payload: any) => {

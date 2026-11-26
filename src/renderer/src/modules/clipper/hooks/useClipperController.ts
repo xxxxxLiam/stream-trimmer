@@ -6,7 +6,7 @@
  * format, quality, error) live here and are handed to them.
  */
 import { useMemo, useState } from "react";
-import { extractVideoId, estimateBytes, type ClipFormat, type VideoInfo } from "../../../shared/utils/clip";
+import { extractVideoId, estimateBytes, type ClipFormat, type VideoInfo, isAudioFormat } from "../../../shared/utils/clip";
 import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import { useClipDownloadMutations } from "./useClipDownloadMutations";
 import { useClipRangeState } from "./useClipRangeState";
@@ -94,7 +94,7 @@ export function useClipperController() {
   // Live size estimate (bytes) for the selected range/format/quality.
   const estimatedBytes = useMemo(() => {
     if (!info?.bitrates) return 0;
-    const table = format === "mp3" ? info.bitrates.mp3 : info.bitrates.mp4;
+    const table = isAudioFormat(format) ? info.bitrates.mp3 : info.bitrates.mp4;
     const kbps = table?.[quality] ?? 0;
     return estimateBytes(kbps, Math.max(0, end - start));
   }, [info, format, quality, start, end]);

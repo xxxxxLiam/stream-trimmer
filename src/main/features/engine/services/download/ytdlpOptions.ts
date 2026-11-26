@@ -106,7 +106,7 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
 
 
   const formatOptions: Record<string, unknown> = isAudio
-    ? { extractAudio: true, audioFormat: "mp3", audioQuality: quality }
+    ? { extractAudio: true, audioFormat: ctx.ext === "m4a" ? "m4a" : "mp3", audioQuality: quality }
     : { format: videoFormat, mergeOutputFormat: "mp4", remuxVideo: "mp4" };
 
   // Both attempts are built per client list rather than once, because a clip

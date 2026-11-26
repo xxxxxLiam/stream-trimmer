@@ -733,3 +733,9 @@ test("Saad: 'Requested format is not available' with no JavaScript runtime is th
   // The flag alone changes nothing else.
   assert.equal(classifyFailure("ERROR: unable to download video data: HTTP Error 403: Forbidden", { jsRuntimeMissing: true }).code, "access_refused");
 });
+
+test("an M4A join re-encodes with AAC, an MP3 join still uses lame", () => {
+  const m4a = concatReencodeArgs("l.txt", "o.m4a", { isAudio: true, audioKbps: "128", audioCodec: "aac" }).join(" ");
+  assert.match(m4a, /-vn -c:a aac -b:a 128k/);
+  assert.match(concatReencodeArgs("l.txt", "o.mp3", { isAudio: true, audioKbps: "128" }).join(" "), /-c:a libmp3lame -b:a 128k/);
+});

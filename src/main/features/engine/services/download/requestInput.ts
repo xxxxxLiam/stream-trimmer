@@ -44,7 +44,7 @@ export function parseDownloadRequest(req: Request, res: Response): DownloadReque
 
   const { url, format, audioLanguage, deliver, cookiesFromBrowser } = parsed.data;
   const quality: string =
-    parsed.data.quality ?? (format === "mp3" ? DEFAULT_AUDIO_QUALITY : DEFAULT_VIDEO_QUALITY);
+    parsed.data.quality ?? (format === "mp3" || format === "m4a" ? DEFAULT_AUDIO_QUALITY : DEFAULT_VIDEO_QUALITY);
   // A clip is a list of ranges. The old single start/end is one segment.
   const resolvedSegments = resolveSegments(parsed.data, MAX_CLIP_SECONDS);
   if (!resolvedSegments.ok) {

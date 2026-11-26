@@ -24,7 +24,7 @@ export interface DownloadCtx extends DownloadRequest {
   jobId: string;
   job: ActiveJob;
   isAudio: boolean;
-  ext: "mp3" | "mp4";
+  ext: "mp3" | "m4a" | "mp4";
   diag: (raw: string) => { diagnostics: ReturnType<typeof buildRunDiagnostics> };
   throwIfCancelled: () => void;
   trackChild: (child: ChildProcess) => void;
@@ -97,7 +97,7 @@ export function createDownloadCtx(req: Request, res: Response, input: DownloadRe
     });
   };
 
-  const isAudio = format === "mp3";
+  const isAudio = format === "mp3" || format === "m4a";
   return {
     ...input,
     req,
@@ -105,7 +105,7 @@ export function createDownloadCtx(req: Request, res: Response, input: DownloadRe
     jobId,
     job,
     isAudio,
-    ext: isAudio ? "mp3" : "mp4",
+    ext: format === "m4a" ? "m4a" : isAudio ? "mp3" : "mp4",
     diag,
     throwIfCancelled,
     trackChild,
