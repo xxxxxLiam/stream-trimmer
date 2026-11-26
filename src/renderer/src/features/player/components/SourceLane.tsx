@@ -7,7 +7,7 @@
  */
 import type { TimelineController } from "../hooks/useTimelineController";
 import { pickHintLead } from "../utils/laneTools";
-import { clockTime } from "../utils/transport";
+import { clockTime, clockTimePrecise } from "../utils/transport";
 import { Magnet } from "react-bootstrap-icons";
 import { IconRemove } from "../../../shared/components/rowIcons";
 import { lengthLabel } from "../hooks/useTimelineController";
@@ -135,7 +135,7 @@ export default function SourceLane({ c, height = 44 }: { c: TimelineController; 
               >
                 <span className="inline-flex items-center gap-[4px] rounded-chip bg-raised px-[8px] text-meta leading-[20px] tabular-nums text-fg">
                   {c.snapOn ? <Magnet aria-hidden="true" size={12} /> : null}
-                  {clockTime(c.dragEdge.time)}
+                  {clockTimePrecise(c.dragEdge.time)}
                 </span>
                 <span className="rounded-chip bg-raised px-[8px] text-meta leading-[20px] text-fg-dim">{lengthLabel(c.dragEdge.length)} long</span>
               </span>

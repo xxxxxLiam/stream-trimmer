@@ -38,6 +38,9 @@ export type TopBarProps = {
   channel?: { open: boolean; onToggle: () => void; isChannelUrl: (text: string) => boolean; onLink: (url: string) => void };
 };
 
+/** The layout is fixed (board v149): the Panels icon stays in the code, hidden. */
+const SHOW_PANELS_MENU = false;
+
 export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleSettings, campaignMenu, panelsMenuExtras, channel }: TopBarProps) {
   const { info } = useClipperContext();
   const { active } = useCampaign();
@@ -61,7 +64,7 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
       <div className="relative ml-auto flex items-center gap-[2px]">
         <UpdatePill />
         {CHANNEL_DATA_BUILT && channel ? <ChannelButton open={channel.open} onToggle={channel.onToggle} /> : null}
-        <PanelsMenu extraItems={panelsMenuExtras} />
+        {SHOW_PANELS_MENU ? <PanelsMenu extraItems={panelsMenuExtras} /> : null}
         <HelpButton open={helpOpen} onToggle={onToggleHelp} />
         <button
           type="button"

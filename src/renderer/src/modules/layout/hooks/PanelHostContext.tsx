@@ -47,6 +47,8 @@ export type PanelHost = {
   openImport: (text?: string) => void;
   /** Save the marked part of this video into the bank, waiting (the + menu in Export, "Add a moment"). */
   addMoment: () => void;
+  /** Drop a marker at the playhead of the open video (Markers + "Add a marker"). */
+  addMarker?: () => void;
   /** Open Channel data (the Videos menu), with a channel link if one was pasted. Owner builds only. */
   openChannel: (url?: string) => void;
 };

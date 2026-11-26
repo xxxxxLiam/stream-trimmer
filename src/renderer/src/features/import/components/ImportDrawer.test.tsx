@@ -28,19 +28,22 @@ test("Board 04.2.1: opened empty, the drawer shows the drop area, and rows paste
   assert.match(src, /h-\[190px\]/);
 });
 
-test("Board 04.2: Export's + opens \"Add to Export\" with Import moments and Add a moment, and Export has no inline Import link", () => {
+test("Board v149: Export's + is \"Add a moment\"; Import moments and Select moments live in its \u22ef menu; Transcript and History have no +", () => {
   const group = readFileSync("src/renderer/src/modules/layout/components/PanelGroup.tsx", "utf8");
-  assert.match(group, /label: "Add to Export"/);
-  assert.match(group, /label: "Import moments"/);
   assert.match(group, /label: "Add a moment"/);
-  assert.doesNotMatch(group, /label: "Add a moment",[^}]*detail/);
+  assert.match(group, /label: "Import moments"/);
+  assert.match(group, /label: "Select moments"/);
+  assert.match(group, /label: "Add a video"/);
+  assert.match(group, /label: "Add a marker"/);
+  assert.doesNotMatch(group, /Add to Export/);
+  assert.doesNotMatch(group, /Move \$\{activeDef\.title\} to the/);
   const exp = readFileSync("src/renderer/src/features/clips/components/ExportPanel.tsx", "utf8");
   assert.doesNotMatch(exp, /Import moments/);
 });
 
 test("C2-14: closing the drawer puts the keyboard back on the + button, not on the page body", () => {
   const src = readFileSync("src/renderer/src/features/import/components/ImportDrawer.tsx", "utf8");
-  assert.match(src, /querySelector<HTMLElement>\('button\[aria-label="Add to Export"\]'\)/);
+  assert.match(src, /querySelector<HTMLElement>\('button\[aria-label="Add a moment"\]'\)/);
   assert.match(src, /const close = \(\) => \{\s*onClose\(\);\s*focusAddButton\(\);/);
   assert.match(src, /e\.key === "Escape" && closeRef\.current\(\)/);
 });

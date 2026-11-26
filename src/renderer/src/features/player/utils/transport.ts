@@ -22,6 +22,13 @@ export function clockTime(seconds: number): string {
   return `${Math.floor(s / 3600)}:${mm}:${ss}`;
 }
 
+/** clockTime with tenths when the time has them ("1:12:04.3"): what a freely dragged handle shows. */
+export function clockTimePrecise(seconds: number): string {
+  const t = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds * 10) / 10) : 0;
+  const tenth = Math.round((t - Math.floor(t)) * 10);
+  return tenth === 0 ? clockTime(t) : `${clockTime(t)}.${tenth}`;
+}
+
 export function stepTarget(current: number, by: number, duration: number): number {
   const max = duration > 0 ? duration : Number.POSITIVE_INFINITY;
   return Math.min(max, Math.max(0, current + by));

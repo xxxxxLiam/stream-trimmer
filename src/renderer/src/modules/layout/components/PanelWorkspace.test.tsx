@@ -52,8 +52,6 @@ test("the tab strip is a tablist with one tab in the tab order and no close butt
       onActivate={() => {}}
       onClose={() => {}}
       onMove={() => {}}
-      addable={[]}
-      onAdd={() => {}}
       menuItems={[]}
     />,
   );
@@ -61,5 +59,7 @@ test("the tab strip is a tablist with one tab in the tab order and no close butt
   assert.equal((html.match(/role="tab"/g) ?? []).length, 2);
   assert.equal((html.match(/tabindex="0"/g) ?? []).length, 1, "roving tabindex");
   assert.doesNotMatch(html, /aria-label="Close/, "no close buttons on the tabs; Close is in the group menu and on Delete");
-  assert.match(html, /aria-label="Add a panel to left panels"/);
+  assert.doesNotMatch(html, /aria-label="Add a/, "no + unless the panel adds something (board v149)");
+  const withAdd = renderToStaticMarkup(<PanelTabStrip label="Left panels" tabs={tabs} active="b" onActivate={() => {}} onClose={() => {}} onMove={() => {}} menuItems={[]} addAction={{ label: "Add a marker", onSelect: () => {} }} />);
+  assert.match(withAdd, /aria-label="Add a marker"/);
 });
