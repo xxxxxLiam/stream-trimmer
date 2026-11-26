@@ -39,7 +39,7 @@ export default function BrandMark({
       className={className}
       style={{
         display: "block",
-        filter: glow ? "drop-shadow(var(--glow-mark))" : undefined,
+        filter: glow ? LOGO_GLOW : undefined,
         // An svg clips what it draws outside its box, and the glow is drawn outside it: let it fade out in full.
         overflow: "visible",
         ...style,
@@ -60,6 +60,9 @@ const LOCKUP_CLIP =
 const LOCKUP_R_STEM = "M401.89 112.16V80.73L413.7 75.66L413.7 75.69V112.16Z";
 const LOCKUP_R_CUT =
   "M416.97 68.55 404.64 73.84V48.81H416.08V58.48H416.72C418.92 51.93 424.89 47.95 431.92 47.95C433.43 47.95 435.68 48.11 436.92 48.28V59.56C436.06 59.34 433.21 58.91 430.74 58.91C423.89 58.91 418.58 62.74 416.97 68.55Z";
+
+/** The cold-start logo glow: three drop-shadows, near to far (8, 26 and 70 px). */
+const LOGO_GLOW = "drop-shadow(var(--glow-mark)) drop-shadow(var(--glow-mark-mid)) drop-shadow(var(--glow-mark-far))";
 
 export type BrandLockupProps = { size?: number; glow?: boolean };
 
@@ -90,7 +93,7 @@ export function BrandLockup({ size = 28, glow = false }: BrandLockupProps) {
         style={{ display: "block", overflow: "visible" }}
       >
         <g
-          style={{ filter: glow ? "drop-shadow(var(--glow-mark))" : undefined }}
+          style={{ filter: glow ? LOGO_GLOW : undefined }}
         >
           <path id="mark-frost" fill="var(--frost)" d={LOCKUP_FROST} />
           <path id="mark-ice" fill="var(--ice)" d={LOCKUP_ICE} />
