@@ -43,6 +43,7 @@
     "release:linux": "npm run build:electron && electron-builder --linux AppImage --publish always",
     "// ===== MONTHLY MAINTENANCE: run `POT_PROVIDER_LICENSE_ACK=1 npm run tools:refresh-pot` about once a month (refreshes the YouTube PO-token provider) =====": "",
     "tools:refresh-pot": "node scripts/bundle-binaries.cjs --pot",
+    "// ===== DIAGNOSTICS: crash reports and machine id (not monthly) =====": "",
     "collect-sourcemaps": "node scripts/collect-sourcemaps.cjs",
     "decode-stack": "node scripts/decodeStack.cjs",
     "machine-id": "tsx scripts/machine-id.cjs",
