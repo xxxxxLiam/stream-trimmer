@@ -202,3 +202,15 @@ test("a stack from the OBFUSCATED shipped file still decodes to the original sou
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the release workflow keeps each build's source maps as a private artifact and never ships them", () => {
+  const yml = readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8");
+  assert.match(yml, /CLIPR_SOURCEMAPS: "1"/, "the release build writes maps");
+  assert.match(yml, /npm run collect-sourcemaps/);
+  assert.match(yml, /actions\/upload-artifact@v4/);
+  assert.match(yml, /name: sourcemaps-\$\{\{ steps\.maps\.outputs\.version \}\}-\$\{\{ runner\.os \}\}/);
+  // The only upload to the public releases repo is electron-builder's installer; the maps step is
+  // an artifact of this private repository, and the packaged file list still excludes every map.
+  assert.equal(yml.includes("gh release upload"), false);
+  assert.ok(pkg.build.files.includes("!**/*.map"));
+});
