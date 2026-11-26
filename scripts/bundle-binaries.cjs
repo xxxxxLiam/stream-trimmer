@@ -389,6 +389,11 @@ async function bundlePotProvider() {
   // size for nothing this process ever runs.
   res = spawnSync("npm", ["prune", "--omit=dev"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
   if (res.status !== 0) throw new Error(`npm prune failed in ${serverDir} (${res.status})`);
+  // node_modules/.bin holds CLI shims (tldts, prebuild-install, esvalidate, ...) for packages whose
+  // *own* devDependency on them was pruned above, leaving dangling symlinks behind — npm doesn't
+  // clean these up. We only ever `deno run` main.js directly, never anything under .bin, so drop it
+  // rather than ship broken symlinks (macOS's `xattr -dr` errors on every one it can't resolve).
+  removeDanglingBin(serverDir);
 
   // main.js is not self-contained: it imports sibling files under build/ and, via plain Node-style
   // specifiers, the node_modules beside it (confirmed by actually running the vendored build — see
@@ -415,6 +420,12 @@ async function bundlePotProvider() {
       "separately, on each platform's own build host; copying this folder between platforms will " +
       "not work for a native module.",
   );
+}
+
+// Removes node_modules/.bin from a built pot-provider server dir. Exported separately so a unit
+// test can exercise it on a small fixture without running the real clone/npm ci/tsc pipeline.
+function removeDanglingBin(serverDir) {
+  fs.rmSync(path.join(serverDir, "node_modules", ".bin"), { recursive: true, force: true });
 }
 
 /** Actually starts the vendored server and confirms it answers, rather than trusting the build to have worked. */
@@ -461,7 +472,7 @@ async function smokeTestPotProvider(entry) {
   }
 }
 
-(async () => {
+async function main() {
   try {
     if (process.argv.includes("--pot")) {
       // A separate, explicit mode: `node scripts/bundle-binaries.cjs --pot` only builds the PO
@@ -492,4 +503,8 @@ async function smokeTestPotProvider(entry) {
     console.error("[bundle-binaries] failed:", err.message || err);
     process.exit(1);
   }
-})();
+}
+
+if (require.main === module) main();
+
+module.exports = { removeDanglingBin };

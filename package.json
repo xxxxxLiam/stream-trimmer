@@ -121,7 +121,9 @@
         "from": "resources/bin",
         "to": "bin",
         "filter": [
-          "**/*"
+          "**/*",
+          "!.cache",
+          "!.cache/**"
         ]
       },
       {
