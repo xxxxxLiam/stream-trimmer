@@ -12,8 +12,12 @@ const platform = process.platform; // 'darwin' | 'win32' | 'linux'
 const arch = process.arch; // 'x64' | 'arm64'
 const outDir = path.join(__dirname, "..", "resources", "bin");
 const cacheDir = path.join(outDir, ".cache");
+const potProviderDir = path.join(__dirname, "..", "resources", "pot-provider");
 fs.mkdirSync(outDir, { recursive: true });
 fs.mkdirSync(cacheDir, { recursive: true });
+// Always present, even empty, so electron-builder's extraResources entry for it never fails on a
+// platform `--pot` was never run on (see bundlePotProvider() below) — an empty folder packages fine.
+fs.mkdirSync(potProviderDir, { recursive: true });
 
 function copy(src, dstName) {
   const dst = path.join(outDir, dstName);
@@ -381,41 +385,80 @@ async function bundlePotProvider() {
   if (res.status !== 0) throw new Error(`npm ci failed in ${serverDir} (${res.status})`);
   res = spawnSync("npx", ["tsc"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
   if (res.status !== 0) throw new Error(`npx tsc failed in ${serverDir} (${res.status})`);
+  // Only runtime deps are needed from here; typescript, @types/*, etc. nearly triples the folder
+  // size for nothing this process ever runs.
+  res = spawnSync("npm", ["prune", "--omit=dev"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
+  if (res.status !== 0) throw new Error(`npm prune failed in ${serverDir} (${res.status})`);
 
-  // The repo's compiled entry point has not been pinned here with certainty (see
-  // docs/pot-provider.md) — found by name under the build output rather than a hardcoded path, so
-  // this fails loudly with a clear message instead of silently vendoring the wrong file.
-  const built = findFileNamed(path.join(serverDir, "build"), "main.js");
-  if (!built) {
-    throw new Error(
-      `Could not find a built main.js under ${path.join(serverDir, "build")}. ` +
-        `Set POT_PROVIDER_ENTRY to the right path and update this script.`,
-    );
+  // main.js is not self-contained: it imports sibling files under build/ and, via plain Node-style
+  // specifiers, the node_modules beside it (confirmed by actually running the vendored build — see
+  // potTokenProvider.ts and docs/pot-provider.md). Both are copied whole, not cherry-picked.
+  const builtDir = path.join(serverDir, "build");
+  const builtEntry = path.join(builtDir, "main.js");
+  if (!fs.existsSync(builtEntry)) {
+    throw new Error(`Expected ${builtEntry} after the build but it is not there.`);
   }
   fs.rmSync(vendorDir, { recursive: true, force: true });
   fs.mkdirSync(vendorDir, { recursive: true });
-  fs.copyFileSync(built, path.join(vendorDir, "server.js"));
+  fs.cpSync(builtDir, path.join(vendorDir, "build"), {
+    recursive: true,
+    // .map files point back at this build host's absolute paths and are never read at runtime.
+    filter: (src) => !src.endsWith(".map"),
+  });
+  fs.cpSync(path.join(serverDir, "node_modules"), path.join(vendorDir, "node_modules"), { recursive: true });
   fs.writeFileSync(path.join(vendorDir, "pot-provider.version"), `${POT_PROVIDER_REF}\n`);
-  console.log(`[bundle-binaries] PO token provider ${POT_PROVIDER_REF} -> ${vendorDir}/server.js`);
+  console.log(`[bundle-binaries] PO token provider ${POT_PROVIDER_REF} -> ${vendorDir}`);
+  await smokeTestPotProvider(path.join(vendorDir, "build", "main.js"));
   console.log(
-    "[bundle-binaries] NOT verified on this machine: that the `canvas` native dependency has a " +
-      `prebuilt binary for ${platform}/${arch}, and that the vendored server actually starts and ` +
-      "mints a token. Run the app and watch for a provider failing to listen before trusting this build.",
+    `[bundle-binaries] NOT verified: that the \`canvas\` native dependency has a prebuilt binary ` +
+      `on any OTHER platform than this one (${platform}/${arch}) — this command has to be run again, ` +
+      "separately, on each platform's own build host; copying this folder between platforms will " +
+      "not work for a native module.",
   );
 }
 
-function findFileNamed(dir, name) {
-  if (!fs.existsSync(dir)) return null;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      const found = findFileNamed(full, name);
-      if (found) return found;
-    } else if (entry.name === name) {
-      return full;
+/** Actually starts the vendored server and confirms it answers, rather than trusting the build to have worked. */
+async function smokeTestPotProvider(entry) {
+  const deno = path.join(outDir, process.platform === "win32" ? "deno.exe" : "deno");
+  if (!fs.existsSync(deno)) {
+    console.warn("[bundle-binaries] WARNING: no bundled deno to smoke-test the PO token provider with — skipping.");
+    return;
+  }
+  const port = 14400 + Math.floor(Math.random() * 1000);
+  const { spawn: spawnProc } = require("node:child_process");
+  const proc = spawnProc(
+    deno,
+    ["run", "--allow-net", "--allow-env", "--allow-read", entry, "--port", String(port), "--host", "127.0.0.1"],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const deadline = Date.now() + 10_000;
+  try {
+    while (Date.now() < deadline) {
+      const ok = await new Promise((resolve) => {
+        const req = require("node:http").get({ host: "127.0.0.1", port, path: "/ping", timeout: 1000 }, (res) => {
+          res.resume();
+          resolve(res.statusCode === 200);
+        });
+        req.on("error", () => resolve(false));
+        req.on("timeout", () => {
+          req.destroy();
+          resolve(false);
+        });
+      });
+      if (ok) {
+        console.log(`[bundle-binaries] PO token provider smoke test: answered /ping on 127.0.0.1:${port}`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    throw new Error("the vendored PO token provider never answered /ping within 10s");
+  } finally {
+    try {
+      proc.kill();
+    } catch {
+      /* ignore */
     }
   }
-  return null;
 }
 
 (async () => {

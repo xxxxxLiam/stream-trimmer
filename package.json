@@ -116,6 +116,13 @@
         ]
       },
       {
+        "from": "resources/pot-provider",
+        "to": "pot-provider",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
         "from": "LICENSE",
         "to": "LICENSE"
       },
