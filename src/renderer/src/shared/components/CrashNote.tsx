@@ -4,7 +4,7 @@
  * Description: The status block at the top of Export after the window closed unexpectedly (board 03.6.3):
  *   one line, then Send report (Ice outline) and Copy details. Pressing Send report is the consent. Logic-free.
  */
-import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../../features/clips/utils/pillClasses";
+import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../utils/pillClasses";
 
 export type CrashNoteProps = {
   text: string;

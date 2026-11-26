@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { DESTINATIONS, type ClipDestination } from "../../player/utils/clipDestination";
 import type { HandoffNotice } from "../utils/handoffNotice";
-import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../utils/pillClasses";
+import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../../../shared/utils/pillClasses";
 
 export type HandoffRowProps = {
   notice: HandoffNotice;

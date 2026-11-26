@@ -6,6 +6,10 @@
  *   snapped to whole caption lines, used ranges render hatched with a "used" tag.
  */
 import TranscriptWait from "./TranscriptWait";
+import { usePanelHost } from "../../../modules/layout/hooks/PanelHostContext";
+import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
+import { transcriptSignInHelps } from "../../../shared/utils/transcriptOutcome";
+import { PILL_HIT, PRIMARY_PILL, QUIET_PILL } from "../../../shared/utils/pillClasses";
 import {
   useCallback,
   useEffect,
@@ -119,7 +123,16 @@ export default function TranscriptColumn({
 }: TranscriptColumnProps) {
   const clipper = useClipperContext();
   const { active: campaign } = useCampaign();
-  const { info, videoId, transcript, transcriptError, loadingTranscript, ensureTranscript, seekRequest } = clipper;
+  const { info, videoId, transcript, transcriptError, transcriptKind, retryTranscript, loadingTranscript, ensureTranscript, seekRequest } = clipper;
+  const { openSignIn } = usePanelHost();
+  const connected = useYouTubeConnection().connected;
+  const signInHelps = transcriptSignInHelps(transcriptKind);
+  // A sign-in that lands while this prompt is showing tries the transcript again by itself.
+  const wasConnected = useRef(connected);
+  useEffect(() => {
+    if (signInHelps && connected && !wasConnected.current) retryTranscript();
+    wasConnected.current = connected;
+  }, [signInHelps, connected, retryTranscript]);
 
   // Load lazily the first time a video is present.
   useEffect(() => {
@@ -375,6 +388,19 @@ export default function TranscriptColumn({
       >
         {loadingTranscript ? (
           <TranscriptWait />
+        ) : !hasTranscript && signInHelps && transcript && transcript.length === 0 ? (
+          <div role="alert" className="flex flex-col items-center gap-[4px] px-[14px] py-[24px] text-center">
+            <p className="m-[0px] text-body text-error">YouTube wouldn’t share the transcript.</p>
+            <p className="m-[0px] text-meta text-fg-dim">Signing in often fixes this, and downloads too.</p>
+            <div className="mt-[8px] flex gap-[6px]">
+              <button type="button" className={PILL_HIT} onClick={() => openSignIn()}>
+                <span className={PRIMARY_PILL}>Sign in</span>
+              </button>
+              <button type="button" className={PILL_HIT} onClick={retryTranscript}>
+                <span className={QUIET_PILL}>Try again</span>
+              </button>
+            </div>
+          </div>
         ) : !hasTranscript ? (
           <p className="m-[0px] px-[14px] py-[8px] text-meta text-fg-dim">
             {transcript && transcript.length === 0

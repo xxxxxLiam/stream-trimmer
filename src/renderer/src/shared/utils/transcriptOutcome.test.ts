@@ -37,3 +37,9 @@ test("a fetch with no failure, or one the engine sent no kind for, carries none"
     null,
   );
 });
+
+import { transcriptSignInHelps } from "./transcriptOutcome";
+test("board 03.2.56: only a refused or sign-in-shaped transcript failure offers Sign in", () => {
+  for (const k of ["refused", "signin", "age"]) assert.equal(transcriptSignInHelps(k), true, k);
+  for (const k of [null, undefined, "private", "removed", "live", "region", "members"]) assert.equal(transcriptSignInHelps(k), false, String(k));
+});

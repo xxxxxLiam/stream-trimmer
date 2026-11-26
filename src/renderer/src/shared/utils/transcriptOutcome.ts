@@ -28,3 +28,8 @@ export function transcriptOutcome(data: TranscriptResponse | null): TranscriptOu
   if (data.failed) return { lines: [], error: data.error || TRANSCRIPT_REQUEST_FAILED, kind: data.kind ?? null };
   return { lines: [], error: null, kind: null };
 }
+
+/** Board 03.2.56: a transcript YouTube refused, or wants a sign-in for, offers Sign in and Try again. */
+export function transcriptSignInHelps(kind: string | null | undefined): boolean {
+  return kind === "refused" || kind === "signin" || kind === "age";
+}
