@@ -16,9 +16,17 @@ test("extractorArgsFor adds the provider's base url as a second extractor-args e
   ]);
 });
 
-test("vendorEntryPoint is null until tools:refresh has vendored a server.js", () => {
+test("vendorEntryPoint is null until tools:refresh-pot has vendored both the build and node_modules", () => {
   assert.equal(vendorEntryPoint("/anywhere", () => false), null);
-  assert.equal(vendorEntryPoint("/anywhere", () => true), "/anywhere/server.js");
+  assert.equal(vendorEntryPoint("/anywhere", () => true), "/anywhere/build/main.js");
+});
+
+test("vendorEntryPoint is null when the build exists but node_modules does not (a half-finished vendor)", () => {
+  const entry = "/anywhere/build/main.js";
+  assert.equal(
+    vendorEntryPoint("/anywhere", (p) => p === entry),
+    null,
+  );
 });
 
 test("startPotProvider is a no-op (null, no spawn) when nothing is vendored", async () => {
