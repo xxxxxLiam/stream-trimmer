@@ -3,6 +3,8 @@
  * Path: src/renderer/src/modules/layout/components/PanelGroup.tsx
  * Description: One tabbed group (left or right): the tab strip over the active panel's body.
  */
+import { useFinalCutInstalled } from "../../../shared/hooks/useFinalCutInstalled";
+import { enterSelectClips, useSelectClips } from "../../../shared/utils/selectClipsStore";
 import { enterSelectMoments, useSelectMoments } from "../../../shared/utils/selectMomentsStore";
 import { createElement, useEffect, useState } from "react";
 import PanelTabStrip, { panelBodyDomId, tabDomId } from "./PanelTabStrip";
@@ -48,6 +50,8 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   // Export and History start their menu with the list as text: Copy as text (the default) and Save as .txt….
   const list = useCopyListFor(activeDef?.id);
   const pickingMoments = useSelectMoments().on;
+  const pickingClips = useSelectClips().on;
+  const finalCut = useFinalCutInstalled();
   const [said, setSaid] = useState<string | null>(null);
   useEffect(() => {
     if (!said) return;
@@ -85,6 +89,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   };
   const listItems: MenuItem[] = list
     ? [
+        ...(activeDef?.id === "history" && finalCut ? [{ key: "select-clips", label: "Select clips", disabled: list.count === 0, onSelect: enterSelectClips } as MenuItem] : []),
         ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", disabled: list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
         { key: "copy-list", label: "Copy as text", icon: <IconCopy />, detail: list.count > 0 ? countText(list.count) : undefined, disabled: list.count === 0, onSelect: () => void copyList() },
         { key: "save-list", label: "Save as .txt…", icon: <IconSaveFile />, disabled: list.count === 0, onSelect: () => void saveList() },
@@ -98,7 +103,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
 
   return (
     <section aria-label={NAMES[group]} className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {pickingMoments && activeDef?.id === "export" ? null : (
+      {(pickingMoments && activeDef?.id === "export") || (pickingClips && activeDef?.id === "history") ? null : (
       <PanelTabStrip
         addAction={addAction}
         addMenu={addMenu}
