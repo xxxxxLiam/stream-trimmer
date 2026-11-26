@@ -11,6 +11,7 @@ import { readFcpLookFile } from "../features/editor/services/fcpLookFile";
 import { rememberPickedDir } from "../features/files/services/saveRoots";
 import { resolveBrandedDir } from "../features/files/services/brandedFolder";
 import { saveTextFile } from "../features/files/services/saveTextFile";
+import { lastAssetsLibraryFolder, rememberAssetsLibraryFolder } from "../features/editor/services/assetsLibraryMemory";
 
 const { app, dialog, ipcMain } = electron;
 
@@ -75,6 +76,31 @@ export function registerDialogHandlers() {
       return null;
     }
     // Deliberately not added to pickedDirs: that list is where the app may write clips.
+    return picked;
+  });
+
+  // A library for "Add to Final Cut": chosen fresh on every call (locations can go to different
+  // libraries), so only the folder it was picked from is remembered, to start the next pick there.
+  ipcMain.handle(IPC.dialogPickAssetsLibrary, async () => {
+    const mainWindow = getMainWindow();
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: "Choose a Final Cut Pro library",
+      message: "Pick the library these clips should be added to.",
+      defaultPath: lastAssetsLibraryFolder() || path.join(app.getPath("home"), "Movies"),
+      properties: ["openFile", "openDirectory"],
+      filters: [{ name: "Final Cut Pro Library", extensions: ["fcpbundle"] }],
+    });
+    if (res.canceled || res.filePaths.length === 0) return null;
+    const picked = res.filePaths[0];
+    if (!/\.fcpbundle$/i.test(picked)) {
+      await dialog.showMessageBox(mainWindow, {
+        type: "info",
+        message: "That is not a Final Cut Pro library.",
+        detail: "Libraries end in .fcpbundle. Pick one from your Movies folder or wherever you keep them.",
+      });
+      return null;
+    }
+    rememberAssetsLibraryFolder(picked);
     return picked;
   });
 

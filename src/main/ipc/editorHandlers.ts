@@ -9,6 +9,7 @@ import { IPC } from "../../common/ipc/channels";
 import electron from "electron";
 import { readFcpLookFile } from "../features/editor/services/fcpLookFile";
 import { checkEditorRequest, type EditorRequest } from "../features/editor/services/editorPaths";
+import { recordAssetsLibraryClips, unaddedAssetsLibraryClips } from "../features/editor/services/assetsLibraryMemory";
 import { saveRoots } from "../features/files/services/saveRoots";
 import {
   copyFiles,
@@ -48,4 +49,21 @@ export function registerEditorHandlers() {
   // A dropped file or bundle: the renderer sends its path, main reads and checks it.
   ipcMain.handle(IPC.fcpLookRead, (_e: unknown, picked: unknown) => readFcpLookFile(picked));
   ipcMain.handle(IPC.editorPathExists, checked("pathExists", (t) => pathExists(t)));
+  // "Add to Final Cut": of these clip files, which are new to this library (not already added on an
+  // earlier call), and recording the ones just added. The library path itself is whatever the native
+  // picker returned; it is not a save root (nothing here writes into it), so this skips checkEditorRequest.
+  ipcMain.handle(
+    IPC.editorAssetsLibraryAdded,
+    guard(({ library, files }: any = {}) => ({
+      ok: true,
+      newFiles: unaddedAssetsLibraryClips(library, Array.isArray(files) ? files.filter((f: unknown) => typeof f === "string") : []),
+    })),
+  );
+  ipcMain.handle(
+    IPC.editorAssetsLibraryRecordAdded,
+    guard(({ library, files }: any = {}) => {
+      recordAssetsLibraryClips(library, Array.isArray(files) ? files.filter((f: unknown) => typeof f === "string") : []);
+      return { ok: true };
+    }),
+  );
 }

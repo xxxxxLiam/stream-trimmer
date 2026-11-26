@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createSettingsStore } from "./settingsStore";
-import { APPROVED_ROOTS_KEY, MAX_VALUE_BYTES, PAGE_KEYS, pageMayWrite } from "./settingsKeys";
+import { APPROVED_ROOTS_KEY, ASSETS_LIBRARY_ADDED_KEY, ASSETS_LIBRARY_FOLDER_KEY, MAX_VALUE_BYTES, PAGE_KEYS, pageMayWrite } from "./settingsKeys";
 import { allowedRoots } from "../../../shared/utils/pathSafety";
 
 const GOOD = { "clipper.bank": [{ id: "a" }], "clipper.clipsDir": "/x/clips" };
@@ -70,6 +70,11 @@ test("a page may write known keys only and small values only, and never the appr
   assert.equal(pageMayWrite("clipper.bank", "x".repeat(MAX_VALUE_BYTES + 1)), false);
   assert.equal(pageMayWrite(APPROVED_ROOTS_KEY, ["/"]), false);
   assert.equal(pageMayWrite(42, 1), false);
+});
+
+test("a page may not write the Add to Final Cut library memory: it is main's own, not the page's", () => {
+  assert.equal(pageMayWrite(ASSETS_LIBRARY_FOLDER_KEY, "/Users/a/Movies"), false);
+  assert.equal(pageMayWrite(ASSETS_LIBRARY_ADDED_KEY, { "/L/A.fcpbundle": ["/clips/a.mp4"] }), false);
 });
 
 test("folders already chosen are carried into main's approved list once; a later settings change does not widen it", () => {

@@ -51,6 +51,8 @@ try {
     saveTextFile: (payload: unknown) => ipcRenderer.invoke(IPC.dialogSaveText, payload),
     pickBrandedDirectory: (payload: unknown) => ipcRenderer.invoke(IPC.dialogPickBrandedDirectory, payload),
     pickDirectory: () => ipcRenderer.invoke(IPC.dialogPickDirectory), pickFcpLibrary: () => ipcRenderer.invoke(IPC.dialogPickFcpLibrary),
+    // "Add to Final Cut": the library is picked fresh every call, starting in the folder last used.
+    pickAssetsLibrary: () => ipcRenderer.invoke(IPC.dialogPickAssetsLibrary),
     // Ready-made folders for a fresh install; the renderer only asks when the
     // user has not chosen any. Returns null if they could not be created.
     getDefaultFolders: () => ipcRenderer.invoke(IPC.systemDefaultFolders),
@@ -101,6 +103,9 @@ try {
       reveal: (target: unknown) => ipcRenderer.invoke(IPC.editorReveal, target),
       copyFiles: (payload: unknown) => ipcRenderer.invoke(IPC.editorCopyFiles, payload),
       pathExists: (target: unknown) => ipcRenderer.invoke(IPC.editorPathExists, target),
+      // Per-library duplicate tracking for "Add to Final Cut" (assetsLibraryRecord.ts).
+      assetsLibraryAdded: (payload: unknown) => ipcRenderer.invoke(IPC.editorAssetsLibraryAdded, payload),
+      recordAssetsLibraryAdded: (payload: unknown) => ipcRenderer.invoke(IPC.editorAssetsLibraryRecordAdded, payload),
     },
     // Diagnostics: reads the app's own local log so a crash can be reported.
     readDiagnostics: () => ipcRenderer.invoke(IPC.diagnosticsRead),
