@@ -15,6 +15,7 @@ import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
 import SettingsSignIn from "./SettingsSignIn";
 import { useCookieDropMutations } from "../hooks/useCookieDropMutations";
 import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
+import { signInRowValue, type SignInStatus } from "../utils/signInStatus";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
@@ -53,6 +54,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   const c = useSettingsController({ open, onClose, startAt });
   const cookies = useCookieDropMutations();
   const connection = useYouTubeConnection();
+  const signInStatus: SignInStatus | null = cookies.status ?? (connection.connected ? { state: "signed-in", justChecked: false } : null);
   const [chosen] = useClipDestination();
   // Liam, 25 Nov: a campaign's export settings are always here. With no editor chosen yet (or CapCut, which has
   // nothing to set) the page is Final Cut Pro's, the first editor, so its library, event, layout and look are never out of reach.
@@ -205,8 +207,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   } else if (view.kind === "signin") {
     body = (
       <SettingsSignIn
-        problem={cookies.problem}
-        done={cookies.done}
+        status={signInStatus}
+        onSignOut={() => void cookies.signOut()}
         onFile={(f) => void cookies.onFile(f)}
         onChoose={() => void cookies.choose()}
         onBack={c.back}
@@ -224,7 +226,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         autoUpdateAvailable={updatesInPlace(typeof navigator === "undefined" ? "" : navigator.platform)}
         onAutoUpdate={c.setAutoUpdate}
         onPatchApp={c.patchApp}
-        signedIn={connection.connected}
+        signInValue={signInRowValue(cookies.status, connection.connected)}
         onOpenSignIn={() => c.setView({ kind: "signin" })}
         onClose={onClose}
       />

@@ -14,6 +14,7 @@ import SettingsEditor from "./SettingsEditor";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
 import SettingsTopList from "./SettingsTopList";
 import SettingsSignIn from "./SettingsSignIn";
+import { signInRowValue, statusFromAnswer } from "../utils/signInStatus";
 import { cookieReason } from "../utils/cookieReasons";
 import { parentOf } from "../hooks/useSettingsController";
 
@@ -201,16 +202,47 @@ test("A3-3: Settings keeps focus inside, lands on its heading when it opens and 
 });
 
 test("sign-in page: honest line, three steps, drop zone; a refusal shows reason then fix", () => {
-  const base = { problem: null, done: false, onFile: noop, onChoose: noop, onBack: noop, onClose: noop };
+  const base = { status: null, onFile: noop, onChoose: noop, onSignOut: noop, onBack: noop, onClose: noop };
   const h = renderToStaticMarkup(<SettingsSignIn {...base} />);
   assert.match(h, /never posts, likes or changes anything/);
   assert.match(h, /Drop cookies\.txt, or choose a file/);
   assert.match(h, /Get cookies\.txt LOCALLY/);
   assert.doesNotMatch(h, /Try again/);
-  const bad = renderToStaticMarkup(<SettingsSignIn {...base} problem={cookieReason({ ok: false, reason: "wrong-site" })} />);
+  const bad = renderToStaticMarkup(<SettingsSignIn {...base} status={statusFromAnswer({ ok: false, reason: "wrong-site" })} />);
   assert.match(bad, /role="alert"/);
+  assert.match(bad, /Couldn’t sign in/);
   assert.match(bad, /no YouTube cookies/);
   assert.match(bad, /text-error/);
+  assert.match(bad, /Drop cookies\.txt/, "a failed file keeps the steps and drop zone");
+});
+
+test("board 04.6 A: Checking shows the sliding line; Signed in folds the steps away and offers Replace file and Sign out", () => {
+  const base = { status: null, onFile: noop, onChoose: noop, onSignOut: noop, onBack: noop, onClose: noop };
+  const checking = renderToStaticMarkup(<SettingsSignIn {...base} status={{ state: "checking" }} />);
+  assert.match(checking, /Checking your file…/);
+  const named = renderToStaticMarkup(<SettingsSignIn {...base} status={statusFromAnswer({ ok: true, verify: "signed_in", account: "Acme Studio" })} />);
+  assert.match(named, /Signed in as Acme Studio/);
+  assert.match(named, /1080p is on\. Checked just now\./);
+  assert.match(named, />Replace file</);
+  assert.match(named, />Sign out</);
+  assert.doesNotMatch(named, /Drop cookies\.txt/);
+  assert.doesNotMatch(named, /Get cookies\.txt LOCALLY/);
+  const plain = renderToStaticMarkup(<SettingsSignIn {...base} status={statusFromAnswer({ ok: true, verify: "signed_in" })} />);
+  assert.match(plain, />Signed in</);
+  assert.doesNotMatch(plain, /Signed in as/);
+});
+
+test("board 04.6 A: the engine's verdicts map onto the card and the Settings row", () => {
+  const rejected = statusFromAnswer({ ok: true, verify: "rejected", message: "YouTube didn't accept this sign-in. Export a fresh cookies file while signed in and add it again." });
+  assert.deepEqual(rejected, { state: "failed", reason: "YouTube didn't accept this sign-in.", fix: "Export a fresh cookies file while signed in and add it again." });
+  assert.equal(statusFromAnswer({ ok: true, verify: "unverified", message: "Saved." }).state, "saved");
+  assert.equal(statusFromAnswer({ ok: true }).state, "signed-in");
+  assert.equal(statusFromAnswer(undefined).state, "failed");
+  assert.equal(signInRowValue({ state: "checking" }, false), "Checking…");
+  assert.equal(signInRowValue(null, true), "Signed in");
+  assert.equal(signInRowValue(rejected, false), "Not signed in");
+  const hook = read("features/settings/hooks/useCookieDropMutations.ts");
+  assert.match(hook, /setSignInStatus\(\{ state: "checking" \}\);\s*await settle\(await window\.electronAPI\?\.importYouTubeCookiesText/, "Checking is set before the main process is asked");
 });
 
 test("the engine's own sentences win over the fallback", () => {
