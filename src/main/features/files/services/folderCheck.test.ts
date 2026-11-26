@@ -15,9 +15,12 @@ test("a folder that takes files is ok, and the probe file is gone afterwards", (
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("a missing folder and an unmounted drive are gone; a path through a file is blocked, not a missing drive", () => {
+test("a folder that does not exist yet is fine (the save creates it); an unmounted drive is gone; a path through a file is blocked", () => {
   const dir = tmp();
-  assert.deepEqual(checkFolder({ dirPath: path.join(dir, "nope", "deeper") }, [dir]), { ok: false, problem: "gone" });
+  assert.deepEqual(checkFolder({ dirPath: path.join(dir, "nope", "deeper") }, [dir]), { ok: true }, "Liam 26 Nov: a new campaign folder is not a missing drive");
+  assert.deepEqual(fs.readdirSync(dir), [], "nothing is created or left behind by the check");
+  const gone = { statSync: (p: string) => { if (p === "/Volumes" || p === "/") return { isDirectory: () => true }; throw errno("ENOENT"); }, writeFileSync: () => {}, rmSync: () => {} };
+  if (path.sep === "/") assert.deepEqual(checkFolder({ dirPath: "/Volumes/Work/Clipr/B-roll" }, ["/Volumes/Work/Clipr/B-roll"], { fs: gone }), { ok: false, problem: "gone" }, "the drive itself is missing");
   const file = path.join(dir, "a.txt");
   fs.writeFileSync(file, "x");
   assert.deepEqual(checkFolder({ dirPath: file }, [dir]), { ok: false, problem: "blocked" });
