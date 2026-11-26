@@ -5,6 +5,9 @@
 const path = require("node:path");
 const fs = require("node:fs");
 const esbuild = require("esbuild");
+const { isHardened, esbuildHardeningOptions, collectLegalComments, obfuscateFile } = require("./buildHardening.cjs");
+
+const hardened = isHardened();
 
 const channelData = /^(1|true|yes|on)$/i.test(
   String(process.env.VITE_ENABLE_CHANNEL_DATA || "").trim(),
@@ -116,10 +119,13 @@ esbuild
         : {}),
     },
     logLevel: "info",
+    ...esbuildHardeningOptions(hardened),
   })
   .then(() => {
     fs.unlinkSync(shimFile);
-    console.log("[build-server] wrote", outFile);
+    collectLegalComments(outFile, "the engine");
+    if (hardened) obfuscateFile(outFile);
+    console.log(`[build-server] wrote ${outFile}${hardened ? " (hardened)" : " (readable: CLIPR_DEV_BUILD)"}`);
   })
   .catch((err) => {
     console.error(err);
