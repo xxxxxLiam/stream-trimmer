@@ -76,9 +76,22 @@
   --glow-range: 0 0 14px rgb(var(--ice-rgb) / 0.8);
   --glow-row: 0 0 16px rgb(var(--ice-rgb) / 0.55);
   --glow-playhead: 0 0 10px rgb(var(--frost-rgb) / 0.8);
-  --glow-box: 0 0 0 4px rgb(var(--ice-rgb) / 0.08), 0 18px 40px -18px rgb(var(--ice-rgb) / 0.45);
-  --glow-spotlight: radial-gradient(closest-side, rgb(var(--ice-rgb) / 0.13), transparent 70%);
-  --glow-mark: 0 0 22px rgb(var(--frost-rgb) / 0.35);
+  --glow-box: 0 0 0 4px rgb(var(--ice-rgb) / 0.05), 0 0 26px -2px rgb(var(--ice-rgb) / 0.18), 0 28px 70px -28px rgb(var(--ice-rgb) / 0.38);
+  /* Eased falloff (Liam, 26 Nov): 8 stops at 1 / .92 / .75 / .52 / .30 / .14 / .045 / 0 of the peak (Ice .15), never a 2-stop fade. */
+  --glow-spotlight: radial-gradient(
+    ellipse closest-side,
+    rgb(var(--ice-rgb) / 0.15) 0%,
+    rgb(var(--ice-rgb) / 0.138) 12%,
+    rgb(var(--ice-rgb) / 0.1125) 25%,
+    rgb(var(--ice-rgb) / 0.078) 40%,
+    rgb(var(--ice-rgb) / 0.045) 55%,
+    rgb(var(--ice-rgb) / 0.021) 70%,
+    rgb(var(--ice-rgb) / 0.00675) 85%,
+    rgb(var(--ice-rgb) / 0) 100%
+  );
+  --glow-mark: 0 0 8px rgb(var(--frost-rgb) / 0.3);
+  --glow-mark-mid: 0 0 26px rgb(var(--frost-rgb) / 0.16);
+  --glow-mark-far: 0 0 70px rgb(var(--ice-rgb) / 0.1);
   --flash-saved: 0 0 12px rgb(var(--frost-rgb) / 0.45);
   /* Component-board glows: the Clip button on hover, the open video row, the just-made row. */
   --glow-clip-hover: 0 0 14px rgb(var(--ice-rgb) / 0.35);

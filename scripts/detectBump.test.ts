@@ -17,12 +17,14 @@ const require = createRequire(import.meta.url);
 const {
   detectBump,
   rangeFrom,
+  capPatch,
 }: {
   detectBump: (input: {
     subjects?: string[];
     bodies?: string[];
   }) => { bump: "patch" | "minor" | "major"; why: string };
   rangeFrom: (input: { tag?: string; logLines?: string[] }) => string | null;
+  capPatch: (bump: string, version: string) => string;
 } = require("./detectBump.cjs");
 
 const bump = (subjects: string[], bodies: string[] = []) =>
@@ -159,4 +161,27 @@ test("only a real Release commit is a boundary, not a commit that mentions one",
     rangeFrom({ tag: "", logLines: ["aaa1111 docs: explain the Release v2.1.0 boundary"] }),
     null,
   );
+});
+
+// Liam, 26 Nov: patch numbers never reach 10; the next release becomes the next minor.
+test("a patch that would reach 10 becomes the next minor", () => {
+  assert.equal(capPatch("patch", "19.2.8"), "patch");
+  assert.equal(capPatch("patch", "19.2.9"), "minor");
+  assert.equal(capPatch("patch", "19.2.10"), "minor");
+  assert.equal(capPatch("minor", "19.2.9"), "minor");
+  assert.equal(capPatch("major", "19.2.9"), "major");
+  assert.equal(capPatch("patch", ""), "patch");
+});
+
+test("the cap makes 19.2.9 and 19.2.10 release as 19.3.0, and 19.2.8 as 19.2.9", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "cap-"));
+  const run = (version: string) => {
+    writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "x", version }));
+    const level = capPatch("patch", version);
+    return execFileSync("npm", ["version", level, "--no-git-tag-version"], { cwd: dir, encoding: "utf8" }).trim();
+  };
+  assert.equal(run("19.2.8"), "v19.2.9");
+  assert.equal(run("19.2.9"), "v19.3.0");
+  assert.equal(run("19.2.10"), "v19.3.0");
+  rmSync(dir, { recursive: true, force: true });
 });

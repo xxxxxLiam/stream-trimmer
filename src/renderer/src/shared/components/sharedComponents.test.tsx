@@ -138,13 +138,13 @@ test("BrandMark is the two-blade mark in Frost over Ice; the lockup adds the nam
   assert.equal(h.match(/<path/g)?.length, 2);
   assert.ok(h.indexOf("var(--frost)") < h.indexOf("var(--ice)"));
   assert.doesNotMatch(h, /drop-shadow/);
-  assert.match(html(<BrandMark glow />), /drop-shadow\(var\(--glow-mark\)\)/);
+  assert.match(html(<BrandMark glow />), /drop-shadow\(var\(--glow-mark\)\) drop-shadow\(var\(--glow-mark-mid\)\) drop-shadow\(var\(--glow-mark-far\)\)/);
   const lock = html(<BrandLockup size={56} />);
   assert.match(lock, /aria-label="Clipr"/);
   assert.match(lock, /<path id="r-cut" fill="var\(--ice\)"/, "the Ice piece of the r is its own path in the brand colour");
   assert.match(lock, /<path id="r-stem" fill="var\(--c-fg\)"/);
   assert.doesNotMatch(html(<BrandLockup size={24} />), /r-cut/, "below 32px the mark stands alone");
-  assert.match(html(<BrandLockup size={56} glow />), /<g style="filter:drop-shadow\(var\(--glow-mark\)\)"/);
+  assert.match(html(<BrandLockup size={56} glow />), /<g style="filter:drop-shadow\(var\(--glow-mark\)\) drop-shadow\(var\(--glow-mark-mid\)\) drop-shadow\(var\(--glow-mark-far\)\)"/);
 });
 
 test("no shared component holds a raw hex or rgba value", () => {

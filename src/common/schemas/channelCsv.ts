@@ -56,6 +56,7 @@ export const COMMENT_COLUMNS = [
   "comment_id",
   "parent_id",
   "is_reply",
+  "reply_count",
   "author",
   "author_channel_id",
   "text",

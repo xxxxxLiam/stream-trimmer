@@ -8,6 +8,7 @@ import { publishChannel } from "./channelJobs";
 import { fetchTranscript } from "./channelListing";
 import { appendCheckpoint } from "./checkpoints";
 import { RawComment } from "./exportTypes";
+import { COMMENTS_PER_VIDEO, REPLIES_PER_THREAD, topComments } from "./topComments";
 import { runForJob } from "./ytRunner";
 import { ExportRun } from "./exportRun";
 
@@ -61,7 +62,9 @@ export async function collectDetails(run: ExportRun, selected: { id: string; tit
               noWarnings: true,
               skipDownload: true,
               extractorArgs:
-                "youtube:comment_sort=top;max_comments=50,50,0,0",
+                // Top 20 top-level comments, and up to 5 replies under each so a thread's reply count has
+                // something to count (see COMMENTS_PER_VIDEO).
+                `youtube:comment_sort=top;max_comments=${COMMENTS_PER_VIDEO},${COMMENTS_PER_VIDEO},${COMMENTS_PER_VIDEO * REPLIES_PER_THREAD},${REPLIES_PER_THREAD}`,
               ...cookieOptions,
             },
             240_000,
@@ -70,13 +73,13 @@ export async function collectDetails(run: ExportRun, selected: { id: string; tit
             ? info.comments
             : [];
           if (raw.length === 0) notes.push("no comments");
-          for (const c of raw) {
-            const isReply = Boolean(c.parent && c.parent !== "root");
+          for (const c of topComments(raw, COMMENTS_PER_VIDEO)) {
             videoComments.push({
               video_id: v.id,
               comment_id: c.id ?? "",
-              parent_id: isReply ? c.parent ?? "" : "",
-              is_reply: isReply,
+              parent_id: "",
+              is_reply: false,
+              reply_count: c.replies,
               author: c.author ?? "",
               author_channel_id: c.author_id ?? "",
               text: c.text ?? "",

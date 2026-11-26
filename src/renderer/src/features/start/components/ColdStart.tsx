@@ -37,6 +37,9 @@ export type ColdStartProps = {
   folderNote?: string;
 };
 
+const NOISE =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")";
+
 const Tick = () => (
   <Check2 width={12} height={12} className="text-ice" aria-hidden="true" focusable="false" />
 );
@@ -63,9 +66,11 @@ export default function ColdStart(p: ColdStartProps) {
   return (
     <main
       id="ui-cold-start"
-      className="flex min-h-[0px] flex-1 flex-col items-center gap-[56px] overflow-y-auto bg-bg bg-no-repeat pt-[clamp(48px,33.4vh,300px)]"
-      style={{ backgroundImage: "var(--glow-spotlight)", backgroundSize: "640px 420px", backgroundPosition: "50% 36%" }}
+      className="relative flex min-h-[0px] flex-1 flex-col items-center gap-[56px] overflow-y-auto bg-bg bg-no-repeat pt-[clamp(48px,33.4vh,300px)]"
+      style={{ backgroundImage: "var(--glow-spotlight)", backgroundSize: "1100px 760px", backgroundPosition: "50% 36%" }}
     >
+      {/* 5% fractal noise over the window so the long fades never band. */}
+      <span aria-hidden="true" className="pointer-events-none fixed inset-[0px] mix-blend-overlay" style={{ opacity: 0.05, backgroundImage: NOISE }} />
       <div className="flex w-[680px] max-w-full flex-col items-center gap-[32px]">
         <BrandLockup size={56} glow />
         <h1 className="m-[0px] text-center text-[36px] font-medium leading-[1.1] tracking-[-0.02em]">Only the seconds you need</h1>
