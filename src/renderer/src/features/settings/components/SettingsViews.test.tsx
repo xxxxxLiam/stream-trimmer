@@ -235,7 +235,14 @@ test("board 04.6 A: Checking shows the sliding line; Signed in folds the steps a
 test("board 04.6 A: the engine's verdicts map onto the card and the Settings row", () => {
   const rejected = statusFromAnswer({ ok: true, verify: "rejected", message: "YouTube didn't accept this sign-in. Export a fresh cookies file while signed in and add it again." });
   assert.deepEqual(rejected, { state: "failed", reason: "YouTube didn't accept this sign-in.", fix: "Export a fresh cookies file while signed in and add it again." });
-  assert.equal(statusFromAnswer({ ok: true, verify: "unverified", message: "Saved." }).state, "saved");
+  assert.deepEqual(statusFromAnswer({ ok: true, verify: "unverified", message: "Saved." }), { state: "saved" });
+  const saved = renderToStaticMarkup(<SettingsSignIn status={{ state: "saved" }} onFile={noop} onChoose={noop} onSignOut={noop} onBack={noop} onClose={noop} />);
+  assert.match(saved, /Saved, not checked yet/);
+  assert.match(saved, /YouTube didn’t answer\. Clipr will check again when you download\./);
+  assert.match(saved, />Replace file</);
+  assert.doesNotMatch(saved, /text-error|Drop cookies\.txt/);
+  assert.equal(signInRowValue({ state: "saved" }, false), "Saved");
+  assert.match(read("features/settings/hooks/useCookieDropMutations.ts"), /res\.verify !== "unverified"\) await restoreConnection/);
   assert.equal(statusFromAnswer({ ok: true }).state, "signed-in");
   assert.equal(statusFromAnswer(undefined).state, "failed");
   assert.equal(signInRowValue({ state: "checking" }, false), "Checking…");

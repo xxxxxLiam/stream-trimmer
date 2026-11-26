@@ -6,7 +6,8 @@
  *   and the waiting rows.
  */
 import { useCopyListSource } from "../../../modules/layout/hooks/copyListStore";
-import { exportListText, listFileName } from "../../../shared/utils/clipListText";
+import { exportListText, listFileName, singleClipText, transcriptFor, type ListClip } from "../../../shared/utils/clipListText";
+import type { BankedClip } from "../../../shared/utils/bank";
 import { validateClipName } from "../utils/clipName";
 import { suggestProjectName } from "../utils/projectName";
 import { useMakingClipId, useMakingName } from "../../../shared/utils/clipNameStore";
@@ -53,21 +54,33 @@ export function useExportController() {
   const made = queries.made.filter((c) => !onTop.has(c.id));
 
   // The ··· menu's Copy as text and Save as .txt: the clips waiting in this video, as the list shows them.
-  const { info } = useClipperContext();
+  const { info, getTranscript } = useClipperContext();
+  const nameOf = (c: BankedClip) => (validateClipName(c.label).ok ? c.label.trim() : suggestProjectName(c)) || c.id;
+  // Each clip with the words said in its range (fetched now if the transcript isn't loaded yet).
+  const listClips = async (clips: BankedClip[]): Promise<ListClip[]> => {
+    const got = await getTranscript();
+    return clips.map((c) => ({ name: nameOf(c), segments: c.segments, transcript: transcriptFor(got, c.segments) }));
+  };
   useCopyListSource("export", {
     count: waiting.length,
     emptyNote: "Nothing to copy yet. Clips you add show up here.",
-    text: () =>
-      exportListText({
-        videoId: queries.vid || undefined,
-        title: info?.title,
-        clips: waiting.map((c) => ({ name: (validateClipName(c.label).ok ? c.label.trim() : suggestProjectName(c)) || c.id, segments: c.segments })),
-      }),
+    text: async () => exportListText({ videoId: queries.vid || undefined, title: info?.title, clips: await listClips(waiting) }),
     fileName: () => listFileName(info?.title, "Clipr clips"),
   });
 
+  /** The row's Copy: just this clip, its line and its transcript range. */
+  const copyClip = async (clip: BankedClip): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(singleClipText((await listClips([clip]))[0], queries.vid || undefined));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   return {
     ...queries,
+    copyClip,
     waiting,
     made,
     ...actions,

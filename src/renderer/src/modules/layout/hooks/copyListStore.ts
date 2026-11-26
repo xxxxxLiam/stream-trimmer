@@ -10,7 +10,7 @@ import { useIsTabActive } from "../../../features/workspace/hooks/WorkspaceConte
 export type CopyList = {
   count: number;
   /** The text, written when it is asked for, never on every render. */
-  text: () => string;
+  text: () => string | Promise<string>;
   fileName: () => string;
   /** The dim line under the disabled items when there is nothing to copy. */
   emptyNote: string;
@@ -45,7 +45,7 @@ export function useCopyListFor(id: string | undefined): CopyList | undefined {
 }
 
 /** A panel offers its list: the count is read live, the text only when copied. */
-export function useCopyListSource(id: string, list: { count: number; text: () => string; fileName: () => string; emptyNote: string }) {
+export function useCopyListSource(id: string, list: { count: number; text: () => string | Promise<string>; fileName: () => string; emptyNote: string }) {
   const latest = useRef(list);
   latest.current = list;
   // Every workspace tab renders its own panels; only the tab in front owns the menu's list.

@@ -136,6 +136,7 @@ export function useClipperController() {
     showTranscript: transcript.showTranscript,
     toggleTranscript: transcript.toggleTranscript,
     ensureTranscript: transcript.ensureTranscript,
+    getTranscript: transcript.getTranscript,
     loadingTranscript: transcript.loadingTranscript,
     transcriptError: transcript.transcriptError,
     transcript: transcript.transcript,

@@ -6,7 +6,7 @@
 import { isStreamSource } from "../../../shared/utils/videoSource";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatTimestamp, normalizeYouTubeUrl, parseJson, apiUrl, type TranscriptLine, type TranscriptResponse } from "../../../shared/utils/clip";
-import { transcriptOutcome } from "../../../shared/utils/transcriptOutcome";
+import { transcriptOutcome, type TranscriptOutcome } from "../../../shared/utils/transcriptOutcome";
 import { cookiePayload } from "../../../shared/utils/youtubeConnection";
 
 export function useTranscriptQueries({
@@ -49,13 +49,13 @@ export function useTranscriptQueries({
     setTranscriptQuery("");
   }, [videoId]);
 
-  const loadTranscript = useCallback(async () => {
-    if (!url) return;
+  const loadTranscript = useCallback(async (): Promise<TranscriptOutcome> => {
+    if (!url) return { lines: [], error: null };
     // Twitch and Kick have no captions to fetch: the transcript says there is none, with no request.
     if (isStreamSource(videoId)) {
       setTranscript([]);
       setTranscriptError(null);
-      return;
+      return { lines: [], error: null };
     }
     setLoadingTranscript(true);
     try {
@@ -74,10 +74,12 @@ export function useTranscriptQueries({
       const out = transcriptOutcome(data);
       setTranscript(out.lines);
       setTranscriptError(out.error);
+      return out;
     } catch {
       const out = transcriptOutcome(null);
       setTranscript(out.lines);
       setTranscriptError(out.error);
+      return out;
     } finally {
       setLoadingTranscript(false);
     }
@@ -95,6 +97,12 @@ export function useTranscriptQueries({
   const ensureTranscript = useCallback(() => {
     if (transcript === null && !loadingTranscript) void loadTranscript();
   }, [transcript, loadingTranscript, loadTranscript]);
+
+  /** The transcript for copying: what is loaded, or fetched now. `error` is set only when the fetch failed. */
+  const getTranscript = useCallback(
+    async (): Promise<TranscriptOutcome> => (transcript !== null ? { lines: transcript, error: transcriptError } : loadTranscript()),
+    [transcript, transcriptError, loadTranscript],
+  );
 
   const rangeTranscript = useMemo(() => {
     if (!transcript) return [];
@@ -143,6 +151,7 @@ export function useTranscriptQueries({
     showTranscript,
     toggleTranscript,
     ensureTranscript,
+    getTranscript,
     loadingTranscript,
     transcriptError,
     transcript,
