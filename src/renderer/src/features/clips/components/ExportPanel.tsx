@@ -24,6 +24,7 @@ import PillSearch from "../../../shared/components/PillSearch";
 import SortFilterPanel from "./SortFilterPanel";
 import { DEFAULT_VIEW, SORT_LABELS, applyView, type BankView } from "../utils/bankView";
 import { useState } from "react";
+import { IconRemove } from "../../../shared/components/rowIcons";
 import { exitSelectMoments, selectAllMoments, toggleMoment, useSelectMoments } from "../../../shared/utils/selectMomentsStore";
 
 /** A moment shorter than the campaign's minimum says so in one dim line; the rule is the editor's to bend. */
@@ -47,14 +48,36 @@ export default function ExportPanel() {
   const everyClip = applyView(all, view);
   const topics = [...new Set(all.map((x) => x.category).filter((t): t is string => !!t))];
   const filterPills = [...view.topics, ...view.tiers.map((t) => `T${t}`), ...(view.minRating > 0 ? [`${view.minRating}+`] : [])];
-  const chosen = everyClip.filter((x) => pick.ids.has(x.id));
+  const tickable = everyClip.filter((x) => x.status === "banked");
+  const chosen = tickable.filter((x) => pick.ids.has(x.id));
   const leave = () => {
     setConfirming(false);
     exitSelectMoments();
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto" id="help-anchor-clips-tabs">
+      {pick.on ? (
+        <div id="ui-select-moments" className="flex h-[45px] flex-none items-center gap-[8px] border-b border-hairline px-[14px] text-body">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={tickable.length > 0 && chosen.length === tickable.length}
+            aria-label="Select all"
+            onClick={() => selectAllMoments(tickable.map((x) => x.id))}
+            className="flex items-center gap-[8px] text-fg"
+          >
+            <span className={`flex size-[18px] items-center justify-center rounded-chip border text-meta leading-[normal] ${chosen.length > 0 ? "border-ice bg-ice text-bg" : "border-hairlineStrong"}`}>
+              {chosen.length === 0 ? "" : chosen.length === tickable.length ? "✓" : "–"}
+            </span>
+            Select all
+          </button>
+          <span className="ml-auto text-meta tabular-nums text-fg-dim">{chosen.length} selected</span>
+          <button type="button" onClick={leave} className="h-[32px] rounded-pill border border-hairlineStrong px-[14px] text-meta text-fg hover:bg-hover">
+            Done
+          </button>
+        </div>
+      ) : null}
       <CrashNoteHost />
       {active && momentNote && (
         <p role="status" className="mx-[10px] mt-[10px] text-meta text-fg-dim">
@@ -110,6 +133,7 @@ export default function ExportPanel() {
         </PanelEmptyNote>
       ) : (
         <>
+          {pick.on ? null : (
           <PillSearch
             placeholder="Search moments"
             pills={[...filterPills, ...view.words]}
@@ -123,52 +147,18 @@ export default function ExportPanel() {
               })
             }
             count={everyClip.length === all.length ? `${all.length} ${all.length === 1 ? "moment" : "moments"}` : `${everyClip.length} of ${all.length}`}
+            inline
             trailing={<SortFilterPanel view={view} onChange={setView} topics={topics} />}
           />
-          <div className="flex justify-between px-[12px] pb-[6px] pt-[6px] text-meta leading-[normal] text-fg-dim">
-            Waiting in this video · {SORT_LABELS[view.sort]}
+          )}
+          <div className="flex items-center gap-[8px] px-[12px] pb-[6px] pt-[6px] text-meta leading-[normal] text-fg-dim">
+            Waiting in this video
+            <span className="ml-auto inline-flex items-center gap-[4px]">
+              <span aria-hidden="true">⇅</span>
+              {SORT_LABELS[view.sort]}
+            </span>
             <span>{c.waiting.length}</span>
           </div>
-          {pick.on ? (
-            <div className="mx-[10px] mb-[4px] flex items-center gap-[8px] text-meta text-fg-dim" id="ui-select-moments">
-              <span className="tabular-nums">{chosen.length} selected</span>
-              <button type="button" className="rounded-control px-[8px] py-[4px] hover:bg-hover hover:text-fg" onClick={() => selectAllMoments(everyClip.map((x) => x.id))}>
-                Select all
-              </button>
-              {confirming ? (
-                <>
-                  <span className="ml-auto text-fg">Delete {chosen.length}? This can't be undone.</span>
-                  <button
-                    type="button"
-                    className="rounded-control border border-error px-[8px] py-[4px] text-error"
-                    onClick={() => {
-                      chosen.forEach((x) => c.remove(x));
-                      leave();
-                    }}
-                  >
-                    Delete
-                  </button>
-                  <button type="button" className="rounded-control px-[8px] py-[4px] hover:bg-hover hover:text-fg" onClick={() => setConfirming(false)}>
-                    Keep
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    disabled={chosen.length === 0}
-                    className="ml-auto rounded-control px-[8px] py-[4px] text-fg hover:bg-hover disabled:text-disabled"
-                    onClick={() => setConfirming(true)}
-                  >
-                    Delete {chosen.length || ""}
-                  </button>
-                  <button type="button" className="rounded-control px-[8px] py-[4px] hover:bg-hover hover:text-fg" onClick={leave}>
-                    Done
-                  </button>
-                </>
-              )}
-            </div>
-          ) : null}
           {everyClip.map((clip) => {
             const name = validateClipName(clip.label).ok ? clip.label.trim() : suggestProjectName(clip);
             return (
@@ -185,7 +175,7 @@ export default function ExportPanel() {
                 onRename={(label) => c.rename(clip, label)}
                 onCopy={() => c.copyClip(clip)}
                 onRemove={() => c.remove(clip)}
-                picking={pick.on ? { checked: pick.ids.has(clip.id), onToggle: () => toggleMoment(clip.id) } : undefined}
+                picking={pick.on && clip.status === "banked" ? { checked: pick.ids.has(clip.id), onToggle: () => toggleMoment(clip.id) } : undefined}
               />
             );
           })}
@@ -197,6 +187,41 @@ export default function ExportPanel() {
           {c.notice}
         </p>
       )}
+      {pick.on ? (
+        <div className="sticky bottom-0 mt-auto flex-none bg-panel px-[10px] pb-[10px] pt-[8px]">
+          <button
+            type="button"
+            disabled={chosen.length === 0}
+            onClick={() => setConfirming(true)}
+            className="flex h-[44px] w-full items-center justify-center gap-[8px] rounded-pill border border-error text-body font-medium text-error disabled:opacity-60"
+          >
+            <IconRemove />
+            Delete {chosen.length || ""}
+          </button>
+        </div>
+      ) : null}
+      {pick.on && confirming ? <div aria-hidden="true" className="absolute inset-0 z-10 bg-bg-overlay-60" /> : null}
+      {pick.on && confirming ? (
+        <div role="alertdialog" aria-label={`Delete ${chosen.length} moments`} className="absolute inset-x-[10px] top-[60px] z-20 rounded-panel border border-hairlineStrong bg-raised p-[16px]">
+          <h3 className="m-0 text-[17px] font-medium text-fg">Delete {chosen.length} {chosen.length === 1 ? "moment" : "moments"}?</h3>
+          <p className="my-[8px] text-meta leading-[1.5] text-fg-dim">They leave the bank. Clips you already made are not touched. This cannot be undone.</p>
+          <div className="flex gap-[8px]">
+            <button type="button" onClick={() => setConfirming(false)} className="h-[44px] flex-1 rounded-pill border border-hairlineStrong text-body text-fg hover:bg-hover">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                chosen.forEach((x) => c.remove(x));
+                leave();
+              }}
+              className="h-[44px] flex-1 rounded-pill border border-error bg-error text-body font-medium text-bg"
+            >
+              Delete {chosen.length}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -11,8 +11,15 @@ export type BankView = { sort: BankSortKey; topics: readonly string[]; tiers: re
 
 export const DEFAULT_VIEW: BankView = { sort: "rating-desc", topics: [], tiers: [], minRating: 0, words: [] };
 export const SORT_LABELS: Record<BankSortKey, string> = {
-  "rating-desc": "Highest rating first",
-  "rating-asc": "Lowest rating first",
+  "rating-desc": "Rating, high to low",
+  "rating-asc": "Rating, low to high",
+  order: "Order in the video",
+};
+
+/** The rows in Sort and filter (board 03.2.52). */
+export const SORT_ROWS: Record<BankSortKey, string> = {
+  "rating-desc": "Rating, high to low",
+  "rating-asc": "Rating, low to high",
   order: "Order in the video",
 };
 

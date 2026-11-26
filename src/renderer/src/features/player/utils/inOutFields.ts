@@ -4,7 +4,7 @@
  * Description: The footer's In and Out fields: what a typed or pasted time becomes (the clipper's HH:MM:SS
  *   text, cleared, or a short sentence saying what is wrong) and when In and Out are the wrong way round.
  */
-import { formatTimestamp, parseTimestamp } from "../../../shared/utils/clip";
+import { formatPrecise, parseTimestamp } from "../../../shared/utils/clip";
 import { parseTimecode } from "../../../shared/utils/segments";
 
 export type TimeEntry = { kind: "clear" } | { kind: "set"; text: string } | { kind: "bad"; message: string };
@@ -17,7 +17,7 @@ export function readTime(draft: string, duration: number): TimeEntry {
   if (sec === null) return { kind: "bad", message: "Type a time like 1:12:04" };
   const whole = Math.floor(sec);
   if (duration > 0 && whole > duration) return { kind: "bad", message: "That is past the end of the video" };
-  return { kind: "set", text: formatTimestamp(whole) };
+  return { kind: "set", text: formatPrecise(sec) };
 }
 
 /** Both ends are set and Out is not after In. */

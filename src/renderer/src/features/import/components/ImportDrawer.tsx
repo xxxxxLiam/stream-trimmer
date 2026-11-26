@@ -123,16 +123,17 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
             <SectionLabel>Duplicates</SectionLabel>
             <ul className="m-[0px] flex list-none flex-col p-[0px]">
               {c.flagged.filter((m) => m.problem?.duplicate).map((m) => (
-                <li key={m.key} className="flex min-h-[64px] items-center gap-[12px] border-b border-hairline">
+                <li key={m.key} className="flex min-h-[64px] items-center gap-[10px] border-b border-hairline">
+                  <span aria-hidden="true" className="size-[6px] flex-none rounded-[50%] bg-frost" />
                   <span className="min-w-[0px] flex-1">
                     <span className="block truncate text-body">{m.name || `Line ${m.key}`}</span>
-                    <span className="block text-meta text-fg-dim">{m.problem?.reason}</span>
+                    <span className="block text-meta text-fg">{m.problem?.reason}</span>
                   </span>
-                  <button type="button" className="text-meta text-fg-dim hover:text-fg" onClick={() => c.skip(m.key)}>
-                    Skip
-                  </button>
-                  <button type="button" className="text-meta text-ice hover:underline" onClick={() => c.keep(m.key)}>
+                  <button type="button" className="h-[32px] rounded-pill border border-hairlineStrong px-[12px] text-meta text-fg hover:bg-hover" onClick={() => c.keep(m.key)}>
                     Keep
+                  </button>
+                  <button type="button" className="h-[32px] rounded-pill border border-ice px-[12px] text-meta text-ice hover:bg-ice-tint-12" onClick={() => c.skip(m.key)}>
+                    Skip
                   </button>
                 </li>
               ))}

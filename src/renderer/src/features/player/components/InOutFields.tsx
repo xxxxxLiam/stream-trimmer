@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { parseTimestamp } from "../../../shared/utils/clip";
-import { clockTime } from "../utils/transport";
+import { clockTimePrecise } from "../utils/transport";
 import { OUT_AFTER_IN, outBeforeIn, readTime } from "../utils/inOutFields";
 
 const FIELD =
@@ -33,7 +33,7 @@ function Field({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const parsed = parseTimestamp(text);
-  const shown = draft ?? (parsed === null ? "" : clockTime(parsed));
+  const shown = draft ?? (parsed === null ? "" : clockTimePrecise(parsed));
   const commit = (value: string) => {
     const r = readTime(value, duration);
     if (r.kind === "bad") {

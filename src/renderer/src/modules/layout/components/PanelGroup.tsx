@@ -3,7 +3,7 @@
  * Path: src/renderer/src/modules/layout/components/PanelGroup.tsx
  * Description: One tabbed group (left or right): the tab strip over the active panel's body.
  */
-import { enterSelectMoments } from "../../../shared/utils/selectMomentsStore";
+import { enterSelectMoments, useSelectMoments } from "../../../shared/utils/selectMomentsStore";
 import { createElement, useEffect, useState } from "react";
 import PanelTabStrip, { panelBodyDomId, tabDomId } from "./PanelTabStrip";
 import { usePanelHostOptional } from "../hooks/PanelHostContext";
@@ -37,6 +37,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   const mac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
   // Export and History start their menu with the list as text: Copy as text (the default) and Save as .txt….
   const list = useCopyListFor(activeDef?.id);
+  const pickingMoments = useSelectMoments().on;
   const [said, setSaid] = useState<string | null>(null);
   useEffect(() => {
     if (!said) return;
@@ -91,6 +92,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
 
   return (
     <section aria-label={NAMES[group]} className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {pickingMoments && activeDef?.id === "export" ? null : (
       <PanelTabStrip
         addAction={addAction}
         label={NAMES[group]}
@@ -101,6 +103,7 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
         onMove={move}
         menuItems={menuItems}
       />
+      )}
       {activeDef ? (
         <div
           role="tabpanel"

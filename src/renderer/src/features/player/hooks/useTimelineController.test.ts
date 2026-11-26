@@ -346,9 +346,11 @@ test("Design v145: Snap pill decides whether handles snap to the transcript; the
   assert.match(tools, /h-\[45px\]/);
   assert.match(tools, /ui-playhead-time/);
   assert.match(src, /tools\.snap \? Math\.round\(snapToWord\(lines, t, edge\)\) : Math\.round\(t \* 10\) \/ 10/);
-  assert.match(sourceLane, /Delete section \$\{i \+ 1\}/);
+  const clips2 = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+  assert.match(clips2, /Delete section \$\{i \+ 1\}/);
+  assert.doesNotMatch(sourceLane, /Delete section/);
   assert.match(sourceLane, /c\.dragEdge/);
-  assert.match(sourceLane, /size-\[22px\]/);
+  assert.match(clips2, /size-\[22px\]/);
   assert.match(sourceLane, / long</);
   assert.match(src, /store\.segments\.length === 1 && !range\) deleteClip\(\)/);
 });
@@ -358,7 +360,8 @@ test("Design v146: Select moments is in the Export menu, ticks cards, and delete
   const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
   assert.match(group, /label: "Select moments"/);
   assert.match(panel, /Select all/);
-  assert.match(panel, /Delete \{chosen\.length\}\? This can't be undone/);
+  assert.match(panel, /This cannot be undone/);
+  assert.match(panel, /Delete \{chosen\.length\} \{chosen\.length === 1 \? "moment" : "moments"\}\?/);
   assert.match(panel, /chosen\.forEach\(\(x\) => c\.remove\(x\)\)/);
 });
 
@@ -369,7 +372,7 @@ test("Design v147/v148: the bank card is name + rating over topic, tier and leng
   assert.doesNotMatch(row, /rangeLine/);
   assert.match(row, /mt-\[3px\] flex items-center gap-\[4px\]/);
   assert.match(panel, /trailing=\{<SortFilterPanel/);
-  assert.match(panel, /Waiting in this video · \{SORT_LABELS\[view\.sort\]\}/);
+  assert.match(panel, /\{SORT_LABELS\[view\.sort\]\}/);
   assert.match(sf, /h-\[28px\]/);
   assert.match(sf, /gap-\[6px\]/);
   assert.match(sf, /mb-\[6px\] mt-\[12px\]/);
