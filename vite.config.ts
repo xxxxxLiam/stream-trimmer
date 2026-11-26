@@ -11,6 +11,10 @@
 import { readFileSync } from "node:fs";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { createRequire } from "node:module";
+
+// Private source maps for release builds only (scripts/sourcemaps.cjs); a normal build writes none.
+const { viteMaps } = createRequire(import.meta.url)("./scripts/sourcemaps.cjs") as { viteMaps: () => false | "hidden" };
 
 const truthy = (v: string | undefined) =>
   /^(1|true|yes|on)$/i.test(String(v ?? "").trim());
@@ -36,7 +40,7 @@ export default defineConfig(({ mode }) => {
       },
     ],
     base: "./",
-    build: { outDir: "../../dist", emptyOutDir: true },
+    build: { outDir: "../../dist", emptyOutDir: true, sourcemap: viteMaps() },
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __CHANNEL_DATA__: JSON.stringify(built),

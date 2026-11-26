@@ -5,6 +5,7 @@
 const path = require("node:path");
 const fs = require("node:fs");
 const esbuild = require("esbuild");
+const { esbuildMaps } = require("./sourcemaps.cjs");
 const { isHardened, esbuildHardeningOptions, collectLegalComments, obfuscateFile } = require("./buildHardening.cjs");
 
 const hardened = isHardened();
@@ -118,6 +119,7 @@ esbuild
           }
         : {}),
     },
+    ...esbuildMaps(),
     logLevel: "info",
     ...esbuildHardeningOptions(hardened),
   })

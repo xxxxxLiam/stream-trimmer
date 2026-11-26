@@ -9,6 +9,7 @@
 // itself and the second is shipped in the packaged app's node_modules.
 const path = require("node:path");
 const esbuild = require("esbuild");
+const { esbuildMaps } = require("./sourcemaps.cjs");
 const { isHardened, esbuildHardeningOptions, collectLegalComments, obfuscateFile } = require("./buildHardening.cjs");
 
 const root = path.join(__dirname, "..");
@@ -38,6 +39,7 @@ const common = {
   target: "node20",
   loader: { ".ts": "ts" },
   external: ["electron", "electron-updater"],
+  ...esbuildMaps(),
   logLevel: "info",
   ...esbuildHardeningOptions(hardened),
 };
