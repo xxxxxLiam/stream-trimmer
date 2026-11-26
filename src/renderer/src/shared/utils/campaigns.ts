@@ -113,7 +113,7 @@ export function normalizeBand<T extends Pick<Campaign, "targetMinSec" | "targetM
 
 import { CHANNEL_DATA_BUILT } from "./ownerGate";
 import { siblingDir } from "../../../../common/utils/siblingDir";
-import { INVISIBLE_CHARS as INVISIBLE, safeFolderName, type CampaignKind } from "../../../../common/utils/brandedFolder";
+import { INVISIBLE_CHARS as INVISIBLE, isBrandedName, safeFolderName, type CampaignKind } from "../../../../common/utils/brandedFolder";
 
 export type { CampaignKind };
 
@@ -133,10 +133,15 @@ export function folderNameOf(name: string): string {
  * Where a campaign's clips go: its own folder when it chose one, else a folder named after it inside the
  * Clips folder (the parent). Empty when there is no parent yet.
  */
-export function campaignClipsDir(c: Pick<Campaign, "name" | "clipsDir">, parent: string): string {
+export function campaignClipsDir(c: Pick<Campaign, "name" | "clipsDir"> & { kind?: CampaignKind }, parent: string): string {
   if (c.clipsDir) return c.clipsDir;
   const base = parent.replace(/[\\/]+$/, "");
   if (!base) return "";
+  // A location's own folder is "Clipr <Name>" beside the Clipr folder (Downloads/Clipr B-roll), not inside it.
+  if (c.kind === "location") {
+    const leaf = safeFolderName(c.name, "Location");
+    return siblingDir(base, isBrandedName(leaf) ? leaf : `Clipr ${leaf}`);
+  }
   const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
   return `${base}${sep}${folderNameOf(c.name)}`;
 }
@@ -451,7 +456,8 @@ export function clipsMadeToday(c: Campaign | null | undefined, now: number = Dat
  */
 export function todayCount(c: Campaign | null | undefined, now: number = Date.now()): string | null {
   const quota = c?.dailyQuota;
-  if (!c || !quota || quota <= 0) return null;
+  // A location has no quota, so no count.
+  if (!c || c.kind === "location" || !quota || quota <= 0) return null;
   const made = clipsMadeToday(c, now);
   return made >= quota ? "Done for today" : `${made} of ${quota} today`;
 }

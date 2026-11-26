@@ -60,7 +60,12 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
         {typeof window !== "undefined" && window.electronAPI?.pickDirectory && (
           <button
             type="button"
-            onClick={() => void window.electronAPI?.pickDirectory().then((d) => d && setOwn(d))}
+            onClick={() => {
+              const api = window.electronAPI;
+              // The pick becomes <chosen>/Clipr clips/<Campaign> (an existing Clipr clips folder is reused, never nested).
+              if (api?.pickBrandedDirectory) void api.pickBrandedDirectory({ kind: "campaign", name: name.trim() || "Campaign" }).then((r) => r && setOwn(r.dir));
+              else void api?.pickDirectory().then((d) => d && setOwn(d));
+            }}
             className="h-target rounded-control border border-hairlineStrong bg-raised px-[16px] text-body leading-[normal] text-fg hover:bg-hover"
           >
             Choose
