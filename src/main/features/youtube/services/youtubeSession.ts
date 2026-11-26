@@ -16,7 +16,7 @@ const { app, session } = electron;
 import path from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import { checkCookiesFile, readCookieFile } from "./cookieFile";
+import { checkCookiesFile, landedCheck, readCookieFile } from "./cookieFile";
 import { resolveAuthState } from "./cookieState";
 import { signIn } from "../../../shared/utils/signInSignal";
 import * as logger from "../../../modules/logger/logger";
@@ -114,6 +114,13 @@ async function importCookieText(text: unknown) {
       await fsp.chmod(target, 0o600);
     } catch {
       /* best effort on Windows */
+    }
+    // Read it back before claiming a sign-in: only a file that really landed counts.
+    const readBack = await fsp.readFile(target, "utf8").catch(() => null);
+    const landed = landedCheck(readBack, raw);
+    if (!landed.ok) {
+      logger.log("youtube", `cookie import: file did not land (${readBack === null ? "unreadable" : readBack.trim() === "" ? "empty" : "different"})`);
+      return { ok: false, error: landed.error };
     }
     signIn.setFileUsable(true);
     return { ok: true, count: check.count };
