@@ -196,6 +196,11 @@ export function removeClip(data: BankData, campaignId: string, videoId: string, 
   return withClips(data, campaignId, videoId, list.filter((c) => c.id !== clipId));
 }
 
+/** Put a video's whole list back as it was (Undo and Redo). An empty list leaves the video out, as removing its last clip does. */
+export function setClips(data: BankData, campaignId: string, videoId: string, clips: readonly BankedClip[]): BankData {
+  return withClips(data, campaignId, videoId, [...clips]);
+}
+
 /** The note a kept duplicate carries; the bank card shows it as a line (board 04.2.2). */
 export const DUPLICATE_NOTE = "Duplicate. Adjust it in the timeline.";
 
@@ -360,6 +365,8 @@ export type BankStore = {
   rename: (campaignId: string, videoId: string, clipId: string, label: string) => void;
   clearRanPastEnd: (campaignId: string, videoId: string, clipId: string) => void;
   setSegments: (campaignId: string, videoId: string, clipId: string, segments: readonly Segment[]) => void;
+  /** Put a video's list back as it was (Undo and Redo). */
+  setClips: (campaignId: string, videoId: string, clips: readonly BankedClip[]) => void;
   /** Forget everything banked under a campaign (it was removed). */
   removeCampaign: (campaignId: string) => void;
 };
@@ -397,6 +404,7 @@ export function createBankStore(io: BankIO): BankStore {
     rename: (c, v, id, label) => commit(renameClip(data, c, v, id, label)),
     clearRanPastEnd: (c, v, id) => commit(clearRanPastEnd(data, c, v, id)),
     setSegments: (c, v, id, segs) => commit(setClipSegments(data, c, v, id, segs)),
+    setClips: (c, v, clips) => commit(setClips(data, c, v, clips)),
     removeCampaign: (c) => commit(removeCampaignBank(data, c)),
   };
 }
