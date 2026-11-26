@@ -72,11 +72,35 @@ function rangeFrom({ tag = "", logLines = [] } = {}) {
   return tag ? `${tag}..HEAD` : null;
 }
 
+/**
+ * Liam's standing rule (26 Nov): a patch number never reaches 10. When the
+ * next patch would be x.y.10 or higher, the release becomes the next minor
+ * instead (x.(y+1).0). Only a patch is capped; minor and major pass through.
+ */
+const MAX_PATCH = 9;
+function capPatch(bump, version = "") {
+  if (bump !== "patch") return bump;
+  const m = /^(\d+)\.(\d+)\.(\d+)/.exec(String(version).trim());
+  if (!m) return bump;
+  return Number(m[3]) + 1 > MAX_PATCH ? "minor" : bump;
+}
+
+/** The version in the working directory's package.json, which the version step bumps next. */
+function currentVersion() {
+  try {
+    return JSON.parse(
+      require("node:fs").readFileSync(require("node:path").join(process.cwd(), "package.json"), "utf8"),
+    ).version;
+  } catch {
+    return "";
+  }
+}
+
 /** Reads the commit range since the last release and prints the bump. */
 function main() {
   const forced = process.argv[2];
   if (forced && forced !== "auto") {
-    process.stdout.write(`${forced}\n`);
+    process.stdout.write(`${capPatch(forced, currentVersion())}\n`);
     return;
   }
   const git = (args) =>
@@ -92,7 +116,7 @@ function main() {
   const logLines = git(["log", "--format=%H %s", "--skip=1", "-n", "500"]).split("\n");
   const range = rangeFrom({ tag, logLines });
   if (!range) {
-    process.stdout.write("patch\n");
+    process.stdout.write(`${capPatch("patch", currentVersion())}\n`);
     return;
   }
 
@@ -106,9 +130,9 @@ function main() {
     subjects: split("%s"),
     bodies: split("%b"),
   });
-  process.stdout.write(`${bump}\n`);
+  process.stdout.write(`${capPatch(bump, currentVersion())}\n`);
 }
 
 if (require.main === module) main();
 
-module.exports = { detectBump, rangeFrom };
+module.exports = { detectBump, rangeFrom, capPatch };
