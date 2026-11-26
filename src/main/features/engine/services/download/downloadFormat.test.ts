@@ -32,9 +32,10 @@ test.after(() => fs.rmSync(cookieDir, { recursive: true, force: true }));
 
 /**
  * Drives /api/download far enough that the server logs the yt-dlp invocation.
- * The fake yt-dlp answers the probe but writes no media, so the request ends
- * in "yt-dlp produced no output" — by which point the exec line is on stdout,
- * which is the only thing being asserted here.
+ * With no formats at all on either client set the request fails outright (after
+ * one retry on the fallback clients — see the format_unavailable retry tests
+ * below), so the FIRST exec line is what these ladder/client-list assertions
+ * are about: the options the server first tried to build.
  */
 async function execOptions(
   harness: Harness,
@@ -60,7 +61,7 @@ async function execOptions(
     .split("\n")
     .filter((l) => l.includes("/api/download exec "));
   assert.ok(lines.length > 0, `no exec line logged:\n${harness.log()}`);
-  const json = lines[lines.length - 1].replace(/^.*?options=/, "");
+  const json = lines[0].replace(/^.*?options=/, "");
   return JSON.parse(json) as Record<string, unknown>;
 }
 
@@ -243,6 +244,41 @@ test("a retry that fails outright leaves the user the clip they had", async (t) 
   assert.equal(res.headers.get("X-Quality-Degraded"), "1");
   assert.ok(fs.existsSync(res.body.path), "the kept clip is gone");
   assert.match(harness.log(), /degraded retry failed job=/);
+});
+
+test("a player client that hands back no formats at all is retried on a different one, not a hard failure", async (t) => {
+  // FAKE_HEIGHT_PRIMARY=0 makes the fake yt-dlp fail every request on the primary player clients with
+  // "Requested format is not available" — exactly what a real session hits when YouTube serves that
+  // client zero formats for a given video. Before this fix the job failed outright; the ladder ending
+  // in a bare `best` cannot help, because there is nothing in the list to select from at all.
+  const harness = await startHarness({
+    availableHeights: PROBED,
+    deliveredHeights: { primary: 0, fallback: 1080 },
+  });
+  t.after(() => harness.stop());
+
+  const res = await download(harness, "1080");
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.headers.get("X-Delivered-Height"), "1080");
+
+  const used = clientsUsed(harness);
+  assert.equal(used.length, 2, `expected one retry on different clients, got ${used.join(" | ")}`);
+  assert.notEqual(used[0], used[1]);
+  assert.match(harness.log(), /format_unavailable job=.* — retrying on/);
+});
+
+test("a player client with no formats at all, and no other client has any either, still fails plainly", async (t) => {
+  const harness = await startHarness({
+    availableHeights: PROBED,
+    deliveredHeights: { primary: 0, fallback: 0 },
+  });
+  t.after(() => harness.stop());
+
+  const res = await download(harness, "1080");
+  assert.equal(res.status, 500, JSON.stringify(res.body));
+  assert.equal(res.body.code, "format_unavailable");
+  // Both client lists were genuinely tried, not just the first.
+  assert.equal(clientsUsed(harness).length, 2);
 });
 
 test("a video that genuinely has no better rendition is downloaded once", async (t) => {

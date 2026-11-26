@@ -150,6 +150,14 @@ export async function startHarness(channel: FakeChannel = {}): Promise<Harness> 
   );
   fs.chmodSync(ffmpeg, 0o755);
 
+  // yt-dlp's own [jsc:deno] step needs this to be findable too — without it,
+  // jsRuntimeProblem() reports deno missing, which turns every "format not
+  // available" test into the "reinstall Clipr" failure instead of the one
+  // actually being tested. A version line is all the probe reads.
+  const deno = path.join(binDir, "deno");
+  fs.writeFileSync(deno, `#!/bin/sh\necho "deno 1.0.0 (fake, test harness)"\n`);
+  fs.chmodSync(deno, 0o755);
+
   // The bundle keeps ffmpeg-static external, exactly as the packaged build
   // does, so it has to sit where node can resolve the repo's node_modules.
   const bundleDir = path.join(repoRoot, "node_modules", ".cache", "ytclip-test");
