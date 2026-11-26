@@ -118,3 +118,18 @@ export function checkCookiesFile(text: unknown, now = Date.now()): CookieCheck {
 
   return { ok: true, count: relevant.length };
 }
+
+/**
+ * After the import is committed: is what is on disk the file that was just checked? A missing, empty or
+ * different file (an antivirus holding it, a failed rename that did not throw) must never be reported as
+ * "signed in", because yt-dlp would then run with no session at all.
+ */
+export function landedCheck(readBack: string | null, imported: string): { ok: true } | { ok: false; error: string } {
+  if (readBack === null || readBack.trim() === "") {
+    return { ok: false, error: "The cookies file could not be saved on this computer. Try adding it again." };
+  }
+  if (readBack !== imported || !checkCookiesFile(readBack).ok) {
+    return { ok: false, error: "The saved cookies file did not match the one you chose. Try adding it again." };
+  }
+  return { ok: true };
+}

@@ -38,6 +38,7 @@
     "parity": "node scripts/parity/parity.cjs",
     "parity:el": "node scripts/parity/elements.cjs",
     "build:relay": "node scripts/build-relay.cjs",
+    "tools:refresh-pot": "node scripts/bundle-binaries.cjs --pot",
     "collect-sourcemaps": "node scripts/collect-sourcemaps.cjs",
     "decode-stack": "node scripts/decodeStack.cjs"
   },
@@ -110,6 +111,13 @@
       {
         "from": "resources/bin",
         "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/pot-provider",
+        "to": "pot-provider",
         "filter": [
           "**/*"
         ]

@@ -99,7 +99,8 @@ export function failureCopy(
   if (kind === "refused") return { reason: ov ?? "YouTube refused the download for this video.", detail: attempts < 2 ? "Try again in a moment." : "" };
   // "Will try once more" is said only when the engine really is about to (retrying:true).
   if (kind === "ratelimited") return { reason: ov ?? "YouTube is asking Clipr to slow down.", detail: "Try again in a few minutes." };
-  if (kind === "format") return { reason: ov ?? "YouTube has no version of this video Clipr can download right now.", detail: "Retry. If it keeps happening, sign in to YouTube in Settings." };
+  // Board 03.2.56: no downloadable format. Signing in often fixes it (the engine's own sentence is not used: the board's words are).
+  if (kind === "format") return { reason: "YouTube gave no downloadable version.", detail: "Signing in often fixes this, and the transcript too. Your range is kept." };
   if (kind === "tools") return { reason: ov ?? "Clipr’s download tools are missing.", detail: "Restart Clipr, then Retry." };
   // The engine's own plain sentence when it sent one; "will try once more" only when it really is retrying.
   return { reason: ov ?? "YouTube stopped the download.", detail: retrying ? RETRY_SENTENCE : "" };
@@ -114,10 +115,10 @@ export function failureActions(kind: ClipFailureKind, attempts: number, final = 
   if (kind === "members") return signedIn ? ["showInBrowser", "saveForLater"] : ["signIn", "showInBrowser", "saveForLater"];
   if (kind === "private" || kind === "removed") return ["showInBrowser", "saveForLater"];
   if (kind === "toolong") return [];
-  if (kind === "signin" || kind === "expired") return attempts >= 2 ? ["signIn", "retry", "copyDetails"] : ["signIn", "retry"];
+  if (kind === "signin" || kind === "expired" || kind === "format") return attempts >= 2 ? ["signIn", "retry", "copyDetails"] : ["signIn", "retry"];
   // The rest get Retry (no engine retry is promised), with Copy details once the Retry also failed. A kind with
   // no sentence of its own (the engine's words stand in) has Copy details at once when the engine says final.
-  const generic = kind === "stopped" || kind === "refused" || kind === "ratelimited" || kind === "format" || kind === "tools";
+  const generic = kind === "stopped" || kind === "refused" || kind === "ratelimited" || kind === "tools";
   return attempts >= 2 || (final && generic) ? ["retry", "copyDetails"] : ["retry"];
 }
 

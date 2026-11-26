@@ -116,13 +116,14 @@ test("E2-1 renderer half: the engine's new codes map, and a final row shows the 
   assert.equal(classifyClipFailure("format_unavailable"), "format");
   assert.equal(classifyClipFailure("tools_missing"), "tools");
   assert.match(failureCopy("ratelimited", 1).reason, /slow down/);
-  assert.match(failureCopy("format", 1).reason, /no version of this video/);
+  assert.deepEqual(failureCopy("format", 1), { reason: "YouTube gave no downloadable version.", detail: "Signing in often fixes this, and the transcript too. Your range is kept." }, "board 03.2.56");
   assert.doesNotMatch(JSON.stringify(failureCopy("format", 1)), /another quality/, "there is no quality picker to point at");
   assert.match(failureCopy("tools", 1).detail, /Restart Clipr/);
   assert.equal(failureCopy("refused", 1, "YouTube turned this download down.").reason, "YouTube turned this download down.");
   assert.equal(failureCopy("stopped", 1, "The engine's own words.").reason, "The engine's own words.");
   assert.deepEqual(failureActions("stopped", 1, true), ["retry", "copyDetails"]);
-  assert.deepEqual(failureActions("format", 1, true), ["retry", "copyDetails"]);
+  assert.deepEqual(failureActions("format", 1, true), ["signIn", "retry"], "board 03.2.56: Sign in first, then Try again");
+  assert.deepEqual(failureActions("format", 2, true), ["signIn", "retry", "copyDetails"]);
   assert.deepEqual(failureActions("offline", 1, true), ["retry"], "a kind with its own full sentence waits for the second failed Retry");
 });
 
@@ -190,4 +191,14 @@ test("C4-5: a path through a file says a folder cannot be made there, not that t
   assert.equal(classifyClipFailure("folder_unusable"), "nofolder");
   assert.deepEqual(failureCopy("nofolder", 1, undefined, false, undefined, "Acme"), { reason: "Clipr can’t make Acme’s folder there.", detail: "A file is in the way. Pick another folder." });
   assert.deepEqual(failureActions("nofolder", 1), ["changeFolder"]);
+});
+
+test("Board 03.2.56: after a sign-in the retry says 'Signed in. Trying again…' on the making row with the sliding Ice line", async () => {
+  const { readFileSync } = await import("node:fs");
+  const ctl = readFileSync("src/renderer/src/features/clips/hooks/useExportController.ts", "utf8");
+  assert.match(ctl, /retryAfterSignIn\)/, "the sign-in retry goes through the flag");
+  assert.match(ctl, /signedInRetry: justSignedIn/);
+  const mk = readFileSync("src/renderer/src/features/clips/components/MakingRow.tsx", "utf8");
+  assert.match(mk, /props\.signedInRetry && preparing[\s\S]*Signed in\. Trying again…/);
+  assert.match(mk, /bg-ice/);
 });

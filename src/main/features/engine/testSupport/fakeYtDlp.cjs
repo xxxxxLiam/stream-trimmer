@@ -202,9 +202,42 @@ function comments(id) {
   return out;
 }
 
+// FAKE_SUBTITLE_FAIL_TIMES=<n> makes the first n subtitle fetches come back refused (HTTP 429, as
+// YouTube's timedtext endpoint does when it rate-limits), so a test can show the retry works and
+// stops. Each invocation is its own process, so the count is kept in a file named by
+// FAKE_SUBTITLE_FAIL_COUNTER — mirroring FAKE_CALL_LOG, the other piece of cross-invocation state.
+function subtitleShouldFail() {
+  const failTimes = num("FAKE_SUBTITLE_FAIL_TIMES", 0);
+  if (failTimes <= 0) return false;
+  const counterFile = process.env.FAKE_SUBTITLE_FAIL_COUNTER;
+  let soFar = 0;
+  if (counterFile) {
+    try {
+      soFar = Number(fs.readFileSync(counterFile, "utf8")) || 0;
+    } catch {
+      /* first call */
+    }
+  }
+  if (soFar >= failTimes) return false;
+  if (counterFile) fs.writeFileSync(counterFile, String(soFar + 1));
+  return true;
+}
+
+/**
+ * Writes the caption file, or leaves none and prints the refusal to stderr — exit code 0 either
+ * way. That matches real yt-dlp: a refused subtitle fetch (HTTP 429) is only a warning, not a
+ * fatal error, so the process always exits 0 here too.
+ */
 function writeSubtitles(id) {
   const out = valueOf("--output");
   if (!out) return;
+  if (subtitleShouldFail()) {
+    const message =
+      process.env.FAKE_SUBTITLE_FAIL_MESSAGE ||
+      "unable to download video subtitles for tt-en: HTTP Error 429: Too Many Requests";
+    process.stderr.write(`WARNING: ${message}\n`);
+    return;
+  }
   const blocks = ["WEBVTT", ""];
   // HH:MM:SS.mmm — the exporter's VTT parser wants exactly two digits per
   // field, so a long transcript must roll over into minutes and hours rather

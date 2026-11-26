@@ -12,8 +12,12 @@ const platform = process.platform; // 'darwin' | 'win32' | 'linux'
 const arch = process.arch; // 'x64' | 'arm64'
 const outDir = path.join(__dirname, "..", "resources", "bin");
 const cacheDir = path.join(outDir, ".cache");
+const potProviderDir = path.join(__dirname, "..", "resources", "pot-provider");
 fs.mkdirSync(outDir, { recursive: true });
 fs.mkdirSync(cacheDir, { recursive: true });
+// Always present, even empty, so electron-builder's extraResources entry for it never fails on a
+// platform `--pot` was never run on (see bundlePotProvider() below) — an empty folder packages fine.
+fs.mkdirSync(potProviderDir, { recursive: true });
 
 function copy(src, dstName) {
   const dst = path.join(outDir, dstName);
@@ -344,8 +348,129 @@ async function bundleDeno() {
   console.log(`[bundle-binaries] deno -> ${dst}`);
 }
 
+// -------- PO token provider: build bgutil-ytdlp-pot-provider from source --------
+// Never run as part of an ordinary build (see the main() guard below): this clones and compiles
+// GPL-3.0 code (see docs/pot-provider.md), which this project has not yet cleared with Liam to
+// ship. It only runs when explicitly asked for with `--pot`, and even then refuses without
+// POT_PROVIDER_LICENSE_ACK=1. Output goes to resources/pot-provider/, which is gitignored: it is
+// never committed to this repo, and the download path (potTokenProvider.ts) only uses it once this
+// has actually been run on the machine building the release.
+const POT_PROVIDER_REPO = "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git";
+// Pin a tag rather than tracking a moving branch, so "the monthly refresh" is a deliberate,
+// reviewable version bump (edit this line) rather than whatever happens to be on master that day.
+const POT_PROVIDER_REF = process.env.POT_PROVIDER_REF || "2.0.2";
+
+async function bundlePotProvider() {
+  if (process.env.POT_PROVIDER_LICENSE_ACK !== "1") {
+    throw new Error(
+      "Refusing to build the PO token provider: set POT_PROVIDER_LICENSE_ACK=1 once the GPL-3.0 " +
+        "bundling question has been cleared (see docs/pot-provider.md). Nothing else here runs " +
+        "without that — this command is the one place that gate lives.",
+    );
+  }
+  const vendorDir = path.join(__dirname, "..", "resources", "pot-provider");
+  const cloneDir = path.join(cacheDir, "bgutil-src");
+  fs.rmSync(cloneDir, { recursive: true, force: true });
+  console.log(`[bundle-binaries] cloning bgutil-ytdlp-pot-provider @ ${POT_PROVIDER_REF}`);
+  let res = spawnSync(
+    "git",
+    ["clone", "--depth", "1", "--branch", POT_PROVIDER_REF, POT_PROVIDER_REPO, cloneDir],
+    { stdio: "inherit" },
+  );
+  if (res.status !== 0) {
+    throw new Error(`git clone of the PO token provider failed (${res.status})`);
+  }
+  const serverDir = path.join(cloneDir, "server");
+  res = spawnSync("npm", ["ci"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
+  if (res.status !== 0) throw new Error(`npm ci failed in ${serverDir} (${res.status})`);
+  res = spawnSync("npx", ["tsc"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
+  if (res.status !== 0) throw new Error(`npx tsc failed in ${serverDir} (${res.status})`);
+  // Only runtime deps are needed from here; typescript, @types/*, etc. nearly triples the folder
+  // size for nothing this process ever runs.
+  res = spawnSync("npm", ["prune", "--omit=dev"], { cwd: serverDir, stdio: "inherit", shell: platform === "win32" });
+  if (res.status !== 0) throw new Error(`npm prune failed in ${serverDir} (${res.status})`);
+
+  // main.js is not self-contained: it imports sibling files under build/ and, via plain Node-style
+  // specifiers, the node_modules beside it (confirmed by actually running the vendored build — see
+  // potTokenProvider.ts and docs/pot-provider.md). Both are copied whole, not cherry-picked.
+  const builtDir = path.join(serverDir, "build");
+  const builtEntry = path.join(builtDir, "main.js");
+  if (!fs.existsSync(builtEntry)) {
+    throw new Error(`Expected ${builtEntry} after the build but it is not there.`);
+  }
+  fs.rmSync(vendorDir, { recursive: true, force: true });
+  fs.mkdirSync(vendorDir, { recursive: true });
+  fs.cpSync(builtDir, path.join(vendorDir, "build"), {
+    recursive: true,
+    // .map files point back at this build host's absolute paths and are never read at runtime.
+    filter: (src) => !src.endsWith(".map"),
+  });
+  fs.cpSync(path.join(serverDir, "node_modules"), path.join(vendorDir, "node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(vendorDir, "pot-provider.version"), `${POT_PROVIDER_REF}\n`);
+  console.log(`[bundle-binaries] PO token provider ${POT_PROVIDER_REF} -> ${vendorDir}`);
+  await smokeTestPotProvider(path.join(vendorDir, "build", "main.js"));
+  console.log(
+    `[bundle-binaries] NOT verified: that the \`canvas\` native dependency has a prebuilt binary ` +
+      `on any OTHER platform than this one (${platform}/${arch}) — this command has to be run again, ` +
+      "separately, on each platform's own build host; copying this folder between platforms will " +
+      "not work for a native module.",
+  );
+}
+
+/** Actually starts the vendored server and confirms it answers, rather than trusting the build to have worked. */
+async function smokeTestPotProvider(entry) {
+  const deno = path.join(outDir, process.platform === "win32" ? "deno.exe" : "deno");
+  if (!fs.existsSync(deno)) {
+    console.warn("[bundle-binaries] WARNING: no bundled deno to smoke-test the PO token provider with — skipping.");
+    return;
+  }
+  const port = 14400 + Math.floor(Math.random() * 1000);
+  const { spawn: spawnProc } = require("node:child_process");
+  const proc = spawnProc(
+    deno,
+    ["run", "--allow-net", "--allow-env", "--allow-read", entry, "--port", String(port), "--host", "127.0.0.1"],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const deadline = Date.now() + 10_000;
+  try {
+    while (Date.now() < deadline) {
+      const ok = await new Promise((resolve) => {
+        const req = require("node:http").get({ host: "127.0.0.1", port, path: "/ping", timeout: 1000 }, (res) => {
+          res.resume();
+          resolve(res.statusCode === 200);
+        });
+        req.on("error", () => resolve(false));
+        req.on("timeout", () => {
+          req.destroy();
+          resolve(false);
+        });
+      });
+      if (ok) {
+        console.log(`[bundle-binaries] PO token provider smoke test: answered /ping on 127.0.0.1:${port}`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    throw new Error("the vendored PO token provider never answered /ping within 10s");
+  } finally {
+    try {
+      proc.kill();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 (async () => {
   try {
+    if (process.argv.includes("--pot")) {
+      // A separate, explicit mode: `node scripts/bundle-binaries.cjs --pot` only builds the PO
+      // token provider, never yt-dlp/ffmpeg/deno, so running it can't accidentally touch the
+      // binaries an ordinary build already refreshes.
+      await bundlePotProvider();
+      console.log("[bundle-binaries] done (--pot)");
+      return;
+    }
     await cached(
       platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
       () => null,

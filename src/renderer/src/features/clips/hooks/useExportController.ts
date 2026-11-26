@@ -5,6 +5,7 @@
  *   mutations into what the screen shows: the Making row, the finished row with its Undo ring,
  *   and the waiting rows.
  */
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useCopyListSource } from "../../../modules/layout/hooks/copyListStore";
 import { exportListText, listFileName, singleClipText, transcriptFor, type ListClip } from "../../../shared/utils/clipListText";
 import type { BankedClip } from "../../../shared/utils/bank";
@@ -34,8 +35,20 @@ export function useExportController() {
   const connected = useYouTubeConnection().connected;
   const kind = state.failed?.kind;
   useFolderResume(kind === "drivegone", actions.folder ?? "", actions.retry);
-  useSignInRetry(kind === "age" || kind === "members" || kind === "signin" || kind === "expired", connected, actions.retry);
+  // After a sign-in the row retries by itself and says so ("Signed in. Trying again…", board 03.2.56).
+  const [justSignedIn, setJustSignedIn] = useState(false);
+  const retryAfterSignIn = useCallback(() => {
+    setJustSignedIn(true);
+    actions.retry();
+  }, [actions.retry]);
+  useSignInRetry(kind === "age" || kind === "members" || kind === "signin" || kind === "expired" || kind === "format", connected, retryAfterSignIn);
   const { downloading, downloadProgress, downloadPhase, downloads, failure, downloadNote } = useClipperContext();
+  // The "Trying again" line lasts until that cut ends.
+  const wasMaking = useRef(false);
+  useEffect(() => {
+    if (wasMaking.current && !downloading) setJustSignedIn(false);
+    wasMaking.current = downloading;
+  }, [downloading]);
 
   // Each clip just made, with its own file and its own Undo seconds.
   const finished = state.finished.map((f) => {
@@ -90,7 +103,7 @@ export function useExportController() {
     // A failed clip has its own row; the generic "was not made" line would say it twice.
     notice: (state.failed || state.offline) && !downloading ? "" : state.notice,
     making: downloading
-      ? { name: makingName ?? "New clip", percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote) }
+      ? { name: makingName ?? "New clip", percent: downloadProgress, phase: downloadPhase, retrying: isRetryingNote(downloadNote), signedInRetry: justSignedIn }
       : null,
     finished,
     failed: state.failed && !downloading ? state.failed : null,

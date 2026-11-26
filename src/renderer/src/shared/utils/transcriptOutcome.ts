@@ -12,11 +12,24 @@ export interface TranscriptOutcome {
   lines: TranscriptLine[];
   /** Set only when the fetch failed; an empty list without it means the video has no captions. */
   error: string | null;
+  /**
+   * Why it failed, from the engine's reason table (ytReasons.ts) — "refused", "signin", "age", etc.
+   * Set only alongside `error`. A caller that wants to offer "Sign in to YouTube" on an auth-shaped
+   * failure, rather than only showing the sentence, reads this; null/absent means that decision
+   * doesn't apply. `transcriptOutcome()` itself always sets it (to null when there is none); it is
+   * optional here only so a caller replaying an already-held outcome needn't restate it.
+   */
+  kind?: string | null;
 }
 
 export function transcriptOutcome(data: TranscriptResponse | null): TranscriptOutcome {
-  if (!data) return { lines: [], error: TRANSCRIPT_REQUEST_FAILED };
-  if (data.available) return { lines: data.lines, error: null };
-  if (data.failed) return { lines: [], error: data.error || TRANSCRIPT_REQUEST_FAILED };
-  return { lines: [], error: null };
+  if (!data) return { lines: [], error: TRANSCRIPT_REQUEST_FAILED, kind: null };
+  if (data.available) return { lines: data.lines, error: null, kind: null };
+  if (data.failed) return { lines: [], error: data.error || TRANSCRIPT_REQUEST_FAILED, kind: data.kind ?? null };
+  return { lines: [], error: null, kind: null };
+}
+
+/** Board 03.2.56: a transcript YouTube refused, or wants a sign-in for, offers Sign in and Try again. */
+export function transcriptSignInHelps(kind: string | null | undefined): boolean {
+  return kind === "refused" || kind === "signin" || kind === "age";
 }

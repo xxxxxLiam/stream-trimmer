@@ -99,3 +99,14 @@ test("the picker path: a folder, a missing file and a file over the cap each get
   fs.writeFileSync(fine, "hello");
   assert.deepEqual(await readCookieFile(fine), { ok: true, text: "hello" });
 });
+
+import { landedCheck } from "./cookieFile";
+test("a cookies file only counts as saved when what is on disk is what was imported", () => {
+  const row = (n: string) => [".youtube.com", "TRUE", "/", "TRUE", "2000000000", n, "v"].join("\t");
+  const text = ["# Netscape HTTP Cookie File", row("SID"), row("__Secure-3PSID")].join("\r\n") + "\r\n";
+  assert.deepEqual(landedCheck(text, text), { ok: true });
+  assert.equal(landedCheck(null, text).ok, false, "missing");
+  assert.equal(landedCheck("", text).ok, false, "empty");
+  assert.equal(landedCheck("  \r\n", text).ok, false, "blank");
+  assert.equal(landedCheck(text.slice(0, 60), text).ok, false, "cut short");
+});

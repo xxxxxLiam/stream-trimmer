@@ -7,6 +7,7 @@ import { BEST_HEIGHT_CAP } from "../../utils/quality";
 import { sectionArg, type Segment } from "../segments";
 import { resolvedFfmpeg } from "../binaries";
 import { audioSelector } from "../../utils/audioTracks";
+import { extractorArgsFor } from "./potTokenProvider";
 import { DownloadCtx } from "./jobContext";
 import { Workspace } from "./workspace";
 
@@ -41,8 +42,14 @@ export const PLAYER_CLIENTS_PRIMARY = "youtube:player_client=default,web_embedde
 // 403 retry is a different downloader on the same clients, not this.)
 export const PLAYER_CLIENTS_FALLBACK =
   "youtube:player_client=tv_samsung,web_embedded,visionos";
+// Only used once a PO token provider is actually running (see potTokenProvider.ts): mweb carries its
+// own GVS_PO_TOKEN_POLICY (required=True), which is exactly why it was left out of the primary list
+// above — without a way to mint that token it was a dead end. With one, it is the client that benefits
+// most, so it leads; default/web_embedded stay as the same same-run fallback they already were.
+export const PLAYER_CLIENTS_PRIMARY_WITH_POT =
+  "youtube:player_client=mweb,default,web_embedded";
 
-export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
+export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace, potBaseUrl: string | null = null) {
   const { quality, isAudio } = ctx;
   // A chosen dub only changes the audio half of each pair; the picture is the same on every track.
   const lang = ctx.audioLanguageUsed;
@@ -129,7 +136,7 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
     ...commonOptions,
     ...cookies,
     ...formatOptions,
-    ...(ctx.isYouTube ? { extractorArgs: clients } : {}),
+    ...(ctx.isYouTube ? { extractorArgs: extractorArgsFor(clients, potBaseUrl) } : {}),
     downloadSections: sectionArg(seg),
     forceKeyframesAtCuts: true,
     output: out,
@@ -147,7 +154,7 @@ export function createOptionBuilders(ctx: DownloadCtx, ws: Workspace) {
   ): Record<string, unknown> => ({
     ...commonOptions,
     ...cookies,
-    ...(ctx.isYouTube ? { extractorArgs: clients } : {}),
+    ...(ctx.isYouTube ? { extractorArgs: extractorArgsFor(clients, potBaseUrl) } : {}),
     // Fetch HLS with yt-dlp's own segment downloader so ffmpeg only ever sees
     // a local file. Older bundled ffmpeg builds crash fetching m3u8 themselves.
     hlsPreferNative: true,
