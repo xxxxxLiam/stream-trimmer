@@ -12,6 +12,11 @@ export interface Env {
   GITHUB_TOKEN?: string;
   /** Test and CLI override; defaults to the one repository the token is for. */
   GITHUB_REPO?: string;
+  /**
+   * The oldest Clipr version allowed to run, e.g. "19.6.0". A plain dashboard variable, so raising it needs
+   * no redeploy. Unset or empty means no minimum.
+   */
+  MIN_VERSION?: string;
 }
 
 export interface Deps {
@@ -95,6 +100,11 @@ export function createRelay(deps: Deps) {
 
   return async function relay(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/min-version") {
+      if (request.method !== "GET") return json(405, { error: "method_not_allowed" });
+      if (request.headers.get(CLIENT_HEADER) !== CLIENT_VALUE) return json(403, { error: "forbidden" });
+      return json(200, { minVersion: (env.MIN_VERSION ?? "").trim() });
+    }
     if (url.pathname !== "/report") return json(404, { error: "not_found" });
     if (request.method !== "POST") return json(405, { error: "method_not_allowed" });
     if (request.headers.get(CLIENT_HEADER) !== CLIENT_VALUE) return json(403, { error: "forbidden" });

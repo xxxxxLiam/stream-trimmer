@@ -6,6 +6,7 @@
  *   save folder from the folder chip.
  */
 import { useCallback, useRef, useState } from "react";
+import { resolveLink } from "../../workspace/utils/videoList";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace } from "../../workspace/hooks/WorkspaceContext";
@@ -37,14 +38,36 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
     [flushAutoLoad, setUrl],
   );
 
-  const { copied } = useStartEffects({ active: !url });
+  // Home (the icon in the top bar): the start page over a workspace. Its box is its own, never the open video's link,
+  // and a link here opens that video (or switches to it when it is already in Videos) and never replaces or duplicates one.
+  const home = ws.home;
+  const [homeText, setHomeText] = useState("");
+  const openHomeLink = useCallback(
+    (text: string) => {
+      const action = resolveLink(text, ws.tabs);
+      if (action.kind !== "open") {
+        setSubmitted(text.trim());
+        setHomeText(text.trim());
+        return;
+      }
+      if (action.existingId) {
+        if (action.reopen) ws.setTabDone(action.existingId, false);
+        ws.selectTab(action.existingId);
+      } else ws.addTab(action.target);
+      setHomeText("");
+      ws.closeHome();
+    },
+    [ws],
+  );
+
+  const { copied } = useStartEffects({ active: !url || home });
 
   const onPasteButton = useCallback(() => {
     navigator.clipboard
       ?.readText()
-      .then((t) => t && openLink(t))
+      .then((t) => t && (home ? openHomeLink(t) : openLink(t)))
       .catch(() => {});
-  }, [openLink]);
+  }, [openLink, openHomeLink, home]);
 
   const [folderNote, setFolderNote] = useState("");
   const onOpenFolder = useCallback(() => {
@@ -53,6 +76,28 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
 
   // The video you were on: the way back when this link will not open. Never "the last one in the list".
   const backId = ws.backTargetFor(ws.activeId);
+
+  const homeView: Partial<ColdStartProps> = home
+    ? {
+        value: homeText,
+        onChange: (v) => {
+          if (youtubeLinkFromText(v)) return openHomeLink(v);
+          if (pasting.current && !extractVideoId(v)) setSubmitted(v.trim());
+          pasting.current = false;
+          setHomeText(v);
+        },
+        onSubmit: () => {
+          if (homeText.trim()) openHomeLink(homeText);
+        },
+        offer: copied ? { text: copied, short: shortLink(copied) } : null,
+        onUseOffer: () => copied && openHomeLink(copied),
+        opening: false,
+        problem: homeText && submitted === homeText.trim() ? NOT_A_VIDEO : "",
+        onRetryOpen: () => openHomeLink(homeText),
+        backTo: null,
+        returnTo: { label: ws.labelFor(ws.activeId), onReturn: ws.closeHome },
+      }
+    : {};
 
   const platform = typeof navigator === "undefined" ? "" : navigator.platform;
   return {
@@ -85,5 +130,6 @@ export function useStartController(toolsOverride?: ToolsStatus): ColdStartProps 
     folderLabel: folderChipLabel(dir),
     onOpenFolder,
     folderNote,
+    ...homeView,
   };
 }

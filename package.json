@@ -25,8 +25,9 @@
     "test": "tsx --test \"src/main/**/*.test.ts\" \"src/main/**/*.test.cjs\" \"src/preload/**/*.test.ts\" \"src/common/**/*.test.ts\" \"scripts/*.test.ts\" \"relay/**/*.test.ts\" \"src/renderer/**/*.test.ts\" \"src/renderer/**/*.test.tsx\"",
     "preview": "vite preview",
     "start": "concurrently -k -n web,server -c cyan,magenta \"npm:preview\" \"npm:dev:server\"",
-    "dev:electron": "cross-env ELECTRON_DEV=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"node scripts/build-main.cjs && wait-on http://localhost:8080 && electron out/main/index.cjs\"",
+    "dev:electron": "cross-env ELECTRON_DEV=1 CLIPR_DEV_BUILD=1 concurrently -k -n vite,server,electron -c cyan,magenta,yellow \"npm:dev:client\" \"npm:dev:server\" \"node scripts/build-main.cjs && wait-on http://localhost:8080 && electron out/main/index.cjs\"",
     "build:electron": "vite build && node scripts/bundle-binaries.cjs && node scripts/build-server.cjs && node scripts/build-main.cjs",
+    "build:electron:dev": "cross-env CLIPR_DEV_BUILD=1 npm run build:electron",
     "dist:mac": "npm run build:electron && electron-builder --mac dmg",
     "dist:win": "npm run build:electron && electron-builder --win nsis",
     "dist:linux": "npm run build:electron && electron-builder --linux AppImage",
@@ -36,7 +37,9 @@
     "release": "npm run build:electron && electron-builder -mwl --publish always",
     "parity": "node scripts/parity/parity.cjs",
     "parity:el": "node scripts/parity/elements.cjs",
-    "build:relay": "node scripts/build-relay.cjs"
+    "build:relay": "node scripts/build-relay.cjs",
+    "collect-sourcemaps": "node scripts/collect-sourcemaps.cjs",
+    "decode-stack": "node scripts/decodeStack.cjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
@@ -44,7 +47,10 @@
     "youtube-dl-exec": "^3.0.10"
   },
   "devDependencies": {
+    "@electron/fuses": "^1.8.0",
     "@fontsource-variable/inter": "^5.3.0",
+    "@jridgewell/remapping": "^2.3.5",
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.0",
@@ -61,6 +67,7 @@
     "eslint": "^9.39.5",
     "express": "^4.21.0",
     "framer-motion": "^12.42.2",
+    "javascript-obfuscator": "^5.10.1",
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0",
     "postcss": "^8.5.16",
@@ -117,6 +124,7 @@
       }
     ],
     "asar": true,
+    "afterPack": "scripts/fuses.cjs",
     "mac": {
       "target": [
         {

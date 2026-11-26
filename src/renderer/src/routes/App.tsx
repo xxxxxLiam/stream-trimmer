@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "../modules/clipper/hooks/ClipperContext";
+import { resolveLink } from "../features/workspace/utils/videoList";
+import { EditHistoryProvider } from "../features/player/hooks/EditHistoryContext";
 import {
   ChannelExportProvider,
   useChannelExportContext,
@@ -18,10 +20,12 @@ import {
   TabActiveProvider,
   useWorkspace,
 } from "../features/workspace/hooks/WorkspaceContext";
+import CampaignSwitchHost from "../features/campaigns/components/CampaignSwitchHost";
 import { CampaignProvider, CampaignTabScope, useCampaign } from "../features/campaigns/hooks/CampaignContext";
 import { clearInFlightCut, saveInFlightCut, takeInterruptedCut } from "../shared/utils/inFlightCut";
 import { consumeCrashFlag } from "../shared/utils/crashNoteStore";
 import { runLaunchSignIn } from "../shared/utils/launchSignIn";
+import VersionGate from "../features/updates/components/VersionGate";
 import CrashScreenHost from "../features/help/components/CrashScreenHost";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 import ChannelDataDrawer from "../features/channelExport/components/ChannelDataDrawer";
@@ -93,8 +97,9 @@ import { onEditorSetupRequest } from "../shared/utils/editorSetupRequest";
 import ColdStartScreen from "../features/start/components/ColdStartScreen";
 
 /** Where clips go is chosen in the Clip arrow menu only; it decides what happens after a clip is saved. */
-function withDestination(settings: EditorHandoffSettings): EditorHandoffSettings {
-  return settingsWithDestination(settings, getClipDestination());
+function withDestination(settings: EditorHandoffSettings, isLocation = false): EditorHandoffSettings {
+  // A location (B-roll, sound effects, music) has one destination, its folder: no editor project, whatever is ticked.
+  return settingsWithDestination(settings, isLocation ? "folder" : getClipDestination());
 }
 
 const EDITOR_KEY = "clipper.editorHandoff";
@@ -421,7 +426,7 @@ function Layout({ active }: { active: boolean }) {
     async (segments: Segment[], retryName?: string) => {
       if (!videoId || segments.length === 0) return;
       const cutCampaignId = campaign?.id;
-      const startSettings = withDestination(editorRef.current);
+      const startSettings = withDestination(editorRef.current, campaign?.kind === "location");
       const taken = downloads.map((d) => d.label.replace(/\.[^.]+$/, ""));
       // A retry keeps the failed attempt's name; a new cut takes the lane's, else a suggested one.
       const name = retryName ?? clipNameFor({ candidates: [getNextClipName()], videoTitle: info?.title, taken });
@@ -481,7 +486,7 @@ function Layout({ active }: { active: boolean }) {
   const cutBankedNow = useCallback(
     async (clip: BankedClip, projectName?: string): Promise<boolean> => {
       if (clip.segments.length === 0) return false;
-      const startSettings = withDestination(editorRef.current);
+      const startSettings = withDestination(editorRef.current, campaign?.kind === "location");
       const baseId = projectName?.trim() || clip.id;
       let madeAny = false;
       const made: SessionClip[] = [];
@@ -504,7 +509,7 @@ function Layout({ active }: { active: boolean }) {
       }
       return madeAny;
     },
-    [download, recordSaved, handOff],
+    [download, recordSaved, handOff, campaign?.kind],
   );
   // The same line as Clip: a banked moment made while a clip is making waits its turn.
   const cutBanked = (clip: BankedClip, projectName?: string) => cutQueue.current.enqueue(() => cutBankedNow(clip, projectName));
@@ -652,6 +657,19 @@ function Layout({ active }: { active: boolean }) {
     active,
     {
       onVideo: (link) => {
+        // A link already in Videos opens that video, never a duplicate; from Home a new link is a new video beside the others.
+        const hit = resolveLink(link, wsTabs.tabs);
+        if (hit.kind === "open" && hit.existingId) {
+          if (hit.reopen) wsTabs.setTabDone(hit.existingId, false);
+          wsTabs.selectTab(hit.existingId);
+          wsTabs.closeHome();
+          return;
+        }
+        if (wsTabs.home) {
+          wsTabs.addTab(link);
+          wsTabs.closeHome();
+          return;
+        }
         setUrl(link);
         flushAutoLoad();
       },
@@ -694,7 +712,7 @@ function Layout({ active }: { active: boolean }) {
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
-        {!info && !openingBesideOthers ? (
+        {(!info && !openingBesideOthers) || (active && wsTabs.home) ? (
           <ColdStartScreen />
         ) : (
         <>
@@ -788,6 +806,7 @@ function Shell() {
 
   return (
     <div className="surface-ground flex h-screen w-full flex-col overflow-hidden">
+      <CampaignSwitchHost />
       <div className="relative min-h-0 flex-1">
         {tabs.map((tab) => {
           const active = tab.id === activeId;
@@ -806,7 +825,9 @@ function Shell() {
                       campaignId={tab.campaignId}
                       onChange={(cid) => setTabCampaign(tab.id, cid)}
                     >
-                      <Layout active={active} />
+                      <EditHistoryProvider>
+                        <Layout active={active} />
+                      </EditHistoryProvider>
                     </CampaignTabScope>
                   </TabActiveProvider>
                 </ChannelBoundary>
@@ -825,11 +846,13 @@ export default function App() {
   consumeCrashFlag(window.location.search, (clean) => window.history.replaceState(null, "", `${window.location.pathname}${clean}${window.location.hash}`));
   return (
     <ErrorBoundary fallback={(error) => <CrashScreenHost error={error} />}>
-      <WorkspaceProvider>
-        <CampaignProvider>
-          <Shell />
-        </CampaignProvider>
-      </WorkspaceProvider>
+      <VersionGate>
+        <WorkspaceProvider>
+          <CampaignProvider>
+            <Shell />
+          </CampaignProvider>
+        </WorkspaceProvider>
+      </VersionGate>
     </ErrorBoundary>
   );
 }

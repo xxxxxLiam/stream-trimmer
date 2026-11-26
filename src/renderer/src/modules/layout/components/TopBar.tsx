@@ -9,6 +9,8 @@
  *   zooms) and every control is no-drag. On Linux the real window keeps its own frame.
  */
 import type { ReactNode } from "react";
+import { House } from "react-bootstrap-icons";
+import { useWorkspace } from "../../../features/workspace/hooks/WorkspaceContext";
 import { useClipperContext } from "../../clipper/hooks/ClipperContext";
 import { useCampaign } from "../../../features/campaigns/hooks/CampaignContext";
 import CampaignChip from "../../../features/campaigns/components/CampaignChip";
@@ -47,6 +49,7 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
   const now = useToday();
   const today = todayCount(active, now);
   const chrome = useWindowChrome();
+  const ws = useWorkspace();
 
   return (
     <header
@@ -54,6 +57,17 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
       style={{ paddingLeft: topBarPaddingLeft(chrome), paddingRight: topBarPaddingRight(chrome) }}
       data-lights={lightsShowing(chrome) || undefined}
     >
+      {/* Board 03.1.3: Home opens the start page over the workspace; nothing closes. */}
+      <button
+        type="button"
+        id="ui-home"
+        aria-label="Home"
+        title="Home"
+        onClick={ws.openHome}
+        className="[-webkit-app-region:no-drag] inline-flex h-target w-target shrink-0 items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg"
+      >
+        <House aria-hidden="true" size={16} />
+      </button>
       {active ? <CampaignChip menu={campaignMenu} /> : null}
       {today ? (
         <span id="ui-today-count" className="text-meta text-fg-dim">

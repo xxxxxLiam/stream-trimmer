@@ -14,7 +14,8 @@ import {
   IconZoomTool,
 } from "../../../modules/layout/components/BarIcons";
 import { TOOL_KEYS, ZOOM_MIN, useToolState, type TimelineTool } from "../../../modules/layout/hooks/useToolState";
-import { Magnet } from "react-bootstrap-icons";
+import { ArrowClockwise, ArrowCounterclockwise, Magnet } from "react-bootstrap-icons";
+import { useEditHistory } from "../hooks/EditHistoryContext";
 import { useSegmentsState } from "../../../shared/hooks/useSegmentsState";
 import { zoomFromX, zoomThumbPercent } from "../utils/laneTools";
 import { clockTime } from "../utils/transport";
@@ -30,7 +31,10 @@ const TOOLS: { tool: TimelineTool; label: string; icon: () => ReactElement }[] =
 
 const STEP_BUTTON = "inline-flex h-[36px] w-[32px] items-center justify-center rounded-control text-fg-dim hover:bg-hover hover:text-fg";
 
+const MAC = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+
 export default function TimelineTools() {
+  const { canUndo, canRedo, undo, redo } = useEditHistory();
   const { tool, setTool, zoom, setZoom, zoomBy, fit, snap, toggleSnap } = useToolState();
   const { playhead } = useSegmentsState();
   return (
@@ -63,6 +67,28 @@ export default function TimelineTools() {
       >
         <Magnet aria-hidden="true" size={14} />
         Snap
+      </button>
+      {/* Board 03.2.53: a hairline, then Undo and Redo. Disabled is aria-disabled, the disabled colour and no hover. */}
+      <span aria-hidden="true" className="mx-[8px] h-[24px] w-px bg-hairline" />
+      <button
+        type="button"
+        aria-label="Undo"
+        aria-disabled={!canUndo}
+        title={MAC ? "Undo (⌘Z)" : "Undo (Ctrl Z)"}
+        onClick={() => canUndo && undo()}
+        className={`inline-flex h-[36px] w-[36px] items-center justify-center rounded-control ${canUndo ? "text-fg hover:bg-hover" : "cursor-default text-disabled"}`}
+      >
+        <ArrowCounterclockwise aria-hidden="true" size={16} />
+      </button>
+      <button
+        type="button"
+        aria-label="Redo"
+        aria-disabled={!canRedo}
+        title={MAC ? "Redo (⇧⌘Z)" : "Redo (Ctrl Shift Z)"}
+        onClick={() => canRedo && redo()}
+        className={`inline-flex h-[36px] w-[36px] items-center justify-center rounded-control ${canRedo ? "text-fg hover:bg-hover" : "cursor-default text-disabled"}`}
+      >
+        <ArrowClockwise aria-hidden="true" size={16} />
       </button>
       <span id="ui-playhead-time" className="pointer-events-none absolute left-1/2 -translate-x-1/2 tabular-nums text-fg">
         {clockTime(playhead)}

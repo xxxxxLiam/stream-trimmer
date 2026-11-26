@@ -5,7 +5,7 @@
  *   link box, the No ads / No account chips and the folder chip. One job: get a link in. Logic-free;
  *   useStartController feeds it. States: empty, link already copied, checking tools, tool cannot be fixed.
  */
-import { Check2, Folder } from "react-bootstrap-icons";
+import { ArrowLeft, Check2, Folder } from "react-bootstrap-icons";
 import { BrandLockup } from "../../../shared/components/BrandMark";
 import PreparingLine from "../../player/components/PreparingLine";
 import type { ToolsStatus } from "../utils/startUtils";
@@ -31,6 +31,8 @@ export type ColdStartProps = {
   opening: boolean;
   /** Return to a video that is already open, when there is one. */
   backTo: { label: string; onBack: () => void } | null;
+  /** Home over a workspace (board 03.1.3): one pill back to the open video, in place of the No ads and No account chips. */
+  returnTo?: { label: string; onReturn: () => void } | null;
   folderLabel: string;
   onOpenFolder: () => void;
   /** Said under the chips when Open finds the folder not made yet. */
@@ -131,8 +133,21 @@ export default function ColdStart(p: ColdStartProps) {
             )}
           </div>
           <div className="flex items-center gap-[8px]">
-            <span className={pill}><Tick />No ads</span>
-            <span className={pill}><Tick />No account</span>
+            {p.returnTo ? (
+              <button
+                type="button"
+                onClick={p.returnTo.onReturn}
+                className="inline-flex h-target min-w-[0px] max-w-[420px] items-center gap-[8px] rounded-[22px] border border-ice bg-raised px-[16px] text-meta text-fg hover:bg-hover"
+              >
+                <ArrowLeft width={14} height={14} aria-hidden="true" focusable="false" className="shrink-0" />
+                <span className="truncate">Back to {p.returnTo.label}</span>
+              </button>
+            ) : (
+              <>
+                <span className={pill}><Tick />No ads</span>
+                <span className={pill}><Tick />No account</span>
+              </>
+            )}
             <button
               type="button"
               onClick={p.onOpenFolder}

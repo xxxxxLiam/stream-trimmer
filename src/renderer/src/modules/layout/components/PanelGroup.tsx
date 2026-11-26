@@ -3,6 +3,8 @@
  * Path: src/renderer/src/modules/layout/components/PanelGroup.tsx
  * Description: One tabbed group (left or right): the tab strip over the active panel's body.
  */
+import { useFinalCutInstalled } from "../../../shared/hooks/useFinalCutInstalled";
+import { enterSelectClips, useSelectClips } from "../../../shared/utils/selectClipsStore";
 import { enterSelectMoments, useSelectMoments } from "../../../shared/utils/selectMomentsStore";
 import { createElement, useEffect, useState } from "react";
 import PanelTabStrip, { panelBodyDomId, tabDomId } from "./PanelTabStrip";
@@ -14,30 +16,43 @@ import { getPanel } from "../utils/panelRegistry";
 import type { MenuItem } from "./PopoverMenu";
 import { useCopyListFor } from "../hooks/copyListStore";
 import { IconCopy, IconSaveFile } from "../../../shared/components/rowIcons";
+import { IconSelect } from "../../../shared/components/PanelIcons";
 import { clipCountText as countText } from "../../../shared/utils/clipListText";
 
 const NAMES: Record<PanelGroupId, string> = { left: "Left panels", centre: "Centre panels", right: "Right panels" };
 
 export default function PanelGroup({ group }: { group: "left" | "right" }) {
-  const { layout, panels, activate, close, open, move, moveToGroup, reset, save } = usePanelLayoutState();
+  const { layout, panels, activate, close, open, move, moveToGroup } = usePanelLayoutState();
   const state = layout.groups[group];
   const other = group === "left" ? "right" : "left";
   const tabs = state.tabs.flatMap((id) => getPanel(id) ?? []);
   const activeDef = state.active ? getPanel(state.active) : undefined;
   const host = usePanelHostOptional();
   // Board v149: the + appears only where it adds something, and does one thing. Transcript and History have none.
+  const mac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
   const addAction =
     activeDef?.id === "videos"
       ? { label: "Add a video", onSelect: () => document.getElementById("ui-topbar-link")?.focus() }
       : activeDef?.id === "markers" && host?.addMarker
         ? { label: "Add a marker", onSelect: host.addMarker }
-        : activeDef?.id === "export" && host
-          ? { label: "Add a moment", onSelect: () => host.addMoment() }
-          : undefined;
-  const mac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+        : undefined;
+  // Export's + opens a menu (it adds to the panel): Add a moment, Import moments. It never acts on the selected clip by itself.
+  const addMenu =
+    activeDef?.id === "export" && host
+      ? {
+          label: "Add a moment",
+          width: 212,
+          items: [
+            { key: "import", label: "Import moments", detail: mac ? "⌘V" : "Ctrl V", onSelect: () => host.openImport() },
+            { key: "moment", label: "Add a moment", detail: "M", onSelect: () => host.addMoment() },
+          ] as MenuItem[],
+        }
+      : undefined;
   // Export and History start their menu with the list as text: Copy as text (the default) and Save as .txt….
   const list = useCopyListFor(activeDef?.id);
   const pickingMoments = useSelectMoments().on;
+  const pickingClips = useSelectClips().on;
+  const finalCut = useFinalCutInstalled();
   const [said, setSaid] = useState<string | null>(null);
   useEffect(() => {
     if (!said) return;
@@ -73,28 +88,29 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     setSaid(`✓ Saved ${countText(list.count)}`);
   };
+  // Below a line, after the copy items (boards 03.2.23 and 03.2.51).
+  const selectItems: MenuItem[] = [
+    ...(activeDef?.id === "history" && finalCut ? [{ key: "select-clips", label: "Select clips", icon: <IconSelect />, disabled: !list || list.count === 0, onSelect: enterSelectClips } as MenuItem] : []),
+    ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", icon: <IconSelect />, disabled: !list || list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
+  ];
   const listItems: MenuItem[] = list
     ? [
-        ...(activeDef?.id === "export" && host ? [{ key: "import", label: "Import moments", detail: mac ? "⌘V" : "Ctrl V", onSelect: () => host.openImport() } as MenuItem] : []),
-        ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", disabled: list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
         { key: "copy-list", label: "Copy as text", icon: <IconCopy />, detail: list.count > 0 ? countText(list.count) : undefined, disabled: list.count === 0, onSelect: () => void copyList() },
         { key: "save-list", label: "Save as .txt…", icon: <IconSaveFile />, disabled: list.count === 0, onSelect: () => void saveList() },
         ...(list.count === 0 ? [{ kind: "note", key: "list-empty", label: list.emptyNote } as MenuItem] : []),
-        { kind: "separator", key: "sep-list" } as MenuItem,
+        ...(selectItems.length > 0 ? [{ kind: "separator", key: "sep-list" } as MenuItem, ...selectItems] : []),
       ]
     : [];
   const menuItems: MenuItem[] = [
     ...listItems,
-    { kind: "separator", key: "sep" },
-    { key: "reset", label: "Reset layout", onSelect: reset },
-    { key: "save", label: "Save layout", onSelect: save },
   ];
 
   return (
     <section aria-label={NAMES[group]} className="surface-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {pickingMoments && activeDef?.id === "export" ? null : (
+      {(pickingMoments && activeDef?.id === "export") || (pickingClips && activeDef?.id === "history") ? null : (
       <PanelTabStrip
         addAction={addAction}
+        addMenu={addMenu}
         label={NAMES[group]}
         tabs={tabs}
         active={state.active}

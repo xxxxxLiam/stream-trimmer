@@ -769,9 +769,10 @@ test("flow 7: disk full and private videos get their own row states and never re
     assert.equal(disk.body.row.state, "no-space");
   }));
 
-test("flow 7: any other failure is a plain failed row that is not retrying", SLOW, () =>
+test("flow 7: any other failure is a plain failed row, final like the rest (E2-1: never promises a retry that is not coming)", SLOW, () =>
   withHarness(async (h) => {
     h.configure({ failDownload: "ERROR: unable to download video data: Connection reset by peer" });
     const res = await downloadPath(h, "job_f7_net", { url: freshUrl(), segments: [{ start: 0.5, end: 3 }] });
-    assert.deepEqual({ state: res.body.row.state, retrying: res.body.row.retrying }, { state: "failed", retrying: false });
+    assert.equal(res.body.row.state, "failed-final");
+    assert.equal(res.body.row.retrying, undefined);
   }));

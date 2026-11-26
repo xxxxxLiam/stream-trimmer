@@ -249,3 +249,12 @@ test("Liam 26 Nov: trimming a loaded bank clip edits that bank item, and Clip th
   assert.equal(setClipSegments(d0, "c1", "v1", "nope", [{ start: 1, end: 2 }]), d0);
   assert.equal(setClipSegments(d0, "c1", "v1", item.id, []), d0, "an empty edit never wipes the item");
 });
+
+test("setClips puts a video's list back as it was, including after its last clip was deleted", async () => {
+  const { setClips, removeClip, clipsFor } = await import("./bank");
+  const before = importClips({}, "C", "V", [{ line: 1, id: "A1", label: "A", segments: [{ start: 1, end: 5 }] }]).data;
+  const gone = removeClip(before, "C", "V", clipsFor(before, "C", "V")[0].id);
+  assert.deepEqual(gone, {});
+  assert.deepEqual(setClips(gone, "C", "V", clipsFor(before, "C", "V")), before);
+  assert.deepEqual(setClips(before, "C", "V", []), {});
+});

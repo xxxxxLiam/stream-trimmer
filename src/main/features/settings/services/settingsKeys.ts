@@ -8,6 +8,19 @@
 /** Folders the app may write into. Main-only: it grows when the person picks a folder, never from a page. */
 export const APPROVED_ROOTS_KEY = "clipper.approvedRoots";
 
+/**
+ * Main-only: the folder the "Add to Final Cut" library picker opens in next. Only the folder is
+ * remembered, never the library itself — the library is chosen on every call (BUILD-SPEC: locations
+ * can go to different assets libraries), so this is just where the dialog starts.
+ */
+export const ASSETS_LIBRARY_FOLDER_KEY = "clipper.assetsLibraryFolder";
+
+/**
+ * Main-only: which clip files have already been added to which Final Cut assets library, so a
+ * second "Add to Final Cut" for the same library skips duplicates. Shape: { [libraryPath]: string[] }.
+ */
+export const ASSETS_LIBRARY_ADDED_KEY = "clipper.assetsLibraryAdded";
+
 /** The `clipper.*` keys the renderer reads and writes today. */
 export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.activeCampaign",
@@ -17,6 +30,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.autoUpdate",
   "clipper.bank",
   "clipper.campaignPrefs",
+  "clipper.campaignSwitchSeen",
   "clipper.campaigns",
   "clipper.clipDestination",
   "clipper.clipsDir",

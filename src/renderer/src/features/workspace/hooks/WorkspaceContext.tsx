@@ -143,6 +143,10 @@ export type WorkspaceState = {
   meta: Record<string, TabMeta>;
   labelFor: (id: string) => string;
   selectTab: (id: string) => void;
+  /** Select with no question asked: the campaign-switch dialog's "Open in" uses it after the person agreed. */
+  selectTabNow: (id: string) => void;
+  /** The campaign-switch dialog registers here: it may take over a select (returns true) to ask first. */
+  setSelectGuard: (guard: ((id: string) => boolean) | null) => void;
   /** Open a new video; with a link it loads that video. */
   addTab: (url?: string) => void;
   /** The video "Back" returns to from tab `id` (the one it was added from), or null. */
@@ -181,6 +185,10 @@ export type WorkspaceState = {
     id: string,
     meta: TabMeta & { cancel?: () => void },
   ) => void;
+  /** The start page is showing over the workspace (the Home icon). Nothing is closed: videos, bank and the open video stay. */
+  home: boolean;
+  openHome: () => void;
+  closeHome: () => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
@@ -219,7 +227,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     writeSetting(STORE_KEY, savedWorkspace(tabs, activeId, trying, cameFrom));
   }, [tabs, activeId, trying, cameFrom]);
 
-  const selectTab = useCallback((id: string) => setActiveId(id), []);
+  const selectGuard = useRef<((id: string) => boolean) | null>(null);
+  const setSelectGuard = useCallback((g: ((id: string) => boolean) | null) => {
+    selectGuard.current = g;
+  }, []);
+  const selectTabNow = useCallback((id: string) => setActiveId(id), []);
+  const selectTab = useCallback((id: string) => {
+    if (selectGuard.current?.(id)) return;
+    setActiveId(id);
+  }, []);
+
+  // Home sits over the workspace; moving to another video (or one opening) ends it.
+  const [home, setHome] = useState(false);
+  const openHome = useCallback(() => setHome(true), []);
+  const closeHome = useCallback(() => setHome(false), []);
+  useEffect(() => setHome(false), [activeId]);
 
   const addTab = useCallback((url?: string) => {
     const id = newId();
@@ -447,6 +469,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       meta,
       labelFor,
       selectTab,
+      selectTabNow,
+      setSelectGuard,
       addTab,
       backTargetFor,
       goBack,
@@ -465,6 +489,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       reportTabWork,
       setTabCampaign,
       reportTab,
+      home,
+      openHome,
+      closeHome,
     }),
     [
       tabs,
@@ -472,6 +499,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       meta,
       labelFor,
       selectTab,
+      selectTabNow,
+      setSelectGuard,
       addTab,
       backTargetFor,
       goBack,
@@ -489,6 +518,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       reportTabWork,
       setTabCampaign,
       reportTab,
+      home,
+      openHome,
+      closeHome,
     ],
   );
 

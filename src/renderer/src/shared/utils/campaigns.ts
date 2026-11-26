@@ -129,6 +129,12 @@ export function folderNameOf(name: string): string {
   return safeFolderName(name, "Campaign");
 }
 
+/** A location's folder name: "Clipr B-roll", never a double "Clipr". The Clip menu says "Saves to" this. */
+export function brandedLocationName(name: string): string {
+  const leaf = safeFolderName(name, "Location");
+  return isBrandedName(leaf) ? leaf : `Clipr ${leaf}`;
+}
+
 /**
  * Where a campaign's clips go: its own folder when it chose one, else a folder named after it inside the
  * Clips folder (the parent). Empty when there is no parent yet.
@@ -138,10 +144,7 @@ export function campaignClipsDir(c: Pick<Campaign, "name" | "clipsDir"> & { kind
   const base = parent.replace(/[\\/]+$/, "");
   if (!base) return "";
   // A location's own folder is "Clipr <Name>" beside the Clipr folder (Downloads/Clipr B-roll), not inside it.
-  if (c.kind === "location") {
-    const leaf = safeFolderName(c.name, "Location");
-    return siblingDir(base, isBrandedName(leaf) ? leaf : `Clipr ${leaf}`);
-  }
+  if (c.kind === "location") return siblingDir(base, brandedLocationName(c.name));
   const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
   return `${base}${sep}${folderNameOf(c.name)}`;
 }

@@ -14,3 +14,18 @@ test("D2-8: History shows the editor handoff answer for a clip of any campaign",
   const hook = readFileSync("src/renderer/src/features/clips/hooks/useHandoffNotice.ts", "utf8");
   assert.match(hook, /anyCampaign \? \(answer\?\.campaignId \?\? null\) : campaignId/);
 });
+
+test("Add to Final Cut (Design, option A): an item in the row's ⋯ on location clips, Select clips with one Ice bar, In Final Cut for 2 seconds", async () => {
+  const { readFileSync } = await import("node:fs");
+  const panel = readFileSync("src/renderer/src/features/downloads/components/HistoryPanel.tsx", "utf8");
+  assert.match(panel, /key: "finalcut", label: "Add to Final Cut"/);
+  assert.match(panel, /fc\.canAdd\(e\)/);
+  assert.match(panel, /bg-ice text-bg[\s\S]*Add to Final Cut \{chosen\.length \|\| ""\}/);
+  assert.match(panel, /In Final Cut/);
+  assert.doesNotMatch(panel, /aria-label="Add to Final Cut"/); // no always-visible row button
+  const group = readFileSync("src/renderer/src/modules/layout/components/PanelGroup.tsx", "utf8");
+  assert.match(group, /activeDef\?\.id === "history" && finalCut[\s\S]*label: "Select clips"/);
+  const hook = readFileSync("src/renderer/src/features/downloads/hooks/useAddToFinalCut.ts", "utf8");
+  assert.match(hook, /c\.kind === "location"/);
+  assert.match(readFileSync("src/renderer/src/shared/hooks/useFinalCutInstalled.ts", "utf8"), /apps\?\.finalcut/);
+});

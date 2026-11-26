@@ -17,7 +17,10 @@ function build(flag: string): string {
   const out = mkdtempSync(join(tmpdir(), "main-build-"));
   const r = spawnSync("node", [join(root, "scripts", "build-main.cjs")], {
     cwd: root,
-    env: { ...process.env, VITE_ENABLE_CHANNEL_DATA: flag, BUILD_MAIN_OUT: out },
+    // CLIPR_DEV_BUILD=1: this test reads the bundle's own text, so it needs the readable build
+    // (see plans/code-protection-plan.md) — a hardened build moves these literals into an
+    // obfuscated string array and this check would stop meaning anything.
+    env: { ...process.env, VITE_ENABLE_CHANNEL_DATA: flag, BUILD_MAIN_OUT: out, CLIPR_DEV_BUILD: "1" },
     encoding: "utf8",
   });
   assert.equal(r.status, 0, r.stderr || r.stdout);

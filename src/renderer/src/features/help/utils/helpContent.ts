@@ -237,18 +237,14 @@ export const HELP_ANSWERS: HelpAnswer[] = [
   },
   {
     id: "panels",
-    question: "How do I move or hide panels?",
+    question: "How do I resize panels?",
     searchOnly: true,
     groups: [
       {
-        steps: [
-          { text: "Open the Panels menu in the top bar.", show: { target: "#ui-panels-menu", advance: "click" } },
-          { text: "Tick the panels you want, or choose Reset layout." },
-        ],
+        steps: [{ text: "Drag the line between two panels." }],
       },
     ],
-    note: "Drag a tab to move it to the other side.",
-    labels: ["Panels", "Reset layout"],
+    labels: ["Panels"],
     synonyms: ["panels", "panel", "layout", "move", "hide", "show", "tabs", "resize", "drag", "export", "history", "videos", "markers"],
   },
   {

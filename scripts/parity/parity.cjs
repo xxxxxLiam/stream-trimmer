@@ -5,7 +5,7 @@
  *   launches the real app from audit/harness with audit/harness/fixtures/<fixture>.json, screenshots
  *   both at the board's frame size and writes board | app | diff PNGs (pixelmatch, anti-aliasing
  *   tolerated) to audit/out/parity/<screen>/. `--board-only` skips the app (board render check).
- *   Needs a built app (`npm run build:electron`) and a display (`xvfb-run -a`).
+ *   Needs a built app (`npm run build:electron:dev`, which stays readable) and a display (`xvfb-run -a`).
  */
 const fs = require("node:fs");
 const path = require("node:path");

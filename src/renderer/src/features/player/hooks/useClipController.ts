@@ -15,13 +15,17 @@ import { dialogOpen } from "../../../shared/utils/dialogOpen";
 import { usePanelLayoutState } from "../../../modules/layout/hooks/usePanelLayoutState";
 import { usePickedRange } from "./usePickedRange";
 import { useClipDestination } from "./useClipDestination";
+import { brandedLocationName } from "../../../shared/utils/campaigns";
+import { bankStore, clipsFor } from "../../../shared/utils/bank";
+import { requestMake } from "../../../shared/utils/makeRequest";
 import { requestEditorSetup } from "../../../shared/utils/editorSetupRequest";
 
 export function useClipController(opts: { listenForKey?: boolean } = {}) {
   const range = usePickedRange();
   const host = usePanelHost();
   const { open: openPanel } = usePanelLayoutState();
-  const { segments } = useSegmentsState();
+  const { segments, bankId } = useSegmentsState();
+  const { videoId } = useClipperContext();
   const tabActive = useIsTabActive();
   const { active: activeCampaign } = useCampaign();
   const [destination, setDestination] = useClipDestination();
@@ -64,7 +68,13 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
 
   const clip = () => {
     if (reason) return setReasonShown(true);
-    host.cutSegments(toCut);
+    // Liam 26 Nov: a waiting moment loaded on the timeline IS that moment. Clip makes it exactly as its own Clip now does
+    // (its name, Making row and Undo), with any edits to its range kept on the moment, never a new clip under a suggested name.
+    const loaded = bankId && activeCampaign && videoId ? clipsFor(bankStore.get(), activeCampaign.id, videoId).find((c) => c.id === bankId && c.status === "banked") : undefined;
+    if (loaded && activeCampaign && videoId) {
+      bankStore.setSegments(activeCampaign.id, videoId, loaded.id, toCut);
+      requestMake({ campaignId: activeCampaign.id, videoId, clipId: loaded.id });
+    } else host.cutSegments(toCut);
     // Show the clip land: bring Export forward, even when History was in front.
     openPanel("export");
   };
@@ -90,7 +100,9 @@ export function useClipController(opts: { listenForKey?: boolean } = {}) {
     reasonShown,
     clip,
     hasRange,
-    destination,
+    destination: activeCampaign?.kind === "location" ? ("folder" as const) : destination,
+    /** While a location is active Clip saves to its folder only; the menu says so in place of the editors. */
+    savesTo: activeCampaign?.kind === "location" ? brandedLocationName(activeCampaign.name) : null,
     setDestination: (d: Parameters<typeof setDestination>[0]) => {
       if (availableDestinations(offered).find((x) => x.id === d)?.soon) return; // coming soon: not selectable, opens no setup
       setDestination(d);

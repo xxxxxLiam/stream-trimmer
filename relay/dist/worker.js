@@ -192,6 +192,11 @@ function createRelay(deps) {
   };
   return async function relay2(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/min-version") {
+      if (request.method !== "GET") return json(405, { error: "method_not_allowed" });
+      if (request.headers.get(CLIENT_HEADER) !== CLIENT_VALUE) return json(403, { error: "forbidden" });
+      return json(200, { minVersion: (env.MIN_VERSION ?? "").trim() });
+    }
     if (url.pathname !== "/report") return json(404, { error: "not_found" });
     if (request.method !== "POST") return json(405, { error: "method_not_allowed" });
     if (request.headers.get(CLIENT_HEADER) !== CLIENT_VALUE) return json(403, { error: "forbidden" });

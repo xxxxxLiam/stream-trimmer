@@ -149,8 +149,10 @@ testable here, so test it rather than reasoning about it.
 3. Writes `board.png`, `app.png`, `diff.png` and `side-by-side.png` (board | app | diff) to
    `audit/out/parity/<Screen>/`. pixelmatch ignores anti-aliasing; exit code 1 when pixels differ.
 
-Needs a built app and a display: `node node_modules/electron/install.js` once, `npm run build:electron`,
-then `xvfb-run -a npm run parity -- Start`. `--board-only` needs neither.
+Needs a built app and a display: `node node_modules/electron/install.js` once, `npm run build:electron:dev`,
+then `xvfb-run -a npm run parity -- Start`. `--board-only` needs neither. `build:electron:dev` keeps main and the
+engine readable (no minifying or scrambling, see plans/code-protection-plan.md); plain `npm run build:electron`
+ships the hardened code an install would get, which is harder to debug from logs and stack traces.
 
 ### Per-board crops, the pending snapshot and the workspace fixture
 

@@ -27,6 +27,8 @@ import { campaignClipsDir, campaignNameProblems, type Campaign } from "../../../
 import { FOLDER_NOT_MADE_YET, folderChipLabel } from "../../../shared/utils/folderLabel";
 import { readSetting, writeSetting } from "../../../shared/utils/persist";
 import { lookForCampaign, loadSavedLooks } from "../../../shared/utils/fcpLooks";
+import { useAudioLanguageState } from "../../../modules/layout/hooks/useAudioLanguageState";
+import { audioButtonLabel, hasDubTracks, toggleLanguage as toggleAudioLanguage } from "../../../shared/utils/audioLanguages";
 import { destinationLabel } from "../../player/utils/clipDestination";
 import { markSeen, type SetupSeen } from "../utils/editorSetup";
 import { editorSummary, finalCutSummary, hasEditorPage } from "../utils/editorSummary";
@@ -63,6 +65,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   const destination = hasEditorPage(chosen) ? chosen : "finalcut";
   const viewId = c.view.kind === "campaign" || c.view.kind === "editor" ? c.view.id : null;
   const activeCampaign = c.campaigns.campaigns.find((x) => x.id === viewId);
+  // A location's own Languages row is the same remembered choice the Clip menu's Audio page makes, per location.
+  const [langSel, setLangSel] = useAudioLanguageState(activeCampaign?.id ?? null);
   const activeFcp = activeCampaign ? editor.settingsFor(activeCampaign.id) : undefined;
   const look = useFinalCutLook(activeCampaign, c.campaigns, () => {
     if (activeCampaign && activeFcp) editor.onChange(activeCampaign.id, { ...activeFcp, timelineFormat: { ...activeFcp.timelineFormat, kind: "look" } });
@@ -164,6 +168,19 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
       <SettingsLocation
         name={campaign.name}
         folderLabel={folderChipLabel(campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir), 2)}
+        languages={
+          hasDubTracks(tracks)
+            ? {
+                summary: audioButtonLabel(tracks, langSel),
+                items: tracks.map((t) => ({
+                  code: t.language,
+                  label: t.kind === "original" ? "Original" : t.label,
+                  ticked: t.kind === "original" ? !(langSel ?? []).includes(`-${t.language}`) : (langSel ?? []).includes(t.language),
+                })),
+                onToggle: (code) => setLangSel(toggleAudioLanguage(tracks, langSel, code)),
+              }
+            : undefined
+        }
         soundOnly={campaign.soundOnly === true}
         onSoundOnly={(on) => c.campaigns.update(campaign.id, { soundOnly: on })}
         onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}

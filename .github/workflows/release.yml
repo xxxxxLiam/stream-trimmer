@@ -144,6 +144,10 @@ jobs:
           VITE_ENABLE_CHANNEL_DATA: ""
           VITE_OWNER_MACHINES: ""
           VITE_OWNER_SALT: ""
+          # Private source maps for this build (see plans/code-protection-plan.md).
+          # They are written next to the bundles but never packaged: build.files
+          # excludes every .map, and nothing carries a sourceMappingURL.
+          CLIPR_SOURCEMAPS: "1"
         run: npm run build:electron
       # Uploads into a DRAFT release (see build.publish.releaseType in
       # package.json). Draft is deliberate: it keeps a half-finished release
@@ -162,6 +166,28 @@ jobs:
           VITE_OWNER_MACHINES: ""
           VITE_OWNER_SALT: ""
         run: ${{ matrix.build }}
+
+      # Keep this build's source maps, privately, so a crash stack from the
+      # shipped (minified, obfuscated) app can be decoded with
+      # `npm run decode-stack -- <version>`. An artifact of this private
+      # repository: only people with access to it can download it, and it is
+      # never attached to the public release. The obfuscation is randomised
+      # per build, so each platform keeps its own maps.
+      - name: Collect source maps
+        id: maps
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          npm run collect-sourcemaps
+      - name: Keep source maps privately
+        uses: actions/upload-artifact@v4
+        with:
+          name: sourcemaps-${{ steps.maps.outputs.version }}-${{ runner.os }}
+          path: sourcemaps/${{ steps.maps.outputs.version }}
+          if-no-files-found: error
+          retention-days: 90
 
   # Runs only if every platform built, so a partial release is never made
   # public. If one platform fails, the draft stays a draft for inspection.
