@@ -215,7 +215,7 @@ export default function ExportPanel() {
                 chosen.forEach((x) => c.remove(x));
                 leave();
               }}
-              className="h-[44px] flex-1 rounded-pill border border-error bg-error text-body font-medium text-bg"
+              className="h-[44px] flex-1 rounded-[22px] border border-error bg-raised text-meta font-semibold text-error"
             >
               Delete {chosen.length}
             </button>

@@ -377,3 +377,11 @@ test("Design v147/v148: the bank card is name + rating over topic, tier and leng
   assert.match(sf, /gap-\[6px\]/);
   assert.match(sf, /mb-\[6px\] mt-\[12px\]/);
 });
+
+test("Design v150: danger buttons are outlined, never a red fill; the Export menu starts with Import and Select moments", () => {
+  const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(panel, /bg-error/);
+  assert.match(panel, /rounded-\[22px\] border border-error bg-raised text-meta font-semibold text-error/);
+  const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
+  assert.ok(group.indexOf('key: "import"') < group.indexOf('key: "copy-list"'));
+});

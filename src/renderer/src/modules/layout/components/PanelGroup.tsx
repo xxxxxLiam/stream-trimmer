@@ -75,9 +75,9 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
   };
   const listItems: MenuItem[] = list
     ? [
-        { key: "copy-list", label: "Copy as text", icon: <IconCopy />, detail: list.count > 0 ? countText(list.count) : undefined, disabled: list.count === 0, onSelect: () => void copyList() },
         ...(activeDef?.id === "export" && host ? [{ key: "import", label: "Import moments", detail: mac ? "⌘V" : "Ctrl V", onSelect: () => host.openImport() } as MenuItem] : []),
         ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", disabled: list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
+        { key: "copy-list", label: "Copy as text", icon: <IconCopy />, detail: list.count > 0 ? countText(list.count) : undefined, disabled: list.count === 0, onSelect: () => void copyList() },
         { key: "save-list", label: "Save as .txt…", icon: <IconSaveFile />, disabled: list.count === 0, onSelect: () => void saveList() },
         ...(list.count === 0 ? [{ kind: "note", key: "list-empty", label: list.emptyNote } as MenuItem] : []),
         { kind: "separator", key: "sep-list" } as MenuItem,
