@@ -5,7 +5,7 @@
  *   it, undo the clip just made, remove a moment.
  */
 import { sourceLinkFor } from "../../../shared/utils/videoSource";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { clearAfterCuttingOutcome } from "../../handoff/components/EditorHandoff";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
@@ -29,16 +29,24 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   const seg = useSegmentsState();
   const { cutBanked, cutAgain } = usePanelHost();
   const { recordUse, forgetUse, folders, pickClipsDir } = useCampaign();
-  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload } = useClipperContext();
+  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload, setStartText, setEndText, startText, endText } = useClipperContext();
   const stopped = useRef(false);
   const { campaignId, vid } = q;
+
+  // Nothing left on the timeline (Clip pressed, Esc, a click on empty timeline, the trash): no bank row stays selected.
+  const timelineEmpty = seg.segments.length === 0 && startText.trim() === "" && endText.trim() === "";
+  const { selectedId, setSelectedId } = s;
+  useEffect(() => {
+    if (timelineEmpty && selectedId) setSelectedId(null);
+  }, [timelineEmpty, selectedId, setSelectedId]);
 
   const select = useCallback(
     (clip: BankedClip) => {
       s.setSelectedId(clip.id);
       // Opening a clip that ran past the end is the person seeing it: the line has done its job.
       if (clip.ranPastEnd !== undefined && campaignId && vid) bankStore.clearRanPastEnd(campaignId, vid, clip.id);
-      seg.load(clip.segments);
+      // The loaded range is this bank item: edits on the timeline edit it, and Clip makes it.
+      seg.load(clip.segments, clip.id);
       if (clip.segments[0]) playFrom(clip.segments[0].start);
     },
     [seg, s, campaignId, vid],
@@ -65,6 +73,14 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
           const ok = await cutBanked(clip, name);
           if (ok) {
             finishBankedCut({ campaignId, videoId: vid, clipId: clip.id, markCut: bankStore.markCut, recordUse });
+            // Liam 26 Nov: a clip that has been made is no longer the selection. If it is the one on the timeline, the
+            // timeline and the marks go empty so the next clip can be marked by hand; otherwise what is marked is left alone.
+            if (seg.store.get().bankId === clip.id) {
+              seg.clear();
+              setStartText("");
+              setEndText("");
+              s.setSelectedId((cur) => (cur === clip.id ? null : cur));
+            }
             // Its own Undo, even when the next queued clip starts at once.
             const newest = getDownloads().find((d) => d.kind === "clip");
             if (newest) {
@@ -77,7 +93,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
       };
       return queue.current.enqueue(run);
     },
-    [campaignId, vid, cutBanked, recordUse, s, info?.title],
+    [campaignId, vid, cutBanked, recordUse, s, info?.title, seg, setStartText, setEndText],
   );
 
   // The ✕ / Esc on the Making row: the clip goes back to Waiting with its range kept, no notice, no confirm.

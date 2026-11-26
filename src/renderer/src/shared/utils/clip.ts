@@ -41,7 +41,17 @@ export function orderedRange(a: number, b: number): { start: number; end: number
   return { start: Math.min(a, b), end: Math.max(a, b) };
 }
 
-export type ClipFormat = "mp4" | "mp3";
+/** "m4a" is the sound-only output of a campaign or location that saves sound only. */
+export type ClipFormat = "mp4" | "mp3" | "m4a";
+
+export function isAudioFormat(f: ClipFormat): boolean {
+  return f !== "mp4";
+}
+
+/** The file extension a clip of this format is saved with. */
+export function formatExtension(f: ClipFormat): "mp4" | "mp3" | "m4a" {
+  return f;
+}
 
 export type BitrateMap = Partial<Record<string, number>>; // kbps
 

@@ -128,6 +128,8 @@ export interface JoinOptions {
   isAudio: boolean;
   /** MP3 bitrate in kbps; only read when `isAudio`. */
   audioKbps?: string;
+  /** The audio encoder when `isAudio`: MP3 by default, AAC for an M4A (sound only). */
+  audioCodec?: "libmp3lame" | "aac";
 }
 
 export function concatCopyArgs(
@@ -164,7 +166,7 @@ export function concatReencodeArgs(
     "-i",
     list,
     ...(opts.isAudio
-      ? ["-vn", "-c:a", "libmp3lame", "-b:a", `${opts.audioKbps ?? "192"}k`]
+      ? ["-vn", "-c:a", opts.audioCodec ?? "libmp3lame", "-b:a", `${opts.audioKbps ?? "192"}k`]
       : [
           "-c:v",
           "libx264",

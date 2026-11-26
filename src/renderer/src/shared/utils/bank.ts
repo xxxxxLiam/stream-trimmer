@@ -228,6 +228,14 @@ export function renameClip(data: BankData, campaignId: string, videoId: string, 
   return withClips(data, campaignId, videoId, list.map((c) => (c.id === clipId ? { ...c, label } : c)));
 }
 
+/** A waiting moment's edges edited on the timeline: the new ranges replace the old (same count, checked by the caller). */
+export function setClipSegments(data: BankData, campaignId: string, videoId: string, clipId: string, segments: readonly Segment[]): BankData {
+  const list = clipsFor(data, campaignId, videoId);
+  const next = cleanSegments(segments);
+  if (!next.length || !list.some((c) => c.id === clipId)) return data;
+  return withClips(data, campaignId, videoId, list.map((c) => (c.id === clipId ? { ...c, segments: next } : c)));
+}
+
 export type CutResult = { data: BankData; clip: BankedClip; ranges: Segment[] };
 
 /** Flip a clip to `cut` and return the ranges that must be appended to usedRanges. Null when there is no such clip. */
@@ -348,6 +356,7 @@ export type BankStore = {
   setNote: (campaignId: string, videoId: string, clipId: string, note: string) => void;
   rename: (campaignId: string, videoId: string, clipId: string, label: string) => void;
   clearRanPastEnd: (campaignId: string, videoId: string, clipId: string) => void;
+  setSegments: (campaignId: string, videoId: string, clipId: string, segments: readonly Segment[]) => void;
   /** Forget everything banked under a campaign (it was removed). */
   removeCampaign: (campaignId: string) => void;
 };
@@ -384,6 +393,7 @@ export function createBankStore(io: BankIO): BankStore {
     setNote: (c, v, id, n) => commit(setNote(data, c, v, id, n)),
     rename: (c, v, id, label) => commit(renameClip(data, c, v, id, label)),
     clearRanPastEnd: (c, v, id) => commit(clearRanPastEnd(data, c, v, id)),
+    setSegments: (c, v, id, segs) => commit(setClipSegments(data, c, v, id, segs)),
     removeCampaign: (c) => commit(removeCampaignBank(data, c)),
   };
 }

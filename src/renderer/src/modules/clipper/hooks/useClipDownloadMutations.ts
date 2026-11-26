@@ -5,7 +5,7 @@
  */
 import type { ClipRowState } from "../../../../../common/types/clipRowState";
 import { useCallback, useRef, useState } from "react";
-import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl, buildClipFilename, sanitizeFilename, type ClipFormat, type VideoInfo } from "../../../shared/utils/clip";
+import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl, buildClipFilename, sanitizeFilename, type ClipFormat, type VideoInfo, isAudioFormat, formatExtension } from "../../../shared/utils/clip";
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 import { connectionNow, cookiePayload, markDisconnected, requestedQuality, useYouTubeConnection, whenSignInSettled } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
@@ -242,7 +242,7 @@ export function useClipDownloadMutations({
         ? await parseJson<{ path: string; size: number }>(res)
         : null;
       const blob = deliverPath ? null : await res.blob();
-      const ext = format === "mp3" ? "mp3" : "mp4";
+      const ext = formatExtension(format);
       const filename = opts?.clipId
         ? `${sanitizeFilename(opts.clipId)}.${ext}`
         : buildClipFilename(info.title, cutStart, cutEnd, ext);
@@ -257,7 +257,7 @@ export function useClipDownloadMutations({
       const authMode = res.headers.get("X-Auth-Mode") || "";
       const requestedHeight = Number(quality);
       let detail: string | undefined;
-      if (format === "mp3") {
+      if (isAudioFormat(format)) {
         detail = deliveredKbps ? `Downloaded at ${deliveredKbps} kbps.` : undefined;
       } else if (deliveredHeight) {
         if (requestedHeight && deliveredHeight < requestedHeight) {

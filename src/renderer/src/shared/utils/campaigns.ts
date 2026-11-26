@@ -39,6 +39,10 @@ export type Campaign = {
   /** The campaign's clip length rule in seconds, either end optional. Unset (the default) means no rule; it never blocks Clip. */
   lengthMinSec?: number;
   lengthMaxSec?: number;
+  /** "campaign" (the default, and what every record made before locations is) or "location": a name and a folder, no quota or schedule. */
+  kind?: CampaignKind;
+  /** Save the sound only (M4A) instead of the video. Meant for locations such as Sound effects; any destination may turn it on. */
+  soundOnly?: boolean;
 };
 
 export type CampaignInput = Partial<Omit<Campaign, "id" | "usedRanges">> & {
@@ -109,6 +113,9 @@ export function normalizeBand<T extends Pick<Campaign, "targetMinSec" | "targetM
 
 import { CHANNEL_DATA_BUILT } from "./ownerGate";
 import { siblingDir } from "../../../../common/utils/siblingDir";
+import { INVISIBLE_CHARS as INVISIBLE, isBrandedName, safeFolderName, type CampaignKind } from "../../../../common/utils/brandedFolder";
+
+export type { CampaignKind };
 
 /**
  * Name of the suggested data folder. The exporter's own name only exists in a build that
@@ -117,25 +124,24 @@ import { siblingDir } from "../../../../common/utils/siblingDir";
 export const DATA_FOLDER_NAME: string = CHANNEL_DATA_BUILT ? "channel-data" : "data";
 
 /** "/a/b/clips" -> "/a/b/<data folder>". Keeps the separator style of the input. */
-/** A campaign name as one folder name: no path separators or characters a folder cannot hold. */
-/** Zero-width and bidi-control characters, which no one can see in a name. */
-const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
-
+/** A campaign name as one folder name: the shared safe-name rule (src/common/utils/brandedFolder.ts). */
 export function folderNameOf(name: string): string {
-  // A4-3: invisible characters and NFC/NFD spellings must not make two names that read the same. A4-5: a final dot or space is
-  // dropped (Windows cannot end a folder name with one), so "Dr. Pepper Inc." is a fine name with the folder "Dr. Pepper Inc".
-  const safe = name.normalize("NFC").replace(INVISIBLE, "").replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+/, "").replace(/[.\s]+$/, "");
-  return safe || "Campaign";
+  return safeFolderName(name, "Campaign");
 }
 
 /**
  * Where a campaign's clips go: its own folder when it chose one, else a folder named after it inside the
  * Clips folder (the parent). Empty when there is no parent yet.
  */
-export function campaignClipsDir(c: Pick<Campaign, "name" | "clipsDir">, parent: string): string {
+export function campaignClipsDir(c: Pick<Campaign, "name" | "clipsDir"> & { kind?: CampaignKind }, parent: string): string {
   if (c.clipsDir) return c.clipsDir;
   const base = parent.replace(/[\\/]+$/, "");
   if (!base) return "";
+  // A location's own folder is "Clipr <Name>" beside the Clipr folder (Downloads/Clipr B-roll), not inside it.
+  if (c.kind === "location") {
+    const leaf = safeFolderName(c.name, "Location");
+    return siblingDir(base, isBrandedName(leaf) ? leaf : `Clipr ${leaf}`);
+  }
   const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
   return `${base}${sep}${folderNameOf(c.name)}`;
 }
@@ -233,6 +239,8 @@ export function createCampaign(
     dailyQuota: input.dailyQuota && input.dailyQuota >= 1 ? Math.floor(input.dailyQuota) : DEFAULT_DAILY_QUOTA,
     // The caller passes the last look picked, so a second client is one pick, not a second upload.
     ...(input.fcpLookId ? { fcpLookId: input.fcpLookId } : {}),
+    ...(input.kind === "location" ? { kind: "location" as const } : {}),
+    ...(input.soundOnly ? { soundOnly: true } : {}),
   });
   return { campaigns: [...list, campaign], campaign };
 }
@@ -448,7 +456,8 @@ export function clipsMadeToday(c: Campaign | null | undefined, now: number = Dat
  */
 export function todayCount(c: Campaign | null | undefined, now: number = Date.now()): string | null {
   const quota = c?.dailyQuota;
-  if (!c || !quota || quota <= 0) return null;
+  // A location has no quota, so no count.
+  if (!c || c.kind === "location" || !quota || quota <= 0) return null;
   const made = clipsMadeToday(c, now);
   return made >= quota ? "Done for today" : `${made} of ${quota} today`;
 }
@@ -520,6 +529,9 @@ export function normalizeCampaigns(raw: unknown): Campaign[] {
         ...(typeof r.fcpLookId === "string" && r.fcpLookId ? { fcpLookId: r.fcpLookId } : {}),
         ...(isRuleSec(r.lengthMinSec) ? { lengthMinSec: Math.floor(r.lengthMinSec) } : {}),
         ...(isRuleSec(r.lengthMaxSec) ? { lengthMaxSec: Math.floor(r.lengthMaxSec) } : {}),
+        // Records saved before locations have neither field and stay campaigns with their folder untouched.
+        ...(r.kind === "location" ? { kind: "location" as const } : {}),
+        ...(r.soundOnly === true ? { soundOnly: true } : {}),
       }),
     );
   }

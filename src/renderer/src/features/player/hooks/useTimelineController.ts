@@ -25,6 +25,7 @@ import { usePickedRange } from "./usePickedRange";
 import { useTimelineState } from "./useTimelineState";
 import { markByHand } from "../utils/rangeOrigin";
 import { useTimelineEffects } from "./useTimelineEffects";
+import { bankStore, clipsFor } from "../../../shared/utils/bank";
 import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { dialogOpen } from "../../../shared/utils/dialogOpen";
 
@@ -58,6 +59,17 @@ export function useTimelineController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [store.segments, range?.start, range?.end],
   );
+  // Liam 26 Nov: a bank card loaded on the timeline IS that bank item. Dragging or trimming its edges edits
+  // the item's in and out; Clip then matches it as the same moment (matchingMoment) and counts as making it.
+  // Marking another section, clearing the marks or losing the item ends the link, and nothing is written.
+  const { bankId, detachBank } = store;
+  useEffect(() => {
+    if (!bankId || !active || !videoId) return;
+    const item = clipsFor(bankStore.get(), active.id, videoId).find((c) => c.id === bankId);
+    if (!item || item.status !== "banked" || sections.length !== item.segments.length) return detachBank();
+    if (sections.every((r, i) => r.start === item.segments[i].start && r.end === item.segments[i].end)) return;
+    bankStore.setSegments(active.id, videoId, bankId, sections);
+  }, [bankId, active, videoId, sections, detachBank]);
   const startPicked = clipper.startText.trim() !== "" && Number.isFinite(clipper.start) && clipper.start >= 0 && !range;
   // B3-1: an Out set before the In is stored, so the readout shows it instead of a dash.
   const endPicked = clipper.endText.trim() !== "" && Number.isFinite(clipper.end) && clipper.end >= 0 && !range;
@@ -235,6 +247,8 @@ export function useTimelineController() {
       }
     }
     // The pointer only moves the playhead: a click goes there, a drag scrubs along the video.
+    // A click on empty timeline also clears the selection (board 03.2.49), as Esc does.
+    clearSelection();
     s.setDrag({ kind: "scrub" });
     clipper.requestSeek(Math.round(t));
   };
@@ -268,8 +282,25 @@ export function useTimelineController() {
     clipper.setEndText("");
     s.setScissorsStart(null);
   };
+  // Esc clears the whole selection: the picked range and any locked sections (a loaded bank clip included), so there is always a way
+  // to start a clip by hand (Liam 26 Nov).
+  const clearSelection = () => {
+    clearRange();
+    store.clear();
+  };
+  /** Delete the selected clip (board 03.2.49): its range and its waiting card go, which clears the selection. Clips already made are untouched. */
+  const deleteClip = () => {
+    if (active && videoId) {
+      const first = sections[0];
+      const id =
+        store.bankId ??
+        (sections.length === 1 && first ? store.banked.find((b) => b.clipId && b.start === first.start && b.end === first.end)?.clipId : undefined);
+      if (id) bankStore.remove(active.id, videoId, id);
+    }
+    clearSelection();
+  };
   const tabActive = useIsTabActive();
-  const hasRange = !!range;
+  const hasRange = !!range || store.segments.length > 0;
   const dragging = !!s.drag;
   useEffect(() => {
     if (!tabActive || !hasRange || dragging) return;
@@ -277,7 +308,7 @@ export function useTimelineController() {
       if (e.key !== "Escape" || e.defaultPrevented || dialogOpen() || document.querySelector('[role="menu"]')) return;
       const el = e.target as HTMLElement | null;
       if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
-      clearRange();
+      clearSelection();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -472,6 +503,7 @@ export function useTimelineController() {
     onLaneClickCapture,
     addSection,
     clearRange,
+    deleteClip,
     removeSection: (i: number) => store.remove(i),
     seek: (t: number) => clipper.requestSeek(t),
   };

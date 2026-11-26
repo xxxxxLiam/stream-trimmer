@@ -276,3 +276,40 @@ test("handles: the Pointer and the Range tool show a hover, and a held handle sh
   assert.match(lane, /cursor-ew-resize/);
   assert.match(lane, /onPointerLeave=\{c\.onLanePointerLeave\}/);
 });
+
+test("Liam 26 Nov: the loaded bank clip's edge edits write to the bank item; a different section count ends the link", () => {
+  assert.match(src, /bankStore\.setSegments\(active\.id, videoId, bankId, sections\)/);
+  assert.match(src, /sections\.length !== item\.segments\.length\) return detachBank\(\)/);
+  const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
+  assert.match(mut, /seg\.load\(clip\.segments, clip\.id\)/);
+});
+
+test("Liam 26 Nov: Esc clears the whole selection, loaded sections included; a made bank clip leaves the timeline empty", async () => {
+  const esc = src.slice(src.indexOf("An unsaved range goes away"), src.indexOf("const lastScrub"));
+  assert.match(esc, /const clearSelection = \(\) => \{\s*clearRange\(\);\s*store\.clear\(\);/);
+  assert.match(esc, /const hasRange = !!range \|\| store\.segments\.length > 0/);
+  assert.match(esc, /\n\s+clearSelection\(\);\n/, "the Esc key runs clearSelection");
+  const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
+  assert.match(mut, /if \(seg\.store\.get\(\)\.bankId === clip\.id\) \{\s*seg\.clear\(\);\s*setStartText\(""\);\s*setEndText\(""\);/);
+  // The store half is real behaviour: clear() empties loaded sections and ends the bank link.
+  const { createSegmentStore } = await import("../../../shared/hooks/useSegmentsState");
+  const store = createSegmentStore();
+  store.load([{ start: 10, end: 20 }], "B01");
+  assert.equal(store.get().bankId, "B01");
+  store.clear();
+  assert.deepEqual(store.get().segments, []);
+  assert.equal(store.get().bankId, null);
+});
+
+test("board 03.2.49 B: a selected clip has a 32px Delete clip trash just outside its bar; it deletes the range and its waiting card", () => {
+  const lane2 = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+  assert.match(lane2, /aria-label="Delete clip"/);
+  assert.match(lane2, /size-\[32px\][^"]*border-hairlineStrong bg-raised text-fg-dim/);
+  assert.match(lane2, /Math\.min\(sp\.left \+ sp\.width \+ 6, c\.width - 32\)/, "6px gap outside the right edge, kept on the lane when the bar runs to its end");
+  assert.match(lane2, /onClick=\{c\.deleteClip\}/);
+  assert.match(src, /bankStore\.remove\(active\.id, videoId, id\);\s*\}\s*clearSelection\(\);/);
+  const down2 = src.slice(src.indexOf("const onLanePointerDown"), src.indexOf("const onLanePointerMove"));
+  assert.match(down2.slice(down2.indexOf("A click on empty timeline")), /clearSelection\(\);\s*s\.setDrag\(\{ kind: "scrub" \}\)/);
+  const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
+  assert.match(mut, /if \(timelineEmpty && selectedId\) setSelectedId\(null\)/, "Clip, Esc or the trash leaves no bank row selected");
+});

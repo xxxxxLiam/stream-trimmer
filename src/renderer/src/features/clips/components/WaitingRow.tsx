@@ -5,9 +5,9 @@
  *   suggested next sits on an Ice edge. Clicking loads it on the timeline; the always-visible ⋯ opens the
  *   row in place with Clip now, Rename and Remove (the shared list row).
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ActionRow from "../../../shared/components/ActionRow";
-import { IconMake, IconRemove, IconRename } from "../../../shared/components/rowIcons";
+import { IconCopy, IconMake, IconRemove, IconRename } from "../../../shared/components/rowIcons";
 import { finishRename, renameKey } from "../../player/utils/laneRename";
 import type { BankedClip } from "../../../shared/utils/bank";
 import { boardTime, rangeLine, ratingText } from "../utils/exportRows";
@@ -26,6 +26,8 @@ export type WaitingRowProps = {
   lengthNote?: string;
   onMake: () => void;
   onRename: (name: string) => void;
+  /** Copies just this clip (its line and its transcript range); true when it landed on the clipboard. */
+  onCopy?: () => Promise<boolean>;
   onRemove: () => void;
 };
 
@@ -33,10 +35,17 @@ const chip = "rounded-chip border border-hairlineStrong px-[4px] py-[1px] text-m
 // A made row is dimmed the board's way (0.6) with the disabled token, not an opacity modifier (CLAUDE.md).
 const madeChip = "rounded-chip border border-hairline px-[4px] py-[1px] text-meta leading-[normal] text-disabled";
 
-export default function WaitingRow({ clip, name, suggested, selected, made, lengthNote, onSelect, onMake, onRename, onRemove }: WaitingRowProps) {
+export default function WaitingRow({ clip, name, suggested, selected, made, lengthNote, onSelect, onMake, onRename, onCopy, onRemove }: WaitingRowProps) {
   const edge = suggested ? "border-ice-tint-50 bg-ice-tint-06" : selected ? "border-hairlineStrong" : "border-transparent";
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [said, setSaid] = useState("");
+  useEffect(() => {
+    if (!said) return;
+    const t = window.setTimeout(() => setSaid(""), 3000);
+    return () => window.clearTimeout(t);
+  }, [said]);
+  const copy = async () => setSaid((await onCopy?.()) ? "✓ Copied this clip with its transcript" : "Could not copy");
   const stop = () => {
     setDraft(null);
     setError(null);
@@ -50,6 +59,7 @@ export default function WaitingRow({ clip, name, suggested, selected, made, leng
   const actions = [
     ...(made ? [] : [{ key: "clip", label: "Clip now", icon: <IconMake />, onSelect: onMake }]),
     ...(made ? [] : [{ key: "rename", label: "Rename", icon: <IconRename />, onSelect: () => setDraft(name) }]),
+    ...(onCopy ? [{ key: "copy", label: "Copy as text", icon: <IconCopy />, onSelect: () => void copy() }] : []),
     { key: "remove", label: "Remove", icon: <IconRemove />, onSelect: onRemove, danger: true },
   ];
   return (
@@ -101,6 +111,7 @@ export default function WaitingRow({ clip, name, suggested, selected, made, leng
           <span className="min-w-0">
             <span className={`block whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
             <span className={`mt-[2px] block whitespace-nowrap text-meta leading-[normal] ${made ? "text-disabled" : "text-fg-dim"}`}>{rangeLine(clip)}</span>
+            {said && <span role="status" className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{said}</span>}
             {lengthNote && !made && <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{lengthNote}</span>}
             {clip.ranPastEnd !== undefined && !made && (
               <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">Ran past the end; stops at {boardTime(clip.ranPastEnd)}</span>

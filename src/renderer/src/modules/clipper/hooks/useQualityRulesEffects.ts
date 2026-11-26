@@ -5,7 +5,7 @@
  *   keeps it valid for the format. Nothing here is stored per campaign.
  */
 import { useEffect } from "react";
-import { type ClipFormat } from "../../../shared/utils/clip";
+import { isAudioFormat, type ClipFormat } from "../../../shared/utils/clip";
 import { isSignedOut, requestedQuality, useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
 import { AUDIO_QUALITIES } from "../utils/clipperTypes";
 
@@ -28,6 +28,6 @@ export function useQualityRulesEffects({
 
   // Audio keeps its bitrate list when the format is audio.
   useEffect(() => {
-    if (format === "mp3" && !(AUDIO_QUALITIES as readonly string[]).includes(quality)) setQuality(AUDIO_QUALITIES[0]);
+    if (isAudioFormat(format) && !(AUDIO_QUALITIES as readonly string[]).includes(quality)) setQuality(AUDIO_QUALITIES[0]);
   }, [format, quality]);
 }

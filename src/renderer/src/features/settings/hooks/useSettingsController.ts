@@ -11,16 +11,18 @@ import { DEFAULT_DAILY_QUOTA, campaignSummary, languagesLine } from "../utils/se
 import { useSettingsState } from "./useSettingsState";
 import { editorStartCampaign } from "../utils/editorSetup";
 
-export type SettingsView = { kind: "top" } | { kind: "campaign"; id: string } | { kind: "editor"; id: string } | { kind: "signin" };
+export type SettingsView = { kind: "top" } | { kind: "campaign"; id: string } | { kind: "editor"; id: string } | { kind: "signin" } | { kind: "newLocation" };
 
 /** `startAt` value that opens Settings on the sign-in page (the footer pill). */
 export const START_AT_SIGNIN = "@signin";
+/** `startAt` value that opens Settings on the New location form (campaign menu). */
+export const START_AT_NEW_LOCATION = "@new-location";
 
 export function parentOf(v: SettingsView): { label: string; view: SettingsView } | null {
   // The label is the campaign's own name, which only the caller knows; the empty label is replaced there.
   if (v.kind === "editor") return { label: "", view: { kind: "campaign", id: v.id } };
   if (v.kind === "campaign") return { label: "Settings", view: { kind: "top" } };
-  if (v.kind === "signin") return { label: "Settings", view: { kind: "top" } };
+  if (v.kind === "signin" || v.kind === "newLocation") return { label: "Settings", view: { kind: "top" } };
   return null;
 }
 
@@ -46,7 +48,7 @@ export function useSettingsController({
     const pickedFor = editorStartCampaign(startAt);
     setFromPick(pickedFor !== null);
     setView(
-      startAt === START_AT_SIGNIN ? { kind: "signin" } : pickedFor ? { kind: "editor", id: pickedFor } : startAt ? { kind: "campaign", id: startAt } : { kind: "top" },
+      startAt === START_AT_SIGNIN ? { kind: "signin" } : startAt === START_AT_NEW_LOCATION ? { kind: "newLocation" } : pickedFor ? { kind: "editor", id: pickedFor } : startAt ? { kind: "campaign", id: startAt } : { kind: "top" },
     );
   }, [open, startAt]);
 
@@ -72,7 +74,7 @@ export function useSettingsController({
     () =>
       campaigns.campaigns.map((c) => {
         const p = prefs.prefsFor(c.id);
-        return { id: c.id, name: c.name, summary: campaignSummary(c.dailyQuota ?? DEFAULT_DAILY_QUOTA), languages: languagesLine(p) };
+        return { id: c.id, name: c.name, summary: campaignSummary(c.dailyQuota ?? DEFAULT_DAILY_QUOTA), languages: languagesLine(p), location: c.kind === "location" };
       }),
     [campaigns.campaigns, prefs],
   );

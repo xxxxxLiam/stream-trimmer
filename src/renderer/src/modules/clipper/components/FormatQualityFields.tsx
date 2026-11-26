@@ -10,7 +10,7 @@ import { QUALITY_LABELS } from "../utils/clipperTypes";
 export default function FormatQualityFields() {
   const { info, format, setFormat, quality, setQuality } = useClipperContext();
   const qualityOptions =
-    format === "mp3" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
+    format !== "mp4" ? AUDIO_QUALITIES : VIDEO_QUALITIES;
 
   const selectClass = "field appearance-none pr-8 cursor-pointer";
 

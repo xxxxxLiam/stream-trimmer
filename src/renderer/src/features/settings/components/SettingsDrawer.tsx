@@ -13,8 +13,11 @@ import CampaignForm from "../../campaigns/components/CampaignForm";
 import SettingsCampaign from "./SettingsCampaign";
 import SettingsEditor, { type FinalCutFields } from "./SettingsEditor";
 import SettingsSignIn from "./SettingsSignIn";
+import SettingsLocation from "./SettingsLocation";
+import SettingsNewLocation, { locationFolderName } from "./SettingsNewLocation";
 import { useCookieDropMutations } from "../hooks/useCookieDropMutations";
 import { useYouTubeConnection } from "../../../shared/utils/youtubeConnection";
+import { signInRowValue, type SignInStatus } from "../utils/signInStatus";
 import SettingsTopList from "./SettingsTopList";
 import { useSettingsController } from "../hooks/useSettingsController";
 import { useFinalCutLayout } from "../hooks/useFinalCutLayout";
@@ -53,6 +56,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   const c = useSettingsController({ open, onClose, startAt });
   const cookies = useCookieDropMutations();
   const connection = useYouTubeConnection();
+  const signInStatus: SignInStatus | null = cookies.status ?? (connection.connected ? { state: "signed-in", justChecked: false } : null);
   const [chosen] = useClipDestination();
   // Liam, 25 Nov: a campaign's export settings are always here. With no editor chosen yet (or CapCut, which has
   // nothing to set) the page is Final Cut Pro's, the first editor, so its library, event, layout and look are never out of reach.
@@ -139,6 +143,54 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         }
       />
     );
+  } else if (view.kind === "newLocation") {
+    body = (
+      <SettingsNewLocation
+        defaultFolder={(name) => folderChipLabel(campaignClipsDir({ name, clipsDir: "", kind: "location" }, c.campaigns.defaultFolders.clipsDir), 2)}
+        onChoose={async (name) => (await window.electronAPI?.pickBrandedDirectory?.({ kind: "location", name }))?.dir ?? null}
+        onAdd={(input) => {
+          const found = campaignNameProblems(input.name, c.campaigns.campaigns);
+          if (found.length) return found;
+          c.campaigns.create({ name: input.name, kind: "location", soundOnly: input.soundOnly, ...(input.clipsDir ? { clipsDir: input.clipsDir } : {}) });
+          c.setView({ kind: "top" });
+          return [];
+        }}
+        onBack={c.back}
+        onClose={onClose}
+      />
+    );
+  } else if (view.kind === "campaign" && campaign?.kind === "location") {
+    body = (
+      <SettingsLocation
+        name={campaign.name}
+        folderLabel={folderChipLabel(campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir), 2)}
+        soundOnly={campaign.soundOnly === true}
+        onSoundOnly={(on) => c.campaigns.update(campaign.id, { soundOnly: on })}
+        onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}
+        onRename={(next) => {
+          const found = campaignNameProblems(next, c.campaigns.campaigns, campaign.id);
+          if (found.length) return found;
+          // Pin the current folder: renaming must not orphan the clips already there.
+          const pinned = campaign.clipsDir || campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir);
+          c.campaigns.update(campaign.id, { name: next.trim(), ...(pinned ? { clipsDir: pinned } : {}) });
+          return [];
+        }}
+        confirmingDelete={confirming === campaign.id}
+        onDelete={() => {
+          if (confirming === campaign.id) {
+            if (Date.now() - armedAt.current < DELETE_GUARD_MS) return;
+            setConfirming(null);
+            c.campaigns.remove(campaign.id);
+            dropCampaignPrefs(campaign.id, (k) => readSetting<Record<string, unknown>>(k, {}), writeSetting);
+          } else {
+            armedAt.current = Date.now();
+            setConfirming(campaign.id);
+          }
+        }}
+        onBack={c.back}
+        onClose={onClose}
+      />
+    );
   } else if (view.kind === "campaign" && campaign) {
     const fcp = editor.settingsFor(campaign.id);
     body = (
@@ -177,6 +229,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
           const r = await window.electronAPI?.showInFolder(dir);
           return r?.missing ? FOLDER_NOT_MADE_YET : null;
         }}
+        folderChosen={Boolean(campaign.clipsDir)}
         onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}
         onRename={(next) => {
           const found = campaignNameProblems(next, c.campaigns.campaigns, campaign.id);
@@ -205,8 +258,8 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   } else if (view.kind === "signin") {
     body = (
       <SettingsSignIn
-        problem={cookies.problem}
-        done={cookies.done}
+        status={signInStatus}
+        onSignOut={() => void cookies.signOut()}
         onFile={(f) => void cookies.onFile(f)}
         onChoose={() => void cookies.choose()}
         onBack={c.back}
@@ -219,12 +272,14 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
         rows={c.rows}
         onEdit={(id) => c.setView({ kind: "campaign", id })}
         onAdd={() => c.setAdding(true)}
+        onAddLocation={() => c.setView({ kind: "newLocation" })}
+        locationFolder={locationFolderName}
         app={c.app}
         autoUpdate={c.autoUpdate}
         autoUpdateAvailable={updatesInPlace(typeof navigator === "undefined" ? "" : navigator.platform)}
         onAutoUpdate={c.setAutoUpdate}
         onPatchApp={c.patchApp}
-        signedIn={connection.connected}
+        signInValue={signInRowValue(cookies.status, connection.connected)}
         onOpenSignIn={() => c.setView({ kind: "signin" })}
         onClose={onClose}
       />
