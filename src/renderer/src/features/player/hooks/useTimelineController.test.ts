@@ -276,3 +276,10 @@ test("handles: the Pointer and the Range tool show a hover, and a held handle sh
   assert.match(lane, /cursor-ew-resize/);
   assert.match(lane, /onPointerLeave=\{c\.onLanePointerLeave\}/);
 });
+
+test("Liam 26 Nov: the loaded bank clip's edge edits write to the bank item; a different section count ends the link", () => {
+  assert.match(src, /bankStore\.setSegments\(active\.id, videoId, bankId, sections\)/);
+  assert.match(src, /sections\.length !== item\.segments\.length\) return detachBank\(\)/);
+  const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
+  assert.match(mut, /seg\.load\(clip\.segments, clip\.id\)/);
+});

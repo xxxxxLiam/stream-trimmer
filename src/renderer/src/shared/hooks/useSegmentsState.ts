@@ -38,6 +38,11 @@ export type SegmentsState = {
    * list, so edits made now would not reach the file (B-7); they are refused instead.
    */
   locked: boolean;
+  /**
+   * The bank item these marks stand for, after a bank card was clicked: trimming or moving its
+   * edges edits that item, and pressing Clip counts as making it. Null for any other marks.
+   */
+  bankId: string | null;
 };
 
 const EMPTY: Segment[] = [];
@@ -59,6 +64,7 @@ export function createSegmentStore() {
     playhead: 0,
     banked: EMPTY_BANKED,
     locked: false,
+    bankId: null,
   };
   const listeners = new Set<() => void>();
   // Set by restore(): the video a saved clip belongs to, while the tab's clipper has not yet
@@ -96,13 +102,17 @@ export function createSegmentStore() {
       set({ segments: moveSegment(state.segments, from, to) });
     },
     /** Replace the clip's segments, e.g. when a bank row is clicked. */
-    load(segments: readonly Segment[]) {
+    load(segments: readonly Segment[], bankId?: string) {
       if (state.locked) return;
-      set({ segments: segments.map((s) => ({ start: s.start, end: s.end })) });
+      set({ segments: segments.map((s) => ({ start: s.start, end: s.end })), ...(bankId !== undefined ? { bankId } : {}) });
     },
     /** Always allowed: it is how a finished cut empties its own clip. */
     clear() {
-      if (state.segments.length) set({ segments: EMPTY });
+      if (state.segments.length || state.bankId) set({ segments: EMPTY, bankId: null });
+    },
+    /** The marks no longer stand for a bank item (a new clip was started, or the item is gone). */
+    detachBank() {
+      if (state.bankId) set({ bankId: null });
     },
     /** Segments belong to one video: a new video starts a new clip. */
     syncVideo(videoId: string | null) {
@@ -112,7 +122,7 @@ export function createSegmentStore() {
         awaitingVideo = null;
       }
       if (state.videoId === videoId) return;
-      set({ videoId, segments: EMPTY, banked: EMPTY_BANKED });
+      set({ videoId, segments: EMPTY, banked: EMPTY_BANKED, bankId: null });
     },
     /** Put back a clip saved from an earlier session, together with the video it belongs to. */
     restore(videoId: string | null, segments: readonly Segment[]) {
@@ -195,6 +205,8 @@ export function useSegmentsState() {
     playhead: snap.playhead,
     banked: snap.banked,
     locked: snap.locked,
+    bankId: snap.bankId,
+    detachBank: store.detachBank,
     add: store.add,
     remove: store.remove,
     move: store.move,
