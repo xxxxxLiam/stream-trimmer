@@ -5,7 +5,7 @@
  *   it, undo the clip just made, remove a moment.
  */
 import { sourceLinkFor } from "../../../shared/utils/videoSource";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { clearAfterCuttingOutcome } from "../../handoff/components/EditorHandoff";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
@@ -29,9 +29,16 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
   const seg = useSegmentsState();
   const { cutBanked, cutAgain } = usePanelHost();
   const { recordUse, forgetUse, folders, pickClipsDir } = useCampaign();
-  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload, setStartText, setEndText } = useClipperContext();
+  const { removeDownload, pickSaveDir, saveDir, info, cancelDownload, setStartText, setEndText, startText, endText } = useClipperContext();
   const stopped = useRef(false);
   const { campaignId, vid } = q;
+
+  // Nothing left on the timeline (Clip pressed, Esc, a click on empty timeline, the trash): no bank row stays selected.
+  const timelineEmpty = seg.segments.length === 0 && startText.trim() === "" && endText.trim() === "";
+  const { selectedId, setSelectedId } = s;
+  useEffect(() => {
+    if (timelineEmpty && selectedId) setSelectedId(null);
+  }, [timelineEmpty, selectedId, setSelectedId]);
 
   const select = useCallback(
     (clip: BankedClip) => {

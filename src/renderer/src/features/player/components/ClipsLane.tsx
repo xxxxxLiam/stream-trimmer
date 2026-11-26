@@ -19,6 +19,7 @@ import { useIsTabActive } from "../../workspace/hooks/WorkspaceContext";
 import { MAX_CLIP_SECONDS, overCapMessage } from "../../../shared/utils/clip";
 import { useClipController } from "../hooks/useClipController";
 import { IconClose } from "../../../shared/components/PanelIcons";
+import { IconRemove } from "../../../shared/components/rowIcons";
 import ClipNameField from "./ClipNameField";
 import LaneLabel from "./LaneLabel";
 
@@ -136,6 +137,8 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
       </span>
     );
   };
+  // A selected clip (one that is not an unsaved range) gets a trash just outside the right edge of its bar: 32px, 6px gap.
+  const trashLeft = sections.length === 0 || unsaved ? null : (() => { const last = sections[sections.length - 1]; const sp = span(last.start, last.end); return sp.left + sp.width + 6; })();
   const laneRows = Math.max(1, ...slots.map((s) => s.rows));
   // An unsaved range over the 10-minute cap says so under its bar, live as it is dragged, without a hover.
   const overCap = unsaved && c.totalSeconds > MAX_CLIP_SECONDS ? overCapMessage(c.totalSeconds) : "";
@@ -188,6 +191,18 @@ export default function ClipsLane({ c }: { c: TimelineController }) {
                 {outside("built", sections[0].start, sections[0].end, building(sections[0].start))}
               </>
             ) : null}
+            {trashLeft !== null && (
+              <button
+                type="button"
+                aria-label="Delete clip"
+                title="Delete clip"
+                onClick={c.deleteClip}
+                className="absolute top-[1px] inline-flex size-[32px] items-center justify-center rounded-control border border-hairlineStrong bg-raised text-fg-dim hover:bg-hover hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost"
+                style={{ left: trashLeft }}
+              >
+                <IconRemove />
+              </button>
+            )}
             {sections.length > 1
               ? sections.map((s, i) => {
                   const first = i === 0;

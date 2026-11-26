@@ -300,3 +300,16 @@ test("Liam 26 Nov: Esc clears the whole selection, loaded sections included; a m
   assert.deepEqual(store.get().segments, []);
   assert.equal(store.get().bankId, null);
 });
+
+test("board 03.2.49 B: a selected clip has a 32px Delete clip trash just outside its bar; it deletes the range and its waiting card", () => {
+  const lane2 = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+  assert.match(lane2, /aria-label="Delete clip"/);
+  assert.match(lane2, /size-\[32px\][^"]*border-hairlineStrong bg-raised text-fg-dim/);
+  assert.match(lane2, /return sp\.left \+ sp\.width \+ 6/, "6px gap outside the right edge");
+  assert.match(lane2, /onClick=\{c\.deleteClip\}/);
+  assert.match(src, /bankStore\.remove\(active\.id, videoId, id\);\s*\}\s*clearSelection\(\);/);
+  const down2 = src.slice(src.indexOf("const onLanePointerDown"), src.indexOf("const onLanePointerMove"));
+  assert.match(down2.slice(down2.indexOf("A click on empty timeline")), /clearSelection\(\);\s*s\.setDrag\(\{ kind: "scrub" \}\)/);
+  const mut = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
+  assert.match(mut, /if \(timelineEmpty && selectedId\) setSelectedId\(null\)/, "Clip, Esc or the trash leaves no bank row selected");
+});
