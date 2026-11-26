@@ -114,3 +114,12 @@ test("Liam 26 Nov (board 03.1.4): the top field is always empty and clears on pa
   assert.match(videos, /<PreparingLine \/>/);
   assert.match(preview, /mx-\[20px\] min-w-\[0px\] flex-1 truncate text-center/);
 });
+
+test("board 03.1.4: while a video opens the preview header reads 0:00 and a dash, with no Ice line of its own", () => {
+  const preview = readFileSync(new URL("../../player/components/PreviewPanel.tsx", import.meta.url), "utf8");
+  assert.match(preview, /opening \? "0:00"/);
+  assert.match(preview, /opening \? "—"/);
+  assert.doesNotMatch(preview, /PreparingLine/);
+  assert.match(preview, />Opening the video…<\/span>/);
+  assert.doesNotMatch(preview, /the transcript follows/);
+});
