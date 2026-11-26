@@ -8,7 +8,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "../../../shared/components/Drawer";
 import { DrawerHeader, SectionLabel, drawerBody, outlineButton } from "../../../shared/components/DrawerRows";
-import { formatLength, formatTimecode } from "../../../shared/utils/segments";
+import { formatLength } from "../../../shared/utils/segments";
+import { boardTime } from "../../clips/utils/exportRows";
 import { useImportController } from "../hooks/useImportController";
 import { COPY_FORMAT } from "../utils/momentRows";
 
@@ -109,7 +110,7 @@ function Body({ text, onClose }: { text: string; onClose: () => void }) {
                 <li key={m.key} className="flex min-h-target items-center gap-[12px] border-b border-hairline">
                   <span className="min-w-[0px] flex-1 truncate text-body">{m.name || "Unnamed"}</span>
                   <span className="shrink-0 font-mono text-meta text-fg-dim">
-                    {formatTimecode(m.start)} · {formatLength(m.end - m.start)}
+                    {boardTime(m.start)} · {formatLength(m.end - m.start)}
                   </span>
                   {typeof m.rating === "number" && <span className="w-[24px] shrink-0 text-right text-meta text-fg-dim">{m.rating}</span>}
                 </li>
