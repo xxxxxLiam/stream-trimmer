@@ -24,7 +24,10 @@ function build(env: Record<string, string>): { dir: string; file: string } {
   const file = join(dir, "server.cjs");
   const r = spawnSync("node", [join(root, "scripts", "build-server.cjs")], {
     cwd: dir, // no .env here
-    env: { ...process.env, VITE_ENABLE_CHANNEL_DATA: "", VITE_OWNER_MACHINES: "", VITE_OWNER_SALT: "", ...env, BUILD_SERVER_OUT: file },
+    // CLIPR_DEV_BUILD=1: these tests read the bundle's own text, so they need the readable build
+    // (see plans/code-protection-plan.md) — a hardened build moves these literals into an
+    // obfuscated string array and the checks below would stop meaning anything.
+    env: { ...process.env, VITE_ENABLE_CHANNEL_DATA: "", VITE_OWNER_MACHINES: "", VITE_OWNER_SALT: "", CLIPR_DEV_BUILD: "1", ...env, BUILD_SERVER_OUT: file },
     encoding: "utf8",
   });
   assert.equal(r.status, 0, r.stderr || r.stdout);
