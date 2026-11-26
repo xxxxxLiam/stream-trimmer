@@ -62,7 +62,7 @@ function Body({ onClose, onCreated }: { onClose: () => void; onCreated?: (c: Cam
             type="button"
             onClick={() => {
               const api = window.electronAPI;
-              // The pick becomes <chosen>/Clipr clips/<Campaign> (an existing Clipr clips folder is reused, never nested).
+              // The pick is the campaign's folder exactly: clips go straight into it, nothing is added inside.
               if (api?.pickBrandedDirectory) void api.pickBrandedDirectory({ kind: "campaign", name: name.trim() || "Campaign" }).then((r) => r && setOwn(r.dir));
               else void api?.pickDirectory().then((d) => d && setOwn(d));
             }}

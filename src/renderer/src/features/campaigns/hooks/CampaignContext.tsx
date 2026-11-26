@@ -289,7 +289,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
 
   const chooseClipsDir = useCallback(
     async (forId?: string): Promise<{ picked: boolean; problem: string | null }> => {
-      // A campaign pick makes <chosen>/Clipr clips/<Campaign>, a location's <chosen>/Clipr <Name> (an existing one is reused).
+      // A campaign pick is the chosen folder itself, a location's <chosen>/Clipr <Name> (an existing one is reused).
       const target = campaignsRef.current.find((c) => c.id === (idOrUndefined(forId) ?? activeIdRef.current));
       const api = window.electronAPI;
       if (target && api?.pickBrandedDirectory) {
