@@ -56,8 +56,12 @@ export default function PreviewPanel() {
     >
       <div className="flex min-h-[0px] flex-1 flex-col gap-[8px] px-[12px] py-[10px]">
         <div className="flex h-[16px] flex-none items-center justify-between text-body leading-[16px] tabular-nums">
-          <span>{clipPos ? formatLength(clipPos.at) : clockTime(showEnd ? c.duration : player.currentTime)}</span>
-          <span className="text-fg-dim">{clipPos ? formatLength(clipPos.total) : clockTime(c.duration)}</span>
+          <span className="flex-none">{clipPos ? formatLength(clipPos.at) : clockTime(showEnd ? c.duration : player.currentTime)}</span>
+          {/* The video's title, centred between the two times with 20px clear on each side; long ones end in an ellipsis. */}
+          <span title={info?.title || undefined} className="mx-[20px] min-w-[0px] flex-1 truncate text-center text-fg">
+            {info?.title ?? ""}
+          </span>
+          <span className="flex-none text-fg-dim">{clipPos ? formatLength(clipPos.total) : clockTime(c.duration)}</span>
         </div>
 
         <div ref={c.frameRef} className="relative min-h-[0px] flex-1 overflow-hidden rounded-control bg-raised">

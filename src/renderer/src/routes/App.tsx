@@ -252,6 +252,7 @@ function TabReporter({ id }: { id: string }) {
 }
 
 function Layout({ active }: { active: boolean }) {
+  const wsTabs = useWorkspace();
   const {
     exportingComments,
     revealLastSaved,
@@ -265,6 +266,7 @@ function Layout({ active }: { active: boolean }) {
     videoId,
     url: sourceUrl,
     info,
+    loadingInfo,
     download,
     downloads,
     duration,
@@ -289,6 +291,8 @@ function Layout({ active }: { active: boolean }) {
     pickDataDir,
   } = useCampaign();
   const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
+  // A link opening while other videos are open keeps the workspace on screen (board 03.1.4); only the very first video opens from the start screen.
+  const openingBesideOthers = !info && loadingInfo && wsTabs.tabs.filter((t) => t.url).length > 1;
   const lowQuality = useSignInSignalEffects();
   const [channelOpen, setChannelOpen] = useState(false);
   const channel = useChannelState();
@@ -681,7 +685,7 @@ function Layout({ active }: { active: boolean }) {
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
-        {!info ? (
+        {!info && !openingBesideOthers ? (
           <ColdStartScreen />
         ) : (
         <>

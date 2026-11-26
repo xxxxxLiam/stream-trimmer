@@ -1,9 +1,9 @@
 /**
  * File: TopBarLinkField.tsx
  * Path: src/renderer/src/features/workspace/components/TopBarLinkField.tsx
- * Description: The centre of the top bar: a rounded field that reads the open video's title and takes a
+ * Description: The centre of the top bar: a rounded field that is always empty and takes a
  *   link. Click it, paste a link, Enter opens the video and adds it to the Videos
- *   list; Esc puts the title back. A small panel under it says what Enter does.
+ *   list (the field clears at once); Esc leaves it. A small panel under it says what Enter does.
  */
 import { useRef } from "react";
 import { IconSearch } from "../../../shared/components/PanelIcons";
@@ -33,7 +33,7 @@ export default function TopBarLinkField({ channel }: { channel?: ChannelLink }) 
           autoComplete="off"
           aria-label="Open or add a video: paste a YouTube link"
           placeholder="Paste a YouTube link"
-          value={c.editing ? c.text : c.title}
+          value={c.text}
           onFocus={c.onFocus}
           onBlur={c.onBlur}
           onChange={(e) => c.setText(e.target.value)}
