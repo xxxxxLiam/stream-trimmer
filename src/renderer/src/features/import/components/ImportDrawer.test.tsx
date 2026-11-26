@@ -28,12 +28,12 @@ test("Board 04.2.1: opened empty, the drawer shows the drop area, and rows paste
   assert.match(src, /h-\[190px\]/);
 });
 
-test("Board v149/v151: Export's + opens a menu (Add a moment, Import moments); Select moments stays in \u22ef; the + never acts on the selected clip", () => {
+test("Board v149/v151: Export's + opens a menu (Import moments first with the paste key, then Add a moment with M, board 04.2); Select moments stays in \u22ef; the + never acts on the selected clip", () => {
   const group = readFileSync("src/renderer/src/modules/layout/components/PanelGroup.tsx", "utf8");
   assert.match(group, /label: "Add a moment"/);
   assert.match(group, /label: "Import moments"/);
   const plus = group.match(/const addMenu =[\s\S]*?: undefined;/)![0];
-  assert.match(plus, /label: "Add a moment"[\s\S]*label: "Import moments"/);
+  assert.match(plus, /label: "Import moments"[\s\S]*label: "Add a moment", detail: "M"/);
   assert.match(plus, /host\.openImport\(\)/);
   assert.doesNotMatch(group.match(/const addAction =[\s\S]*?: undefined;/)![0], /export/);
   assert.equal((group.match(/label: "Import moments"/g) ?? []).length, 1);

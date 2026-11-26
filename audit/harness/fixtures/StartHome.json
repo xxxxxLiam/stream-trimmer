@@ -1,0 +1,5 @@
+{
+ "_doc": "Board 03.1.3: MainBase workspace open, Home pressed, one Back pill.",
+ "extends": "MainBase",
+ "stepsAppend": [{ "wait": 500 }, { "click": "#ui-home" }, { "wait": 900 }]
+}

@@ -16,6 +16,7 @@ import { getPanel } from "../utils/panelRegistry";
 import type { MenuItem } from "./PopoverMenu";
 import { useCopyListFor } from "../hooks/copyListStore";
 import { IconCopy, IconSaveFile } from "../../../shared/components/rowIcons";
+import { IconSelect } from "../../../shared/components/PanelIcons";
 import { clipCountText as countText } from "../../../shared/utils/clipListText";
 
 const NAMES: Record<PanelGroupId, string> = { left: "Left panels", centre: "Centre panels", right: "Right panels" };
@@ -42,8 +43,8 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
           label: "Add a moment",
           width: 212,
           items: [
-            { key: "moment", label: "Add a moment", onSelect: () => host.addMoment() },
             { key: "import", label: "Import moments", detail: mac ? "⌘V" : "Ctrl V", onSelect: () => host.openImport() },
+            { key: "moment", label: "Add a moment", detail: "M", onSelect: () => host.addMoment() },
           ] as MenuItem[],
         }
       : undefined;
@@ -87,14 +88,17 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     setSaid(`✓ Saved ${countText(list.count)}`);
   };
+  // Below a line, after the copy items (boards 03.2.23 and 03.2.51).
+  const selectItems: MenuItem[] = [
+    ...(activeDef?.id === "history" && finalCut ? [{ key: "select-clips", label: "Select clips", icon: <IconSelect />, disabled: !list || list.count === 0, onSelect: enterSelectClips } as MenuItem] : []),
+    ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", icon: <IconSelect />, disabled: !list || list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
+  ];
   const listItems: MenuItem[] = list
     ? [
-        ...(activeDef?.id === "history" && finalCut ? [{ key: "select-clips", label: "Select clips", disabled: list.count === 0, onSelect: enterSelectClips } as MenuItem] : []),
-        ...(activeDef?.id === "export" ? [{ key: "select-moments", label: "Select moments", disabled: list.count === 0, onSelect: enterSelectMoments } as MenuItem] : []),
         { key: "copy-list", label: "Copy as text", icon: <IconCopy />, detail: list.count > 0 ? countText(list.count) : undefined, disabled: list.count === 0, onSelect: () => void copyList() },
         { key: "save-list", label: "Save as .txt…", icon: <IconSaveFile />, disabled: list.count === 0, onSelect: () => void saveList() },
         ...(list.count === 0 ? [{ kind: "note", key: "list-empty", label: list.emptyNote } as MenuItem] : []),
-        { kind: "separator", key: "sep-list" } as MenuItem,
+        ...(selectItems.length > 0 ? [{ kind: "separator", key: "sep-list" } as MenuItem, ...selectItems] : []),
       ]
     : [];
   const menuItems: MenuItem[] = [

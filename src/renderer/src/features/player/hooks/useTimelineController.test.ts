@@ -388,11 +388,13 @@ test("Design v147/v148: the bank card is name + rating over topic, tier and leng
   assert.match(sf, /mb-\[6px\] mt-\[12px\]/);
 });
 
-test("Design v150: danger buttons are outlined, never a red fill; the Export menu starts with Import and Select moments", () => {
+test("Design v150: danger buttons are outlined, never a red fill; Select moments sits below a line after the copy items (boards 03.2.23, 03.2.51)", () => {
   const panel = readFileSync(new URL("../../clips/components/ExportPanel.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(panel, /bg-error/);
   const group = readFileSync(new URL("../../../modules/layout/components/PanelGroup.tsx", import.meta.url), "utf8");
-  assert.ok(group.indexOf('key: "select-moments"') < group.indexOf('key: "copy-list"'));
+  assert.ok(group.indexOf('key: "copy-list"') < group.indexOf('key: "sep-list"'));
+  assert.ok(group.indexOf('key: "sep-list"') < group.indexOf("...selectItems"));
+  assert.match(group, /label: "Select moments", icon: <IconSelect \/>/);
 });
 
 test("Board 03.2.53: Undo and Redo sit after a hairline following Snap, are aria-disabled in the disabled colour, and the history lives with the tab", () => {
@@ -450,7 +452,9 @@ test("A location: Clip saves to its folder only (no editor project), the menu sa
   const ctl = readFileSync(new URL("./useClipController.ts", import.meta.url), "utf8");
   assert.match(ctl, /savesTo: activeCampaign\?\.kind === "location" \? brandedLocationName\(activeCampaign\.name\) : null/);
   const btn = readFileSync(new URL("../components/ClipButton.tsx", import.meta.url), "utf8");
-  assert.match(btn, /c\.savesTo \? \(\s*<MenuLabel>Saves to \{c\.savesTo\}<\/MenuLabel>/);
+  assert.match(btn, /c\.savesTo \? \(\s*<SavesRow where=\{c\.savesTo\} \/>/);
+  assert.match(btn, /Saves to \{where\}/);
+  assert.match(btn, /<Folder width=\{14\}/);
   const loc = readFileSync(new URL("../../settings/components/SettingsLocation.tsx", import.meta.url), "utf8");
   assert.match(loc, /Languages/);
   assert.match(readFileSync(new URL("../../settings/components/SettingsDrawer.tsx", import.meta.url), "utf8"), /hasDubTracks\(tracks\)/);

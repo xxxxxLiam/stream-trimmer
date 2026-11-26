@@ -1,0 +1,15 @@
+{
+ "_doc": "Board 03.2.53: three toolbar states, shots to /tmp/undo-1..3.png (nothing to undo, after an edit, after an undo).",
+ "extends": "MainBase",
+ "region": { "x": 0, "y": 0, "width": 10, "height": 10 },
+ "stepsAppend": [
+  { "wait": 1200 },
+  { "shot": "/tmp/undo-1.png" },
+  { "eval": "window.__fakeYTPlayer.t = 4330" },
+  { "press": "i" }, { "wait": 1500 },
+  { "shot": "/tmp/undo-2.png" },
+  { "eval": "document.activeElement && document.activeElement.blur()" },
+  { "press": "Control+z" }, { "wait": 800 },
+  { "shot": "/tmp/undo-3.png" }
+ ]
+}

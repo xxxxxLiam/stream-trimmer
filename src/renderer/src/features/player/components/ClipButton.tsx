@@ -12,7 +12,7 @@ import { Menu, MenuItem, MenuLabel } from "../../../shared/components/Menu";
 import { useClipController } from "../hooks/useClipController";
 import { menuTarget } from "../utils/menuKeys";
 import { CaretIcon } from "./TransportIcons";
-import { Check2, ChevronLeft, ChevronRight } from "react-bootstrap-icons";
+import { Check2, ChevronLeft, ChevronRight, Folder } from "react-bootstrap-icons";
 import { useNextClipName } from "../../../modules/layout/hooks/useNextClipName";
 import { audioButtonLabel, makesText, nameForLanguage, planLanguages, shortenPath, toggleLanguage, type AudioTrackInfo } from "../../../shared/utils/audioLanguages";
 import { destinationLabel } from "../utils/clipDestination";
@@ -103,7 +103,7 @@ export default function ClipButton({ openUp = false, listenForKey = false, optio
           {paged && page === "root" ? (
             <>
               {c.savesTo ? (
-                <MenuLabel>Saves to {c.savesTo}</MenuLabel>
+                <SavesRow where={c.savesTo} />
               ) : (
                 <MenuItem trailing={<RowValue value={c.destination === "folder" ? shortenPath(options.folder) || "Choose a folder" : destinationLabel(c.destination)} />} onClick={() => setPage("where")}>
                   Where clips go
@@ -121,7 +121,7 @@ export default function ClipButton({ openUp = false, listenForKey = false, optio
               {page === "where" ? "Where clips go" : "Audio"}
             </MenuItem>
           ) : null}
-          {!paged && c.savesTo ? <MenuLabel>Saves to {c.savesTo}</MenuLabel> : null}
+          {!paged && c.savesTo ? <SavesRow where={c.savesTo} /> : null}
           {(!paged && !c.savesTo) || (paged && page === "where") ? (
             <div className="max-h-[320px] overflow-y-auto">
               {!paged ? <MenuLabel>Where clips go</MenuLabel> : null}
@@ -182,6 +182,16 @@ export default function ClipButton({ openUp = false, listenForKey = false, optio
         </Menu>
       ) : null}
     </span>
+  );
+}
+
+/** Where this location saves (board: folder icon in fg-dim, the words in fg, one 44px line, not a button). */
+function SavesRow({ where }: { where: string }) {
+  return (
+    <div className="flex h-target items-center gap-2.5 px-2.5 text-body text-fg">
+      <Folder width={14} height={14} className="text-fg-dim" aria-hidden="true" focusable="false" />
+      Saves to {where}
+    </div>
   );
 }
 

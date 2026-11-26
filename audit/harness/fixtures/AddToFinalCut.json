@@ -1,0 +1,112 @@
+{
+ "_doc": "Add to Final Cut board: History with three B-roll location clips; Final Cut faked installed (patch out/main) and navigator.platform faked Mac.",
+ "extends": "Main04History",
+ "initScript": "fakeMac.js",
+ "seed": {
+  "clipper.campaigns": [
+   {
+    "id": "acme",
+    "name": "Acme",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "ACM",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/tmp/Clips/Acme",
+    "dataDir": "/tmp/Data/Acme",
+    "usedRanges": {},
+    "dailyQuota": 3
+   },
+   {
+    "id": "nova",
+    "name": "Nova",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "NOV",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/tmp/Clips/Nova",
+    "dataDir": "/tmp/Data/Nova",
+    "usedRanges": {},
+    "dailyQuota": 2
+   },
+   {
+    "id": "broll",
+    "name": "B-roll",
+    "kind": "location",
+    "targetMinSec": 20,
+    "targetMaxSec": 60,
+    "hardMaxSec": 90,
+    "clipIdPattern": "{prefix}-{videoId}-{nn}",
+    "prefix": "BR",
+    "format": "mp4",
+    "quality": "best",
+    "clipsDir": "/tmp/Clips/Clipr B-roll",
+    "dataDir": "/tmp/Data/B-roll",
+    "usedRanges": {},
+    "dailyQuota": 0
+   }
+  ],
+  "clipper.downloads": [
+   {
+    "id": "b0",
+    "kind": "clip",
+    "label": "Rooftop Pan.mp4",
+    "path": "/tmp/Clips/Clipr B-roll/Rooftop Pan.mp4",
+    "dir": "/tmp/Clips/Clipr B-roll",
+    "savedAt": "$NOW-1m",
+    "campaign": "B-roll",
+    "campaignId": "broll",
+    "seconds": 42,
+    "videoId": "stub",
+    "clipId": "BR00"
+   },
+   {
+    "id": "b1",
+    "kind": "clip",
+    "label": "Street Cut.mp4",
+    "path": "/tmp/Clips/Clipr B-roll/Street Cut.mp4",
+    "dir": "/tmp/Clips/Clipr B-roll",
+    "savedAt": "$NOW-2m",
+    "campaign": "B-roll",
+    "campaignId": "broll",
+    "seconds": 41,
+    "videoId": "stub",
+    "clipId": "BR01"
+   },
+   {
+    "id": "b2",
+    "kind": "clip",
+    "label": "Tape Loop.mp4",
+    "path": "/tmp/Clips/Clipr B-roll/Tape Loop.mp4",
+    "dir": "/tmp/Clips/Clipr B-roll",
+    "savedAt": "$NOW-3m",
+    "campaign": "B-roll",
+    "campaignId": "broll",
+    "seconds": 33,
+    "videoId": "stub",
+    "clipId": "BR02"
+   }
+  ]
+ },
+ "touch": [
+  "/tmp/Clips/Clipr B-roll/Rooftop Pan.mp4",
+  "/tmp/Clips/Clipr B-roll/Street Cut.mp4",
+  "/tmp/Clips/Clipr B-roll/Tape Loop.mp4"
+ ],
+ "steps": [
+  {
+   "wait": 1500
+  },
+  {
+   "click": "#panel-tab-history"
+  },
+  {
+   "wait": 600
+  }
+ ]
+}
