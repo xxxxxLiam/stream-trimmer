@@ -83,6 +83,8 @@ function UndoLine({ v }: { v: VideosController }) {
   );
 }
 
+import PreparingLine from "../../player/components/PreparingLine";
+
 export default function VideosPanel() {
   const v = useVideosController();
   const doneCount = v.rows.done.length;
@@ -142,11 +144,11 @@ export default function VideosPanel() {
             <div className="flex items-center gap-[10px]">
               <span aria-hidden="true" className="h-[26px] w-[44px] flex-none rounded-chip bg-hover" />
               <span className="min-w-[0px]">
-                <span className="block text-body font-medium text-fg">Opening…</span>
-                <span className="mt-[2px] block text-meta leading-[normal] text-fg-dim">Preparing</span>
+                <span className="block truncate text-body font-medium text-fg">{v.openingLabel}</span>
+                <span className="mt-[2px] block text-meta leading-[normal] text-fg-dim">Opening</span>
               </span>
             </div>
-            <span aria-hidden="true" className="absolute bottom-[0px] left-[0px] h-[2px] w-1/3 animate-pulse bg-ice" />
+            <PreparingLine />
           </div>
         )}
         {v.rows.open

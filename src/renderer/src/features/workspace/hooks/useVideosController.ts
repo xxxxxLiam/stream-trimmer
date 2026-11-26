@@ -33,7 +33,10 @@ export function useVideosController() {
   const ws = useWorkspace();
   const { loadingInfo, info } = useClipperContext();
   /** The open video is still being read: its row says "Opening…" until the title arrives. */
-  const opening = loadingInfo && !info;
+  const openingLink = ws.openingId ? (ws.tabs.find((t) => t.id === ws.openingId)?.url ?? null) : null;
+  const opening = (loadingInfo && !info) || openingLink !== null;
+  /** What the Opening card calls the video until its title arrives: the pasted link without the scheme and www. */
+  const openingLabel = openingLink ? openingLink.replace(/^https?:\/\/(www\.)?/i, "") : "Opening…";
   const { campaigns } = useCampaign();
   const makingId = useMakingClipId();
   const bank = useSyncExternalStore(bankStore.subscribe, bankStore.get, bankStore.get);
@@ -117,6 +120,7 @@ export function useVideosController() {
 
   return {
     opening,
+    openingLabel,
     rows,
     pills,
     text,

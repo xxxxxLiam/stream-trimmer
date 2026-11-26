@@ -1,11 +1,9 @@
 /**
  * File: useAddVideoController.ts
  * Path: src/renderer/src/features/workspace/hooks/useAddVideoController.ts
- * Description: The only hook TopBarLinkField calls. Holds the field's editing state and what Enter does (open or add the pasted video, or show why it can't). Esc puts the
- *   title back.
+ * Description: The only hook TopBarLinkField calls. Holds the field's editing state and what Enter does (open or add the pasted video, or show why it can't). Esc leaves it.
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext";
 import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace } from "./WorkspaceContext";
 import type { ChannelLink } from "../components/TopBarLinkField";
@@ -13,18 +11,18 @@ import { linkKind, linkInText, resolveLink } from "../utils/videoList";
 
 export function useAddVideoController(channel?: ChannelLink) {
   const ws = useWorkspace();
-  const { info } = useClipperContext();
   const { active } = useCampaign();
-  const title = info?.title ?? "";
   const [editing, setEditing] = useState(false);
   const [text, setTextState] = useState("");
   const [problem, setProblem] = useState("");
   const ref = useRef<RefObject<HTMLInputElement | null> | null>(null);
+  /** The link last sent, put back in the field if it would not open. */
+  const lastLink = useRef("");
 
   // A link that would not open puts the panel back with the reason, in the same place, ready to try again.
   useEffect(() => {
     if (!ws.openFailure) return;
-    setTextState((t) => t || title);
+    setTextState((t) => t || lastLink.current);
     setEditing(true);
     requestAnimationFrame(() => input()?.focus());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -38,12 +36,11 @@ export function useAddVideoController(channel?: ChannelLink) {
   };
 
   const action = resolveLink(text, ws.tabs);
-  const isTitle = text === title;
-  const canAdd = !isTitle && action.kind === "open";
+  const canAdd = action.kind === "open";
 
   const submit = () => {
     if (ws.opening) return; // one link at a time: the panel already says it is opening
-    if (isTitle || action.kind === "empty") return leave();
+    if (action.kind === "empty") return leave();
     // Owner build: a channel link goes to Channel data instead of being refused as "not a video".
     if (channel?.isChannelUrl(text.trim())) {
       channel.onLink(text.trim());
@@ -56,12 +53,14 @@ export function useAddVideoController(channel?: ChannelLink) {
       leave();
       return;
     }
-    // A new link opens in the background: the panel stays and says so until it has opened (or says why not).
+    // The field clears at once; the new video is selected and says it is opening in the Videos list.
+    lastLink.current = text.trim();
     ws.addTab(action.target);
+    setTextState("");
+    leave();
   };
 
   return {
-    title,
     editing,
     text,
     problem: problem || ws.openFailure,
@@ -78,11 +77,8 @@ export function useAddVideoController(channel?: ChannelLink) {
       ws.clearOpenFailure();
     },
     onFocus: () => {
-      setTextState(title);
       setProblem("");
       setEditing(true);
-      // Select the title so a paste replaces it.
-      requestAnimationFrame(() => input()?.select());
     },
     onBlur: () => {
       setEditing(false);
