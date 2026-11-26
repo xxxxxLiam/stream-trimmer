@@ -42,6 +42,8 @@ export interface ElectronAPI {
   /** Pick a folder and get back where this campaign or location saves: <picked>/Clipr clips/<Campaign> or <picked>/Clipr <Name>. Null if cancelled. */
   pickBrandedDirectory?: (payload: { kind: "campaign" | "location"; name: string }) => Promise<{ chosen: string; dir: string } | null>;
   pickDirectory: () => Promise<string | null>; pickFcpLibrary?: () => Promise<string | null>;
+  /** "Add to Final Cut": picks a library fresh every call, starting in the folder last used. */
+  pickAssetsLibrary?: () => Promise<string | null>;
   /** Folders to fall back to on a fresh install; null if they could not be made. */
   getDefaultFolders?: () => Promise<{ clipsDir: string; dataDir: string } | null>;
   saveFile: (payload: {
@@ -177,6 +179,10 @@ export interface ElectronAPI {
     pathExists: (
       target: string,
     ) => Promise<{ ok: boolean; exists?: boolean; isDirectory?: boolean; error?: string }>;
+    /** Of `files`, which are new to this "Add to Final Cut" library (not already added on an earlier call). */
+    assetsLibraryAdded: (payload: { library: string; files: string[] }) => Promise<{ ok: boolean; newFiles?: string[]; error?: string }>;
+    /** Records `files` as now added to this library, so a later call skips them. */
+    recordAssetsLibraryAdded: (payload: { library: string; files: string[] }) => Promise<{ ok: boolean; error?: string }>;
   };
   /** Reads the tail of the local diagnostic log, plus its path on disk. */
   /**
