@@ -79,7 +79,7 @@ test("a link that is not a video shows its sentence", () => {
 
 test("App shows the cold start while no video is open, except a link opening beside other videos", () => {
   const app = readFileSync(join(process.cwd(), "src/renderer/src/routes/App.tsx"), "utf8");
-  assert.match(app, /!info && !openingBesideOthers \? \(\s*<ColdStartScreen \/>/);
+  assert.match(app, /\(!info && !openingBesideOthers\) \|\| \(active && wsTabs\.home\) \? \(\s*<ColdStartScreen \/>/);
   assert.match(app, /const openingBesideOthers = !info && loadingInfo && wsTabs\.tabs\.filter\(\(t\) => t\.url\)\.length > 1;/);
 });
 

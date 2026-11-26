@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircleFill, FolderSymlink, X } from "react-bootstrap-icons";
 import { ClipperProvider, useClipperContext } from "../modules/clipper/hooks/ClipperContext";
+import { resolveLink } from "../features/workspace/utils/videoList";
 import { EditHistoryProvider } from "../features/player/hooks/EditHistoryContext";
 import {
   ChannelExportProvider,
@@ -653,6 +654,19 @@ function Layout({ active }: { active: boolean }) {
     active,
     {
       onVideo: (link) => {
+        // A link already in Videos opens that video, never a duplicate; from Home a new link is a new video beside the others.
+        const hit = resolveLink(link, wsTabs.tabs);
+        if (hit.kind === "open" && hit.existingId) {
+          if (hit.reopen) wsTabs.setTabDone(hit.existingId, false);
+          wsTabs.selectTab(hit.existingId);
+          wsTabs.closeHome();
+          return;
+        }
+        if (wsTabs.home) {
+          wsTabs.addTab(link);
+          wsTabs.closeHome();
+          return;
+        }
         setUrl(link);
         flushAutoLoad();
       },
@@ -695,7 +709,7 @@ function Layout({ active }: { active: boolean }) {
       <OverlayLoader visible={overlayVisible} label="Exporting comments" />
       <main className="flex h-full w-full flex-col overflow-hidden">
         {/* No video open: the cold start screen is the whole window. It replaces the old URL bar. */}
-        {!info && !openingBesideOthers ? (
+        {(!info && !openingBesideOthers) || (active && wsTabs.home) ? (
           <ColdStartScreen />
         ) : (
         <>
