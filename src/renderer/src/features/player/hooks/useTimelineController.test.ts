@@ -404,3 +404,32 @@ test("Board 03.2.53: Undo and Redo sit after a hairline following Snap, are aria
   const app = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
   assert.match(app, /<EditHistoryProvider>\s*<Layout/);
 });
+
+test("Liam 26 Nov: Clip with a waiting moment loaded makes that moment (its own Clip now), keeping range edits on it", () => {
+  const clip = readFileSync(new URL("./useClipController.ts", import.meta.url), "utf8");
+  assert.match(clip, /c\.id === bankId && c\.status === "banked"/);
+  assert.match(clip, /bankStore\.setSegments\(activeCampaign\.id, videoId, loaded\.id, toCut\)/);
+  assert.match(clip, /requestMake\(\{ campaignId: activeCampaign\.id, videoId, clipId: loaded\.id \}\)[\s\S]*else host\.cutSegments\(toCut\)/);
+  const ex = readFileSync(new URL("../../clips/hooks/useExportMutations.ts", import.meta.url), "utf8");
+  assert.match(ex, /onMakeRequest\(/);
+  assert.match(ex, /makeRef\.current\(clip\)/);
+});
+
+test("Board 03.1.3: Home icon far left of the top bar, a Back pill in place of the chips, a pasted link already in Videos opens it", () => {
+  const bar = readFileSync(new URL("../../../modules/layout/components/TopBar.tsx", import.meta.url), "utf8");
+  assert.ok(bar.indexOf('aria-label="Home"') < bar.indexOf("<CampaignChip"));
+  assert.match(bar, /onClick=\{ws\.openHome\}/);
+  assert.match(bar, /h-target w-target[\s\S]*rounded-control[\s\S]*text-fg-dim/);
+  const cs = readFileSync(new URL("../../start/components/ColdStart.tsx", import.meta.url), "utf8");
+  assert.match(cs, /h-target[^"]*rounded-\[22px\] border border-ice bg-raised/);
+  assert.match(cs, /Back to \{p\.returnTo\.label\}/);
+  assert.match(cs, /p\.returnTo \? \([\s\S]*\) : \([\s\S]*No ads[\s\S]*No account/);
+  const ctl = readFileSync(new URL("../../start/hooks/useStartController.ts", import.meta.url), "utf8");
+  assert.match(ctl, /resolveLink\(text, ws\.tabs\)/);
+  assert.match(ctl, /action\.existingId[\s\S]*ws\.selectTab\(action\.existingId\)[\s\S]*else ws\.addTab/);
+  const app = readFileSync(new URL("../../../routes/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /\(active && wsTabs\.home\)/);
+  assert.match(app, /hit\.kind === "open" && hit\.existingId[\s\S]*wsTabs\.selectTab\(hit\.existingId\)/);
+  // Cold start (fresh install) has no Home icon: the bar is only mounted with an open video.
+  assert.match(app, /\{active && \(\s*<TopBar/);
+});

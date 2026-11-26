@@ -181,6 +181,10 @@ export type WorkspaceState = {
     id: string,
     meta: TabMeta & { cancel?: () => void },
   ) => void;
+  /** The start page is showing over the workspace (the Home icon). Nothing is closed: videos, bank and the open video stay. */
+  home: boolean;
+  openHome: () => void;
+  closeHome: () => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
@@ -220,6 +224,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [tabs, activeId, trying, cameFrom]);
 
   const selectTab = useCallback((id: string) => setActiveId(id), []);
+
+  // Home sits over the workspace; moving to another video (or one opening) ends it.
+  const [home, setHome] = useState(false);
+  const openHome = useCallback(() => setHome(true), []);
+  const closeHome = useCallback(() => setHome(false), []);
+  useEffect(() => setHome(false), [activeId]);
 
   const addTab = useCallback((url?: string) => {
     const id = newId();
@@ -465,6 +475,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       reportTabWork,
       setTabCampaign,
       reportTab,
+      home,
+      openHome,
+      closeHome,
     }),
     [
       tabs,
@@ -489,6 +502,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       reportTabWork,
       setTabCampaign,
       reportTab,
+      home,
+      openHome,
+      closeHome,
     ],
   );
 
