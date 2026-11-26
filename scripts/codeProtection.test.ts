@@ -223,3 +223,12 @@ test("a manual run can publish a pre-release that is not 'latest'; an ordinary r
   // A push to main has no inputs, so it can never be a pre-release.
   assert.match(yml, /push:\s*\n\s*branches: \[main\]/);
 });
+
+test("every platform's release build tries to vendor the PO token provider (non-fatal) and reports whether it shipped", () => {
+  const yml = readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8");
+  assert.match(yml, /name: Vendor the PO token provider[\s\S]*?continue-on-error: true[\s\S]*?POT_PROVIDER_LICENSE_ACK: "1"[\s\S]*?npm run tools:refresh-pot/);
+  assert.match(yml, /name: Check the provider is in the package[\s\S]*?if: always\(\)[\s\S]*?GITHUB_STEP_SUMMARY/);
+  // It runs before packaging, in the same job that packages for the matrix OS.
+  assert.ok(yml.indexOf("Vendor the PO token provider") < yml.indexOf("Build & upload installer"));
+  assert.equal(pkg.scripts["tools:refresh-pot"], "node scripts/bundle-binaries.cjs --pot");
+});

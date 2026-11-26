@@ -153,6 +153,19 @@ jobs:
           # excludes every .map, and nothing carries a sourceMappingURL.
           CLIPR_SOURCEMAPS: "1"
         run: npm run build:electron
+      # The PO token provider (bgutil, GPL-3.0, run as a separate child process; its source and
+      # notice are published in the public clipr repo, and Liam cleared bundling it, 26 Nov). Its
+      # native dependency has to be built on each platform's own runner, so it is vendored here,
+      # before packaging. A platform where it cannot be built is not a failed release: the step is
+      # non-fatal and that platform ships with the token-free behaviour the app already had. The
+      # "Check" step below says in the run summary which platforms really carry it.
+      - name: Vendor the PO token provider
+        id: pot
+        continue-on-error: true
+        shell: bash
+        env:
+          POT_PROVIDER_LICENSE_ACK: "1"
+        run: npm run tools:refresh-pot
       # Uploads into a DRAFT release (see build.publish.releaseType in
       # package.json). Draft is deliberate: it keeps a half-finished release
       # — macOS uploaded, Windows still building — from ever being visible.
@@ -170,6 +183,17 @@ jobs:
           VITE_OWNER_MACHINES: ""
           VITE_OWNER_SALT: ""
         run: ${{ matrix.build }}
+
+      - name: Check the provider is in the package
+        if: always()
+        shell: bash
+        run: |
+          FOUND="$(find dist-electron -path '*pot-provider*' -name server.js 2>/dev/null | head -1 || true)"
+          if [ -n "$FOUND" ]; then
+            echo "- ${{ runner.os }}: PO token provider IS in the package ($FOUND)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ${{ runner.os }}: PO token provider is NOT in the package (vendor step: ${{ steps.pot.outcome }}); this platform ships without it" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # Keep this build's source maps, privately, so a crash stack from the
       # shipped (minified, obfuscated) app can be decoded with
