@@ -65,7 +65,7 @@ export default function Timeline() {
   });
 
   return (
-    <div id="ui-timeline" ref={laneBox} className={`relative mx-[8px] mb-[8px] flex min-h-[0px] min-w-[0px] flex-1 flex-col overflow-hidden rounded-panel border border-hairline bg-panel pb-[10px]`}>
+    <div id="ui-timeline" ref={laneBox} className={`relative mx-[8px] mb-[8px] flex min-h-[0px] min-w-[0px] flex-1 flex-col overflow-hidden rounded-panel border border-hairline bg-panel pb-[8px]`}>
       <TimelineTools />
       {/* The tools act on this whole area, down to the empty space under the tracks. */}
       <div

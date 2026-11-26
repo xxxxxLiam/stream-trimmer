@@ -85,8 +85,8 @@ test("the Source lane is 76px at the default timeline (the removed Audio lane's 
 });
 
 test("the default timeline holds the three lanes under the tools row and ruler", () => {
-  // Transcript 32 + Source 76 + Clips 34, the ruler 18, the tools row 44 (+ its 10px below).
-  assert.ok(DEFAULT_SIZES.timeline >= 32 + 76 + 34 + 18 + 44 + 10);
+  // Transcript 32 + Source 76 + Clips 34, the ruler 18, the tools row 44 (+ 1px hairline), the panel's 8px padding.
+  assert.ok(DEFAULT_SIZES.timeline >= 32 + 76 + 34 + 18 + 45 + 8);
 });
 
 import { cursorFor, zoomFromX } from "./laneTools";
