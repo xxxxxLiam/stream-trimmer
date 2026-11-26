@@ -146,7 +146,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
   } else if (view.kind === "newLocation") {
     body = (
       <SettingsNewLocation
-        defaultFolder={(name) => folderChipLabel(campaignClipsDir({ name, clipsDir: "", kind: "location" }, c.campaigns.defaultFolders.clipsDir), 3)}
+        defaultFolder={(name) => folderChipLabel(campaignClipsDir({ name, clipsDir: "", kind: "location" }, c.campaigns.defaultFolders.clipsDir), 2)}
         onChoose={async (name) => (await window.electronAPI?.pickBrandedDirectory?.({ kind: "location", name }))?.dir ?? null}
         onAdd={(input) => {
           const found = campaignNameProblems(input.name, c.campaigns.campaigns);
@@ -163,7 +163,7 @@ export default function SettingsDrawer({ open, onClose, startAt, tracks, editor,
     body = (
       <SettingsLocation
         name={campaign.name}
-        folderLabel={folderChipLabel(campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir), 3)}
+        folderLabel={folderChipLabel(campaignClipsDir(campaign, c.campaigns.defaultFolders.clipsDir), 2)}
         soundOnly={campaign.soundOnly === true}
         onSoundOnly={(on) => c.campaigns.update(campaign.id, { soundOnly: on })}
         onChangeFolder={() => c.campaigns.pickClipsDir(campaign.id)}
