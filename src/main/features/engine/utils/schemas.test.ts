@@ -31,3 +31,8 @@ test("a one-millisecond range is refused; a short real clip is not", () => {
   assert.equal(downloadSchema.safeParse({ url: V, start: 10, end: 12 }).success, true);
   assert.equal(downloadSchema.safeParse({ url: V, segments: [{ start: 0, end: 3 }, { start: 8, end: 9 }] }).success, true);
 });
+
+test("the download format accepts m4a for sound only and still refuses others", () => {
+  assert.equal(downloadSchema.safeParse({ url: V, format: "m4a" }).success, true);
+  assert.equal(downloadSchema.safeParse({ url: V, format: "wav" }).success, false);
+});

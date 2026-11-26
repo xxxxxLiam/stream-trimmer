@@ -65,7 +65,7 @@ export function sendClip(ctx: DownloadCtx, ws: Workspace, lowQuality: DeliveryRe
     }
 
     const name = `clip.${ext}`;
-    res.setHeader("Content-Type", isAudio ? "audio/mpeg" : "video/mp4");
+    res.setHeader("Content-Type", ext === "m4a" ? "audio/mp4" : isAudio ? "audio/mpeg" : "video/mp4");
     res.setHeader("Content-Length", stat.size);
     res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
     console.log(

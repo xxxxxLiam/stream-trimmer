@@ -290,6 +290,11 @@ function Layout({ active }: { active: boolean }) {
     pickClipsDir,
     pickDataDir,
   } = useCampaign();
+  // A campaign or location that saves sound only sends every clip as M4A; leaving it puts the format back.
+  const soundOnly = campaign?.soundOnly === true;
+  useEffect(() => {
+    setFormat((f) => (soundOnly ? "m4a" : f === "m4a" ? "mp4" : f));
+  }, [soundOnly, setFormat]);
   const { playhead, segments: tabSegments, clear: clearSegments } = useSegmentsState();
   // A link opening while other videos are open keeps the workspace on screen (board 03.1.4); only the very first video opens from the start screen.
   const openingBesideOthers = !info && loadingInfo && wsTabs.tabs.filter((t) => t.url).length > 1;

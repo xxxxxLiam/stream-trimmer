@@ -25,7 +25,7 @@ export function createClipBuilder(
 ) {
   const { sectionOptionsFor, fullOptionsFor } = builders;
   const { runStreaming, isForbidden } = runner;
-  const { url, quality, segs, segCount, multi, totalSec, cookieOptions, cookieMode, jobId, job, isAudio, throwIfCancelled, trackChild, ytOpts } = ctx;
+  const { url, quality, segs, segCount, multi, totalSec, cookieOptions, cookieMode, jobId, job, isAudio, ext, throwIfCancelled, trackChild, ytOpts } = ctx;
   const { tempDir, outputPath, segFiles, listPath, fullPath } = ws;
   // A finished whole-file download. A `.part` is not one: yt-dlp renames it
   // only once the file is complete.
@@ -178,7 +178,7 @@ export function createClipBuilder(
             source,
             "-vn",
             "-c:a",
-            "libmp3lame",
+            ext === "m4a" ? "aac" : "libmp3lame",
             "-b:a",
             `${quality}k`,
             out,
@@ -253,7 +253,7 @@ export function createClipBuilder(
           outputPath,
           listPath,
           totalSec,
-          { isAudio, audioKbps: quality },
+          { isAudio, audioKbps: quality, audioCodec: ext === "m4a" ? "aac" : "libmp3lame" },
           {
             // The join ffmpeg is a child of the job like any other: a cancel
             // kills it, and once cancelled no further join attempt starts.

@@ -59,7 +59,7 @@ export const downloadSchema = z.object({
     .optional(),
   start: z.number().nonnegative().optional(),
   end: z.number().positive().optional(),
-  format: z.enum(["mp4", "mp3"]).default("mp4"),
+  format: z.enum(["mp4", "mp3", "m4a"]).default("mp4"),
   // One audio language per request ("es", "pt-BR"): each language is its own clip, so the caller
   // makes one request per ticked language. Omitted means the original track.
   audioLanguage: z

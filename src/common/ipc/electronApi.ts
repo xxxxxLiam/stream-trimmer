@@ -39,6 +39,8 @@ export interface ElectronAPI {
   setSetting?: (key: string, value: unknown) => Promise<{ ok: boolean; reason?: "too-large" | "not-allowed" | "write-failed" }>;
   /** Save a clip list as a .txt the person places in the native save dialog. */
   saveTextFile?: (payload: { name: string; text: string }) => Promise<{ ok: boolean; path?: string; cancelled?: boolean; error?: string }>;
+  /** Pick a folder and get back where this campaign or location saves: <picked>/Clipr clips/<Campaign> or <picked>/Clipr <Name>. Null if cancelled. */
+  pickBrandedDirectory?: (payload: { kind: "campaign" | "location"; name: string }) => Promise<{ chosen: string; dir: string } | null>;
   pickDirectory: () => Promise<string | null>; pickFcpLibrary?: () => Promise<string | null>;
   /** Folders to fall back to on a fresh install; null if they could not be made. */
   getDefaultFolders?: () => Promise<{ clipsDir: string; dataDir: string } | null>;

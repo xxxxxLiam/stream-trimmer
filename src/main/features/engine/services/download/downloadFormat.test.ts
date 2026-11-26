@@ -39,7 +39,7 @@ test.after(() => fs.rmSync(cookieDir, { recursive: true, force: true }));
 async function execOptions(
   harness: Harness,
   quality: string,
-  format: "mp4" | "mp3" = "mp4",
+  format: "mp4" | "mp3" | "m4a" = "mp4",
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${harness.baseUrl}/api/download`, {
     method: "POST",
@@ -325,4 +325,12 @@ test("a request with no quality gets MP4 at 1080p, stepping down below it (never
   } finally {
     await harness.stop();
   }
+});
+
+test("sound only asks yt-dlp for M4A, not MP3", async (t) => {
+  const harness = await startHarness();
+  t.after(() => harness.stop());
+  const opts = await execOptions(harness, "192", "m4a");
+  assert.equal(opts.extractAudio, true);
+  assert.equal(opts.audioFormat, "m4a");
 });
