@@ -56,7 +56,15 @@ function collectLegalComments(outfile, label) {
 function obfuscateFile(file) {
   const JavaScriptObfuscator = require("javascript-obfuscator");
   const code = fs.readFileSync(file, "utf8");
+  // A private source map (CLIPR_SOURCEMAPS) sits beside the file. The obfuscator then writes its
+  // own map (obfuscated -> esbuild output), and the two are chained below so the one kept map
+  // goes from the shipped, obfuscated file straight back to the original source.
+  const mapFile = `${file}.map`;
+  const chain = fs.existsSync(mapFile);
   const result = JavaScriptObfuscator.obfuscate(code, {
+    ...(chain
+      ? { sourceMap: true, sourceMapMode: "separate", inputFileName: path.basename(file) }
+      : {}),
     compact: true,
     target: "node",
     controlFlowFlattening: false,
@@ -71,6 +79,16 @@ function obfuscateFile(file) {
     disableConsoleOutput: false,
   });
   fs.writeFileSync(file, result.getObfuscatedCode(), "utf8");
+  if (chain) {
+    const remapping = require("@jridgewell/remapping");
+    const esbuildMap = fs.readFileSync(mapFile, "utf8");
+    // The obfuscator's map has exactly one source (the esbuild output it was given), whatever it
+    // names it; that one resolves to the esbuild map, and the esbuild map's own sources (the
+    // original files) are left as they are. Returning the map for those too would never end.
+    const first = JSON.parse(result.getSourceMap()).sources[0];
+    const composed = remapping(result.getSourceMap(), (name) => (name === first ? esbuildMap : null));
+    fs.writeFileSync(mapFile, JSON.stringify(composed), "utf8");
+  }
 }
 
 module.exports = { isHardened, esbuildHardeningOptions, collectLegalComments, obfuscateFile };
