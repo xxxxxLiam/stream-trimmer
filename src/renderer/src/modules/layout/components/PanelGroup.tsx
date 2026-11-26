@@ -19,7 +19,7 @@ import { clipCountText as countText } from "../../../shared/utils/clipListText";
 const NAMES: Record<PanelGroupId, string> = { left: "Left panels", centre: "Centre panels", right: "Right panels" };
 
 export default function PanelGroup({ group }: { group: "left" | "right" }) {
-  const { layout, panels, activate, close, open, move, moveToGroup, reset, save } = usePanelLayoutState();
+  const { layout, panels, activate, close, open, move, moveToGroup } = usePanelLayoutState();
   const state = layout.groups[group];
   const other = group === "left" ? "right" : "left";
   const tabs = state.tabs.flatMap((id) => getPanel(id) ?? []);
@@ -94,9 +94,6 @@ export default function PanelGroup({ group }: { group: "left" | "right" }) {
     : [];
   const menuItems: MenuItem[] = [
     ...listItems,
-    { kind: "separator", key: "sep" },
-    { key: "reset", label: "Reset layout", onSelect: reset },
-    { key: "save", label: "Save layout", onSelect: save },
   ];
 
   return (

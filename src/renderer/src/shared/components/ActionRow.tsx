@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 import { cx } from "../utils/cx";
 import { setOpenRow, useRowOpen } from "../utils/openRowStore";
 import { IconMore } from "./rowIcons";
+import HoldButton from "./HoldButton";
 
 export type RowAction = {
   key: string;
@@ -20,6 +21,8 @@ export type RowAction = {
   /** Red text and icon (Remove). */
   danger?: boolean;
   disabled?: boolean;
+  /** Acts only after a 3 second press and hold (deleting a moment), with no dialog. */
+  hold?: boolean;
 };
 
 export type ActionRowProps = {
@@ -62,7 +65,21 @@ export default function ActionRow({ id, name, actions, className, children }: Ac
       </div>
       {open && (
         <div role="menu" aria-label={`Actions for ${name}`} className="mx-[8px] border-t border-hairline pb-[4px] pt-[4px]">
-          {actions.map((a) => (
+          {actions.map((a) =>
+            a.hold ? (
+              <HoldButton
+                key={a.key}
+                role="menuitem"
+                label={a.label}
+                icon={a.icon}
+                disabled={a.disabled}
+                onDone={() => {
+                  setOpenRow(null);
+                  a.onSelect();
+                }}
+                className={cx("h-[44px] w-full rounded-control px-[4px] text-left text-body leading-[normal] focus-visible:outline focus-visible:outline-2 focus-visible:outline-frost", a.danger ? "text-error" : "text-fg")}
+              />
+            ) : (
             <button
               key={a.key}
               type="button"
@@ -81,7 +98,8 @@ export default function ActionRow({ id, name, actions, className, children }: Ac
               {a.icon}
               {a.label}
             </button>
-          ))}
+            ),
+          )}
         </div>
       )}
     </div>

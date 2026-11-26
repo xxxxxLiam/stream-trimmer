@@ -25,6 +25,7 @@ import SortFilterPanel from "./SortFilterPanel";
 import { DEFAULT_VIEW, SORT_LABELS, applyView, type BankView } from "../utils/bankView";
 import { useState } from "react";
 import { IconRemove } from "../../../shared/components/rowIcons";
+import HoldButton from "../../../shared/components/HoldButton";
 import { exitSelectMoments, selectAllMoments, toggleMoment, useSelectMoments } from "../../../shared/utils/selectMomentsStore";
 
 /** A moment shorter than the campaign's minimum says so in one dim line; the rule is the editor's to bend. */
@@ -42,7 +43,6 @@ export default function ExportPanel() {
   const active = useIsTabActive();
   const momentNote = useMomentNote();
   const pick = useSelectMoments();
-  const [confirming, setConfirming] = useState(false);
   const [view, setView] = useState<BankView>(DEFAULT_VIEW);
   const all = [...c.waiting, ...c.made];
   const everyClip = applyView(all, view);
@@ -51,7 +51,6 @@ export default function ExportPanel() {
   const tickable = everyClip.filter((x) => x.status === "banked");
   const chosen = tickable.filter((x) => pick.ids.has(x.id));
   const leave = () => {
-    setConfirming(false);
     exitSelectMoments();
   };
 
@@ -189,37 +188,16 @@ export default function ExportPanel() {
       )}
       {pick.on ? (
         <div className="sticky bottom-0 mt-auto flex-none bg-panel px-[10px] pb-[10px] pt-[8px]">
-          <button
-            type="button"
+          <HoldButton
+            label={`Hold to delete ${chosen.length || ""}`.trim()}
+            icon={<IconRemove />}
             disabled={chosen.length === 0}
-            onClick={() => setConfirming(true)}
-            className="flex h-[44px] w-full items-center justify-center gap-[8px] rounded-pill border border-error text-body font-medium text-error disabled:opacity-60"
-          >
-            <IconRemove />
-            Delete {chosen.length || ""}
-          </button>
-        </div>
-      ) : null}
-      {pick.on && confirming ? <div aria-hidden="true" className="absolute inset-0 z-10 bg-bg-overlay-60" /> : null}
-      {pick.on && confirming ? (
-        <div role="alertdialog" aria-label={`Delete ${chosen.length} moments`} className="absolute inset-x-[10px] top-[60px] z-20 rounded-panel border border-hairlineStrong bg-raised p-[16px]">
-          <h3 className="m-0 text-[17px] font-medium text-fg">Delete {chosen.length} {chosen.length === 1 ? "moment" : "moments"}?</h3>
-          <p className="my-[8px] text-meta leading-[1.5] text-fg-dim">They leave the bank. Clips you already made are not touched. This cannot be undone.</p>
-          <div className="flex gap-[8px]">
-            <button type="button" onClick={() => setConfirming(false)} className="h-[44px] flex-1 rounded-pill border border-hairlineStrong text-body text-fg hover:bg-hover">
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                chosen.forEach((x) => c.remove(x));
-                leave();
-              }}
-              className="h-[44px] flex-1 rounded-[22px] border border-error bg-raised text-meta font-semibold text-error"
-            >
-              Delete {chosen.length}
-            </button>
-          </div>
+            onDone={() => {
+              chosen.forEach((x) => c.remove(x));
+              leave();
+            }}
+            className="h-[44px] w-full rounded-[22px] border border-error text-body font-medium text-error disabled:border-hairlineStrong disabled:text-disabled"
+          />
         </div>
       ) : null}
     </div>
