@@ -145,3 +145,60 @@ test("collect-sourcemaps keeps the maps per version and nothing else", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a stack from the OBFUSCATED shipped file still decodes to the original source line", () => {
+  const { obfuscateFile } = require("./buildHardening.cjs");
+  const { execFileSync } = require("node:child_process");
+  const dir = mkdtempSync(path.join(tmpdir(), "clipr-chain-"));
+  try {
+    mkdirSync(path.join(dir, "src"));
+    mkdirSync(path.join(dir, "out", "main"), { recursive: true });
+    writeFileSync(
+      path.join(dir, "src", "engine.ts"),
+      'export function clipSeconds(a: number, b: number): number {\n  if (b <= a) throw new Error("bad range " + a);\n  return b - a;\n}\nclipSeconds(5, 2);\n',
+    );
+    const outFile = path.join(dir, "out", "main", "engine.cjs");
+    esbuild.buildSync({
+      entryPoints: [path.join(dir, "src", "engine.ts")],
+      outfile: outFile,
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+      minify: true,
+      logLevel: "silent",
+      ...esbuildMaps({ CLIPR_SOURCEMAPS: "1" }),
+    });
+    obfuscateFile(outFile);
+    assert.equal(/sourceMappingURL/.test(readFileSync(outFile, "utf8")), false);
+
+    let stack = "";
+    try {
+      execFileSync(process.execPath, [outFile], { stdio: "pipe" });
+    } catch (e) {
+      stack = String((e as { stderr?: Buffer }).stderr);
+    }
+    assert.match(stack, /engine\.cjs:\d+:\d+/, "the obfuscated file threw with a frame in it");
+
+    const mapsDir = path.join(dir, "maps");
+    mkdirSync(path.join(mapsDir, "main"), { recursive: true });
+    writeFileSync(path.join(mapsDir, "main", "engine.cjs.map"), readFileSync(outFile + ".map"));
+    const decoded = decodeStack(stack, listMaps(mapsDir), TraceMap, originalPositionFor);
+    assert.match(decoded, /engine\.ts:2:/);
+
+    // Negative control: the esbuild map alone (what step 3 kept before chaining) cannot decode it.
+    esbuild.buildSync({
+      entryPoints: [path.join(dir, "src", "engine.ts")],
+      outfile: path.join(dir, "plain", "engine.cjs"),
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+      minify: true,
+      logLevel: "silent",
+      ...esbuildMaps({ CLIPR_SOURCEMAPS: "1" }),
+    });
+    writeFileSync(path.join(mapsDir, "main", "engine.cjs.map"), readFileSync(path.join(dir, "plain", "engine.cjs.map")));
+    assert.equal(/engine\.ts:2:/.test(decodeStack(stack, listMaps(mapsDir), TraceMap, originalPositionFor)), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
