@@ -13,6 +13,7 @@ import { useClipperContext } from "../../../modules/clipper/hooks/ClipperContext
 import { playFrom } from "../../../shared/utils/playFrom";
 import { clearDownloads, removeDownload } from "../../../shared/utils/downloads";
 import type { DownloadEntry } from "../../../shared/utils/downloads";
+import { useAddToFinalCut } from "./useAddToFinalCut";
 import { useHistoryCache } from "./useHistoryCache";
 import { useHistoryQueries } from "./useHistoryQueries";
 
@@ -22,6 +23,7 @@ export function useHistoryController() {
   const { videoId } = useClipperContext();
   const actions = useEntryActions();
   const cache = useHistoryCache(queries.total);
+  const finalCut = useAddToFinalCut();
 
   /** Only a clip from the open video can jump; its start is where it was cut from. */
   const canJump = useCallback(
@@ -41,5 +43,5 @@ export function useHistoryController() {
     fileName: () => "Clipr history.txt",
   });
 
-  return { pills, setPills, ...queries, cache, canJump, jump, remove: removeDownload, clearAll: clearDownloads, show: actions.show, inEditor: actions.inEditor };
+  return { pills, setPills, ...queries, cache, canJump, jump, remove: removeDownload, clearAll: clearDownloads, show: actions.show, inEditor: actions.inEditor, finalCut };
 }
