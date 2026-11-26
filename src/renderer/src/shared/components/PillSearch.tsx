@@ -14,9 +14,11 @@ export type PillSearchProps = {
   onPillsChange: (pills: string[]) => void;
   /** The quiet line under the pills, e.g. "12 clips". */
   count: string;
+  /** A control beside the field (the bank's Sort and filter button). */
+  trailing?: React.ReactNode;
 };
 
-export default function PillSearch({ placeholder, pills, onPillsChange, count }: PillSearchProps) {
+export default function PillSearch({ placeholder, pills, onPillsChange, count, trailing }: PillSearchProps) {
   const [text, setText] = useState("");
 
   const commit = () => {
@@ -28,9 +30,10 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
 
   return (
     <div className="flex flex-none flex-col">
+      <div className="flex items-center">
       <label
         role="search"
-        className="mx-[10px] mb-[6px] mt-[10px] flex h-[44px] items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
+        className="mx-[10px] mb-[6px] mt-[10px] flex h-[44px] min-w-0 flex-1 items-center gap-[8px] rounded-[22px] bg-raised px-[14px] text-body text-fg-dim"
       >
         <IconSearch />
         <input
@@ -50,6 +53,8 @@ export default function PillSearch({ placeholder, pills, onPillsChange, count }:
           className="min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-dim"
         />
       </label>
+      {trailing ? <span className="mr-[10px] mt-[4px] flex-none">{trailing}</span> : null}
+      </div>
       {pills.length > 0 && (
         <div className="-mt-[6px] flex items-center px-[12px]">
           <div className="flex flex-wrap items-center">

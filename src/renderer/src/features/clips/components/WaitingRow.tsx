@@ -9,8 +9,9 @@ import { useEffect, useState } from "react";
 import ActionRow from "../../../shared/components/ActionRow";
 import { IconCopy, IconMake, IconRemove, IconRename } from "../../../shared/components/rowIcons";
 import { finishRename, renameKey } from "../../player/utils/laneRename";
-import { DUPLICATE_NOTE, type BankedClip } from "../../../shared/utils/bank";
-import { boardTime, rangeLine, ratingText } from "../utils/exportRows";
+import { DUPLICATE_NOTE, clipLength, type BankedClip } from "../../../shared/utils/bank";
+import { formatLength } from "../../../shared/utils/segments";
+import { boardTime, ratingText } from "../utils/exportRows";
 
 const tierText = (tier: string) => (/^\d+$/.test(tier) ? `T${tier}` : tier);
 
@@ -120,20 +121,22 @@ export default function WaitingRow({ clip, name, suggested, selected, made, leng
             role="img"
             aria-label={made ? "Made" : "Waiting"}
           />
-          <span className="min-w-0">
-            <span className={`block whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
-            <span className={`mt-[2px] block whitespace-nowrap text-meta leading-[normal] ${made ? "text-disabled" : "text-fg-dim"}`}>{rangeLine(clip)}</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline justify-between gap-[8px]">
+              <span className={`block min-w-0 truncate whitespace-nowrap text-body font-medium leading-[normal] ${made ? "text-disabled" : ""}`}>{name}</span>
+              {clip.rating !== undefined && <span className={`flex-none text-meta font-semibold leading-[normal] ${made ? "text-disabled" : ""}`}>{ratingText(clip.rating)}</span>}
+            </span>
+            <span className="mt-[3px] flex items-center gap-[4px] whitespace-nowrap">
+              {clip.category && <span className={made ? madeChip : chip}>{clip.category}</span>}
+              {clip.tier && <span className={made ? madeChip : chip}>{tierText(clip.tier)}</span>}
+              <span className={`text-meta leading-[normal] ${made ? "text-disabled" : "text-fg-dim"}`}>{formatLength(clipLength(clip))}</span>
+            </span>
             {said && <span role="status" className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{said}</span>}
             {clip.note === DUPLICATE_NOTE && !made && <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{DUPLICATE_NOTE}</span>}
             {lengthNote && !made && <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">{lengthNote}</span>}
             {clip.ranPastEnd !== undefined && !made && (
               <span className="mt-[2px] block whitespace-nowrap text-meta leading-[normal] text-fg-dim">Ran past the end; stops at {boardTime(clip.ranPastEnd)}</span>
             )}
-          </span>
-          <span className="ml-auto flex items-center gap-[3px]">
-            {clip.rating !== undefined && <span className={`text-meta font-semibold leading-[normal] ${made ? "text-disabled" : ""}`}>{ratingText(clip.rating)}</span>}
-            {clip.category && <span className={made ? madeChip : chip}>{clip.category}</span>}
-            {clip.tier && <span className={made ? madeChip : chip}>{tierText(clip.tier)}</span>}
           </span>
         </button>
       )}

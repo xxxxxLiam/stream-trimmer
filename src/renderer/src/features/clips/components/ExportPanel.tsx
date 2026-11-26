@@ -20,6 +20,9 @@ import MakingRow from "./MakingRow";
 import OfflineRow from "./OfflineRow";
 import CrashNoteHost from "../../help/components/CrashNoteHost";
 import WaitingRow from "./WaitingRow";
+import PillSearch from "../../../shared/components/PillSearch";
+import SortFilterPanel from "./SortFilterPanel";
+import { DEFAULT_VIEW, SORT_LABELS, applyView, type BankView } from "../utils/bankView";
 import { useState } from "react";
 import { exitSelectMoments, selectAllMoments, toggleMoment, useSelectMoments } from "../../../shared/utils/selectMomentsStore";
 
@@ -39,7 +42,11 @@ export default function ExportPanel() {
   const momentNote = useMomentNote();
   const pick = useSelectMoments();
   const [confirming, setConfirming] = useState(false);
-  const everyClip = [...c.waiting, ...c.made];
+  const [view, setView] = useState<BankView>(DEFAULT_VIEW);
+  const all = [...c.waiting, ...c.made];
+  const everyClip = applyView(all, view);
+  const topics = [...new Set(all.map((x) => x.category).filter((t): t is string => !!t))];
+  const filterPills = [...view.topics, ...view.tiers.map((t) => `T${t}`), ...(view.minRating > 0 ? [`${view.minRating}+`] : [])];
   const chosen = everyClip.filter((x) => pick.ids.has(x.id));
   const leave = () => {
     setConfirming(false);
@@ -103,8 +110,24 @@ export default function ExportPanel() {
         </PanelEmptyNote>
       ) : (
         <>
-          <div className="flex justify-between px-[12px] pb-[4px] pt-[10px] text-meta leading-[normal] text-fg-dim">
-            Waiting in this video<span>{c.waiting.length}</span>
+          <PillSearch
+            placeholder="Search moments"
+            pills={[...filterPills, ...view.words]}
+            onPillsChange={(next) =>
+              setView({
+                ...view,
+                words: next.filter((p) => !filterPills.includes(p)),
+                topics: view.topics.filter((t) => next.includes(t)),
+                tiers: view.tiers.filter((t) => next.includes(`T${t}`)),
+                minRating: next.includes(`${view.minRating}+`) ? view.minRating : 0,
+              })
+            }
+            count={everyClip.length === all.length ? `${all.length} ${all.length === 1 ? "moment" : "moments"}` : `${everyClip.length} of ${all.length}`}
+            trailing={<SortFilterPanel view={view} onChange={setView} topics={topics} />}
+          />
+          <div className="flex justify-between px-[12px] pb-[6px] pt-[6px] text-meta leading-[normal] text-fg-dim">
+            Waiting in this video · {SORT_LABELS[view.sort]}
+            <span>{c.waiting.length}</span>
           </div>
           {pick.on ? (
             <div className="mx-[10px] mb-[4px] flex items-center gap-[8px] text-meta text-fg-dim" id="ui-select-moments">
