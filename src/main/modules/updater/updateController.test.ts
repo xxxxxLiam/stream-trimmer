@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import test from "node:test";
-import { createUpdateController, type UpdaterLike } from "./updateController";
+import { createUpdateController, RECHECK_MS, type UpdaterLike } from "./updateController";
 
 function setup(opts: { canInstall?: boolean; auto?: boolean; clips?: number } = {}) {
   const em = new EventEmitter();
@@ -22,6 +22,7 @@ function setup(opts: { canInstall?: boolean; auto?: boolean; clips?: number } = 
   const state = { auto: opts.auto ?? true, clips: opts.clips ?? 0 };
   const waiting: boolean[] = [];
   const timers: { fn: () => void; ms: number; live: boolean }[] = [];
+  const repeats: { fn: () => void; ms: number }[] = [];
   const ready: unknown[] = [];
   const status: unknown[] = [];
   const c = createUpdateController({
@@ -34,6 +35,7 @@ function setup(opts: { canInstall?: boolean; auto?: boolean; clips?: number } = 
     sendRestartWaiting: (w) => waiting.push(w),
     setTimer: (fn, ms) => { const t = { fn, ms, live: true }; timers.push(t); return t; },
     clearTimer: (h) => { (h as { live: boolean }).live = false; },
+    setRepeat: (fn, ms) => { repeats.push({ fn, ms }); return null; },
     downloadUrl: (v) => `https://example.test/${v}.dmg`,
     releasesUrl: () => "https://example.test/releases",
     log: () => {},
@@ -41,7 +43,7 @@ function setup(opts: { canInstall?: boolean; auto?: boolean; clips?: number } = 
   c.attach();
   /** Runs the idle timer that is still live, as the clock would. */
   const fire = () => { const t = timers.find((x) => x.live); if (t) { t.live = false; t.fn(); } };
-  return { c, em, updater, calls, state, ready, status, waiting, timers, fire };
+  return { c, em, updater, calls, state, ready, status, waiting, timers, repeats, fire };
 }
 
 test("switch off: nothing downloads automatically", () => {
@@ -193,4 +195,17 @@ test("no dialog and no OS notification anywhere in the updater", () => {
     const src = fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     assert.doesNotMatch(src, /showMessageBox|\bdialog\b|checkForUpdatesAndNotify|new Notification/, f);
   }
+});
+
+test("a copy that stays open asks again every few hours, so a release published after launch still shows (Liam, 27 Nov, Mac)", () => {
+  const { c, calls, repeats, em } = setup({ canInstall: false });
+  c.startRechecks();
+  assert.equal(repeats.length, 1);
+  assert.equal(repeats[0].ms, RECHECK_MS);
+  repeats[0].fn();
+  assert.equal(calls.check, 1, "the repeat asks the updater again");
+  // Once the Get version pill is showing there is nothing more to ask.
+  em.emit("update-available", { version: "20.0.2" });
+  repeats[0].fn();
+  assert.equal(calls.check, 1);
 });
