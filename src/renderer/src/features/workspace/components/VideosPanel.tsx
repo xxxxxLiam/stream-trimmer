@@ -33,7 +33,7 @@ function Row({ row, v }: { row: VideoRow; v: VideosController }) {
       onSelect: () => v.openOnYouTube(row),
       disabled: !row.videoId,
     },
-    { key: "remove", label: "Remove video", icon: <IconRemove />, onSelect: () => v.removeVideo(row), danger: true },
+    { key: "remove", label: "Hold to remove video", icon: <IconRemove />, onSelect: () => v.removeVideo(row), danger: true, hold: true },
   ];
   return (
     <ActionRow

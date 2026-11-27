@@ -273,3 +273,15 @@ test("Undo of a made clip puts the moment back where it was, waiting; a clip nev
   store.restoreCut(C, V, "never-cut");
   assert.equal(clipsFor(store.get(), C, V).length, 3);
 });
+
+test("a saved bank from before: made (cut or published) clips are dropped on load, waiting ones stay", () => {
+  const seg = [{ start: 1, end: 5 }];
+  const loaded = normalizeBank({
+    c1: { v1: [
+      { id: "w", label: "waiting", segments: seg, status: "banked" },
+      { id: "m", label: "made", segments: seg, status: "cut" },
+      { id: "p", label: "pub", segments: seg, status: "published" },
+    ] },
+  });
+  assert.deepEqual(clipsFor(loaded, "c1", "v1").map((c) => c.id), ["w"]);
+});

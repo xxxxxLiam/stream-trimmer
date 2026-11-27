@@ -100,7 +100,7 @@ export default function HistoryPanel() {
                     { key: "show", label: SHOW_LABEL, icon: <IconShowFile />, onSelect: () => h.show(e), disabled: !e.path || h.missing[e.id] },
                     { key: "editor", label: "In editor", icon: <IconInEditor />, onSelect: () => h.inEditor(e), disabled: !e.path || h.missing[e.id] },
                     { key: "source", label: "Go to source", icon: <IconJumpToSource />, onSelect: () => h.jump(e), disabled: !h.canJump(e) },
-                    { key: "remove", label: "Remove from history", icon: <IconRemove />, onSelect: () => h.remove(e.id), danger: true },
+                    { key: "remove", label: "Hold to remove from history", icon: <IconRemove />, onSelect: () => h.remove(e.id), danger: true, hold: true },
                   ]}
                 >
                   <div

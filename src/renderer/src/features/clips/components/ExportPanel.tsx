@@ -44,7 +44,7 @@ export default function ExportPanel() {
   const momentNote = useMomentNote();
   const pick = useSelectMoments();
   const [view, setView] = useState<BankView>(DEFAULT_VIEW);
-  const all = [...c.waiting, ...c.made];
+  const all = c.waiting;
   const everyClip = applyView(all, view);
   const topics = [...new Set(all.map((x) => x.category).filter((t): t is string => !!t))];
   const filterPills = [...view.topics, ...view.tiers.map((t) => `T${t}`), ...(view.minRating > 0 ? [`${view.minRating}+`] : [])];
@@ -125,7 +125,7 @@ export default function ExportPanel() {
 
       {c.gate ? (
         <p className="px-[14px] py-[24px] text-center text-body text-fg-dim">{c.gate}</p>
-      ) : c.waiting.length === 0 && c.made.length === 0 ? (
+      ) : c.waiting.length === 0 ? (
         <PanelEmptyNote>
           Nothing waiting. Mark a part and press <KeyChip>{IS_MAC ? "⌘B" : "Ctrl B"}</KeyChip> to save it for later, or paste moments from
           your sheet.
