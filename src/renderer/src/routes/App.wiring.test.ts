@@ -67,7 +67,7 @@ test("F4-1: a failed update download clears the percent; F4-4/List rows: Videos 
   assert.match(hook, /s\.state === "error"\) setDownloading\(null\)/);
   const panel = readFileSync(new URL("../features/workspace/components/VideosPanel.tsx", import.meta.url), "utf8");
   assert.match(panel, /<ActionRow[\s\S]{0,200}actions=\{actions\}/);
-  assert.match(panel, /Mark done[\s\S]{0,400}Open on YouTube[\s\S]{0,400}Remove video/);
+  assert.match(panel, /Mark done[\s\S]{0,400}Open on YouTube[\s\S]{0,400}Hold to remove video/);
   assert.doesNotMatch(panel, /group-hover|Done with this video/);
   const row = readFileSync(new URL("../shared/components/ActionRow.tsx", import.meta.url), "utf8");
   assert.match(row, /h-\[44px\]/);

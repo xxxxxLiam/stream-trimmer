@@ -61,6 +61,8 @@ export function normalizeBank(raw: unknown): BankData {
         if (!c || typeof c !== "object") continue;
         const r = c as Record<string, unknown>;
         const segments = cleanSegments(r.segments);
+        // A made clip lives in History, not the bank. Saves from before that rule still hold cut ones: drop them.
+        if (r.status === "cut" || r.status === "published") continue;
         if (typeof r.id !== "string" || !r.id || !segments.length) continue;
         const clip: BankedClip = {
           id: r.id,

@@ -459,3 +459,11 @@ test("A location: Clip saves to its folder only (no editor project), the menu sa
   assert.match(loc, /Languages/);
   assert.match(readFileSync(new URL("../../settings/components/SettingsDrawer.tsx", import.meta.url), "utf8"), /hasDubTracks\(tracks\)/);
 });
+
+test("Liam 27 Nov: each section's trash sits inside its clip box, so the skipped label cannot cover it", () => {
+  const lane = readFileSync(new URL("../components/ClipsLane.tsx", import.meta.url), "utf8");
+  const trash = lane.slice(lane.indexOf("A trash per section sits INSIDE"), lane.indexOf("Delete section", lane.indexOf("A trash per section sits INSIDE")) + 700);
+  assert.match(trash, /right - 22 - 1/, "flush inside the right edge");
+  assert.doesNotMatch(trash, /right \+ 6/, "never outside the right edge");
+  assert.match(trash, /z-10/, "above the bars");
+});
