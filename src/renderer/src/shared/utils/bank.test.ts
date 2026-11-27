@@ -85,25 +85,22 @@ test("re-pasting the same list changes nothing, by id or by range", () => {
   assert.deepEqual(clipsFor(again.data, C, V), clipsFor(first.data, C, V));
 });
 
-test("a re-paste updates a banked clip but never rewrites a cut one", () => {
+test("a re-paste updates a banked clip; a clip that was made has left the bank", () => {
   const first = importClips({}, C, V, parse("A1 1:00-2:00 old\nA2 3:00-4:00 old"));
   const cut = markCut(first.data, C, V, "A2")!.data;
-  const r = importClips(cut, C, V, parse("A1 1:00-2:30 new [hook]\nA2 9:00-9:30 new"));
+  assert.deepEqual(clipsFor(cut, C, V).map((c) => c.id), ["A1"], "the made clip is gone from the bank");
+  const r = importClips(cut, C, V, parse("A1 1:00-2:30 new [hook]"));
   assert.equal(r.updated, 1);
-  assert.equal(r.skipped, 1);
-  const [a1, a2] = clipsFor(r.data, C, V);
+  const [a1] = clipsFor(r.data, C, V);
   assert.equal(a1.label, "new");
   assert.equal(a1.category, "hook");
   assert.deepEqual(a1.segments, [{ start: 60, end: 150 }]);
-  assert.equal(a2.label, "old");
-  assert.equal(a2.status, "cut");
-  assert.deepEqual(a2.segments, [{ start: 180, end: 240 }]);
 });
 
-test("markCut flips status and returns every range", () => {
+test("markCut takes the clip out of the bank and returns every range", () => {
   const d = seeded();
   const r = markCut(d, C, V, "T1-A02")!;
-  assert.equal(clipsFor(r.data, C, V).find((c) => c.id === "T1-A02")!.status, "cut");
+  assert.equal(clipsFor(r.data, C, V).find((c) => c.id === "T1-A02"), undefined, "a made clip no longer sits in the bank");
   assert.equal(clipsFor(r.data, C, V).find((c) => c.id === "T2-A01")!.status, "banked");
   assert.deepEqual(r.ranges, [
     { start: 120, end: 150 },
@@ -120,7 +117,7 @@ test("applyCut appends all ranges to the campaign usedRanges under the clip id",
     { start: 120, end: 150, clipId: "T1-A02", stamped: true },
     { start: 300, end: 320, clipId: "T1-A02", stamped: true },
   ]);
-  assert.equal(clipsFor(r.data, C, V).find((c) => c.id === "T1-A02")!.status, "cut");
+  assert.equal(clipsFor(r.data, C, V).find((c) => c.id === "T1-A02"), undefined);
   assert.equal(applyCut(seeded(), { ...campaign, id: C }, V, "nope"), null);
 });
 
@@ -202,13 +199,14 @@ test("persistence: a new store over the same storage sees the same bank", () => 
   const a = createBankStore(io);
   let notified = 0;
   a.subscribe(() => notified++);
-  a.importClips(C, V, parse("Hooks:\nT1-A1 1:00-2:00; 5:00-5:30 hi"));
-  a.markCut(C, V, "T1-A1");
+  a.importClips(C, V, parse("Hooks:\nT1-A1 1:00-2:00; 5:00-5:30 hi\nT1-A2 8:00-8:30 other"));
+  a.markCut(C, V, "T1-A2");
   assert.equal(notified, 2);
   const b = createBankStore(io); // "app restarted"
-  const [clip] = clipsFor(b.get(), C, V);
+  const [clip, ...rest] = clipsFor(b.get(), C, V);
+  assert.equal(rest.length, 0, "the made clip stayed gone after a restart");
   assert.equal(clip.id, "T1-A1");
-  assert.equal(clip.status, "cut");
+  assert.equal(clip.status, "banked");
   assert.equal(clip.category, "Hooks");
   assert.equal(clip.tier, "1");
   assert.equal(clip.segments.length, 2);
@@ -257,4 +255,21 @@ test("setClips puts a video's list back as it was, including after its last clip
   assert.deepEqual(gone, {});
   assert.deepEqual(setClips(gone, "C", "V", clipsFor(before, "C", "V")), before);
   assert.deepEqual(setClips(before, "C", "V", []), {});
+});
+
+test("Undo of a made clip puts the moment back where it was, waiting; a clip never cut here is left alone", () => {
+  let disk: unknown = undefined;
+  const store = createBankStore({ load: () => JSON.parse(JSON.stringify(disk ?? {})), save: (d: BankData) => void (disk = JSON.parse(JSON.stringify(d))) });
+  store.importClips(C, V, parse("A1 1:00-2:00 one\nA2 3:00-4:00 two\nA3 5:00-6:00 three"));
+  store.markCut(C, V, "A2");
+  assert.deepEqual(clipsFor(store.get(), C, V).map((c) => c.id), ["A1", "A3"]);
+  store.restoreCut(C, V, "A2");
+  const back = clipsFor(store.get(), C, V);
+  assert.deepEqual(back.map((c) => c.id), ["A1", "A2", "A3"], "same place");
+  assert.equal(back[1].status, "banked");
+  assert.equal(back[1].label, "two");
+  store.restoreCut(C, V, "A2");
+  assert.equal(clipsFor(store.get(), C, V).length, 3, "restoring twice adds nothing");
+  store.restoreCut(C, V, "never-cut");
+  assert.equal(clipsFor(store.get(), C, V).length, 3);
 });

@@ -14,7 +14,7 @@ export const LOCATION_PRESETS = ["B-roll", "Sound effects", "Music", "Reference"
 /** Sound effects is sound; the other presets keep their picture. */
 export const presetSoundOnly = (name: string): boolean => name.trim().toLowerCase() === "sound effects";
 
-/** The folder a location makes inside the folder you choose: "Clipr B-roll". */
+/** The folder a location gets when no folder was chosen: "Clipr B-roll" beside the Clips folder. */
 export function locationFolderName(name: string): string {
   const leaf = safeFolderName(name, "Location");
   return isBrandedName(leaf) ? leaf : `Clipr ${leaf}`;
@@ -94,7 +94,7 @@ export default function SettingsNewLocation(p: SettingsNewLocationProps) {
               Choose
             </button>
           </div>
-          <span className="text-meta text-fg-dim">Clipr makes a folder “{locationFolderName(name.trim() || "Location")}” inside the folder you choose.</span>
+          <span className="text-meta text-fg-dim">Clips for this location go straight into the folder you choose.</span>
         </div>
         <div className="flex flex-col gap-[2px]">
           <SwitchRow label="Sound only" on={sound} onFlip={() => { setSound(!sound); setSoundTouched(true); }} />

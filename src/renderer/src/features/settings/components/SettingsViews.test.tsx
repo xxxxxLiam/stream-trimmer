@@ -306,7 +306,8 @@ test("board 04.6.6: New location has Name, preset chips, Folder with Choose and 
   const h = renderToStaticMarkup(<SettingsNewLocation defaultFolder={(n) => `Downloads/Clipr ${n}`} onChoose={async () => null} onAdd={() => []} onBack={noop} onClose={noop} />);
   for (const preset of ["B-roll", "Sound effects", "Music", "Reference"]) assert.match(h, new RegExp(`>${preset}</button>`));
   assert.match(h, />Choose</);
-  assert.match(h, /Clipr makes a folder “Clipr Location” inside the folder you choose\./);
+  assert.match(h, /Clips for this location go straight into the folder you choose\./);
+  assert.doesNotMatch(h, /makes a folder/);
   assert.match(h, /Saves the sound as M4A, no picture\./);
   assert.match(h, /aria-checked="false"[^>]*aria-label="Sound only"/, "off by default");
   assert.match(h, />Add location</);

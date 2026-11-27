@@ -126,7 +126,7 @@ export function useExportMutations(q: ReturnType<typeof useExportQueries>, s: Ex
       entries: clipGroup(entry, getDownloads()),
       trashFile: window.electronAPI?.undoClip,
       forgetUse,
-      backToWaiting: (c, v, id) => bankStore.setStatus(c, v, id, "banked"),
+      backToWaiting: (c, v, id) => bankStore.restoreCut(c, v, id),
       removeDownload,
     });
     if (!res.ok) s.setNotice(res.error ?? "The clip could not be undone.");
