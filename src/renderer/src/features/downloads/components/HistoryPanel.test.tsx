@@ -16,7 +16,6 @@ test("D2-8: History shows the editor handoff answer for a clip of any campaign",
 });
 
 test("Add to Final Cut (Design, option A): an item in the row's ⋯ on location clips, Select clips with one Ice bar, In Final Cut for 2 seconds", async () => {
-  const { readFileSync } = await import("node:fs");
   const panel = readFileSync("src/renderer/src/features/downloads/components/HistoryPanel.tsx", "utf8");
   assert.match(panel, /key: "finalcut", label: "Add to Final Cut"/);
   assert.match(panel, /fc\.canAdd\(e\)/);
@@ -28,4 +27,12 @@ test("Add to Final Cut (Design, option A): an item in the row's ⋯ on location 
   const hook = readFileSync("src/renderer/src/features/downloads/hooks/useAddToFinalCut.ts", "utf8");
   assert.match(hook, /c\.kind === "location"/);
   assert.match(readFileSync("src/renderer/src/shared/hooks/useFinalCutInstalled.ts", "utf8"), /apps\?\.finalcut/);
+});
+
+test("History, Videos and Export all remove by holding", async () => {
+  const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
+  assert.match(read("./HistoryPanel.tsx"), /Hold to remove from history[^}]*hold: true/);
+  assert.match(read("../../workspace/components/VideosPanel.tsx"), /Hold to remove video[^}]*hold: true/);
+  assert.match(read("../../clips/components/WaitingRow.tsx"), /Hold to remove[^}]*hold: true/);
+  assert.doesNotMatch(read("../../clips/components/ExportPanel.tsx"), /c\.made/);
 });
