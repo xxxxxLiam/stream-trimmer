@@ -9,7 +9,7 @@ export type OfflineRowProps = { name: string; percent: number };
 
 export default function OfflineRow({ name, percent }: OfflineRowProps) {
   return (
-    <div role="group" aria-label={`${name}: No connection.`} className="relative mx-[10px] mb-[6px] mt-[10px] overflow-hidden rounded-control bg-raised px-[10px] py-[9px]">
+    <div role="group" aria-label={`${name}: No connection.`} className="relative mx-[10px] mb-[6px] mt-[10px] flex-none overflow-hidden rounded-control bg-raised px-[10px] py-[9px]">
       <div className="text-body font-medium leading-[normal]">{name}</div>
       <div className="mt-[3px] text-meta leading-[1.45]">
         <span className="text-fg">No connection.</span> <span className="text-fg-dim">It picks up where it stopped when the connection is back.</span>

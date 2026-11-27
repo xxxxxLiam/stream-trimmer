@@ -73,7 +73,7 @@ export default function MakingRow(props: MakingRowProps) {
       <div
         role="progressbar"
         aria-label={`${props.name}, ${preparing ? "preparing" : makingText(props.percent, props.phase)}`}
-        className="relative mx-[10px] mb-[6px] mt-[10px] flex items-center gap-[8px] rounded-control bg-raised py-[9px] pl-[10px] pr-[6px]"
+        className="relative mx-[10px] mb-[6px] mt-[10px] flex flex-none items-center gap-[8px] rounded-control bg-raised py-[9px] pl-[10px] pr-[6px]"
       >
         <div className="min-w-0">
           <div className={NAME}>{props.name}</div>
@@ -108,7 +108,7 @@ export default function MakingRow(props: MakingRowProps) {
     );
   }
   return (
-    <div className="relative mx-[10px] mb-[6px] mt-[10px] flex items-center gap-[8px] overflow-hidden rounded-control border border-hairlineStrong bg-raised py-[8px] pl-[10px] pr-[6px]">
+    <div className="relative mx-[10px] mb-[6px] mt-[10px] flex flex-none items-center gap-[8px] overflow-hidden rounded-control border border-hairlineStrong bg-raised py-[8px] pl-[10px] pr-[6px]">
       <div className="min-w-0">
         <div className={NAME}>{props.name}</div>
         <div className={SUB} role="status">
