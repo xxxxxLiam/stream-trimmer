@@ -59,4 +59,5 @@ export function setupAutoUpdater() {
   controller.check().catch((err: unknown) => {
     logger.log("updater", `initial check failed: ${logger.describe(err)}`);
   });
+  controller.startRechecks();
 }
