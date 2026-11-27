@@ -32,6 +32,8 @@ export interface UpdateControllerDeps {
   /** Injectable for tests. */
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
+  /** Repeats `fn` every `ms`; injectable for tests. Default: setInterval, unref'd so it never keeps the app alive. */
+  setRepeat?: (fn: () => void, ms: number) => unknown;
   downloadUrl: (version: string) => string;
   releasesUrl: () => string;
   log: (message: string) => void;
@@ -39,6 +41,9 @@ export interface UpdateControllerDeps {
 
 /** How long the clips must stay finished before a waiting restart goes ahead, so a queue is not cut between clips. */
 export const RESTART_IDLE_MS = 2000;
+
+/** How often a running copy asks again whether a newer version exists. */
+export const RECHECK_MS = 4 * 60 * 60 * 1000;
 
 export function createUpdateController(d: UpdateControllerDeps) {
   const { updater } = d;
@@ -138,6 +143,23 @@ export function createUpdateController(d: UpdateControllerDeps) {
     pendingReady: () => ready,
     /** Quiet check; downloads only when the switch is on. */
     check: () => updater.checkForUpdates(),
+    /**
+     * Asks again every RECHECK_MS while the app stays open, so a release published after launch (or a first check that
+     * failed offline) still reaches a copy that is never restarted. Skipped once an update is ready.
+     */
+    startRechecks() {
+      const repeat =
+        d.setRepeat ??
+        ((fn: () => void, ms: number) => {
+          const h = setInterval(fn, ms);
+          (h as { unref?: () => void }).unref?.();
+          return h;
+        });
+      repeat(() => {
+        if (ready) return;
+        updater.checkForUpdates().catch((err: unknown) => d.log(`recheck failed: ${err instanceof Error ? err.message : String(err)}`));
+      }, RECHECK_MS);
+    },
     /** The switch changed: apply it, and fetch now if it was just turned on. */
     onAutoUpdateChanged() {
       applyPolicy();
