@@ -90,3 +90,11 @@ test("R2: the top bar sits above the workspace, so the link field's panel is not
   const field = readFileSync(new URL("../features/workspace/components/TopBarLinkField.tsx", import.meta.url), "utf8");
   assert.match(field, /role="status"[\s\S]{0,80}z-30|z-30[\s\S]{0,120}role="status"/);
 });
+
+test("Liam 28 Nov: Symbols and phrases has an icon among the top-right icons", () => {
+  const bar = readFileSync(new URL("../modules/layout/components/TopBar.tsx", import.meta.url), "utf8");
+  assert.match(bar, /aria-label="Symbols and phrases"[\s\S]{0,200}onClick=\{onOpenSymbols\}/);
+  assert.ok(bar.indexOf('aria-label="Symbols and phrases"') < bar.indexOf("<HelpButton"), "sits left of Help and Settings");
+  const app = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+  assert.match(app, /onOpenSymbols=\{\(\) => \(window\.electronAPI\?\.openSymbols/);
+});

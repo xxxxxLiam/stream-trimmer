@@ -9,7 +9,7 @@
  *   zooms) and every control is no-drag. On Linux the real window keeps its own frame.
  */
 import type { ReactNode } from "react";
-import { House } from "react-bootstrap-icons";
+import { House, Type } from "react-bootstrap-icons";
 import { useWorkspace } from "../../../features/workspace/hooks/WorkspaceContext";
 import { useClipperContext } from "../../clipper/hooks/ClipperContext";
 import { useCampaign } from "../../../features/campaigns/hooks/CampaignContext";
@@ -32,6 +32,8 @@ export type TopBarProps = {
   onToggleHelp: () => void;
   settingsOpen: boolean;
   onToggleSettings: () => void;
+  /** Open the Symbols and phrases window (its icon sits among the top-right icons). */
+  onOpenSymbols?: () => void;
   /** Body of the campaign popover. */
   campaignMenu?: ReactNode;
   /** Owner build: the Channel data row of the Panels menu. Empty in the public build. */
@@ -43,7 +45,7 @@ export type TopBarProps = {
 /** The layout is fixed (board v149): the Panels icon stays in the code, hidden. */
 const SHOW_PANELS_MENU = false;
 
-export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleSettings, campaignMenu, panelsMenuExtras, channel }: TopBarProps) {
+export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleSettings, onOpenSymbols, campaignMenu, panelsMenuExtras, channel }: TopBarProps) {
   const { info } = useClipperContext();
   const { active } = useCampaign();
   const now = useToday();
@@ -79,6 +81,11 @@ export default function TopBar({ helpOpen, onToggleHelp, settingsOpen, onToggleS
         <UpdatePill />
         {CHANNEL_DATA_BUILT && channel ? <ChannelButton open={channel.open} onToggle={channel.onToggle} /> : null}
         {SHOW_PANELS_MENU ? <PanelsMenu extraItems={panelsMenuExtras} /> : null}
+        {onOpenSymbols ? (
+          <button type="button" id="ui-symbols" className="icon-btn" aria-label="Symbols and phrases" title="Symbols and phrases (⌘;)" onClick={onOpenSymbols}>
+            <Type aria-hidden="true" size={16} />
+          </button>
+        ) : null}
         <HelpButton open={helpOpen} onToggle={onToggleHelp} />
         <button
           type="button"
