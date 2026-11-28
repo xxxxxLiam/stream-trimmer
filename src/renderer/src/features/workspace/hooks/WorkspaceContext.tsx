@@ -46,6 +46,8 @@ export type WorkspaceTab = {
   campaignId?: string;
   /** Folded into "Done" in the Videos list. Nothing is deleted. */
   done?: boolean;
+  /** When the video was added to the list (ms), for the Videos list's latest-activity order. */
+  addedAt?: number;
   /** The In and Out picked by hand and not yet locked in, as the timestamps the fields hold (B-11). */
   picked?: { start: string; end: string };
 };
@@ -60,6 +62,7 @@ export function cleanTab(t: WorkspaceTab): WorkspaceTab {
   if (typeof t.url === "string" && t.url) out.url = t.url;
   if (typeof t.campaignId === "string" && t.campaignId) out.campaignId = t.campaignId;
   if (t.done === true) out.done = true;
+  if (typeof t.addedAt === "number" && Number.isFinite(t.addedAt) && t.addedAt > 0) out.addedAt = t.addedAt;
   const pk = t.picked;
   if (pk && typeof pk.start === "string" && typeof pk.end === "string" && (pk.start.trim() || pk.end.trim())) {
     out.picked = { start: pk.start.trim(), end: pk.end.trim() };
@@ -116,6 +119,7 @@ export function applyTabWork(
       segments: work.segments as Segment[],
       campaignId: t.campaignId,
       done: t.done,
+      addedAt: t.addedAt,
       picked: work.picked,
     });
   });
@@ -248,7 +252,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const link = typeof url === "string" ? url.trim() : "";
     setCameFrom((prev) => ({ ...prev, [id]: activeRef.current }));
     if (link) setTrying((prev) => ({ ...prev, [id]: true }));
-    setTabs((prev) => [...prev, link ? { id, name: "", url: link } : { id, name: "" }]);
+    setTabs((prev) => [...prev, link ? { id, name: "", url: link, addedAt: Date.now() } : { id, name: "", addedAt: Date.now() }]);
     if (link) {
       // The new video is selected at once and says it is opening; a failure goes back to the video you were on
       // and never leaves the workspace.

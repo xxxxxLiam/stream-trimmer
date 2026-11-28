@@ -14,7 +14,8 @@ import { useCampaign } from "../../campaigns/hooks/CampaignContext";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
 import { doneUndoStore } from "../utils/doneUndoStore";
 import { useMakingClipId } from "../../../shared/utils/clipNameStore";
-import { matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
+import { activityStore } from "../../../shared/utils/videoActivity";
+import { byLatestActivity, matchesVideoQuery, splitVideos, waitingIn } from "../utils/videoList";
 
 export type VideoRow = {
   id: string;
@@ -40,6 +41,7 @@ export function useVideosController() {
   const { campaigns } = useCampaign();
   const makingId = useMakingClipId();
   const bank = useSyncExternalStore(bankStore.subscribe, bankStore.get, bankStore.get);
+  const activity = useSyncExternalStore(activityStore.subscribe, activityStore.get, activityStore.get);
   const [pills, setPills] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [doneOpen, setDoneOpen] = useState(false);
@@ -66,8 +68,8 @@ export function useVideosController() {
   const rows = useMemo(() => {
     const { open, done } = splitVideos(ws.tabs);
     const keep = (r: VideoRow) => matchesVideoQuery(r.title, r.campaign, terms);
-    return { open: open.map(toRow).filter(keep), done: done.map(toRow).filter(keep) };
-  }, [ws.tabs, toRow, terms]);
+    return { open: byLatestActivity(open, (id) => activity[id] ?? 0).map(toRow).filter(keep), done: done.map(toRow).filter(keep) };
+  }, [ws.tabs, toRow, terms, activity]);
 
   const doneVideo = useCallback(
     (row: VideoRow) => {
