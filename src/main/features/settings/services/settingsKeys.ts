@@ -59,6 +59,7 @@ export const PAGE_KEYS: ReadonlySet<string> = new Set([
   "clipper.tips.seen",
   "clipper.transcriptLane",
   "clipper.audioLanes",
+  "clipper.videoActivity",
   "clipper.workspaces",
 ]);
 

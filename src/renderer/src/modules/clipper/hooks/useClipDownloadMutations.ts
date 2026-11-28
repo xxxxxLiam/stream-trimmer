@@ -9,6 +9,7 @@ import { formatTimestamp, extractVideoId, normalizeYouTubeUrl, parseJson, apiUrl
 import { type FailureDiagnostics } from "../../../shared/utils/diagnostics";
 import { connectionNow, cookiePayload, markDisconnected, requestedQuality, useYouTubeConnection, whenSignInSettled } from "../../../shared/utils/youtubeConnection";
 import { addDownload } from "../../../shared/utils/downloads";
+import { activityStore } from "../../../shared/utils/videoActivity";
 import { FOLDER_FAILURE, folderProblem } from "../../../shared/utils/folderCheck";
 import { ROOM_REASON, roomProblem } from "../../../shared/utils/freeSpace";
 import { type DownloadFailureInfo, type DownloadOptions } from "../utils/clipperTypes";
@@ -336,6 +337,7 @@ export function useClipDownloadMutations({
       }
       setDownloadProgress(100);
       setDownloadPhase("done");
+      activityStore.touch(extractVideoId(url));
       saved = true;
     } catch (e) {
       if (isQuietCancel(e)) {

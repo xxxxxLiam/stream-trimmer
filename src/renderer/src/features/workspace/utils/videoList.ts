@@ -31,6 +31,21 @@ export function splitVideos(tabs: readonly WorkspaceTab[]): { open: WorkspaceTab
   return { open: tabs.filter((t) => !t.done), done: tabs.filter((t) => t.done) };
 }
 
+/**
+ * Latest activity first (Liam, 28 Nov): a video added to the list or clipped from goes to the top. A video's time is the
+ * later of when it was added and when it was last clipped from; ties and videos with no time keep the order they had.
+ */
+export function byLatestActivity<T extends { addedAt?: number; url?: string }>(
+  tabs: readonly T[],
+  clippedAt: (videoId: string) => number,
+): T[] {
+  const at = (t: T) => {
+    const id = t.url ? extractVideoId(t.url) : null;
+    return Math.max(t.addedAt ?? 0, id ? clippedAt(id) : 0);
+  };
+  return tabs.map((t, i) => ({ t, i, a: at(t) })).sort((x, y) => y.a - x.a || x.i - y.i).map((x) => x.t);
+}
+
 /** The open video after `id`, wrapping round; null when `id` is the only open one. */
 export function nextOpenId(tabs: readonly WorkspaceTab[], id: string): string | null {
   const at = tabs.findIndex((t) => t.id === id);

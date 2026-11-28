@@ -122,3 +122,16 @@ test("resolveLink: Enter in the top bar field opens a video link, reuses an open
   const shared = resolveLink("Watch this https://youtu.be/bbbbbbbbbbb – wow", tabs);
   assert.equal(shared.kind === "open" && shared.target, "https://youtu.be/bbbbbbbbbbb");
 });
+
+test("Liam 28 Nov: the Videos list sorts by latest activity, newest first", async () => {
+  const { byLatestActivity } = await import("./videoList");
+  const A = { id: "a", url: "https://youtu.be/aaaaaaaaaaa", addedAt: 100 };
+  const B = { id: "b", url: "https://youtu.be/bbbbbbbbbbb", addedAt: 200 };
+  const C = { id: "c", url: "https://youtu.be/ccccccccccc" }; // from an older save: no time
+  const D = { id: "d", url: "https://youtu.be/ddddddddddd" };
+  const none = () => 0;
+  assert.deepEqual(byLatestActivity([A, B, C, D], none).map((t) => t.id), ["b", "a", "c", "d"], "added later goes higher; no time keeps its order below");
+  assert.deepEqual(byLatestActivity([A, B, C, D], (v) => (v === "aaaaaaaaaaa" ? 300 : 0)).map((t) => t.id), ["a", "b", "c", "d"], "clipped from: to the top");
+  assert.deepEqual(byLatestActivity([A, B, C, D], (v) => (v === "ddddddddddd" ? 999 : 0)).map((t) => t.id), ["d", "b", "a", "c"], "an old unstamped video clipped from jumps up");
+  assert.deepEqual(byLatestActivity([A, B], (v) => (v === "aaaaaaaaaaa" ? 50 : 0)).map((t) => t.id), ["b", "a"], "an older clip does not lower a later add");
+});
