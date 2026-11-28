@@ -731,6 +731,7 @@ function Layout({ active }: { active: boolean }) {
             setHelpOpen(false);
             setSettingsOpen((v) => !v);
           }}
+          onOpenSymbols={() => (window.electronAPI?.openSymbols ? void window.electronAPI.openSymbols() : setSymbolsOpen(true))}
           panelsMenuExtras={overlayItems}
           channel={
             CHANNEL_DATA_BUILT && channelAvailable
