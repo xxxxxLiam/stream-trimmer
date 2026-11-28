@@ -154,3 +154,16 @@ test("one picked range plays alone: play starts at its start, runs to its end, t
   assert.deepEqual(joinedStep(one, 131, true), { kind: "seek", to: 100 }, "looping: back to the start");
   assert.equal(joinedStep([], 50, false), null);
 });
+
+test("Liam 28 Nov: sections listed out of video order still play each one; the playhead in the earlier one is not thrown to the later", () => {
+  // The second section was marked first, so it leads the list although it sits later in the video.
+  const out = [{ start: 400, end: 420 }, { start: 100, end: 120 }];
+  assert.equal(joinedStep(out, 105, true), null, "inside the early section it plays on");
+  assert.equal(joinedStep(out, 105, false), null);
+  assert.equal(joinedStep(out, 410, false), null, "inside the later section too");
+  assert.deepEqual(joinedStep(out, 420 - SECTION_LEAD / 2, false), { kind: "seek", to: 100 }, "list order: after the first listed comes the next listed");
+  assert.deepEqual(joinedStep(out, 120 - SECTION_LEAD / 2, false), { kind: "stop", at: 120 });
+  assert.deepEqual(joinedStep(out, 120 - SECTION_LEAD / 2, true), { kind: "seek", to: 400 });
+  assert.deepEqual(joinedStep(out, 250, false), { kind: "seek", to: 400 }, "a gap goes on to the next section ahead in the video");
+  assert.deepEqual(joinedStep(out, 50, false), { kind: "seek", to: 100 });
+});

@@ -83,19 +83,20 @@ export function joinedStep(
   loop: boolean,
 ): { kind: "seek"; to: number } | { kind: "stop"; at: number } | null {
   if (sections.length < 1) return null;
+  // The list is the clip's play order, which need not be the order in the video: a section marked later can
+  // sit earlier in the source. Where the playhead is decides first (inside a section it plays on), then the list.
   for (let i = 0; i < sections.length; i++) {
     const s = sections[i];
-    if (t < s.start) return { kind: "seek", to: s.start };
+    if (t < s.start || t >= s.end) continue;
     if (t < s.end - SECTION_LEAD) return null;
-    if (t < s.end) {
-      const next = sections[i + 1];
-      if (next) return { kind: "seek", to: next.start };
-      return loop ? { kind: "seek", to: sections[0].start } : { kind: "stop", at: s.end };
-    }
-    // At or past this section's end: the next one decides (or, after the last, loop or stop).
-    if (i === sections.length - 1) return loop ? { kind: "seek", to: sections[0].start } : { kind: "stop", at: s.end };
+    const next = sections[i + 1];
+    if (next) return { kind: "seek", to: next.start };
+    return loop ? { kind: "seek", to: sections[0].start } : { kind: "stop", at: s.end };
   }
-  return null;
+  // In a gap, before the first or past the last: on to the next section ahead in the video, else loop or stop.
+  const ahead = sections.filter((s) => s.start > t).sort((a, b) => a.start - b.start)[0];
+  if (ahead) return { kind: "seek", to: ahead.start };
+  return loop ? { kind: "seek", to: sections[0].start } : { kind: "stop", at: Math.max(...sections.map((s) => s.end)) };
 }
 
 export type TransportButton = "play" | "back" | "forward" | "loop" | "speed" | "volume" | "fullscreen";
